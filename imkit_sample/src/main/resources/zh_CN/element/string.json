@@ -1,0 +1,88 @@
+{
+  "string": [
+    {
+      "name": "ability_label",
+      "value": "云信IM"
+    },
+    {
+      "name": "login",
+      "value": "登录"
+    },
+    {
+      "name": "tab_conversation",
+      "value": "会话"
+    },
+    {
+      "name": "tab_contact",
+      "value": "通讯录"
+    },
+    {
+      "name": "tab_mine",
+      "value": "我的"
+    },
+    {
+      "name": "mine_collection",
+      "value": "收藏"
+    },
+    {
+      "name": "mine_about",
+      "value": "关于云信"
+    },
+    {
+      "name": "mine_setting",
+      "value": "设置"
+    },
+    {
+      "name": "mine_setting_",
+      "value": "设置"
+    },
+    {
+      "name": "mine_setting_earpiece",
+      "value": "听筒模式"
+    },
+    {
+      "name": "mine_setting_show_remind",
+      "value": "新消息提醒"
+    },
+    {
+      "name": "mine_setting_show_remind_detail",
+      "value": "通知栏显示消息详情"
+    },
+    {
+      "name": "mine_setting_read",
+      "value": "消息已读未读功能"
+    },
+    {
+      "name": "mine_setting_logout",
+      "value": "退出登录"
+    },
+    {
+      "name": "mine_setting_logout_confirm",
+      "value": "确认注销当前登录账号？"
+    },
+    {
+      "name": "mine_setting_logout_yes",
+      "value": "是"
+    },
+    {
+      "name": "mine_setting_logout_no",
+      "value": "否"
+    },
+    {
+      "name": "mine_about_logo",
+      "value": "网易云信"
+    },
+    {
+      "name": "mine_about_uikit_version",
+      "value": "版本号"
+    },
+    {
+      "name": "mine_about_nim_version",
+      "value": "NIM 版本"
+    },
+    {
+      "name": "mine_about_introduce",
+      "value": "产品介绍"
+    }
+  ]
+}

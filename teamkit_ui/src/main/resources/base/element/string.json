@@ -1,0 +1,88 @@
+{
+  "string": [
+    {
+      "name": "page_show",
+      "value": "page from package"
+    },
+    {
+      "name": "team_member",
+      "value": "群成员"
+    },
+    {
+      "name": "team_nick",
+      "value": "我在群里的昵称"
+    },
+    {
+      "name": "team_mute",
+      "value": "群禁言"
+    },
+    {
+      "name": "team_dismiss",
+      "value": "解散群聊"
+    },
+    {
+      "name": "team_left",
+      "value": "退出群聊"
+    },
+    {
+      "name": "team_group_left",
+      "value": "退出讨论组"
+    },
+    {
+      "name": "team_setting",
+      "value": "设置"
+    },
+    {
+      "name": "team_info",
+      "value": "群信息"
+    },
+    {
+      "name": "team_avatar",
+      "value": "群头像"
+    },
+    {
+      "name": "team_name",
+      "value": "群名称"
+    },
+    {
+      "name": "team_des",
+      "value": "群介绍"
+    },
+    {
+      "name": "team_edit_avatar",
+      "value": "修改头像"
+    },
+    {
+      "name": "team_default_avatar_selector",
+      "value": "选择默认图标"
+    },
+    {
+      "name": "team_owner",
+      "value": "群主"
+    },
+    {
+      "name": "team_manage",
+      "value": "群管理"
+    },
+    {
+      "name": "team_owner_and_manager",
+      "value": "群主和管理员"
+    },
+    {
+      "name": "team_all_member",
+      "value": "所有人"
+    },
+    {
+      "name": "team_edit_team_info",
+      "value": "谁可以编辑群信息"
+    },
+    {
+      "name": "team_add_team_member",
+      "value": "谁可以添加群成员"
+    },
+    {
+      "name": "team_group_member",
+      "value": "讨论组成员"
+    }
+  ]
+}

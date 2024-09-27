@@ -1,0 +1,180 @@
+{
+  "string": [
+    {
+      "name": "contact_title",
+      "value": "通讯录"
+    },
+    {
+      "name": "contact_validation_message",
+      "value": "验证消息"
+    },
+    {
+      "name": "contact_blocklist",
+      "value": "黑名单"
+    },
+    {
+      "name": "contact_my_teams",
+      "value": "我的群聊"
+    },
+    {
+      "name": "contact_clean",
+      "value": "清空"
+    },
+    {
+      "name": "contact_blockList_tip",
+      "value": "你不会收到列表中任何联系人的消息"
+    },
+    {
+      "name": "contact_blockList_relieve",
+      "value": "解除"
+    },
+    {
+      "name": "contact_validation_accept",
+      "value": "同意"
+    },
+    {
+      "name": "contact_validation_accepted",
+      "value": "已同意"
+    },
+    {
+      "name": "contact_validation_refuse",
+      "value": "拒绝"
+    },
+    {
+      "name": "contact_validation_refused",
+      "value": "已拒绝"
+    },
+    {
+      "name": "contact_validation_expired",
+      "value": "已过期"
+    },
+    {
+      "name": "contact_validation_add_me",
+      "value": "好友申请"
+    },
+    {
+      "name": "contact_validation_accepted_me",
+      "value": "同意了你的好友请求"
+    },
+    {
+      "name": "contact_validation_refused_me",
+      "value": "拒绝了你的好友请求"
+    },
+    {
+      "name": "person_info_nick",
+      "value": "昵称"
+    },
+    {
+      "name": "person_info_gender",
+      "value": "性别"
+    },
+    {
+      "name": "person_info_birthday",
+      "value": "生日"
+    },
+    {
+      "name": "person_info_mobile",
+      "value": "手机"
+    },
+    {
+      "name": "person_info_email",
+      "value": "邮箱"
+    },
+    {
+      "name": "person_info_sign",
+      "value": "个性签名"
+    },
+    {
+      "name": "person_info_alias",
+      "value": "备注名"
+    },
+    {
+      "name": "person_gender_unknown",
+      "value": "未知"
+    },
+    {
+      "name": "person_gender_male",
+      "value": "男"
+    },
+    {
+      "name": "person_gender_female",
+      "value": "女"
+    },
+    {
+      "name": "person_setting_remind",
+      "value": "消息提醒"
+    },
+    {
+      "name": "person_setting_add_block",
+      "value": "加入黑名单"
+    },
+    {
+      "name": "person_info_add",
+      "value": "添加好友"
+    },
+    {
+      "name": "person_info_add_tip",
+      "value": "好友申请已发送"
+    },
+    {
+      "name": "person_info_chat",
+      "value": "聊天"
+    },
+    {
+      "name": "person_info_delete",
+      "value": "删除好友"
+    },
+    {
+      "name": "person_info_delete_tip",
+      "value": "将联系人“%s”删除"
+    },
+    {
+      "name": "search_result_friend",
+      "value": "好友"
+    },
+    {
+      "name": "search_result_discussion",
+      "value": "讨论组"
+    },
+    {
+      "name": "search_result_senior",
+      "value": "高级群"
+    },
+    {
+      "name": "mine_info",
+      "value": "个人信息"
+    },
+    {
+      "name": "mine_info_avatar",
+      "value": "头像"
+    },
+    {
+      "name": "person_select",
+      "value": "选择"
+    },
+    {
+      "name": "validation_empty",
+      "value": "暂无验证消息"
+    },
+    {
+      "name": "avatar_uploading",
+      "value": "头像上传中%d%"
+    },
+    {
+      "name": "select_limit_tip",
+      "value": "最多选择%d个好友"
+    },
+    {
+      "name": "select_none_tip",
+      "value": "请选择联系人"
+    },
+    {
+      "name": "copy_success",
+      "value": "复制成功"
+    },
+    {
+      "name": "let_us_chat",
+      "value": "我已经同意了你的申请，现在开始聊天吧~"
+    }
+  ]
+}

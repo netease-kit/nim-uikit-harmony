@@ -1,0 +1,25 @@
+{
+  "name": "imkit_sample",
+  "version": "1.0.0",
+  "description": "Please describe the basic information.",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "@nimkit/conversationkit_ui": "file:../conversationkit_ui",
+    "@nimkit/contactkit_ui": "file:../contactkit_ui",
+    "@nimkit/teamkit_ui": "file:../teamkit_ui",
+    "@nimkit/chatkit": "file:../chatkit",
+    "@nimkit/chatkit_ui": "file:../chatkit_ui",
+    "@nimkit/common": "file:../common",
+    "@nimkit/corekit": "file:../corekit",
+    "@nimsdk/conversation": "file:../libs/conversation.har",
+    "@nimsdk/conversationgroup": "file:../libs/conversationgroup.har",
+    "@nimsdk/message": "file:../libs/message.har",
+    "@nimsdk/team": "file:../libs/team.har",
+    "@nimsdk/user": "file:../libs/user.har",
+    "@nimsdk/friend": "file:../libs/friend.har",
+    "@nimsdk/nim": "file:../libs/nim.har",
+    "@nimsdk/base": "file:../libs/base.har"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "module": {
+    "routerMap": "$profile:route_map",
+    "name": "common",
+    "type": "har",
+    "deviceTypes": [
+      "phone",
+      "tablet",
+      "2in1"
+    ]
+  }
+}

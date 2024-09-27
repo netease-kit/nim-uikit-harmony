@@ -1,0 +1,16 @@
+<?xml version="1.0" standalone="no"?><!--
+  - Copyright (c) 2022 NetEase, Inc. All rights reserved.
+  - Use of this source code is governed by a MIT license that can be
+  - found in the LICENSE file.
+  -
+  -->
+
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg t="1726822847451" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"
+     p-id="25072"
+     width="64" height="64">
+    <path d="M748 183.5V0H96v1024h836V183.5z" fill="#92A8C1" p-id="25073"></path>
+    <path d="M932 184H748V0" fill="#B5BDC6" p-id="25074"></path>
+    <path d="M387.4 321.8h249.8v61.9H387.4v-61.9z m92.8 27.9h64.2v312.9h-64.2V349.7z" fill="#FFFFFF"
+          p-id="25075"></path>
+</svg>

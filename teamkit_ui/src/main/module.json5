@@ -1,0 +1,12 @@
+{
+  "module": {
+    "routerMap": "$profile:route_map",
+    "name": "teamkit_ui",
+    "type": "har",
+    "deviceTypes": [
+      "default",
+      "tablet",
+      "2in1"
+    ]
+  }
+}

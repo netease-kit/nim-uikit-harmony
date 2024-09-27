@@ -1,0 +1,196 @@
+{
+  "string": [
+    {
+      "name": "p2p_chat_default_title",
+      "value": "Message"
+    },
+    {
+      "name": "chat_edit_take_picture",
+      "value": "Photo"
+    },
+    {
+      "name": "chat_edit_toke_video",
+      "value": "Video"
+    },
+    {
+      "name": "chat_media_permission_name",
+      "value": "YunXin"
+    },
+    {
+      "name": "chat_team_notify_invite_title",
+      "value": "invite"
+    },
+    {
+      "name": "chat_team_notify_invite_join",
+      "value": " Enter Group"
+    },
+    {
+      "name": "chat_team_notify_kick_title",
+      "value": " Removed from the group"
+    },
+    {
+      "name": "chat_team_notify_leave_title",
+      "value": " Left Group"
+    },
+    {
+      "name": "chat_team_notify_dismiss_title",
+      "value": " Dissolved Group"
+    },
+    {
+      "name": "null_message_not_support",
+      "value": "Empty messages are not allowed to be sent"
+    },
+    {
+      "name": "chat_send",
+      "value": "Send"
+    },
+    {
+      "name": "chat_send_tips",
+      "value": "Send to  %s"
+    },
+    {
+      "name": "chat_audio_tips",
+      "value": "Hold to Talk"
+    },
+    {
+      "name": "chat_camera_take",
+      "value": "Camera"
+    },
+    {
+      "name": "chat_send_file",
+      "value": "File"
+    },
+    {
+      "name": "chat_operation_copy",
+      "value": "copy"
+    },
+    {
+      "name": "chat_operation_delete",
+      "value": "delete"
+    },
+    {
+      "name": "chat_operation_undo",
+      "value": "Recall"
+    },
+    {
+      "name": "chat_msg_undo_tips",
+      "value": "This message has been recalled"
+    },
+    {
+      "name": "chat_msg_delete_dialog_title",
+      "value": "Delete"
+    },
+    {
+      "name": "chat_msg_delete_dialog_desc",
+      "value": "Delete Message？"
+    },
+    {
+      "name": "chat_msg_revoke_dialog_title",
+      "value": "Recall"
+    },
+    {
+      "name": "chat_msg_revoke_dialog_desc",
+      "value": "recall message"
+    },
+    {
+      "name": "chat_msg_dialog_cancel",
+      "value": "Cancel"
+    },
+    {
+      "name": "chat_msg_dialog_sure",
+      "value": "Sure"
+    },
+    {
+      "name": "chat_msg_call_canceled",
+      "value": "Canceled"
+    },
+    {
+      "name": "chat_msg_call_refused",
+      "value": "Refused"
+    },
+    {
+      "name": "chat_msg_call_timeout",
+      "value": "Time Out"
+    },
+    {
+      "name": "chat_msg_call_busy",
+      "value": "Busy"
+    },
+    {
+      "name": "chat_msg_call_completed",
+      "value": "Call "
+    },
+    {
+      "name": "chat_msg_unknown_type",
+      "value": "unkown message"
+    },
+    {
+      "name": "chat_team_error_tip_content",
+      "value": "You have been removed from the group chat or the group chat has been dissolved."
+    },
+    {
+      "name": "chat_setting",
+      "value": "Settings"
+    },
+    {
+      "name": "chat_team_notify_current_user_name",
+      "value": "You"
+    },
+    {
+      "name": "chat_team_name_update",
+      "value": "Named as "
+    },
+    {
+      "name": "chat_team_avatar_update",
+      "value": "Group avatar has been updated"
+    },
+    {
+      "name": "chat_team_extension_update",
+      "value": "Group Extension update as"
+    },
+    {
+      "name": "chat_team_intro_update",
+      "value": "Group introduction update as"
+    },
+    {
+      "name": "chat_team_notice_update",
+      "value": "Modified group announcement"
+    },
+    {
+      "name": "chat_team_verify_update",
+      "value": "permissions updated to"
+    },
+    {
+      "name": "chat_team_invitation_permission_update",
+      "value": "Group inviting permission has been updated to"
+    },
+    {
+      "name": "chat_team_permission_all",
+      "value": "everyone"
+    },
+    {
+      "name": "chat_team_permission_manager",
+      "value": "admin only"
+    },
+    {
+      "name": "chat_team_modify_resource_permission_update",
+      "value": "Group setting permission has been updated to"
+    },
+    {
+      "name": "chat_team_cancel_all_mute",
+      "value": "Unmute all"
+    },
+    {
+      "name": "chat_team_full_mute",
+      "value": "Mute everyone"
+    },
+    {
+      "name": "chat_permission_camera_desc",
+      "value": "Used to send picture or video message"
+    },
+    {
+      "name": "chat_permission_micro_phone_desc",
+      "value": "Used to send audio message"
+    }
+  ]
+}

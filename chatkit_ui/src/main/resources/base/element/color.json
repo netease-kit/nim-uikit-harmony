@@ -1,0 +1,40 @@
+{
+  "color": [
+    {
+      "name": "color_chat_title",
+      "value": "#333333"
+    },
+    {
+      "name": "color_chat_sub_title",
+      "value": "#666666"
+    },
+    {
+      "name": "color_chat_desc",
+      "value": "#999999"
+    },
+    {
+      "name": "chat_input_background",
+      "value": "#E9EFF5"
+    },
+    {
+      "name": "color_chat_send",
+      "value": "#337EFF"
+    },
+    {
+      "name": "color_chat_operation_item_text",
+      "value": "#333333"
+    },
+    {
+      "name": "color_chat_send_message_bg",
+      "value": "#D6E5F6"
+    },
+    {
+      "name": "color_chat_receive_message_bg",
+      "value": "#E8EAED"
+    },
+    {
+      "name": "color_chat_converse_bg",
+      "value": "#50000000"
+    }
+  ]
+}
