@@ -1,0 +1,44 @@
+{
+  "routerMap": [
+    {
+      "name": "SettingPage",
+      "pageSourceFile": "src/main/ets/Mine/SettingPage.ets",
+      "buildFunction": "SettingPageBuilder",
+      "data": {
+        "description": "this is setting page"
+      }
+    },
+    {
+      "name": "AboutPage",
+      "pageSourceFile": "src/main/ets/Mine/AboutPage.ets",
+      "buildFunction": "AboutPageBuilder",
+      "data": {
+        "description": "this is about page"
+      }
+    },
+    {
+      "name": "IntroducePage",
+      "pageSourceFile": "src/main/ets/Mine/IntroducePage.ets",
+      "buildFunction": "IntroducePageBuilder",
+      "data": {
+        "description": "this is introduce page"
+      }
+    },
+    {
+      "name": "MinePage",
+      "pageSourceFile": "src/main/ets/Mine/MinePage.ets",
+      "buildFunction": "MinePageBuilder",
+      "data": {
+        "description": "this is mine page"
+      }
+    },
+    {
+      "name": "MessageRemindPage",
+      "pageSourceFile": "src/main/ets/Mine/MessageRemindPage.ets",
+      "buildFunction": "MessageRemindPageBuilder",
+      "data": {
+        "description": "this is message remind page"
+      }
+    }
+  ]
+}

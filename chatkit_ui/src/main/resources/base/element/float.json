@@ -1,0 +1,20 @@
+{
+  "float": [
+    {
+      "name": "chat_title_text_font_size",
+      "value": "16vp"
+    },
+    {
+      "name": "chat_subtitle_text_font_size",
+      "value": "14vp"
+    },
+    {
+      "name": "chat_desc_text_font_size",
+      "value": "12vp"
+    },
+    {
+      "name": "chat_message_text_font_size",
+      "value": "14vp"
+    }
+  ]
+}

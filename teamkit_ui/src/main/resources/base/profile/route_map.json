@@ -1,0 +1,44 @@
+{
+  "routerMap": [
+    {
+      "name": "TeamSettingPage",
+      "pageSourceFile": "src/main/ets/pages/TeamSettingPage.ets",
+      "buildFunction": "TeamSettingPageBuilder",
+      "data": {
+        "description": "this is team setting page"
+      }
+    },
+    {
+      "name": "TeamInfoPage",
+      "pageSourceFile": "src/main/ets/pages/TeamInfoPage.ets",
+      "buildFunction": "TeamInfoPageBuilder",
+      "data": {
+        "description": "this is team info page"
+      }
+    },
+    {
+      "name": "TeamAvatarPage",
+      "pageSourceFile": "src/main/ets/pages/TeamAvatarPage.ets",
+      "buildFunction": "TeamAvatarPageBuilder",
+      "data": {
+        "description": "this is team avatar edit page"
+      }
+    },
+    {
+      "name": "TeamMemberListPage",
+      "pageSourceFile": "src/main/ets/pages/TeamMemberListPage.ets",
+      "buildFunction": "TeamMemberListPageBuilder",
+      "data": {
+        "description": "this is team member list page"
+      }
+    },
+    {
+      "name": "TeamManagePage",
+      "pageSourceFile": "src/main/ets/pages/TeamManagePage.ets",
+      "buildFunction": "TeamManagePageBuilder",
+      "data": {
+        "description": "this is team member manage page"
+      }
+    }
+  ]
+}

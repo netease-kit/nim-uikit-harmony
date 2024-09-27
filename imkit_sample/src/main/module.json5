@@ -1,0 +1,53 @@
+{
+  "module": {
+    "name": "imkit_sample",
+    "type": "entry",
+    "description": "$string:module_desc",
+    "mainElement": "DefaultAbility",
+    "deviceTypes": [
+      "phone",
+      "tablet",
+      "2in1"
+    ],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "pages": "$profile:main_pages",
+    "routerMap": "$profile:router_map",
+    "abilities": [
+      {
+        "name": "DefaultAbility",
+        "srcEntry": "./ets/imability/IMAbility.ets",
+        "description": "$string:module_desc",
+        "icon": "$media:ic_app",
+        "label": "$string:ability_label",
+        "startWindowIcon": "$media:start_logo",
+        "startWindowBackground": "$color:start_window_background",
+        "exported": true,
+        "skills": [
+          {
+            "entities": [
+              "entity.system.home"
+            ],
+            "actions": [
+              "action.system.home"
+            ]
+          }
+        ]
+      }
+    ],
+    "extensionAbilities": [
+      {
+        "name": "DefaultBackupAbility",
+        "srcEntry": "./ets/defaultbackupability/DefaultBackupAbility.ets",
+        "type": "backup",
+        "exported": false,
+        "metadata": [
+          {
+            "name": "ohos.extension.backup",
+            "resource": "$profile:backup_config"
+          }
+        ]
+      }
+    ]
+  }
+}

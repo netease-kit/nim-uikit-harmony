@@ -1,0 +1,28 @@
+{
+  "routerMap": [
+    {
+      "name": "ChatP2PPage",
+      "pageSourceFile": "src/main/ets/pages/ChatP2PPage.ets",
+      "buildFunction": "ChatP2PPageBuilder",
+      "data": {
+        "description": "this is p2p chat page"
+      }
+    },
+    {
+      "name": "ChatTeamPage",
+      "pageSourceFile": "src/main/ets/pages/ChatTeamPage.ets",
+      "buildFunction": "ChatTeamPageBuilder",
+      "data": {
+        "description": "this is team chat page"
+      }
+    },
+    {
+      "name": "UserSettingPage",
+      "pageSourceFile": "src/main/ets/pages/UserSettingPage.ets",
+      "buildFunction": "UserSettingPageBuilder",
+      "data": {
+        "description": "this is chat setting page"
+      }
+    }
+  ]
+}

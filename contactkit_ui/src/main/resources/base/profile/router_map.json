@@ -1,0 +1,92 @@
+{
+  "routerMap": [
+    {
+      "name": "AddFriendPage",
+      "pageSourceFile": "src/main/ets/pages/AddFriendPage.ets",
+      "buildFunction": "AddFriendPageBuilder",
+      "data": {
+        "description": "this is add friend page"
+      }
+    },
+    {
+      "name": "BlockListPage",
+      "pageSourceFile": "src/main/ets/pages/BlockListPage.ets",
+      "buildFunction": "BlockListPageBuilder",
+      "data": {
+        "description": "this is block list page"
+      }
+    },
+    {
+      "name": "ContactPage",
+      "pageSourceFile": "src/main/ets/pages/ContactPage.ets",
+      "buildFunction": "ContactPageBuilder",
+      "data": {
+        "description": "this is contact list page"
+      }
+    },
+    {
+      "name": "EditInfoPage",
+      "pageSourceFile": "src/main/ets/pages/EditInfoPage.ets",
+      "buildFunction": "EditInfoPageBuilder",
+      "data": {
+        "description": "this is user info edit page"
+      }
+    },
+    {
+      "name": "EditGenderPage",
+      "pageSourceFile": "src/main/ets/pages/EditGenderPage.ets",
+      "buildFunction": "EditGenderPageBuilder",
+      "data": {
+        "description": "this is edit gender page"
+      }
+    },
+    {
+      "name": "MineInfoPage",
+      "pageSourceFile": "src/main/ets/pages/MineInfoPage.ets",
+      "buildFunction": "MineInfoPageBuilder",
+      "data": {
+        "description": "this is mine info page"
+      }
+    },
+    {
+      "name": "MyTeamsPage",
+      "pageSourceFile": "src/main/ets/pages/MyTeamsPage.ets",
+      "buildFunction": "MyTeamsPageBuilder",
+      "data": {
+        "description": "this is my team list page"
+      }
+    },
+    {
+      "name": "PersonInfoPage",
+      "pageSourceFile": "src/main/ets/pages/PersonInfoPage.ets",
+      "buildFunction": "PersonInfoPageBuilder",
+      "data": {
+        "description": "this is person info page"
+      }
+    },
+    {
+      "name": "SearchPage",
+      "pageSourceFile": "src/main/ets/pages/SearchPage.ets",
+      "buildFunction": "SearchPageBuilder",
+      "data": {
+        "description": "this is search page"
+      }
+    },
+    {
+      "name": "ValidationMessagePage",
+      "pageSourceFile": "src/main/ets/pages/ValidationMessagePage.ets",
+      "buildFunction": "ValidationMessagePageBuilder",
+      "data": {
+        "description": "this is validation message list page"
+      }
+    },
+    {
+      "name": "PersonSelectPage",
+      "pageSourceFile": "src/main/ets/pages/PersonSelectPage.ets",
+      "buildFunction": "PersonSelectPageBuilder",
+      "data": {
+        "description": "this is person select page"
+      }
+    }
+  ]
+}

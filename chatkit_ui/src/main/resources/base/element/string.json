@@ -1,0 +1,200 @@
+{
+  "string": [
+    {
+      "name": "p2p_chat_default_title",
+      "value": "会话消息"
+    },
+    {
+      "name": "chat_edit_take_picture",
+      "value": "拍照"
+    },
+    {
+      "name": "chat_edit_toke_video",
+      "value": "摄像"
+    },
+    {
+      "name": "chat_media_permission_name",
+      "value": "云信"
+    },
+    {
+      "name": "chat_team_notify_invite_title",
+      "value": "邀请"
+    },
+    {
+      "name": "chat_team_notify_invite_join",
+      "value": "加入群聊"
+    },
+    {
+      "name": "chat_team_notify_kick_title",
+      "value": "被移出了群聊"
+    },
+    {
+      "name": "chat_team_notify_leave_title",
+      "value": "退出了群聊"
+    },
+    {
+      "name": "chat_team_notify_dismiss_title",
+      "value": "解散了群聊"
+    },
+    {
+      "name": "null_message_not_support",
+      "value": "不支持发送空消息"
+    },
+    {
+      "name": "chat_send",
+      "value": "发送"
+    },
+    {
+      "name": "chat_send_tips",
+      "value": "发送给  %s"
+    },
+    {
+      "name": "chat_audio_tips",
+      "value": "按住说话"
+    },
+    {
+      "name": "chat_camera_take",
+      "value": "拍摄"
+    },
+    {
+      "name": "chat_send_file",
+      "value": "文件"
+    },
+    {
+      "name": "chat_operation_copy",
+      "value": "复制"
+    },
+    {
+      "name": "chat_operation_delete",
+      "value": "删除"
+    },
+    {
+      "name": "chat_operation_undo",
+      "value": "撤回"
+    },
+    {
+      "name": "chat_msg_undo_tips",
+      "value": "此消息已撤回"
+    },
+    {
+      "name": "chat_msg_delete_dialog_title",
+      "value": "删除"
+    },
+    {
+      "name": "chat_msg_delete_dialog_desc",
+      "value": "删除此消息？"
+    },
+    {
+      "name": "chat_msg_revoke_dialog_title",
+      "value": "撤回"
+    },
+    {
+      "name": "chat_msg_revoke_dialog_desc",
+      "value": "撤回此消息"
+    },
+    {
+      "name": "chat_msg_dialog_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "chat_msg_dialog_sure",
+      "value": "确定"
+    },
+    {
+      "name": "chat_msg_call_canceled",
+      "value": "已取消"
+    },
+    {
+      "name": "chat_msg_call_refused",
+      "value": "已拒绝"
+    },
+    {
+      "name": "chat_msg_call_timeout",
+      "value": "未接听"
+    },
+    {
+      "name": "chat_msg_call_busy",
+      "value": "忙线未接"
+    },
+    {
+      "name": "chat_msg_call_completed",
+      "value": "通话时长 "
+    },
+    {
+      "name": "chat_msg_unknown_type",
+      "value": "未知消息"
+    },
+    {
+      "name": "chat_team_error_tip_content",
+      "value": "您已被移出群聊或该群聊已被解散"
+    },
+    {
+      "name": "chat_setting",
+      "value": "聊天设置"
+    },
+    {
+      "name": "chat_team_notify_current_user_name",
+      "value": "你"
+    },
+    {
+      "name": "chat_team_name_update",
+      "value": "更新群名称为"
+    },
+    {
+      "name": "chat_team_avatar_update",
+      "value": "更新了群头像"
+    },
+    {
+      "name": "chat_team_extension_update",
+      "value": "更新了群扩展字段"
+    },
+    {
+      "name": "chat_team_intro_update",
+      "value": "更新了群介绍"
+    },
+    {
+      "name": "chat_team_notice_update",
+      "value": "更新了群公告"
+    },
+    {
+      "name": "chat_team_verify_update",
+      "value": "更新群身份验证权限为"
+    },
+    {
+      "name": "chat_team_invitation_permission_update",
+      "value": "更新了群权限'邀请他人权限'为"
+    },
+    {
+      "name": "chat_team_permission_all",
+      "value": "'所有人'"
+    },
+    {
+      "name": "chat_team_permission_manager",
+      "value": "'群主和管理员'"
+    },
+    {
+      "name": "chat_team_modify_resource_permission_update",
+      "value": "更新了群权限'群资料修改权限'为"
+    },
+    {
+      "name": "chat_team_cancel_all_mute",
+      "value": "群禁言已关闭"
+    },
+    {
+      "name": "chat_team_full_mute",
+      "value": "群禁言已开启"
+    },
+    {
+      "name": "chat_permission_camera_desc",
+      "value": "用于发送图片和视频消息"
+    },
+    {
+      "name": "chat_permission_micro_phone_desc",
+      "value": "用于发送语音消息"
+    },
+    {
+      "name": "chatSpeakTooShort",
+      "value": "说话时间太短"
+    }
+  ]
+}

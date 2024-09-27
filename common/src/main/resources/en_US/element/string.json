@@ -1,0 +1,104 @@
+{
+  "string": [
+    {
+      "name": "mine_account_nick",
+      "value": "昵称:%s"
+    },
+    {
+      "name": "mine_account_id",
+      "value": "账号"
+    },
+    {
+      "name": "mine_account_id_tip",
+      "value": "账号:%s"
+    },
+    {
+      "name": "mine_edit_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "mine_edit_sure",
+      "value": "确认"
+    },
+    {
+      "name": "mine_info_save",
+      "value": "完成"
+    },
+    {
+      "name": "common_close",
+      "value": "关闭"
+    },
+    {
+      "name": "common_sure",
+      "value": "确定"
+    },
+    {
+      "name": "common_sure_count",
+      "value": "确定(%d)"
+    },
+    {
+      "name": "mine_info_save_ok",
+      "value": "保存完成"
+    },
+    {
+      "name": "text_input_placeholder",
+      "value": "请输入帐号"
+    },
+    {
+      "name": "empty_tips",
+      "value": "该用户不存在"
+    },
+    {
+      "name": "common_search",
+      "value": "搜索"
+    },
+    {
+      "name": "common_search_placeholder",
+      "value": "请输入你要搜索的关键字"
+    },
+    {
+      "name": "all_space_not_support",
+      "value": "不支持全空格"
+    },
+    {
+      "name": "no_friend",
+      "value": "暂无好友"
+    },
+    {
+      "name": "no_team",
+      "value": "暂无群聊"
+    },
+    {
+      "name": "cancel",
+      "value": "Cancel"
+    },
+    {
+      "name": "save",
+      "value": "Save"
+    },
+    {
+      "name": "dialog_take_picture",
+      "value": "拍照"
+    },
+    {
+      "name": "dialog_photo",
+      "value": "从手机相册选择"
+    },
+    {
+      "name": "setting_pin",
+      "value": "标记"
+    },
+    {
+      "name": "setting_message_notify",
+      "value": "开启消息提醒"
+    },
+    {
+      "name": "setting_message_stick_top",
+      "value": "聊天置顶"
+    },
+    {
+      "name": "chat_permission_deny_tips",
+      "value": "请在设置页面添加相关权限"
+    }
+  ]
+}

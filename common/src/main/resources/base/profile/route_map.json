@@ -1,0 +1,12 @@
+{
+  "routerMap": [
+    {
+      "name": "TextEditPage",
+      "pageSourceFile": "src/main/ets/pages/TextEditPage.ets",
+      "buildFunction": "TextEditPageBuilder",
+      "data": {
+        "description": "this is text edit page"
+      }
+    }
+  ]
+}
