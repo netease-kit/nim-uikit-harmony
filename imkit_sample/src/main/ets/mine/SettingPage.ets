@@ -5,11 +5,11 @@
  *
  */
 
-import { LoginComponent } from '../pages/LoginComponent';
 import { ViewItemSwitch } from '@nimkit/common/src/main/ets/model/ViewItemSwitch';
 import promptAction from '@ohos.promptAction';
 import { CommonConstants, NavigationBackBuilder, NECommonUtils, ViewItemArrow, ViewItemBuilder } from '@nimkit/common';
 import { ChatKitClient } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
+import { NimRepository } from '../ability/NimRepository';
 
 @CustomDialog
 export struct LogoutDialog {
@@ -18,7 +18,7 @@ export struct LogoutDialog {
 
   async logout() {
     try {
-      await LoginComponent.nim.loginService.logout()
+      await NimRepository.getNIM().loginService.logout()
 
       ChatKitClient.haveSyncedConversation = false
     } catch (err) {

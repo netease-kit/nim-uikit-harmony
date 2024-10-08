@@ -5,17 +5,16 @@
  *
  */
 
-import { NimRepository } from '../imability/NimRepository';
+import { NimRepository } from '../ability/NimRepository';
 import { promptAction, router } from '@kit.ArkUI';
 import { V2NIMDataSyncState, V2NIMDataSyncType, V2NIMError, V2NIMUser } from '@nimsdk/base';
-import { ChatKitClient, NEFriendUserCache } from '@nimkit/chatkit';
+import { NEFriendUserCache } from '@nimkit/chatkit';
 
 export class LoginComponent {
-  public static nim = NimRepository.getInstance(getContext(this)?.getApplicationContext() ?? null).nim;
   public static myUser?: V2NIMUser;
 
   constructor() {
-    LoginComponent.nim.loginService.on('onDataSync',
+    NimRepository.getNIM().loginService.on('onDataSync',
       (type: V2NIMDataSyncType, state: V2NIMDataSyncState, error?: V2NIMError) => {
         if (state === V2NIMDataSyncState.V2NIM_DATA_SYNC_STATE_COMPLETED) {
           NEFriendUserCache.getInstance()
@@ -27,14 +26,13 @@ export class LoginComponent {
       })
   }
 
-  async login(accountId: string, token: string, appKey: string) {
+  async login(accountId: string, token: string) {
     try {
-      await LoginComponent.nim.loginService.login(accountId, token);
+      await NimRepository.getNIM().loginService.login(accountId, token);
       promptAction.showToast({
         message: "登录成功",
         alignment: Alignment.Center
       })
-      ChatKitClient.init(LoginComponent.nim, appKey)
 
       router.replaceUrl({
         url: 'pages/TabIndex'
