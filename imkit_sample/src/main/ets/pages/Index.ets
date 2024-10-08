@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  *
  */
+import { AppConfig } from '../constants/AppConfig';
 
 import { LoginComponent } from './LoginComponent';
 
@@ -41,7 +42,7 @@ struct Index {
               //应用APPKEY
               let appKey = ''
               const loginComponent = new LoginComponent();
-              loginComponent.login(accountId, accountToken, appKey)
+              loginComponent.login(AppConfig.userName, AppConfig.userToken)
             })
             .borderRadius(10)
             .height(50)

@@ -9,7 +9,7 @@ import { ChatKitClient, ContactRepo, ConversationRepo } from '@nimkit/chatkit';
 import { ContactPage } from '@nimkit/contactkit_ui';
 import { ConversationPage } from '@nimkit/conversationkit_ui';
 import { V2NIMFriendAddApplication } from '@nimsdk/base';
-import { MinePage } from '../Mine/MinePage';
+import { MinePage } from '../mine/MinePage';
 
 @ObservedV2
 class TabBarItem {
@@ -30,11 +30,11 @@ class TabBarItem {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct TabIndex {
   pathStack: NavPathStack = new NavPathStack()
-  @State currentIndex: number = 0;
-  @State tabs: Array<TabBarItem> = [
+  @Local currentIndex: number = 0;
+  @Local tabs: Array<TabBarItem> = [
     new TabBarItem($r('app.string.tab_conversation'), 0, $r('app.media.tab_conversation'),
       $r('app.media.tab_conversation_light')),
     new TabBarItem($r('app.string.tab_contact'), 1, $r('app.media.tab_contact'), $r('app.media.tab_contact_light')),
@@ -48,16 +48,13 @@ struct TabIndex {
       console.log(err)
     }
   }
-
   onUnreadApplicationChange = (unreadCountString?: string) => {
     this.tabs[1].showRedPoint = unreadCountString !== undefined
   }
-
   //未读消息回调
   onUreadMessageChange = (unreadCount?: number) => {
     this.tabs[0].showRedPoint = (unreadCount ?? 0) > 0
   }
-
   //获取会话列表未读数
   loadUnreadMessageCount = () => {
     const unreadCount = ConversationRepo.getTotalUnreadCount()

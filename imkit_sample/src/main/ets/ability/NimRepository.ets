@@ -6,7 +6,7 @@
  */
 
 import common from '@ohos.app.ability.common'
-import { LogLevel, NIMInitializeOptions, NIMInterface, NIMServiceOptions, V2NIMProvidedServiceType } from '@nimsdk/base'
+import { NIMInitializeOptions, NIMInterface, NIMServiceOptions, V2NIMProvidedServiceType } from '@nimsdk/base'
 import { NIMSdk } from '@nimsdk/nim'
 import { V2NIMTeamServiceImpl } from '@nimsdk/team'
 import { V2NIMConversationServiceImpl } from '@nimsdk/conversation'
@@ -14,67 +14,30 @@ import { V2NIMUserServiceImpl } from '@nimsdk/user'
 import { V2NIMFriendServiceImpl } from '@nimsdk/friend'
 import { V2NIMClientAntispamUtil, V2NIMMessageServiceImpl } from '@nimsdk/message'
 import { V2NIMConversationGroupServiceImpl } from '@nimsdk/conversationgroup'
-import { AppConfig } from '../constants/AppConfig'
+import { ChatKitClient } from '@nimkit/chatkit'
 
 export class NimRepository {
+  private static nimRepository: NimRepository | undefined
   private _context: common.Context
+  private _nim: NIMInterface | undefined
 
   constructor(context: common.Context) {
     this._context = context
   }
 
-  private _nim: NIMInterface | undefined
-
-  public get nim(): NIMInterface {
-    if (!this._nim) {
-      this.createDefaultNim(this._context)
-    }
-
-    return this._nim!
-  }
-
   public static getInstance(context: common.Context): NimRepository {
-    return new NimRepository(context);
+    if (NimRepository.nimRepository == undefined) {
+      NimRepository.nimRepository = new NimRepository(context);
+    }
+    return NimRepository.nimRepository
   }
 
-  createDefaultNim(context: common.Context) {
-    console.warn('------------- 创建NIM实例 --------------')
-
-    let initializeOptions: NIMInitializeOptions = {
-      appkey: "xxx",
-    }
-
-    let serviceOptions: NIMServiceOptions = {
-      loginServiceConfig: {},
-    }
-
-
-    // 正式服
-    initializeOptions = {
-      appkey: AppConfig.appKey,
-      logLevel: LogLevel.Debug,
-      // ...其他属性
-    };
-
-    serviceOptions = {
-      loginServiceConfig: {
-        lbsUrls: ['https://lbs.netease.im/lbs/webconf.jsp'],
-        linkUrl: 'weblink.netease.im:443'
-      },
-      pushServiceConfig: {
-        harmonyCertificateName: "DEMO_HMOS_PUSH"
-      },
-      databaseServiceConfig: {
-        encrypt: false,
-        appKey: AppConfig.appKey,
-      }
-    }
-
-    this.initNim(initializeOptions, serviceOptions)
-    console.log("net ease nim from createDefaultNim: " + this._nim)
+  public static getNIM(): NIMInterface {
+    return NimRepository.nimRepository?._nim!
   }
 
   initNim(initializeOptions: NIMInitializeOptions, serviceOptions?: NIMServiceOptions) {
+    //初始化NIM SDK
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_TEAM,
       (core, serviceName, serviceConfig) => new V2NIMTeamServiceImpl(core, serviceName, serviceConfig))
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_CLIENT_ANTISPAM_UTIL,
@@ -90,6 +53,7 @@ export class NimRepository {
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_FRIEND,
       (core, serviceName, serviceConfig) => new V2NIMFriendServiceImpl(core, serviceName, serviceConfig));
     this._nim = NIMSdk.newInstance(this._context, initializeOptions, serviceOptions)
-    console.log("nim from initNim: " + this._nim)
+    // 初始化 UI组件
+    ChatKitClient.init(this._nim, initializeOptions.appkey)
   }
 }
