@@ -16,7 +16,7 @@
     "abilities": [
       {
         "name": "DefaultAbility",
-        "srcEntry": "./ets/imability/IMAbility.ets",
+        "srcEntry": "./ets/ability/IMAbility.ets",
         "description": "$string:module_desc",
         "icon": "$media:ic_app",
         "label": "$string:ability_label",
