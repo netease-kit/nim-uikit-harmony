@@ -96,7 +96,7 @@ export struct NEAudioRecordView {
         }
       })
     } else {
-      NECommonUtils.showToast($r('app.string.chatSpeakTooShort'))
+      NECommonUtils.showToast($r("app.string.chat_speak_too_short"))
     }
     if (this.onRecordEnd) {
       this.onRecordEnd()

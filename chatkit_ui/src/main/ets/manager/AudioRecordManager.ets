@@ -7,10 +7,7 @@
 
 import { media } from '@kit.MediaKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { FileUtils } from '@nimkit/common';
-import File from '@system.file';
 import fs from '@ohos.file.fs';
-import { url } from '@kit.ArkTS';
 
 let avProfile: media.AVRecorderProfile = {
   audioBitrate: 100000, // 音频比特率

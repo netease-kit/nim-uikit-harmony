@@ -5,8 +5,9 @@
  *
  */
 
-import { StorageRepo, TeamRepo } from '@nimkit/chatkit';
+import { ChatKitClient, StorageRepo, TeamRepo } from '@nimkit/chatkit';
 import { ChooseAvatarDialog, NavigationBackBuilder } from '@nimkit/common';
+import { V2NIMError, V2NIMLoginStatus } from '@nimsdk/base';
 import fs from '@ohos.file.fs';
 
 export interface AvatarEditParams {
@@ -21,7 +22,6 @@ struct TeamAvatarPage {
   @State avatar?: string | null = null
   //显示保存按钮
   @State showSave: boolean = true
-
   //图片选择结果处理
   onImageChosen = async (filePath: string) => {
 
@@ -33,18 +33,43 @@ struct TeamAvatarPage {
       const file = fs.openSync(filePath, fs.OpenMode.READ_ONLY)
       fs.copyFileSync(file.fd, dir)
 
-      const task = StorageRepo.createUploadFileTask({
-        filePath: dir,
-        sceneName: 'nim_default_profile_icon'
-      })
-      if (task) {
-        const url = await StorageRepo.uploadFile(task, (progress: number) => {
-          // NECommonUtils.showToast($r('app.string.avatar_uploading', progress * 100))
+      if (ChatKitClient.nim.loginService?.getLoginStatus() === V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED) {
+        console.debug(`TeamAvatarPage uploadFile loginStatus logined`)
+        this.uploadFile(dir)
+      } else {
+        ChatKitClient.nim.loginService.on('onLoginStatus', (status: V2NIMLoginStatus) => {
+          console.debug(`TeamAvatarPage uploadFile loginStatus changed ${status}}`)
+          if (status === V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED) {
+            this.uploadFile(dir)
+          }
         })
-        this.avatar = url
       }
+
     } catch (err) {
       console.log(err)
+    }
+  }
+
+  /**
+   * 上传头像
+   * @param dir
+   */
+  uploadFile(dir: string) {
+    const task = StorageRepo.createUploadFileTask({
+      filePath: dir,
+      sceneName: 'nim_default_profile_icon'
+    })
+    if (task) {
+      StorageRepo.uploadFile(task, (progress: number) => {
+        // NECommonUtils.showToast($r('app.string.avatar_uploading', progress * 100))
+      }).then((url) => {
+        console.debug(`TeamAvatarPage uploadFile success url = ${url}`)
+        this.avatar = url
+      }).catch((e: V2NIMError) => {
+        console.debug(`TeamAvatarPage uploadFile error = ${e.detail.reason}`)
+      })
+
+
     }
   }
 
@@ -107,50 +132,52 @@ struct TeamAvatarPage {
         })
         .borderRadius(8)
 
-        Column() {
-          Text($r('app.string.team_default_avatar_selector'))
-            .fontSize(16)
-            .fontColor('#333333')
-            .margin({
-              bottom: 16
-            })
-
-          Row() {
-            ForEach(TeamRepo.teamDefaultIcons, (avatar: string) => {
-
-              Stack({ alignContent: Alignment.Center }) {
-                Image(avatar)
-                  .height(32)
-                  .width(32)
-              }
-              .width(48)
-              .height(48)
-              .backgroundColor(
-                avatar === this.avatar ? '#ffF4F4F4' : '#ffffffff'
-              )
-              .borderRadius(8)
-              .onClick(() => {
-                this.avatar = avatar
+        if (this.showSave) {
+          Column() {
+            Text($r('app.string.team_default_avatar_selector'))
+              .fontSize(16)
+              .fontColor('#333333')
+              .margin({
+                bottom: 16
               })
 
-            })
-          }.width('100%')
-          .justifyContent(FlexAlign.SpaceBetween)
+            Row() {
+              ForEach(TeamRepo.teamDefaultIcons, (avatar: string) => {
 
+                Stack({ alignContent: Alignment.Center }) {
+                  Image(avatar)
+                    .height(32)
+                    .width(32)
+                }
+                .width(48)
+                .height(48)
+                .backgroundColor(
+                  avatar === this.avatar ? '#ffF4F4F4' : '#ffffffff'
+                )
+                .borderRadius(8)
+                .onClick(() => {
+                  this.avatar = avatar
+                })
+
+              })
+            }.width('100%')
+            .justifyContent(FlexAlign.SpaceBetween)
+
+          }
+          .alignItems(HorizontalAlign.Start)
+          .backgroundColor(Color.White)
+          .padding({
+            top: 16,
+            bottom: 16,
+            left: 16,
+            right: 16
+          })
+          .borderRadius(8)
+          .width('90%')
+          .margin({
+            bottom: 12,
+          })
         }
-        .alignItems(HorizontalAlign.Start)
-        .backgroundColor(Color.White)
-        .padding({
-          top: 16,
-          bottom: 16,
-          left: 16,
-          right: 16
-        })
-        .borderRadius(8)
-        .width('90%')
-        .margin({
-          bottom: 12,
-        })
       }
 
     }

@@ -21,6 +21,10 @@ export { CommonTextInput } from './src/main/ets/builder/CommonTextInput';
 
 export { CommonEmptyResult } from './src/main/ets/builder/CommonEmptyResult';
 
+export { NetworkBrokenBuilder } from './src/main/ets/builder/NetworkBrokenBuilder';
+
+export { ListGroupHeader } from './src/main/ets/builder/ListGroupHeader';
+
 export type { ViewItem } from './src/main/ets/model/ViewItem';
 
 export type { ViewItemArrow } from './src/main/ets/model/ViewItemArrow';

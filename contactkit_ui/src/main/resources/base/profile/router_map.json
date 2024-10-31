@@ -87,6 +87,22 @@
       "data": {
         "description": "this is person select page"
       }
+    },
+    {
+      "name": "ConversationSelectPage",
+      "pageSourceFile": "src/main/ets/pages/ConversationSelectPage.ets",
+      "buildFunction": "ConversationSelectPageBuilder",
+      "data": {
+        "description": "this is conversation select page"
+      }
+    },
+    {
+      "name": "ConversationSelectedPage",
+      "pageSourceFile": "src/main/ets/pages/ConversationSelectedPage.ets",
+      "buildFunction": "ConversationSelectedPageBuilder",
+      "data": {
+        "description": "this is conversation selected page"
+      }
     }
   ]
 }

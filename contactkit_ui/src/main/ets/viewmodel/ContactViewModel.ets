@@ -8,7 +8,7 @@
 import { ContactRepo, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit'
 import { GetUnreadCountStr, initalLetter } from '@nimkit/common'
 import { V2NIMFriend, V2NIMUser } from '@nimsdk/base'
-import { NEContactSection, SelectUserWithFriend } from '../model/NEContactSection'
+import { NEContactSection, NEContactSectionDataSource, SelectUserWithFriend } from '../model/NEContactSection'
 
 const digitRegular = /[0-9]/
 const azRegular = /[A-Z]/
@@ -16,45 +16,55 @@ const azRegular = /[A-Z]/
 @ObservedV2
 export class ContactViewModel {
   @Trace friendList: NEUserWithFriend[] = []
-  @Trace friendSection: NEContactSection[] = []
-
-  constructor() {
-    NEFriendUserCache.getInstance().listener.on('updateUserInfo', async (users: V2NIMUser[]) => {
-      users.forEach((user) => {
-        this.removeFromContact(user.accountId)
+  @Trace friendSection: NEContactSectionDataSource = new NEContactSectionDataSource()
+  @Trace initalList: string[] = []
+  updateUserInfoFun = async (users: V2NIMUser[]) => {
+    await Promise.all(
+      users.map(async (user) => {
+        const oldUser = this.findContactModel(user.accountId)
+        if (oldUser && (oldUser?.user?.name !== user.name || oldUser?.user?.avatar !== user.avatar)) {
+          this.removeFromContact(user.accountId)
+        }
         const userWithFriend = NEFriendUserCache.getInstance().getFriendById(user.accountId)
         if (userWithFriend) {
-          this.addToContact(userWithFriend)
+          await this.addToContact(userWithFriend)
         }
       })
-    })
-
-    NEFriendUserCache.getInstance().listener.on('updateFriendInfo', async (friend: V2NIMFriend) => {
+    )
+  }
+  updateFriendInfoFun = async (friend: V2NIMFriend) => {
+    const oldUser = this.findContactModel(friend.accountId)
+    if (oldUser && oldUser.friend?.alias !== friend.alias) {
       this.removeFromContact(friend.accountId)
-      const user = NEFriendUserCache.getInstance().getFriendById(friend.accountId)
-      if (user) {
-        this.addToContact(user)
-      }
-    })
+    }
+    const user = NEFriendUserCache.getInstance().getFriendById(friend.accountId)
+    if (user) {
+      this.addToContact(user)
+    }
+  }
+  removeFriendInfoFun = async (accountId: string) => {
+    this.removeFromContact(accountId)
+  }
+  addBlockAccountFun = async (accountId: string) => {
+    this.removeFromContact(accountId)
+  }
+  removeBlockAccountFun = async (accountId: string) => {
+    const user = NEFriendUserCache.getInstance().getFriendById(accountId)
+    if (user) {
+      this.addToContact(user)
+    }
+  }
 
-    NEFriendUserCache.getInstance().listener.on('removeFriendInfo', async (accountId: string) => {
-      this.removeFromContact(accountId)
-    })
-
-    NEFriendUserCache.getInstance().listener.on('addBlockAccount', async (accountId: string) => {
-      this.removeFromContact(accountId)
-    })
-
-    NEFriendUserCache.getInstance().listener.on('removeBlockAccount', async (accountId: string) => {
-      const user = NEFriendUserCache.getInstance().getFriendById(accountId)
-      if (user) {
-        this.addToContact(user)
-      }
-    })
+  constructor() {
+    NEFriendUserCache.getInstance().listener.on('updateUserInfo', this.updateUserInfoFun)
+    NEFriendUserCache.getInstance().listener.on('updateFriendInfo', this.updateFriendInfoFun)
+    NEFriendUserCache.getInstance().listener.on('removeFriendInfo', this.removeFriendInfoFun)
+    NEFriendUserCache.getInstance().listener.on('addBlockAccount', this.addBlockAccountFun)
+    NEFriendUserCache.getInstance().listener.on('removeBlockAccount', this.removeBlockAccountFun)
   }
 
   // 获取好友列表
-  async getFriendList(filterList: string[] = []) {
+  async getFriendList(filterList: string[] = []): Promise<NEContactSection[] | undefined> {
     try {
       let friendList: NEUserWithFriend[] = []
       if (NEFriendUserCache.getInstance().isEmpty()) {
@@ -64,41 +74,44 @@ export class ContactViewModel {
       friendList = NEFriendUserCache.getInstance().getFriendListNotInBlocklist()
       if (friendList) {
         this.friendList = friendList
-        this.formatFriends(friendList, filterList)
+        const contactList = await this.formatFriends(friendList, filterList)
+        this.friendSection.pushList(contactList)
+        return contactList
       }
     } catch (err) {
       console.log(err)
     }
+    return undefined
   }
 
   // 格式化好友列表（按分组排序）
-  formatFriends(friendList: NEUserWithFriend[], filterList: string[]) {
+  async formatFriends(friendList: NEUserWithFriend[], filterList: string[]): Promise<NEContactSection[]> {
     let contactList: NEContactSection[] = []
-    let initalDict: Map<string, NEUserWithFriend[]> = new Map<string, NEUserWithFriend[]>()
-    let digitList: NEUserWithFriend[] = []
-    let specialCharList: NEUserWithFriend[] = []
+    let initalDict: Map<string, SelectUserWithFriend[]> = new Map<string, SelectUserWithFriend[]>()
+    let digitList: SelectUserWithFriend[] = []
+    let specialCharList: SelectUserWithFriend[] = []
 
-    for (const friend of friendList) {
-      if (friend.user?.accountId && filterList.includes(friend.user?.accountId)) {
-        continue
-      }
-
-      let name = friend.showName()
-      if (name) {
-        const inital = initalLetter(name)
-        if (digitRegular.test(inital)) {
-          digitList.push(friend)
-        } else if (!azRegular.test(inital)) {
-          specialCharList.push(friend)
-        } else {
-          if (initalDict.get(inital)) {
-            initalDict.get(inital)?.push(friend)
-          } else {
-            initalDict.set(inital, [friend])
+    await Promise.all(
+      friendList.map(async (friend) => {
+        if (friend.user?.accountId && !filterList.includes(friend.user?.accountId)) {
+          let name = friend.showName()
+          if (name) {
+            const inital = await initalLetter(name)
+            if (digitRegular.test(inital)) {
+              digitList.push(new SelectUserWithFriend(friend))
+            } else if (!azRegular.test(inital)) {
+              specialCharList.push(new SelectUserWithFriend(friend))
+            } else {
+              if (initalDict.get(inital)) {
+                initalDict.get(inital)?.push(new SelectUserWithFriend(friend))
+              } else {
+                initalDict.set(inital, [new SelectUserWithFriend(friend)])
+              }
+            }
           }
         }
-      }
-    }
+      })
+    )
 
     const nameSortFunc = (s1: NEUserWithFriend, s2: NEUserWithFriend) => {
       if ((s1.showName()) < (s2.showName())) {
@@ -135,55 +148,64 @@ export class ContactViewModel {
     if (specialList.length > 0) {
       contactList.push(new NEContactSection("#", specialList))
     }
-    this.friendSection = contactList
+
+    // 获取侧边字母导航栏
+    this.initalList = contactList.map((value, index, arr) => {
+      return value.initial
+    })
+
+    return contactList
   }
 
   // 添加好友到通讯录
-  addToContact(userWithFriend: NEUserWithFriend) {
+  async addToContact(userWithFriend: NEUserWithFriend): Promise<void> {
     let name = userWithFriend.showName()
     let user = new SelectUserWithFriend(userWithFriend)
     if (name) {
-      let inital = initalLetter(name)
+      let inital = await initalLetter(name)
       if (digitRegular.test(inital)) {
         inital = '#'
       } else if (!azRegular.test(inital)) {
         inital = '#'
       }
 
-      for (let title = 0; title < this.friendSection.length; title++) {
+      for (let title = 0; title < this.friendSection.contactSections.length; title++) {
+        let contactSection = this.friendSection.contactSections[title]
         // 当前分组已存在
-        if (this.friendSection[title].initial === inital) {
+        if (contactSection.initial === inital) {
           // 判断是否已经存在
-          for (const friend of this.friendSection[title].contacts.contacts) {
+          for (const friend of contactSection.contacts.contacts) {
             if (friend.user?.accountId === userWithFriend.user?.accountId) {
               return
             }
           }
 
           // 已有分组中插入
-          for (let index = 0; index < this.friendSection[title].contacts.contacts.length; index++) {
-            if (name < this.friendSection[title].contacts.contacts[index].showName()) {
-              this.friendSection[title].contacts.addData(index, user)
+          for (let index = 0; index < contactSection.contacts.contacts.length; index++) {
+            if (name < contactSection.contacts.contacts[index].showName()) {
+              contactSection.contacts.addData(index, user)
               return
             }
           }
           // 尾插
-          this.friendSection[title].contacts.push(user)
+          contactSection.contacts.push(user)
           return
         }
       }
 
       // 无当前分组
       let contactSection = new NEContactSection(inital, [userWithFriend])
-      for (let index = 0; index < this.friendSection.length; index++) {
-        // 保证字母分组在【#】之前
-        if (this.friendSection[index].initial === '#') {
-          this.friendSection.splice(index, 0, contactSection)
-          return
-        }
-        if (inital < this.friendSection[index].initial) {
-          this.friendSection.splice(index, 0, contactSection)
-          return
+      if (inital !== '#') {
+        for (let index = 0; index < this.friendSection.contactSections.length; index++) {
+          // 保证字母分组在【#】之前
+          if (this.friendSection.contactSections[index].initial === '#') {
+            this.friendSection.addData(index, contactSection)
+            return
+          }
+          if (inital < this.friendSection.contactSections[index].initial) {
+            this.friendSection.addData(index, contactSection)
+            return
+          }
         }
       }
       // 尾插
@@ -193,19 +215,24 @@ export class ContactViewModel {
 
   // 从通讯录中移除好友
   removeFromContact(accountId: string) {
-    for (let title = 0; title < this.friendSection.length; title++) {
-      this.friendSection[title].contacts.delete(accountId)
-      if (this.friendSection[title].contacts.contacts.length <= 0) {
-        this.friendSection.splice(title, 1)
+    for (let title = 0; title < this.friendSection.contactSections.length; title++) {
+      const contactSection = this.friendSection.contactSections[title]
+      contactSection.contacts.delete(accountId)
+      if (contactSection.contacts.contacts.length <= 0) {
+        this.friendSection.delete(contactSection.initial)
       }
     }
   }
 
-  // 获取侧边字母导航栏
-  getInitalList(): string[] {
-    return this.friendSection.map((value, index, arr) => {
-      return value.initial
-    })
+  // 查询好友并返回
+  findContactModel(accountId: string): SelectUserWithFriend | undefined {
+    for (const section of this.friendSection.contactSections) {
+      let model = section?.contacts.contacts.find(contact => contact.user?.accountId === accountId)
+      if (model) {
+        return model
+      }
+    }
+    return undefined
   }
 
   // 获取好友申请未读数
@@ -219,6 +246,16 @@ export class ContactViewModel {
     } catch (err) {
       console.log(err)
       return undefined
+    }
+  }
+
+  onDestroy() {
+    if (AppStorage.get<NEFriendUserCache>(NEFriendUserCache.name)) {
+      NEFriendUserCache.getInstance().listener.off('updateUserInfo', this.updateUserInfoFun)
+      NEFriendUserCache.getInstance().listener.off('updateFriendInfo', this.updateFriendInfoFun)
+      NEFriendUserCache.getInstance().listener.off('removeFriendInfo', this.removeFriendInfoFun)
+      NEFriendUserCache.getInstance().listener.off('addBlockAccount', this.addBlockAccountFun)
+      NEFriendUserCache.getInstance().listener.off('removeBlockAccount', this.removeBlockAccountFun)
     }
   }
 }

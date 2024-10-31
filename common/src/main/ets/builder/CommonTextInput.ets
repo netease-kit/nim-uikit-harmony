@@ -11,6 +11,7 @@ export struct CommonTextInput {
   @Param leftIcon?: Resource = $r('app.media.text_input_icon')
   @Param onSubmit?: (enterKey: EnterKeyType, event: SubmitEvent) => void = undefined
   @Param onTextChange?: (value: string, previewText?: PreviewText) => void = undefined
+  @Param keepEditableState: boolean = true // 是否保持键盘弹出
 
   build() {
     Stack({
@@ -39,7 +40,14 @@ export struct CommonTextInput {
         .borderRadius(4)
         .backgroundColor('#F2F4F5')
         .placeholderColor('#A6ADB6')
-        .onSubmit(this.onSubmit)
+        .onSubmit((enterKey: EnterKeyType, event: SubmitEvent) => {
+          if (this.onSubmit) {
+            this.onSubmit(enterKey, event)
+          }
+          if (this.keepEditableState) {
+            event.keepEditableState()
+          }
+        })
         .onChange(this.onTextChange)
         .onAppear(() => {
 

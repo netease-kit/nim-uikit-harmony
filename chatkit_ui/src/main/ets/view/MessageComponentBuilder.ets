@@ -19,6 +19,7 @@ import {
   parseMessageText
 } from '../common/MessageHelper'
 import { NIMMessageInfo } from '../model/NIMMessageInfo'
+import { MessageItemClick } from './MessageItemClick'
 import { MessageAudioItemView } from '../view/MessageAudioItemView'
 
 
@@ -27,25 +28,54 @@ export struct messageContent {
   @BuilderParam
   message: NIMMessageInfo
   @BuilderParam
-  onItemLongClick?: (event: GestureEvent, msg: NIMMessageInfo | undefined,) => void
+  onMessageClick: MessageItemClick | undefined
 
   build() {
     if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
-      textBuilder({ message: this.message });
+      textBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
-      locationBuilder({ message: this.message });
+      locationBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
-      imageBuilder({ message: this.message, onItemLongClick: this.onItemLongClick });
+      imageBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
-      videoBuilder({ message: this.message, onItemLongClick: this.onItemLongClick });
+      videoBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE) {
-      fileBuilder({ message: this.message });
+      fileBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
-      MessageAudioItemView({ message: this.message });
+      MessageAudioItemView({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
-      callBuilder({ message: this.message });
+      callBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else {
-      unknownBuilder({ message: this.message });
+      unknownBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    }
+  }
+}
+
+
+@ComponentV2
+export struct pinMessageContent {
+  @BuilderParam
+  message: NIMMessageInfo
+  @BuilderParam
+  onMessageClick: MessageItemClick | undefined
+
+  build() {
+    if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+      pinTextBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
+      locationBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
+      imageBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
+      videoBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE) {
+      fileBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
+      MessageAudioItemView({ message: this.message, onMessageClick: this.onMessageClick });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
+      callBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    } else {
+      unknownBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     }
   }
 }
@@ -55,10 +85,62 @@ export struct messageContent {
 export struct textBuilder {
   @BuilderParam
   message: NIMMessageInfo
+  @BuilderParam
+  onMessageClick: MessageItemClick | undefined
 
   build() {
     Column() {
-      // Text(message?.message.text?.trimStart().trimEnd())
+      Text() {
+        if (this.message.isRevokeMsg) {
+          Span(this.message.message.text)
+          if (this.message.revokeEditMsg) {
+            Span($r('app.string.chat_msg_undo_edit_tips'))
+              .fontColor($r('app.color.color_chat_send'))
+              .onClick((event: ClickEvent) => {
+                this.onMessageClick?.onRevokeEditClick?.(event, this.message)
+              })
+          }
+        } else {
+          ForEach(parseMessageText(this.message), (item: NEEmojiParseResult) => {
+            if (item.text) {
+              Span(item.text)
+                .fontSize($r('app.float.chat_message_text_font_size'))
+                .textCase(TextCase.Normal)
+                .fontColor($r('app.color.color_chat_title'))
+            } else if (item.emoji) {
+              ImageSpan($rawfile(`emoji/${item.emoji.file}`)).width('18')
+                .height('18')
+                .objectFit(ImageFit.Fill)
+                .verticalAlign(ImageSpanAlignment.CENTER)
+            }
+          })
+        }
+      }
+      .fontColor($r('app.color.color_chat_title'))
+      .lineHeight(20)
+      .fontSize($r('app.float.chat_subtitle_text_font_size'))
+      .textOverflow({ overflow: TextOverflow.Ellipsis })
+      .ellipsisMode(EllipsisMode.END)
+    }
+    .padding({
+      left: 12,
+      top: 12,
+      bottom: 12,
+      right: 12
+    })
+  }
+}
+
+
+@ComponentV2
+export struct pinTextBuilder {
+  @BuilderParam
+  message: NIMMessageInfo
+  @BuilderParam
+  onMessageClick: MessageItemClick | undefined
+
+  build() {
+    Column() {
       Text() {
         ForEach(parseMessageText(this.message), (item: NEEmojiParseResult) => {
           if (item.text) {
@@ -77,13 +159,10 @@ export struct textBuilder {
       .fontColor($r('app.color.color_chat_title'))
       .lineHeight(20)
       .fontSize($r('app.float.chat_subtitle_text_font_size'))
+      .maxLines(3)
+      .textOverflow({ overflow: TextOverflow.Ellipsis })
+      .ellipsisMode(EllipsisMode.END)
     }
-    .padding({
-      left: 12,
-      top: 12,
-      bottom: 12,
-      right: 12
-    })
   }
 }
 
@@ -92,7 +171,7 @@ export struct imageBuilder {
   @BuilderParam
   message: NIMMessageInfo
   @BuilderParam
-  onItemLongClick?: (event: GestureEvent, msg: NIMMessageInfo | undefined,) => void
+  onMessageClick: MessageItemClick | undefined
 
   build() {
     Column() {
@@ -100,7 +179,7 @@ export struct imageBuilder {
         .width(getImageWidth(this.message)).height(getImageHeight(this.message))
         .borderRadius(8)
     }.gesture(LongPressGesture().onAction((event: GestureEvent) => {
-      this.onItemLongClick?.(event, this.message)
+      this.onMessageClick?.onItemLongClick?.(event, this.message)
     }), GestureMask.IgnoreInternal)
   }
 }
@@ -110,7 +189,7 @@ export struct videoBuilder {
   @BuilderParam
   message: NIMMessageInfo
   @BuilderParam
-  onItemLongClick?: (event: GestureEvent, msg: NIMMessageInfo | undefined,) => void
+  onMessageClick: MessageItemClick | undefined
 
   showLoading() {
     if ((this.message.message.attachment as V2NIMMessageFileAttachment).path === undefined) {
@@ -158,7 +237,7 @@ export struct videoBuilder {
         .style({ strokeWidth: 3 })// 设置strokeWidth进度条宽度为15.0vp
         .visibility(this.showLoading() ? Visibility.Visible : Visibility.Hidden)
     }.gesture(LongPressGesture().onAction((event: GestureEvent) => {
-      this.onItemLongClick?.(event, this.message)
+      this.onMessageClick?.onItemLongClick?.(event, this.message)
     }), GestureMask.IgnoreInternal)
   }
 }
@@ -167,6 +246,8 @@ export struct videoBuilder {
 export struct callBuilder {
   @BuilderParam
   message: NIMMessageInfo
+  @BuilderParam
+  onMessageClick: MessageItemClick | undefined
 
   build() {
     Row() {
@@ -194,6 +275,8 @@ export struct callBuilder {
 export struct fileBuilder {
   @BuilderParam
   message: NIMMessageInfo
+  @BuilderParam
+  onMessageClick: MessageItemClick | undefined
 
   build() {
     Row() {
@@ -248,6 +331,8 @@ export struct fileBuilder {
 export struct locationBuilder {
   @BuilderParam
   message: NIMMessageInfo
+  @BuilderParam
+  onMessageClick: MessageItemClick | undefined
 
   build() {
     Column() {
@@ -275,6 +360,8 @@ export struct locationBuilder {
 export struct unknownBuilder {
   @BuilderParam
   message: NIMMessageInfo
+  @BuilderParam
+  onMessageClick: MessageItemClick | undefined
 
   build() {
     Column() {

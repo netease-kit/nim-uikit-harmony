@@ -31,28 +31,29 @@ export class ValidationMessageViewModel {
   finished: boolean = false
   @Trace friendAddApplications: NEFriendAddApplication[] = []
   private context = getContext(this) as common.UIAbilityContext
+  onFriendAddApplicationFun = async (application: V2NIMFriendAddApplication) => {
+    try {
+      const neApplication = await this.convertToNEFriendAddApplication(application, true)
+      if (neApplication) {
+        this.friendAddApplications.unshift(neApplication)
+      }
+    } catch (err) {
+      console.log(err)
+    }
+  }
+  onFriendAddRejectedFun = async (rejection: V2NIMFriendAddRejection) => {
+    for (let item of this.friendAddApplications) {
+      if (item.friendAddApplication.applicantAccountId === ChatKitClient.getLoginUserId() &&
+        item.friendAddApplication.recipientAccountId === rejection.operatorAccountId) {
+        item.status = V2NIMFriendAddApplicationStatus.V2NIM_FRIEND_ADD_APPLICATION_STATUS_REJECTED
+        item.unreadCount = 0
+      }
+    }
+  }
 
   constructor() {
-    ChatKitClient.nim.friendService?.on("onFriendAddApplication", async (application: V2NIMFriendAddApplication) => {
-      try {
-        const neApplication = await this.convertToNEFriendAddApplication(application, true)
-        if (neApplication) {
-          this.friendAddApplications.unshift(neApplication)
-        }
-      } catch (err) {
-        console.log(err)
-      }
-    })
-
-    ChatKitClient.nim.friendService?.on("onFriendAddRejected", async (rejection: V2NIMFriendAddRejection) => {
-      for (let item of this.friendAddApplications) {
-        if (item.friendAddApplication.applicantAccountId === ChatKitClient.getLoginUserId() &&
-          item.friendAddApplication.recipientAccountId === rejection.operatorAccountId) {
-          item.status = V2NIMFriendAddApplicationStatus.V2NIM_FRIEND_ADD_APPLICATION_STATUS_REJECTED
-          item.unreadCount = 0
-        }
-      }
-    })
+    ChatKitClient.nim.friendService?.on("onFriendAddApplication", this.onFriendAddApplicationFun)
+    ChatKitClient.nim.friendService?.on("onFriendAddRejected", this.onFriendAddRejectedFun)
   }
 
   async convertToNEFriendAddApplication(item: V2NIMFriendAddApplication, move: boolean = false) {
@@ -220,5 +221,10 @@ export class ValidationMessageViewModel {
     } catch (err) {
       console.log(err)
     }
+  }
+
+  onDestroy() {
+    ChatKitClient.nim.friendService?.off("onFriendAddApplication", this.onFriendAddApplicationFun)
+    ChatKitClient.nim.friendService?.off("onFriendAddRejected", this.onFriendAddRejectedFun)
   }
 }

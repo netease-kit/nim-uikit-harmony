@@ -12,6 +12,11 @@ export enum MessageOperationType {
   Copy = 2,
   // 撤回
   Undo = 3,
+  // 转发
+  Translate = 4,
+  //标记
+  Pin = 5,
+  Unpin = 6
 }
 
 export class MessageOperationItem {

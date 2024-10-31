@@ -4,7 +4,4 @@
  * found in the LICENSE file.
  *
  */
-
-export { MainPage } from './src/main/ets/components/MainPage'
-
-export { KitReport } from './src/main/ets/KitReport'
+export { CoreKitClient } from './src/main/ets/CoreKitClient'

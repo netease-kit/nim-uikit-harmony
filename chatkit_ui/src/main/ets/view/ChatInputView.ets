@@ -4,17 +4,9 @@
  * found in the LICENSE file.
  *
  */
-import { NEImageButton } from './NEImageButton'
-import prompt from '@ohos.prompt';
-import { abilityAccessCtrl, bundleManager, common, Permissions, Want } from '@kit.AbilityKit';
-import { BusinessError } from '@kit.BasicServicesKit';
-import { photoAccessHelper } from '@kit.MediaLibraryKit';
+import { NEImageButton } from './NEImageButton';
 import { NEChatMoreOperationData, NEChatMoreOperationType } from '../model/NEChatMoreOperationData';
-import picker from '@ohos.file.picker';
-import { NEChatEmojiView } from './NEChatEmojiView';
-import { NEEmojiManager, NIMInputEmoticon } from '../manager/NEEmojiManager';
-import { NEChatMoreOperation } from './ChatMoreOperationLayout';
-import { NEAudioRecordView } from './NEAudioRecordView';
+import { NEEmojiManager } from '../manager/NEEmojiManager';
 import { inputMethod } from '@kit.IMEKit';
 
 export enum InputStyleType {
@@ -50,9 +42,19 @@ export struct NEChatInputView {
   controller?: RichEditorController;
   inputFontSize = 16;
   contentLength = 0;
+  @Param
+  mute: boolean = false
 
   aboutToAppear(): void {
     this.initData();
+  }
+
+  @Monitor('mute')
+  onMute(monitor: IMonitor) {
+    if (this.mute) {
+      this.controller?.deleteSpans()
+      this.controller?.stopEditing()
+    }
   }
 
   // 初始化数据
@@ -70,75 +72,41 @@ export struct NEChatInputView {
     NEEmojiManager.instance.setup();
   }
 
-  toSendMessage() {
-    console.log('net ease toSendMessage')
-    this.text = '';
-    let results = this.controller?.getSpans();
-    console.log('net ease rich editor results:' + JSON.stringify(results))
-    results?.forEach((item) => {
-      if (typeof (item as RichEditorImageSpanResult)['imageStyle'] != 'undefined') {
-        let resourcePath = (item as RichEditorImageSpanResult).valueResourceStr;
-        if (resourcePath != null && resourcePath.toString().length > 0) {
-          let path = resourcePath.toString();
-          let splits = path.split("/")
-          let fileName = splits[splits.length - 1];
-          console.log('net ease file name :' + fileName)
-          let emoji = NEEmojiManager.instance.getEmojiByName(String(fileName));
-          if (emoji?.tag != null) {
-            this.text += emoji.tag;
-          }
-          console.log('net ease current text ', this.text)
-        }
-      } else {
-        this.text += (item as RichEditorTextSpanResult).value;
-        console.log('net ease current text ', this.text)
-      }
-    })
-  }
-
   build() {
     RelativeContainer() {
       RichEditor({ controller: this.controller })
-        .backgroundColor("#FFFFFF")
+        .backgroundColor(this.mute ? '#ffE3E4E4' : "#FFFFFF")
         .height(40)
         .alignRules({
           left: { anchor: "__container__", align: HorizontalAlign.Start },
           right: { anchor: "__container__", align: HorizontalAlign.End },
           top: { anchor: "__container__", align: VerticalAlign.Top },
         })
-        .placeholder($r('app.string.chat_send_tips', this.placeHolder))
+        .placeholder(this.mute ? $r('app.string.chat_team_all_mute') :
+        $r('app.string.chat_send_tips', this.placeHolder))
         .onWillChange((value: RichEditorChangeValue) => {
-          console.log('net ease test log: onWillChange')
           return true
         })
         .onDidChange((rangeBefore: TextRange, rangeAfter: TextRange) => {
-          console.log('net ease onDidChange')
-          console.log('net ease rangeBefore:' + JSON.stringify(rangeBefore))
-          console.log('net ease rangeAfter:' + JSON.stringify(rangeAfter))
         })
         .onSizeChange((oldValue: SizeOptions, newValue: SizeOptions) => {
-          console.log('net ease test log: onSizeChange old value ', JSON.stringify(oldValue))
-          console.log('net ease test log: onSizeChange new value ', JSON.stringify(newValue))
 
         })
         .onCut((event: CutEvent) => {
           event.preventDefault!()
-          console.log('net ease ：onCut')
         })
         .onCopy((event: CopyEvent) => {
           event.preventDefault!()
-          console.log('net ease ：onCopy')
         })
         .onPaste(() => {
-          console.log('net ease ：onPaste')
         })
         .borderRadius(8)
         .id("chat_input")
-        .onSubmit((type) => {
-          if (type == EnterKeyType.Send) {
-            console.log("net ease send input text message");
+        .onSubmit((enterKey: EnterKeyType, event: SubmitEvent) => {
+          if (enterKey == EnterKeyType.Send) {
             if (this.onSendTextMessage) {
               this.onSendTextMessage();
+              event.keepEditableState()
             }
           }
         })
@@ -344,6 +312,18 @@ export struct NEChatInputView {
         right: { anchor: "__container__", align: HorizontalAlign.End },
         top: { anchor: "chat_input", align: VerticalAlign.Bottom },
       })
+
+      if (this.mute) {
+        Column()
+          .alignRules({
+            left: { anchor: "__container__", align: HorizontalAlign.Start },
+            right: { anchor: "__container__", align: HorizontalAlign.End },
+            top: { anchor: "__container__", align: VerticalAlign.Top },
+            bottom: { anchor: "__container__", align: VerticalAlign.Bottom }
+          })
+          .width('100%')
+          .height('100%')
+      }
     }.padding({ top: 6, left: 7, right: 7 })
   }
 }

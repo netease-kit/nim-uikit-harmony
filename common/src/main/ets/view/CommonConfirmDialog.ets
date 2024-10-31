@@ -10,6 +10,8 @@
  */
 @CustomDialog
 export struct CommonConfirmDialog {
+  //title
+  @State title: string | Resource | undefined = undefined
   //确认内容
   @State confirmContent: string | Resource = ''
   @State showCancelButton: boolean = true
@@ -21,10 +23,16 @@ export struct CommonConfirmDialog {
 
   build() {
     Column() {
+      if (this.title) {
+        Text(this.title)
+          .fontSize(20)
+          .fontColor('#ff333333')
+          .margin({ top: 20 })
+      }
       Text(this.confirmContent)
-        .fontSize(20)
+        .fontSize(14)
         .fontColor('#ff333333')
-        .margin({ top: 40, bottom: 50 })
+        .margin({ top: 20, bottom: 20 })
       Flex({ justifyContent: FlexAlign.SpaceAround }) {
         if (this.showCancelButton) {
           Button($r('app.string.cancel'))
@@ -45,7 +53,9 @@ export struct CommonConfirmDialog {
               this.confirm()
             }
           }).backgroundColor(0xffffff).fontColor('#ff007AFF')
-      }.margin({ bottom: 10 })
+      }
+      .margin({ bottom: 10 })
     }
+    .backgroundColor(0xffffff)
   }
 }

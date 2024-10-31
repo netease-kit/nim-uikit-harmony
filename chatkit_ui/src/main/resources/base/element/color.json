@@ -35,6 +35,18 @@
     {
       "name": "color_chat_converse_bg",
       "value": "#50000000"
+    },
+    {
+      "name": "color_chat_pin_bg",
+      "value": "#FFFBEA"
+    },
+    {
+      "name": "color_chat_page_bg",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "color_chat_pin_tips",
+      "value": "#3EAF96"
     }
   ]
 }

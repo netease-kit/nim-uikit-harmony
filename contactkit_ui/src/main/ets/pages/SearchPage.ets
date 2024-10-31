@@ -11,12 +11,12 @@ import {
   CommonAvatar,
   CommonEmptyResult,
   CommonTextInput,
+  ListGroupHeader,
   NavigationBackBuilder,
   TailString
 } from '@nimkit/common';
 import { SearchViewModel } from '../viewmodel/SearchViewModel';
 import { SearchListModel } from '../model/SearchListModel';
-import { ListGroupHeader } from './ContactPage';
 import { ChatKitClient } from '@nimkit/chatkit';
 
 @ComponentV2
@@ -71,7 +71,7 @@ export struct SearchPage {
         value.length > 0 && this.viewModel.friendData.length === 0 && this.viewModel.discussData.length === 0 &&
           this.viewModel.seniorData.length === 0
     } catch (err) {
-      console.log(err)
+      console.error(err)
     }
   }
 
@@ -87,7 +87,8 @@ export struct SearchPage {
 
         CommonTextInput({
           placeHolderText: $r('app.string.common_search_placeholder'),
-          onTextChange: this.onTextChange
+          onTextChange: this.onTextChange,
+          keepEditableState: false
         })
 
         if (this.isEmpty) {

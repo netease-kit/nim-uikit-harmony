@@ -1,8 +1,12 @@
 {
   "string": [
     {
-      "name": "page_show",
-      "value": "page from package"
+      "name": "chat_network_error_tips",
+      "value": "当前网络不可用，请检查你的网络设置。"
+    },
+    {
+      "name": "chat_pin_limit_error_tips",
+      "value": "PIN消息已达最大限制"
     }
   ]
 }

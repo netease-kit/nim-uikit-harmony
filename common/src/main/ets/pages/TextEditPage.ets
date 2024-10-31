@@ -14,6 +14,7 @@ export interface TextEditParams {
   showSave: boolean
   maxLine?: number
   height?: Length
+  emptyTextEnable?: boolean
 }
 
 /**
@@ -38,9 +39,14 @@ export struct TextEditPage {
             this.pathStack.pop()
           },
           rightButtonTitle: this.params?.showSave ? $r('app.string.save') : undefined,
-          rightButtonColor: '#ff337EFF',
+          rightButtonColor: (this.params?.emptyTextEnable === false
+            && this.content.length <= 0) ? '#80337EFF' : '#ff337EFF',
           backgroundColor: '#ffEFF1F4',
           rightButtonAction: this.params?.showSave ? () => {
+            if (this.params?.emptyTextEnable === false
+              && this.content.length <= 0) {
+              return
+            }
             this.pathStack.pop(this.content)
           } : undefined
         }

@@ -5,42 +5,29 @@
  *
  */
 
-import { ChatKitClient, TeamRepo } from '@nimkit/chatkit'
-import { AvatarColorUntil, AvatarItem, CommonAvatar, NavigationBackBuilder, TextEditParams } from '@nimkit/common'
+import { TeamRepo } from '@nimkit/chatkit'
+import {
+  AvatarColorUntil,
+  AvatarItem,
+  CommonAvatar,
+  NavigationBackBuilder,
+  NECommonUtils,
+  TextEditParams
+} from '@nimkit/common'
 import {
   V2NIMTeam,
-  V2NIMTeamMember,
   V2NIMTeamMemberRole,
   V2NIMTeamType,
   V2NIMTeamUpdateInfoMode,
   V2NIMUpdateTeamInfoParams
 } from '@nimsdk/base'
+import { TeamInfoViewModel } from '../viewModel/TeamInfoViewModel'
 import { AvatarEditParams } from './TeamAvatarPage'
 
-@Component
+@ComponentV2
 struct TeamInfoPage {
   pathStack: NavPathStack = new NavPathStack()
-  @State teamInfo?: V2NIMTeam = undefined
-  //本人的群成员身份
-  mineTeamMember?: V2NIMTeamMember
-
-  initTeamData() {
-    ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', (team) => {
-      if (team.teamId === this.teamInfo?.teamId) {
-        this.teamInfo = team
-      }
-    })
-    if (this.teamInfo) {
-      TeamRepo.getTeamMemberListByIds(
-        this.teamInfo.teamId,
-        this.teamInfo.teamType,
-        [ChatKitClient.getLoginUserId()]
-      ).then((result) => {
-        this.mineTeamMember = result[0]
-      })
-    }
-
-  }
+  @Local viewModel: TeamInfoViewModel = new TeamInfoViewModel()
 
   build() {
     NavDestination() {
@@ -51,7 +38,7 @@ struct TeamInfoPage {
           this.pathStack.pop()
         }
       })
-      if (this.teamInfo) {
+      if (this.viewModel.teamInfo) {
         Column() {
           Row() {
             Text($r('app.string.team_avatar'))
@@ -62,9 +49,9 @@ struct TeamInfoPage {
 
             CommonAvatar({
               item: new AvatarItem(
-                this.teamInfo?.avatar,
-                this.teamInfo?.name,
-                AvatarColorUntil.getBackgroundColorById(this.teamInfo?.teamId)
+                this.viewModel.teamInfo?.avatar,
+                this.viewModel.teamInfo?.name,
+                AvatarColorUntil.getBackgroundColorById(this.viewModel.teamInfo?.teamId)
               )
             })
               .width(42)
@@ -109,7 +96,7 @@ struct TeamInfoPage {
             this.goToEditTeamName()
           })
 
-          if (!TeamRepo.isGroupTeam(this.teamInfo)) {
+          if (!TeamRepo.isGroupTeam(this.viewModel.teamInfo)) {
             Row() {
               Text($r('app.string.team_des'))
                 .fontSize(16)
@@ -142,18 +129,20 @@ struct TeamInfoPage {
     .backgroundColor('#ffEFF1F4')
     .onReady((context: NavDestinationContext) => {
       this.pathStack = context.pathStack
-      this.teamInfo = context.pathStack.getParamByName('TeamInfoPage')[0] as V2NIMTeam
-      this.initTeamData()
+      let teamInfo = context.pathStack.getParamByName('TeamInfoPage')[0] as V2NIMTeam
+      this.viewModel.initTeamData(teamInfo)
+      this.viewModel.getMineTeamMember()
     })
   }
 
   //修改群名称
   goToEditTeamName() {
     let params: TextEditParams = {
-      content: this.teamInfo?.name ?? '',
+      content: this.viewModel.teamInfo?.name ?? '',
       title: $r('app.string.team_name'),
       maxLength: 30,
-      showSave: this.havePermissionToEditTeamInfo()
+      showSave: this.havePermissionToEditTeamInfo(),
+      emptyTextEnable: false
     }
     this.pathStack.pushPath({
       name: 'TextEditPage',
@@ -165,10 +154,13 @@ struct TeamInfoPage {
             name: teamName
           }
           TeamRepo.updateTeamInfo(
-            this.teamInfo?.teamId,
+            this.viewModel.teamInfo?.teamId,
             V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
             params
-          )
+          ).catch((e: Error) => {
+            console.debug(`update team info error:${e.message}`)
+            NECommonUtils.showToast($r('app.string.common_operate_failed'))
+          })
         }
       }
     })
@@ -177,7 +169,7 @@ struct TeamInfoPage {
   //修改群介绍
   goToEditTeamDesc() {
     let params: TextEditParams = {
-      content: this.teamInfo?.intro ?? '',
+      content: this.viewModel.teamInfo?.intro ?? '',
       title: $r('app.string.team_des'),
       maxLength: 100,
       maxLine: 5,
@@ -194,27 +186,30 @@ struct TeamInfoPage {
             intro: teamDesc
           }
           TeamRepo.updateTeamInfo(
-            this.teamInfo?.teamId,
+            this.viewModel.teamInfo?.teamId,
             V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
             params
-          )
+          ).catch((e: Error) => {
+            console.debug(`update team info error:${e.message}`)
+            NECommonUtils.showToast($r('app.string.common_operate_failed'))
+          })
         }
       }
     })
   }
 
   havePermissionToEditTeamInfo(): boolean {
-    if (this.teamInfo?.updateInfoMode == V2NIMTeamUpdateInfoMode.V2NIM_TEAM_UPDATE_INFO_MODE_ALL) {
+    if (this.viewModel.teamInfo?.updateInfoMode == V2NIMTeamUpdateInfoMode.V2NIM_TEAM_UPDATE_INFO_MODE_ALL) {
       return true
     }
-    return this.mineTeamMember?.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_OWNER
-      || this.mineTeamMember?.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_MANAGER
+    return this.viewModel.mineTeamMember?.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_OWNER
+      || this.viewModel.mineTeamMember?.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_MANAGER
   }
 
   //修改群头像
   goToEditTeamAvatar() {
     const param: AvatarEditParams = {
-      avatar: this.teamInfo?.avatar ?? '',
+      avatar: this.viewModel.teamInfo?.avatar ?? '',
       showSave: this.havePermissionToEditTeamInfo()
     }
     this.pathStack.pushPath({
@@ -227,13 +222,20 @@ struct TeamInfoPage {
             avatar: teamAvatar
           }
           TeamRepo.updateTeamInfo(
-            this.teamInfo?.teamId,
+            this.viewModel.teamInfo?.teamId,
             V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
             params
-          )
+          ).catch((e: Error) => {
+            console.debug(`update team info error:${e.message}`)
+            NECommonUtils.showToast($r('app.string.common_operate_failed'))
+          })
         }
       }
     })
+  }
+
+  aboutToDisappear(): void {
+    this.viewModel.destroy()
   }
 }
 

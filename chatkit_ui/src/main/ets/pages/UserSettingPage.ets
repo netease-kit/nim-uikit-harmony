@@ -8,6 +8,7 @@
 import {
   ChatKitClient,
   ContactRepo,
+  ErrorUtils,
   NEFriendUserCache,
   NEUserWithFriend,
   PersonSelectParam,
@@ -23,74 +24,68 @@ import {
   ViewItemBuilder,
   ViewItemSwitch
 } from '@nimkit/common'
+import { UserSettingViewModel } from '../viewmodel/UserSettingViewModel'
 
 @ComponentV2
 export struct UserSettingPage {
   pathStack: NavPathStack = new NavPathStack()
   accountId?: string
   @Local userWithFriend?: NEUserWithFriend
-  chatViewModel?: ChatP2PViewModel
+  viewModel: UserSettingViewModel = new UserSettingViewModel()
   firstItems: ViewItemArrow[] = [
-  // {
-  //   title: $r("app.string.setting_pin"),
-  //   itemHeight: 48,
-  //   routerUrl: "",
-  //   rightIcon: $r('app.media.arrow_right')
-  // }
+    {
+      title: $r("app.string.setting_pin"),
+      itemHeight: 48,
+      routerUrl: "PinMessagePage",
+      rightIcon: $r('app.media.arrow_right')
+    }
   ]
   // 设置是否开启消息提醒
   setP2PNotify = async (isOpen: boolean) => {
-    try {
-      await this.chatViewModel?.setP2PNotify(isOpen)
-    } catch (err) {
-      console.log(err)
+    if (ErrorUtils.checkNetworkAndToast()) {
+      try {
+        await this.viewModel?.setP2PNotify(isOpen)
+      } catch (err) {
+        console.log(err)
+      }
     }
   }
   // 设置是否聊天置顶
   stickTopConversation = async (isOpen: boolean) => {
-    try {
-      await this.chatViewModel?.stickTopConversation(isOpen)
-    } catch (err) {
-      console.log(err)
+    if (ErrorUtils.checkNetworkAndToast()) {
+      try {
+        await this.viewModel?.stickTopConversation(isOpen)
+      } catch (err) {
+        console.log(err)
+      }
     }
   }
-  secondItems: ViewItemSwitch[] = [
-    {
-      title: $r('app.string.setting_message_notify'),
-      itemHeight: 48,
-      isOpen: false,
-      switchChange: this.setP2PNotify
-    },
-    {
-      title: $r('app.string.setting_message_stick_top'),
-      itemHeight: 48,
-      isOpen: false,
-      switchChange: this.stickTopConversation
-    },
-  ]
+  @Local secondItems: ViewItemSwitch[] = []
   // 创建讨论组
   createDiscussion = async (selectedList: NEUserWithFriend[]) => {
-    const inviteeAccountIds: string[] = []
-    selectedList.forEach((userWithFriend) => {
-      if (userWithFriend.user?.accountId) {
-        inviteeAccountIds.push(userWithFriend.user.accountId)
+    if (ErrorUtils.checkNetworkAndToast()) {
+      const inviteeAccountIds: string[] = []
+      selectedList.forEach((userWithFriend) => {
+        if (userWithFriend.user?.accountId) {
+          inviteeAccountIds.push(userWithFriend.user.accountId)
+        }
+      })
+      if (this.viewModel?.accountId) {
+        inviteeAccountIds.push(this.viewModel?.accountId)
       }
-    })
-    if (this.chatViewModel?.accountId) {
-      inviteeAccountIds.push(this.chatViewModel?.accountId)
-    }
 
-    try {
-      const createTeamResult = await TeamRepo.createGroupTeam(inviteeAccountIds)
+      try {
+        const createTeamResult = await TeamRepo.createGroupTeam(inviteeAccountIds)
 
-      // 替换聊天页
-      if (createTeamResult?.team) {
-        this.pathStack.popToName('ChatP2PPage')
-        this.pathStack.replacePathByName('ChatTeamPage',
-          ChatKitClient.nim.conversationIdUtil.teamConversationId(createTeamResult.team.teamId))
+        // 替换聊天页
+        if (createTeamResult?.team) {
+          this.pathStack.popToName('ChatP2PPage')
+          this.pathStack.replacePathByName('ChatTeamPage',
+            ChatKitClient.nim.conversationIdUtil.teamConversationId(createTeamResult.team.teamId))
+        }
+      } catch (err) {
+        console.log(err)
       }
-    } catch (err) {
-      console.log(err)
     }
   }
 
@@ -99,16 +94,35 @@ export struct UserSettingPage {
     this.pathStack.pushPath({
       name: 'PersonSelectPage',
       param: new PersonSelectParam(this.createDiscussion,
-        [this.chatViewModel?.accountId],
+        [this.viewModel?.accountId],
         10)
     })
   }
 
+  updateSecondItems() {
+    this.secondItems = [
+      {
+        title: $r('app.string.setting_message_notify'),
+        itemHeight: 48,
+        isOpen: this.viewModel.isMessageNotify,
+        switchChange: this.setP2PNotify
+      },
+      {
+        title: $r('app.string.setting_message_stick_top'),
+        itemHeight: 48,
+        isOpen: this.viewModel.isStickTop,
+        switchChange: this.stickTopConversation
+      }
+    ]
+  }
+
   async requestData() {
-    this.chatViewModel = this.pathStack.getParamByName('UserSettingPage')[0] as ChatP2PViewModel
-    this.secondItems[0].isOpen = this.chatViewModel.isMessageNotify
-    this.secondItems[1].isOpen = this.chatViewModel.isStickTop
-    const accountId = this.chatViewModel.accountId
+    const conversationId = this.pathStack.getParamByName('UserSettingPage')[0] as string
+    this.viewModel.init(conversationId).then(() => {
+      this.updateSecondItems()
+    })
+
+    const accountId = this.viewModel.accountId
     if (NEFriendUserCache.getInstance().isFriend(accountId)) {
       this.userWithFriend = NEFriendUserCache.getInstance().getFriendById(accountId)
     } else {
@@ -135,46 +149,48 @@ export struct UserSettingPage {
         })
 
         Row() {
-          Column() {
-            CommonAvatar({
-              item: new AvatarItem(this.userWithFriend?.user?.avatar,
-                this.userWithFriend?.shortName(),
-                AvatarColorUntil.getBackgroundColorById(this.userWithFriend?.user?.accountId ?? "")),
-              roundRadius: 21,
-              textSize: 16
-            })
+          Row() {
+            Column() {
+              CommonAvatar({
+                item: new AvatarItem(this.userWithFriend?.user?.avatar,
+                  this.userWithFriend?.shortName(),
+                  AvatarColorUntil.getBackgroundColorById(this.userWithFriend?.user?.accountId ?? "")),
+                roundRadius: 21,
+                textSize: 16
+              })
+                .width(42)
+                .height(42)
+
+              Text(this.userWithFriend?.showName())
+                .width(42)
+                .height(14)
+                .fontSize(12)
+                .maxLines(1)
+                .textOverflow({
+                  overflow: TextOverflow.Ellipsis
+                })
+                .margin({
+                  top: 6
+                })
+            }
+            .width(42)
+            .height(80)
+
+            Image($r('app.media.team_invite'))
               .width(42)
               .height(42)
-
-            Text(this.userWithFriend?.showName())
-              .width(42)
-              .fontSize(12)
-              .maxLines(1)
-              .textOverflow({
-                overflow: TextOverflow.Ellipsis
-              })
               .margin({
-                top: 6
+                left: 16
+              })
+              .onClick(() => {
+                this.onAddButtonClick()
               })
           }
-          .width(42)
-          // .alignSelf(ItemAlign.Start)
-          .height('100%')
-
-          Image($r('app.media.team_invite'))
-            .width(42)
-            .height(42)
-            .margin({
-              left: 16
-            })
-            .onClick(() => {
-              this.onAddButtonClick()
-            })
+          .alignSelf(ItemAlign.Start)
+          .alignItems(VerticalAlign.Top)
+          .height(80)
+          .width('100%')
         }
-        .width('100%')
-        .alignSelf(ItemAlign.Start)
-        .alignItems(VerticalAlign.Top)
-        .height(86)
         .borderRadius(8)
         .backgroundColor(Color.White)
         .margin({
@@ -196,6 +212,12 @@ export struct UserSettingPage {
             .width('100%')
             .height(item.itemHeight)
             .backgroundColor(item.backgroundColor ?? Color.White)
+            .onClick(() => {
+              this.pathStack.pushPath({
+                name: item.routerUrl,
+                param: this.viewModel?.conversationId
+              })
+            })
           })
 
           ForEach(this.secondItems, (item: ViewItemSwitch) => {

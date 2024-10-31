@@ -12,9 +12,12 @@ export class DeviceUtils {
   private static msgLineWidth: number = 0;
 
   static getMessageLineWidth(): number {
-    if (DeviceUtils.msgLineWidth == 0) {
-      DeviceUtils.msgLineWidth = DeviceUtils.windowPXWidth - vp2px(144);
-    }
+    DeviceUtils.msgLineWidth = DeviceUtils.windowPXWidth - vp2px(144);
+    return DeviceUtils.msgLineWidth;
+  }
+
+  static getPinMessageLineWidth(): number {
+    DeviceUtils.msgLineWidth = DeviceUtils.windowPXWidth - vp2px(72);
     return DeviceUtils.msgLineWidth;
   }
 }

@@ -69,12 +69,16 @@
       "value": "[聊天记录]"
     },
     {
-      "name": "conversation_empty",
-      "value": "暂无会话"
-    },
-    {
       "name": "createAdvancedTeamSuccess",
       "value": "成功创建高级群"
+    },
+    {
+      "name": "msg_type_rtc_video",
+      "value": "[视频通话]"
+    },
+    {
+      "name": "msg_type_rtc_audio",
+      "value": "[语音通话]"
     }
   ]
 }

@@ -5,7 +5,7 @@
  *
  */
 
-import { ChatKitClient } from '@nimkit/chatkit';
+import { ChatKitClient, ErrorUtils } from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -174,13 +174,15 @@ export function ValidationMessagePageBuilder() {
 export struct ValidationMessagePage {
   pathStack: NavPathStack = new NavPathStack()
   viewModel: ValidationMessageViewModel = new ValidationMessageViewModel()
+  hasPop: boolean = false
   // 返回前设置验证消息已读
   backAction = async () => {
+    this.hasPop = true
     try {
       await this.viewModel.setAddApplicationRead()
       this.pathStack.pop(0)
     } catch (err) {
-      console.log(err)
+      console.error(err)
     }
   }
 
@@ -188,27 +190,31 @@ export struct ValidationMessagePage {
     try {
       await this.viewModel.getAddApplicationList()
     } catch (err) {
-      console.log(err)
+      console.error(err)
     }
   }
 
   // 【同意】按钮点击事件
   onAcceptClick = (application?: V2NIMFriendAddApplication) => {
-    if (application) {
-      this.viewModel.acceptAddApplication(application)
+    if (ErrorUtils.checkNetworkAndToast()) {
+      if (application) {
+        this.viewModel.acceptAddApplication(application)
+      }
     }
   }
-
   // 【拒绝】按钮点击事件
   onRefuseClick = (application?: V2NIMFriendAddApplication) => {
-    if (application) {
-      this.viewModel.rejectAddApplication(application)
+    if (ErrorUtils.checkNetworkAndToast()) {
+      if (application) {
+        this.viewModel.rejectAddApplication(application)
+      }
     }
   }
-
   // 【清空】按钮点击事件
   onCleanClick = () => {
-    NECommonUtils.showToast("清空")
+    if (ErrorUtils.checkNetworkAndToast()) {
+      NECommonUtils.showToast("清空")
+    }
   }
 
   build() {
@@ -268,11 +274,16 @@ export struct ValidationMessagePage {
       this.requestData()
     })
     .onHidden(() => {
-      this.viewModel.setAddApplicationRead()
+      if (!this.hasPop) {
+        this.viewModel.setAddApplicationRead()
+      }
     })
     .onBackPressed(() => {
       this.backAction()
       return true;
+    })
+    .onDisAppear(() => {
+      this.viewModel.onDestroy()
     })
   }
 }

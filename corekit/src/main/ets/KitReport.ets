@@ -37,9 +37,9 @@ export class KitReport {
         readTimeout: 60000, // 可选，默认为60000ms
       }, (err, data) => {
         if (!err) {
-          console.debug('xKitReport report success')
+          console.debug('coreKit server success')
         }
-        console.debug('xKitReport report failed')
+        console.debug('coreKit server failed')
       })
 
   }

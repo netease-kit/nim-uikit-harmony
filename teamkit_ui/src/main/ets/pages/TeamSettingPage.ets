@@ -11,12 +11,20 @@ import {
   CommonAvatar,
   CommonConfirmDialog,
   NavigationBackBuilder,
+  NECommonUtils,
   TextEditParams
 } from '@nimkit/common'
-import { V2NIMTeamChatBannedMode, V2NIMTeamInviteMode, V2NIMTeamMemberRole, V2NIMTeamType } from '@nimsdk/base'
+import {
+  V2NIMError,
+  V2NIMTeamChatBannedMode,
+  V2NIMTeamInviteMode,
+  V2NIMTeamMemberRole,
+  V2NIMTeamType
+} from '@nimsdk/base'
 import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
-import { TeamViewModel } from '../viewModel/TeamViewModel'
+import { TeamSettingViewModel } from '../viewModel/TeamViewModel'
 import { ChatKitClient, NEUserWithFriend, PersonSelectParam, TeamRepo } from '@nimkit/chatkit'
+import { MemberListParams } from './TeamMemberListPage'
 
 @ComponentV2
 export struct TeamSettingPage {
@@ -26,10 +34,11 @@ export struct TeamSettingPage {
   //
   // @Local teamMemberList:V2NIMTeamMember[] = []
 
-  teamViewModel?: TeamViewModel
+  teamViewModel?: TeamSettingViewModel
   dialogLeaveGroupTeamDialogController: CustomDialogController = new CustomDialogController({
     builder: CommonConfirmDialog({
-      confirmContent: $r('app.string.team_group_left'),
+      title: $r('app.string.team_group_left'),
+      confirmContent: $r('app.string.team_group_left_content'),
       confirm: () => {
         this.leftGroupTeam()
       },
@@ -37,7 +46,8 @@ export struct TeamSettingPage {
   })
   dialogDismissTeamController: CustomDialogController = new CustomDialogController({
     builder: CommonConfirmDialog({
-      confirmContent: $r('app.string.team_dismiss'),
+      title: $r('app.string.team_dismiss'),
+      confirmContent: $r('app.string.team_dismiss_content'),
       confirm: () => {
         this.dismissTeam()
       },
@@ -45,7 +55,8 @@ export struct TeamSettingPage {
   })
   dialogLeaveTeamController: CustomDialogController = new CustomDialogController({
     builder: CommonConfirmDialog({
-      confirmContent: $r('app.string.team_left'),
+      title: $r('app.string.team_left'),
+      confirmContent: $r('app.string.team_left_content'),
       confirm: () => {
         this.leftTeam()
       },
@@ -134,16 +145,20 @@ export struct TeamSettingPage {
               top: 12,
               bottom: 12
             }).onClick(() => {
+              let params: MemberListParams = {
+                caseRole: !this.isGroupTeam(),
+                teamId: this.teamId
+              }
               this.pathStack.pushPath({
                 name: 'TeamMemberListPage',
-                param: this.teamId
+                param: params
               })
             })
 
             List({
               space: 15
             }) {
-              if (this.showAddTeamMember()) {
+              if (this.haveAddTeamMemberPermission()) {
                 ListItem() {
                   Image($r('app.media.team_invite'))
                     .width(32)
@@ -197,6 +212,27 @@ export struct TeamSettingPage {
 
 
           Column() {
+            Row() {
+              Text($r('app.string.setting_pin'))
+                .fontSize(16)
+                .fontColor('#ff333333')
+
+              Blank().layoutWeight(1)
+
+              Image($r('app.media.arrow_right'))
+                .width(4.92)
+                .height(9.54)
+            }
+            .height(40)
+            .width('100%')
+            .alignItems(VerticalAlign.Center)
+            .onClick(() => {
+              const conversationId = ChatKitClient.nim.conversationIdUtil.teamConversationId(this.teamViewModel?.teamId)
+              this.pathStack.pushPath({
+                name: 'PinMessagePage',
+                param: conversationId,
+              })
+            })
 
             Row() {
               Text($r("app.string.setting_message_notify"))
@@ -422,6 +458,13 @@ export struct TeamSettingPage {
     })
   }
 
+  aboutToDisappear(): void {
+    this.dialogLeaveTeamController.close()
+    this.dialogLeaveGroupTeamDialogController.close()
+    this.dialogDismissTeamController.close()
+    this.teamViewModel?.destroy()
+  }
+
   //弹框退出讨论组
   showLeaveGroupTeamDialog() {
     this.dialogLeaveGroupTeamDialogController.open()
@@ -491,8 +534,8 @@ export struct TeamSettingPage {
     })
   }
 
-  //是否显示添加成员按钮
-  showAddTeamMember(): boolean {
+  //是否有添加成员的权限
+  haveAddTeamMemberPermission(): boolean {
     if (this.teamViewModel?.team) {
       if (TeamRepo.isGroupTeam(this.teamViewModel?.team)) {
         return true
@@ -521,7 +564,7 @@ export struct TeamSettingPage {
   requestTeamInfo() {
     let index = this.pathStack.getIndexByName('TeamSettingPage')
     this.teamId = this.pathStack.getParamByIndex(index[0]) as string
-    this.teamViewModel = new TeamViewModel(this.teamId)
+    this.teamViewModel = new TeamSettingViewModel(this.teamId)
     this.teamViewModel.initTeamInfo()
   }
 
@@ -529,11 +572,21 @@ export struct TeamSettingPage {
   teamSelectorCallback = async (selectedList: NEUserWithFriend[]) => {
     try {
       this.pathStack.pop()
+      if (!this.haveAddTeamMemberPermission()) {
+        NECommonUtils.showToast($r('app.string.team_operate_no_permission_tip'))
+        return
+      }
       let invitees = selectedList.map(user => user.user?.accountId ?? '')
       TeamRepo.inviteMember(this.teamId,
         V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
         invitees
-      )
+      ).then((accIds) => {
+        console.debug(`inviteMember success ${accIds.join(',')}`)
+      })
+        .catch((e: V2NIMError) => {
+          console.debug(`inviteMember faile ${e.message}`)
+          NECommonUtils.showToast($r('app.string.common_operate_failed'))
+        })
     } catch (err) {
       console.log(err)
     }

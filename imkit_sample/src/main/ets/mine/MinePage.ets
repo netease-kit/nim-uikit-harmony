@@ -7,14 +7,17 @@
 
 import { V2NIMUser } from '@nimsdk/base';
 import { ViewItem } from '@nimkit/common/src/main/ets/model/ViewItem';
-import { AvatarColorUntil, AvatarItem, CommonAvatar, ViewItemBuilder } from '@nimkit/common';
-import { NEFriendUserCache } from '@nimkit/chatkit';
+import { AvatarColorUntil, AvatarItem, CommonAvatar, CommonConstants, ViewItemBuilder } from '@nimkit/common';
+import { ChatKitClient, NEFriendUserCache } from '@nimkit/chatkit';
 
 // 跳转页面入口函数
 @Builder
 function MinePageBuilder() {
   MinePage()
 }
+
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_EARPIECE_MODE, true)
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, true)
 
 @ComponentV2
 export struct MinePage {
@@ -47,13 +50,26 @@ export struct MinePage {
     },
   ]
 
+  getAvatarName(): string {
+    let user = NEFriendUserCache.mineUserCache?.user
+    let avatarName = ChatKitClient.getLoginUserId()
+    if (user && user.name.length > 0) {
+      if (user.name.length > 2) {
+        avatarName = user.name.substring(user.name.length - 2, user.name.length)
+      } else {
+        avatarName = user.name
+      }
+    }
+    return avatarName
+  }
+
   build() {
     NavDestination() {
       Column({ space: 6 }) {
         Row() {
           CommonAvatar({
             item: new AvatarItem(NEFriendUserCache.mineUserCache?.user?.avatar,
-              NEFriendUserCache.mineUserCache?.user?.name,
+              this.getAvatarName(),
               AvatarColorUntil.getBackgroundColorById(NEFriendUserCache.mineUserCache?.user?.accountId ?? "")),
             roundRadius: 30,
             textSize: 22

@@ -8,31 +8,42 @@
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import fs from '@ohos.file.fs';
 import {
+  V2NIMMessage,
   V2NIMMessageAudioAttachment,
   V2NIMMessageCallAttachment,
   V2NIMMessageFileAttachment,
   V2NIMMessageImageAttachment,
   V2NIMMessageNotificationType,
-  V2NIMMessageRevokeNotification,
   V2NIMMessageType,
   V2NIMMessageVideoAttachment
 } from '@nimsdk/base/src/main/ets/nim/sdk/V2NIMMessageService';
 import {
+  IM_ELITE_SDK_VERSION_HUMAN,
   V2NIMConversationType,
   V2NIMMessageNotificationAttachment,
   V2NIMTeamChatBannedMode,
   V2NIMTeamInviteMode,
   V2NIMTeamUpdateInfoMode
 } from '@nimsdk/base';
-import { ChatKitClient, ChatRepo } from '@nimkit/chatkit';
-import { JSONUtil } from '@nimkit/common';
-import { systemDateTime } from '@kit.BasicServicesKit';
+import {
+  ChatKitClient,
+  ContactRepo,
+  mergedMessageAvatarKey,
+  mergedMessageNickKey,
+  NEFriendUserCache,
+  StorageRepo
+} from '@nimkit/chatkit';
 import { DeviceUtils } from './DeviceUtils';
 import { FileUtils } from './FileUtils';
 import { ChatConst } from '../constants/ChatConst';
 import { DateUtils } from './DateUtils';
 import { NEEmojiManager, NEEmojiParseResult } from '../manager/NEEmojiManager';
 import { ChatInfo } from '../model/ChatInfo';
+import { List } from '@kit.ArkTS';
+import { ImagesIndexModel } from '@nimkit/common';
+import { fileUri } from '@kit.CoreFileKit';
+import { BusinessError } from '@kit.BasicServicesKit';
+import { openFileWithApp } from '../common/ChatUtils';
 
 // 获取群通知消息内容
 export function getNotificationMessageContent(messageInfo: NIMMessageInfo, chatUserInfo: ChatInfo): string {
@@ -42,7 +53,7 @@ export function getNotificationMessageContent(messageInfo: NIMMessageInfo, chatU
     let attachment = messageInfo.message.attachment as V2NIMMessageNotificationAttachment
     let fromAccount = messageInfo.message.senderId;
     if (fromAccount === ChatKitClient.getLoginUserId()) {
-      fromAccount = getContext().resourceManager.getStringByNameSync('chat_team_notify_current_user_name')
+      fromAccount = getContext().resourceManager.getStringByNameSync('chat_current_user_name')
     } else {
       fromAccount = chatUserInfo?.getChatUserShowName(messageInfo.message.senderId)
     }
@@ -50,7 +61,7 @@ export function getNotificationMessageContent(messageInfo: NIMMessageInfo, chatU
     attachment.targetIds?.forEach(element => {
       let name = ''
       if (element == ChatKitClient.getLoginUserId()) {
-        name = getContext().resourceManager.getStringByNameSync('chat_team_notify_current_user_name')
+        name = getContext().resourceManager.getStringByNameSync('chat_current_user_name')
       } else {
         name = chatUserInfo?.getChatUserShowName(element)
       }
@@ -110,50 +121,35 @@ export function getNotificationMessageContent(messageInfo: NIMMessageInfo, chatU
         }
       }
       return fromUser + notifyContent;
+    } else if (attachment.type == V2NIMMessageNotificationType.V2NIM_MESSAGE_NOTIFICATION_TYPE_TEAM_ADD_MANAGER) {
+      return targetName + getContext().resourceManager.getStringByNameSync('chat_team_appoint_manager');
+    } else if (attachment.type == V2NIMMessageNotificationType.V2NIM_MESSAGE_NOTIFICATION_TYPE_TEAM_REMOVE_MANAGER) {
+      return targetName + getContext().resourceManager.getStringByNameSync('chat_team_removed_manager');
     }
   }
   return '';
 }
 
-// 保存撤回消息到本地
-export function saveLocalRevokeMessage(conversationId: string, msg: NIMMessageInfo, edit: boolean) {
-  let currentTime = systemDateTime.getTime()
-  let revokeText = getContext().resourceManager.getStringByNameSync('chat_msg_undo_tips');
-  let revokeMsg = ChatKitClient.nim.messageCreator.createTextMessage(revokeText)
-  revokeMsg.serverExtension = msg.message.serverExtension
-  let jsonData: Map<string, string> = new Map<string, string>()
-  jsonData.set(ChatConst.revokeLocalKey, 'true')
-  jsonData.set(ChatConst.revokeLocalTimeKey, currentTime.toString())
-  jsonData.set(ChatConst.revokeMsgClientIdKey, msg.message.messageClientId)
-  if (msg.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
-    jsonData.set(ChatConst.revokeMsgTextKey, msg.message.text ?? '')
-    jsonData.set(ChatConst.revokeMsgEditKey, Boolean(edit).toString())
+export function getPinMessagesTips(messageInfo: NIMMessageInfo, chatUserInfo: ChatInfo | undefined): string {
+  let targetName = ''
+  if (messageInfo.pinInfo != null) {
+    if (messageInfo.pinInfo.operatorId == ChatKitClient.getLoginUserId()) {
+      targetName = getContext().resourceManager.getStringByNameSync('chat_current_user_name')
+    } else if (chatUserInfo !== undefined) {
+      targetName = chatUserInfo?.getChatUserShowName(messageInfo.pinInfo?.operatorId)
+    }
+    if (targetName.length > ChatConst.pinOperatorNameMaxLen) {
+      targetName = targetName.substring(0, ChatConst.pinOperatorNameMaxLen) + '...'
+    }
   }
-  let jsonString = JSONUtil.toJSONString(jsonData)
-  revokeMsg.localExtension = jsonString
-  let createTime = msg.message.createTime + 10
-  ChatRepo.saveLocalMessage(revokeMsg, conversationId, ChatKitClient.getLoginUserId(), createTime)
-}
 
-// 保存他人撤回消息到本地
-export function saveLocalRevokeMessageFormOther(conversationId: string, msgNotify: V2NIMMessageRevokeNotification,
-  edit: boolean) {
-  let currentTime = systemDateTime.getTime()
-  let revokeText = getContext().resourceManager.getStringByNameSync('chat_msg_undo_tips');
-  let revokeMsg = ChatKitClient.nim.messageCreator.createTextMessage(revokeText)
-  let jsonData = new Map<string, string>()
-  jsonData.set(ChatConst.revokeLocalKey, 'false')
-  jsonData.set(ChatConst.revokeLocalTimeKey, currentTime.toString())
-  revokeMsg.localExtension = JSONUtil.toJSONString(jsonData);
-  console.debug('netease saveLocalRevokeMessageFormOther:', revokeMsg.localExtension)
-  let createTime = msgNotify.messageRefer.createTime + 10;
-  ChatRepo.saveLocalMessage(revokeMsg, conversationId, msgNotify.revokeAccountId, createTime)
+  return getContext().resourceManager.getStringByNameSync('chat_pin_message_tips', targetName);
 }
 
 // 获取消息高度，单位为VP
 export function getMessageHeight(uicontext: UIContext, messageInfo: NIMMessageInfo | undefined): number {
   let messageHeight = ChatConst.messageLineHeight;
-  if (messageInfo?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+  if (messageInfo?.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
     // 文本消息体最大宽度，单位为VP
     let lineWidth = DeviceUtils.getMessageLineWidth();
     let textSize = uicontext.getMeasureUtils().measureTextSize({
@@ -184,6 +180,47 @@ export function getMessageHeight(uicontext: UIContext, messageInfo: NIMMessageIn
   if (messageInfo?.getMessageTime() != null) {
     messageHeight = messageHeight + 10
   }
+
+  if (messageInfo?.isPinMsg) {
+    messageHeight = messageHeight + 26
+  }
+  return messageHeight;
+}
+
+// 获取消息高度，单位为VP
+export function getPinMessageHeight(uicontext: UIContext, messageInfo: NIMMessageInfo | undefined): number {
+  let messageHeight = ChatConst.messageLineHeight;
+  if (messageInfo?.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+    // 文本消息体最大宽度，单位为VP
+    let lineWidth = DeviceUtils.getPinMessageLineWidth()
+    let textSize = uicontext.getMeasureUtils().measureTextSize({
+      textContent: translateEmojiText(messageInfo?.message.text ?? ''),
+      fontSize: ChatConst.messageTextFontSize,
+      constraintWidth: px2vp(lineWidth),
+      lineHeight: ChatConst.textLineHeight
+    });
+    let viewHeight = px2vp(textSize.height as number)
+    messageHeight = viewHeight
+  } else if (messageInfo?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
+    messageHeight = ChatConst.mapMessageHeight;
+  } else if (messageInfo?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE ||
+    messageInfo?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
+    messageHeight = getImageHeight(messageInfo);
+  } else if (messageInfo?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE) {
+    messageHeight = ChatConst.fileMessageWidth;
+  } else if (messageInfo?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
+    messageHeight = ChatConst.messageLineHeight;
+  }
+  // 群消息需要展示发送者昵称，所有高度增加
+  if (messageInfo?.message.conversationType !== V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P
+    && messageInfo?.isReceiveMessage()) {
+    messageHeight = messageHeight + ChatConst.textLineHeight;
+  }
+
+  // 需要展示发送消息时间的，高度增加
+  // if (messageInfo?.getMessageTime() != null) {
+  //   messageHeight = messageHeight + 10
+  // }
   return messageHeight;
 }
 
@@ -197,7 +234,6 @@ export function measureTextHeight(uicontext: UIContext, text: string, maxLines: 
     fontSize: ChatConst.messageTextFontSize,
     constraintWidth: px2vp(lineWidth),
     lineHeight: ChatConst.textLineHeight,
-    maxLines: maxLines
   });
   let viewHeight = px2vp(textSize.height as number) + (ChatConst.messageLineHeight - ChatConst.textLineHeight)
   messageHeight = viewHeight
@@ -411,15 +447,12 @@ export function getCallMessageText(messageInfo: NIMMessageInfo): string | Resour
 
 // 计算文件消息的大小
 export function getCallMessageIcon(messageInfo: NIMMessageInfo): Resource {
-  if (messageInfo.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
+  if (messageInfo.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
     let callAttachment = messageInfo.message.attachment as V2NIMMessageCallAttachment;
-    if (callAttachment != null) {
-      let type = callAttachment.type;
-      if (type == 2) {
-        return $r('app.media.ic_chat_call_video')
-      } else {
-        return $r('app.media.ic_chat_call_audio')
-      }
+    if (callAttachment.type === 2) {
+      return $r('app.media.ic_chat_call_video')
+    } else {
+      return $r('app.media.ic_chat_call_audio')
     }
   }
   return $r('app.media.ic_chat_call_audio');
@@ -507,4 +540,238 @@ export function getFileMessageAttachmentExt(msg: NIMMessageInfo): string {
   }
   console.debug('netease getFileMessageAttachmentExt:', fileExt)
   return fileExt;
+}
+
+export async function createMultiForwardMsg(messages: List<V2NIMMessage>): Promise<string> {
+  if (messages.isEmpty()) {
+    return ''
+  }
+
+  let messageList: V2NIMMessage[] = []
+
+  for (let i = 0; i < messages.length; i++) {
+    let message = messages.get(i);
+    //名称和头像
+    let name = ''
+    let avatar: string | null = null
+    //自己
+    if (message.senderId === ChatKitClient.getLoginUserId()) {
+      name = NEFriendUserCache.mineUserCache?.showName() ?? ''
+      avatar = NEFriendUserCache.mineUserCache?.user?.avatar ?? null
+    } else {
+      let user = NEFriendUserCache.getInstance().getFriendById(message.senderId)?.user
+      if (!user) {
+        let userList = await ContactRepo.getUserList([message.senderId])
+        if (userList.length > 0) {
+          user = userList[0]
+        }
+      }
+      name = user?.name ?? user?.accountId ?? ''
+      avatar = user?.avatar ?? null
+    }
+    let extension: Record<string, Object> = {};
+    extension[mergedMessageNickKey] = name
+    if (avatar !== null) {
+      extension[mergedMessageAvatarKey] = avatar
+    }
+    message.serverExtension = JSON.stringify(extension);
+    messageList.push(message)
+  }
+
+  return createForwardMessageListFileDetail(messageList)
+}
+
+/**
+ * 序列化文件的头部，占一行
+ *
+ * @param version 文件格式版本
+ * @param message_count 消息数目
+ * @return 头部字符串
+ */
+function buildHeader(version: number, messageCount: number): string {
+  const obj: Record<string, Object> = {};
+  obj['version'] = version
+  obj['terminal'] = 1
+  obj['sdk_version'] = IM_ELITE_SDK_VERSION_HUMAN
+  obj['message_count'] = messageCount
+  return JSON.stringify(obj);
+}
+
+/**
+ * 把需要进行上传的数据 按照约定的“数据字段字典”转换后的json格式字符串，每条记录一行，存储在文本文件中，并从第二行开始存储(因为第一行存的是head信息)
+ *
+ * @param msgList 要合并的消息列表
+ * @return 合并后的字符串
+ */
+function buildBody(msgList: V2NIMMessage[]): string {
+  const enter = "\n";
+  if (msgList.length === 0) {
+    return "";
+  }
+  let stringBuilder = "";
+  //todo SDK接口没有提供
+  // for (const msg of msgList) {
+  //   stringBuilder += enter + ChatKitClient.nim.messageCreator
+  // }
+  return stringBuilder.substring(enter.length);
+}
+
+/**
+ * 创建合并转发消息体内容
+ *
+ * @param messages
+ * @return
+ */
+function createForwardMessageListFileDetail(messages: V2NIMMessage[]): string {
+  if (!messages || messages.length === 0) {
+    return "";
+  }
+  const conversationId = messages[0].conversationId;
+  if (!conversationId) {
+    return "";
+  }
+  const msgList: V2NIMMessage[] = [];
+  for (const msg of messages) {
+    if (conversationId !== msg.conversationId) {
+      continue;
+    }
+    if (
+      msg.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_NOTIFICATION ||
+        msg.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_AVCHAT ||
+        msg.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_ROBOT
+    ) {
+      continue;
+    }
+    msgList.push(msg);
+  }
+  return buildHeader(0, msgList.length) + "\n" + buildBody(msgList);
+}
+
+
+/*
+  获取消息的视频 url，用于视频查看器
+ */
+export function getMessageVideoUrl(msg: NIMMessageInfo, chatInfo: ChatInfo): string | undefined {
+  let path = getMessageAttachmentPath(msg)
+  if (msg.downloadProgress < 0) {
+    if (path !== '' && fs.accessSync(path)) {
+      return path
+    } else {
+      downloadAttachment(msg, path, chatInfo)
+      return undefined
+    }
+  }
+  return undefined
+}
+
+/*
+ * 获取消息的视频宽高比
+ */
+export function getMessageVideoRatio(message?: NIMMessageInfo) {
+  const attachment = message?.message.attachment as V2NIMMessageVideoAttachment
+  if (attachment && attachment.height > 0) {
+    return attachment.width / attachment.height
+  }
+  return 0
+}
+
+export async function downloadAttachment(msg: NIMMessageInfo, path: string, chatInfo: ChatInfo) {
+  if (msg.message.attachment as V2NIMMessageFileAttachment) {
+    let fileAttachment = msg.message.attachment as V2NIMMessageFileAttachment;
+    if (fileAttachment.url !== undefined) {
+      msg.setDownloadProgress(1)
+      try {
+        await StorageRepo.downloadFile(fileAttachment.url, path, (progress: number) => {
+          if (progress < 100) {
+            chatInfo?.downloadProgressMap.set(msg.message.messageClientId, progress)
+            msg.setDownloadProgress(progress)
+          } else {
+            if (progress == 100) {
+              msg.setDownloadProgress(100)
+            }
+            msg.setDownloadProgress(-1)
+            chatInfo?.downloadProgressMap.delete(msg.message.messageClientId)
+          }
+        }
+        )
+      } catch (err) {
+        console.log('netease downloadAttachment', err)
+        msg.setDownloadProgress(-1)
+      }
+    }
+  }
+}
+
+
+/*
+    获取消息列表中的图片url列表，并返回当前消息的图片的下标，用于图片查看器
+   */
+export async function getMessageImageUrls(message?: NIMMessageInfo, chatInfo?: ChatInfo): Promise<ImagesIndexModel> {
+  let model = new ImagesIndexModel()
+  chatInfo?.msgList.getMessageList().forEach(async (msg) => {
+    if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
+      const imageAttach = msg.message.attachment as V2NIMMessageImageAttachment
+      if (imageAttach) {
+        let path = getMessageAttachmentPath(msg)
+
+        // 本地存在（已下载）
+        if (fs.accessSync(path)) {
+          const uri = fileUri.getUriFromPath(path)
+          model.imageUrls.push(uri)
+
+          // 当前点击的图片
+          if (msg?.message.messageClientId === message?.message.messageClientId) {
+            model.currentIndex = model.imageUrls.length - 1
+          }
+        } else if (imageAttach.url) {
+          // 未下载
+          // 先展示缩略图
+          const imageThumbUrl = ChatKitClient.nim.storageUtil?.imageThumbUrl(imageAttach.url, 350)
+          if (imageThumbUrl) {
+            model.imageUrls.push(imageThumbUrl)
+
+            // 当前点击的图片
+            if (msg?.message.messageClientId === message?.message.messageClientId) {
+              model.currentIndex = model.imageUrls.length - 1
+            }
+
+            // 下载后替换为原图
+            try {
+              let path = getMessageAttachmentPath(msg)
+              await downloadAttachment(msg, path, chatInfo)
+
+              if (fs.accessSync(path)) {
+                const uri = fileUri.getUriFromPath(path)
+                const imageIndex = model.imageUrls.indexOf(imageThumbUrl)
+                model.imageUrls[imageIndex] = uri
+              }
+            } catch (err) {
+              console.log('netease getMessageImageUrls', err)
+            }
+          }
+        }
+      }
+    }
+  })
+  return model
+}
+
+/**
+ * 文件消息下载或打开
+ * @param msg
+ * @param context
+ */
+export function downLoadAndOpenFile(msg: NIMMessageInfo, context: Context, chatInfo: ChatInfo) {
+  let path = getMessageAttachmentPath(msg)
+  if (path !== '') {
+    fs.stat(path).then((stat: fs.Stat) => {
+      let uri = fileUri.getUriFromPath(path);
+      let fileName = getFileMessageAttachmentName(msg);
+      let fileExt = getFileMessageAttachmentExt(msg);
+      openFileWithApp(uri, fileName, fileExt, context)
+    }).catch((err: BusinessError) => {
+      console.error("netease get file info failed with error message: " + err.message + ", error code: " + err.code);
+      downloadAttachment(msg, path, chatInfo)
+    });
+  }
 }

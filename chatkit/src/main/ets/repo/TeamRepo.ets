@@ -9,7 +9,6 @@ import {
   V2NIMAntispamConfig,
   V2NIMCreateTeamParams,
   V2NIMCreateTeamResult,
-  V2NIMQueryDirection,
   V2NIMTeam,
   V2NIMTeamAgreeMode,
   V2NIMTeamChatBannedMode,
@@ -526,15 +525,11 @@ export class TeamRepo {
    * @returns
    */
   static async getTeamMembers(teamId: string,
-    teamType: V2NIMTeamType, limit?: number, nextToken?: string): Promise<TeamMemberResult | undefined> {
+    teamType: V2NIMTeamType, queryOption: V2NIMTeamMemberQueryOption): Promise<TeamMemberResult | undefined> {
     let teamMemberResult = await TeamRepo.getTeamMemberList(
       teamId,
       teamType,
-      {
-        limit: limit,
-        nextToken: nextToken,
-        direction: V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_ASC
-      }
+      queryOption
     )
 
     let teamMembers: TeamMemberWithUser[] | undefined = teamMemberResult?.memberList.map((teamMember) => {
@@ -575,6 +570,53 @@ export class TeamRepo {
     return
 
   }
+
+  /**
+   * 根据成员id查询群成员的信息
+   * @param teamId
+   * @param teamType
+   * @param accountIds
+   * @returns
+   */
+  static async getTeamMembersByIds(teamId: string,
+    teamType: V2NIMTeamType, accountIds: string[]): Promise<TeamMemberWithUser[]> {
+    let teamMemberList = await TeamRepo.getTeamMemberListByIds(
+      teamId,
+      teamType,
+      accountIds
+    )
+
+    let teamMembers: TeamMemberWithUser[] = teamMemberList.map((teamMember) => {
+      return new TeamMemberWithUser(teamMember,
+        NEFriendUserCache.getInstance().getFriendById(teamMember.accountId)?.friend,
+        NEFriendUserCache.getInstance().getFriendById(teamMember.accountId)?.user)
+    })
+
+    let noUserAccIdList = teamMembers?.filter((member) => {
+      return !member.userInfo
+    }).map((teamMember) => {
+      return teamMember.teamMember.accountId
+    })
+
+    if (noUserAccIdList && noUserAccIdList.length > 0) {
+      let userList = await ContactRepo.getUserList(noUserAccIdList)
+
+      let userMap = userList.reduce((acc, cur, _index) => {
+        acc.set(cur.accountId, cur)
+        return acc
+      }, new Map<string, V2NIMUser>())
+
+      teamMembers?.forEach((member) => {
+        if (!member.userInfo) {
+          member.userInfo = userMap.get(member.teamMember.accountId)
+        }
+      })
+    }
+
+    return teamMembers
+
+  }
+
 
   /**
    * 根据群成员生成群名

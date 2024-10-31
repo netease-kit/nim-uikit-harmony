@@ -16,25 +16,26 @@ interface ViewHolderItemBuilderParams {
 }
 
 @Builder
-export function ViewItemBuilder(params: ViewItem) {
+export function ViewItemBuilder(params: ViewItem | ViewItemArrow | ViewItemSwitch) {
   Column() {
     Row() {
       if (params.avatarItem) {
         CommonAvatar({ item: params.avatarItem })
           .width(params.titleIconSize ?? 36)
           .height(params.titleIconSize ?? 36)
-          .borderRadius((params.titleIconSize ?? 36 / 2))
+          .borderRadius((params.titleIconRadius ?? (params.titleIconSize ?? 36 / 2)))
           .margin({ left: 20 })
       }
 
       Text(params.title)
         .fontSize(params.titleFontSize ?? 14)
-        .fontColor("#333333")
+        .fontColor(params.titleFontColor ?? "#333333")
         .height(18)
         .margin({ left: params.avatarItem ? 12 : 16, right: 12 })
         .layoutWeight(1)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .ellipsisMode(EllipsisMode.END)
 
       if ((params as ViewItemArrow).rightIcon) {
         Image((params as ViewItemArrow).rightIcon)
@@ -65,21 +66,4 @@ export function ViewItemBuilder(params: ViewItem) {
   }
   .width('100%')
   .height(params.itemHeight)
-
-  // .onClick(() => {
-
-  // if (params.routerUrl) {
-  //   if (params.routerUrl?.search('/') !== -1) {
-  //     router.pushUrl({
-  //       url: params.routerUrl,
-  //       params: { "params": params.routerParams }
-  //     })
-  //   } else {
-  //     router.pushNamedRoute({
-  //       name: params.routerUrl,
-  //       params: { "params": params.routerParams }
-  //     })
-  //   }
-  // }
-  // })
 }

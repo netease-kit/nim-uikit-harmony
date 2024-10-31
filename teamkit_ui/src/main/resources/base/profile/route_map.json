@@ -39,6 +39,22 @@
       "data": {
         "description": "this is team member manage page"
       }
+    },
+    {
+      "name": "TeamManagerListPage",
+      "pageSourceFile": "src/main/ets/pages/TeamManagerListPage.ets",
+      "buildFunction": "TeamManagerListPageBuilder",
+      "data": {
+        "description": "this is team manager list page"
+      }
+    },
+    {
+      "name": "TeamMemberSelectorPage",
+      "pageSourceFile": "src/main/ets/pages/TeamMemberSelectorPage.ets",
+      "buildFunction": "TeamMemberSelectorPageBuilder",
+      "data": {
+        "description": "this is team member selector page"
+      }
     }
   ]
 }

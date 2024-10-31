@@ -6,13 +6,17 @@
  */
 
 import { ChatKitClient, NEFriendUserCache } from '@nimkit/chatkit';
-import { V2NIMUser } from '@nimsdk/base';
+import { NIMMessageInfo } from '../model/NIMMessageInfo';
+import { V2NIMFriend, V2NIMP2PMessageReadReceipt, V2NIMUser } from '@nimsdk/base';
 import { ChatInfo } from './ChatInfo';
 
 @ObservedV2
 export class ChatUserInfo extends ChatInfo {
   @Trace currentUser: V2NIMUser | undefined = undefined;
   @Trace chatUser: V2NIMUser | undefined = undefined;
+  @Trace chatFriend: V2NIMFriend | undefined = undefined;
+  readReceipt: V2NIMP2PMessageReadReceipt | undefined = undefined;
+  readReceiptMsg: NIMMessageInfo | undefined = undefined;
 
   constructor() {
     super('');
@@ -32,23 +36,60 @@ export class ChatUserInfo extends ChatInfo {
     this.conversationName = this.getConversationName();
   }
 
+  setChatFriend(friend: V2NIMFriend | undefined) {
+    this.chatFriend = friend;
+  }
+
+  updateConversationName() {
+    this.conversationName = this.getConversationName();
+  }
+
+  setMessageReadReceipt(readReceipt: V2NIMP2PMessageReadReceipt | undefined) {
+    if (readReceipt == undefined || readReceipt.timestamp == undefined) {
+      return
+    }
+    this.readReceipt = readReceipt
+    let readCount = -1
+    for (let index = super.msgList.totalCount() - 1; index >= 0; index--) {
+      if (super.msgList.messageData[index].readCount > 0) {
+        break
+      } else if (readCount == -1) {
+        let hasRead = readReceipt?.timestamp >= super.msgList.messageData[index].getCreateTime()
+        readCount = hasRead ? 1 : 0;
+      }
+      super.msgList.messageData[index].readCount = readCount
+    }
+  }
+
+  updateMessageReadReceipt(message: NIMMessageInfo) {
+    super.updateMessageReadReceipt(message)
+    if (this.readReceipt == undefined) {
+      return
+    }
+    let hasRead = this.readReceipt?.timestamp >= message.getCreateTime()
+    message.readCount = hasRead ? 1 : 0;
+  }
+
   getChatUserAvatarName(): string {
     let name = '';
     let accountId = this.targetId;
-    if (NEFriendUserCache.getInstance().isFriend(accountId)) {
+    if (this.chatFriend) {
+      name = this.chatFriend?.alias ?? '';
+    }
+    if (name === '' && NEFriendUserCache.getInstance().isFriend(accountId)) {
       let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
       if (friendInfo !== undefined) {
-        name = friendInfo.showName(false)
+        name = friendInfo.showName()
       }
     }
-    if (this.chatUser !== undefined) {
+    if (name === '' && this.chatUser !== undefined) {
       name = this.chatUser?.name ?? '';
     }
     if (name === '') {
       name = accountId;
     }
 
-    if (name !== '') {
+    if (name !== '' && name.length > 2) {
       name = name.substring(name.length - 2, name.length)
     }
     return name;
@@ -63,7 +104,7 @@ export class ChatUserInfo extends ChatInfo {
     if (name === '') {
       name = accountId;
     }
-    if (name !== '') {
+    if (name !== '' && name.length > 2) {
       name = name.substring(name.length - 2, name.length)
     }
     return name;

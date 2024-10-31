@@ -6,16 +6,27 @@
  */
 
 import { ChatKitClient, ConversationRepo, TeamRepo } from '@nimkit/chatkit'
-import { V2NIMConversation, V2NIMConversationType, V2NIMFriend, V2NIMTeam, V2NIMTeamType } from '@nimsdk/base'
+import {
+  V2NIMConnectStatus,
+  V2NIMConversation,
+  V2NIMConversationType,
+  V2NIMFriend,
+  V2NIMLoginStatus,
+  V2NIMTeam,
+  V2NIMTeamType
+} from '@nimsdk/base'
 import { Constant } from '../loader/Constant'
 
 @ObservedV2
 export class ConversationViewModel {
+  static logTag = 'ConversationViewModel'
   //是否已经加载完成
   public isFinished: boolean = false
   //会话列表数据
   @Trace conversationList?: V2NIMConversation[]
   onUreadMessageChange?: (unreadCount?: number) => void = undefined
+  // 网络连接状态
+  @Trace networkBroken: boolean = ChatKitClient.connectBroken()
   //记录偏移量，下次请求使用
   private offset: number = 0
   //每次请求拉取的上限
@@ -23,17 +34,7 @@ export class ConversationViewModel {
 
   //会话排序
   sortConversation(a: V2NIMConversation, b: V2NIMConversation): number {
-    if (a.stickTop === b.stickTop) {
-      if (a.lastMessage && b.lastMessage) {
-        return b.lastMessage.messageRefer.createTime - a.lastMessage.messageRefer.createTime
-      }
-      return b.sortOrder - a.sortOrder
-    }
-    if (a.stickTop) {
-      return -1
-    } else {
-      return 1
-    }
+    return b.sortOrder - a.sortOrder
   }
 
   initConversation() {
@@ -45,13 +46,33 @@ export class ConversationViewModel {
     ChatKitClient.nim.conversationService?.on('onSyncFinished',
       () => {
         //同步完成拉一次
+        console.debug(`${ConversationViewModel.logTag} onSyncFinished`)
         this.loadConversation(0)
       }
     )
 
+    // 长连接状态变更
+    ChatKitClient.nim.loginService?.on('onConnectStatus',
+      (status: V2NIMConnectStatus) => {
+        if (status !== V2NIMConnectStatus.V2NIM_CONNECT_STATUS_CONNECTED) {
+          this.networkBroken = true
+        }
+      }
+    )
+
+    // 登录状态变更
+    ChatKitClient.nim.loginService?.on('onLoginStatus',
+      (status: V2NIMLoginStatus) => {
+        if (status === V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED) {
+          this.networkBroken = false
+        }
+      }
+    )
+
     //好友信息变更修改
-    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', (friend: V2NIMFriend) => {
-      this.updateConversationById(ChatKitClient.nim.conversationIdUtil.p2pConversationId(friend.accountId))
+    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', async (friend: V2NIMFriend) => {
+      console.debug(`${ConversationViewModel.logTag} onFriendInfoChanged ${friend.accountId} alias = ${friend.alias}`)
+      await this.updateConversationById(ChatKitClient.nim.conversationIdUtil.p2pConversationId(friend.accountId))
     })
 
 
@@ -74,17 +95,16 @@ export class ConversationViewModel {
 
     //会话创建
     ChatKitClient.nim.conversationService?.on("onConversationCreated", (conversation: V2NIMConversation) => {
+      console.debug(`${ConversationViewModel.logTag} onConversationCreated type is ${conversation.type}`)
       if (conversation.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
-        let teamId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversation.conversationId)
-        TeamRepo.getTeamInfo(teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL).then((team) => {
-          if (team?.isValidTeam) {
-            this.conversationList?.push(...[conversation])
-            this.conversationList?.sort((a, b) => this.sortConversation(a, b))
-          } else {
-            this.deleteConversation(conversation.conversationId)
-          }
-        })
+        this.addTeamConversation(conversation)
       } else {
+        let existConversation: V2NIMConversation | undefined =
+          this.conversationList?.find((m) => m.conversationId === conversation.conversationId)
+        //如果已经存在，则不处理
+        if (existConversation) {
+          return
+        }
         this.conversationList?.push(...[conversation])
         this.conversationList?.sort((a, b) => this.sortConversation(a, b))
       }
@@ -104,32 +124,57 @@ export class ConversationViewModel {
           if (index !== undefined && index > -1) {
             this.conversationList?.splice(index, 1)
           }
+          if (changedItem.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
+            this.addTeamConversation(changedItem)
+          } else {
+            this.conversationList?.push(...[changedItem])
+          }
         }
       );
-      this.conversationList?.push(...updateList)
+
       this.conversationList?.sort((a, b) => this.sortConversation(a, b))
     })
   }
 
   //按照会话ID更新会话
-  updateConversationById(conversationId: string) {
-    ConversationRepo.getConversation(conversationId).then((conversation) => {
-      if (conversation) {
-        const index = this.conversationList?.findIndex(e => e.conversationId === conversation.conversationId)
-        if (index !== undefined && this.conversationList) {
-          this.conversationList.splice(index, 1)
-          this.conversationList[index] = conversation
-        }
+  async updateConversationById(conversationId: string) {
+    const newConversation = await ConversationRepo.getConversation(conversationId)
+    console.debug(`${ConversationViewModel.logTag} updateConversationById ${newConversation?.conversationId} name = ${newConversation?.name}`)
+    if (newConversation) {
+      const index = this.conversationList?.findIndex(e => e.conversationId === newConversation.conversationId)
+      if (index !== undefined && this.conversationList) {
+        this.conversationList[index] = newConversation
       }
-    })
+    }
+  }
+
+  //添加群会话
+  async addTeamConversation(conversation: V2NIMConversation) {
+    let teamId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversation.conversationId)
+    //添加之前判断是否合法team
+    let team = await TeamRepo.getTeamInfo(teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL)
+    if (team?.isValidTeam) {
+      let existConversation: V2NIMConversation | undefined =
+        this.conversationList?.find((m) => m.conversationId === conversation.conversationId)
+      //如果已经存在，则不处理
+      if (existConversation) {
+        return
+      }
+      this.conversationList?.push(...[conversation])
+      this.conversationList?.sort((a, b) => this.sortConversation(a, b))
+    } else {
+      this.deleteConversation(conversation.conversationId)
+    }
   }
 
   /**
    * 删除会话
    * @param conversationId
    */
-  deleteConversation(conversationId: string) {
-    ConversationRepo.deleteConversation(conversationId)
+  async deleteConversation(conversationId: string) {
+    await ConversationRepo.deleteConversation(conversationId)
+    //无论成功与否UI都删
+    this.conversationList = this.conversationList?.filter((m) => m.conversationId !== conversationId)
   }
 
   /**
@@ -138,17 +183,26 @@ export class ConversationViewModel {
    */
   async loadConversation(offset?: number) {
     try {
+      if (!this.conversationList) {
+        this.conversationList = []
+      }
+      if (offset === 0) {
+        this.conversationList?.splice(0, this.conversationList.length);
+      }
       const result = await ConversationRepo.getConversationList(offset ?? this.offset, this.limit)
       if (result != null) {
-        this.offset = result.offset
-        this.isFinished = result.finished
-        if (!this.conversationList) {
-          this.conversationList = []
-        }
         if (offset === 0) {
           this.conversationList?.splice(0, this.conversationList.length);
         }
-        this.conversationList?.push(...result.conversationList)
+        this.offset = result.offset
+        this.isFinished = result.finished
+        let newConversation = result.conversationList
+        if (this.conversationList.length > 0 && newConversation.length > 0) {
+          this.conversationList =
+            this.conversationList.filter(conversation =>!newConversation.find((m) => m.conversationId ===
+            conversation.conversationId))
+        }
+        this.conversationList?.push(...newConversation)
         this.conversationList?.sort((a, b) => this.sortConversation(a, b))
       }
     } catch (e) {

@@ -5,7 +5,7 @@
  *
  */
 
-import { NEFriendUserCache } from '@nimkit/chatkit';
+import { ErrorUtils, NEFriendUserCache } from '@nimkit/chatkit';
 import { NavigationBackBuilder } from '@nimkit/common';
 import { EditInfoViewModel } from '../model/EditInfoViewModel';
 import { EditInfoParam } from './EditInfoPage';
@@ -23,8 +23,12 @@ export struct EditGenderPage {
   @Local isMale?: number = 0;
   // 返回前保存
   backAction = () => {
-    this.viewModel.saveGender(this.isMale)
-    this.pathStack.pop(this.isMale)
+    if (ErrorUtils.checkNetworkAndToast()) {
+      this.viewModel.saveGender(this.isMale)
+      this.pathStack.pop(this.isMale)
+    } else {
+      this.pathStack.pop()
+    }
   }
 
   requestData() {

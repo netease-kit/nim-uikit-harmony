@@ -1,0 +1,12 @@
+{
+  "routerMap": [
+    {
+      "name": "ConversationPage",
+      "pageSourceFile": "src/main/ets/pages/ConversationPage.ets",
+      "buildFunction": "ConversationPageBuilder",
+      "data": {
+        "description": "this is Conversation list page"
+      }
+    }
+  ]
+}

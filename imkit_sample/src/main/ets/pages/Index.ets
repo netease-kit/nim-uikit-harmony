@@ -4,9 +4,9 @@
  * found in the LICENSE file.
  *
  */
-import { AppConfig } from '../constants/AppConfig';
 
-import { LoginComponent } from './LoginComponent';
+import { NimRepository } from '../ability/NimRepository';
+import { AppConfig } from '../constants/AppConfig';
 
 /**
  * Index is the entry of application and Here is a list showing three buttons,
@@ -35,14 +35,7 @@ struct Index {
           Button($r('app.string.login'), { type: ButtonType.Normal, stateEffect: true })
             .alignSelf(ItemAlign.Center)
             .onClick(() => {
-              //账号ID
-              let accountId = ''
-              //账号Token
-              let accountToken = ''
-              //应用APPKEY
-              let appKey = ''
-              const loginComponent = new LoginComponent();
-              loginComponent.login(AppConfig.userName, AppConfig.userToken)
+              NimRepository.getInstance(getContext(this)).login(AppConfig.userId, AppConfig.userToken, AppConfig.appKey)
             })
             .borderRadius(10)
             .height(50)

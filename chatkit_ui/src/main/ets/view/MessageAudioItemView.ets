@@ -10,12 +10,15 @@ import { V2NIMMessageAudioAttachment } from '@nimsdk/base'
 import { NIMMessageInfo } from '../model/NIMMessageInfo'
 import { AudioPlayerManager } from '../manager/AudioPlayerManager'
 import { ChatConst } from '../constants/ChatConst'
+import { MessageItemClick } from './MessageItemClick'
 
 @ComponentV2
 export struct MessageAudioItemView {
   @Param
   @Require
   message: NIMMessageInfo
+  @BuilderParam
+  onMessageClick: MessageItemClick | undefined
   @Local
   receiveSoundIndex: number = 2
   sendSoundImages = [

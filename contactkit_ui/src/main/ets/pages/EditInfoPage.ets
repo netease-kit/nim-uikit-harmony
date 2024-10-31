@@ -6,7 +6,7 @@
  */
 
 import { router } from '@kit.ArkUI';
-import { ChatKitClient, ContactRepo } from '@nimkit/chatkit';
+import { ChatKitClient, ContactRepo, ErrorUtils } from '@nimkit/chatkit';
 import { NavigationBackBuilder, NECommonUtils } from '@nimkit/common';
 import { EditType } from '../model/MineInfoItem';
 
@@ -77,52 +77,54 @@ export struct EditInfoPage {
   @State showCleanButton: boolean = false
   // 【保存】按钮点击事件
   saveInfo = async () => {
-    NECommonUtils.showToast($r('app.string.mine_info_save_ok'))
-    try {
-      if (this.accountId) {
-        /// 更改好友备注
-        // 不支持全空格
-        if (this.content && this.content?.length > 0 && this.content?.trim().length === 0) {
-          NECommonUtils.showToast($r('app.string.all_space_not_support'))
-          this.content = ""
-          return
+    if (ErrorUtils.checkNetworkAndToast()) {
+      try {
+        if (this.accountId) {
+          /// 更改好友备注
+          // 不支持全空格
+          if (this.content && this.content?.length > 0 && this.content?.trim().length === 0) {
+            NECommonUtils.showToast($r('app.string.all_space_not_support'))
+            this.content = ""
+            return
+          }
+          await ContactRepo.setFriendInfo(this.accountId, {
+            alias: this.content
+          })
+        } else {
+          /// 更改自己信息
+          switch (this.editType) {
+            case EditType.nick:
+              if (this.content?.length === 0) {
+                this.content = ChatKitClient.getLoginUserId()
+              }
+              ContactRepo.updateSelfUserProfile({
+                name: this.content
+              })
+              break
+            case EditType.mobile:
+              ContactRepo.updateSelfUserProfile({
+                mobile: this.content
+              })
+              break
+            case EditType.email:
+              ContactRepo.updateSelfUserProfile({
+                email: this.content
+              })
+              break
+            case EditType.sign:
+              ContactRepo.updateSelfUserProfile({
+                sign: this.content
+              })
+              break
+            default:
+              break
+          }
         }
-        await ContactRepo.setFriendInfo(this.accountId, {
-          alias: this.content
-        })
-      } else {
-        /// 更改自己信息
-        switch (this.editType) {
-          case EditType.nick:
-            if (this.content?.length === 0) {
-              this.content = ChatKitClient.getLoginUserId()
-            }
-            ContactRepo.updateSelfUserProfile({
-              name: this.content
-            })
-            break
-          case EditType.mobile:
-            ContactRepo.updateSelfUserProfile({
-              mobile: this.content
-            })
-            break
-          case EditType.email:
-            ContactRepo.updateSelfUserProfile({
-              email: this.content
-            })
-            break
-          case EditType.sign:
-            ContactRepo.updateSelfUserProfile({
-              sign: this.content
-            })
-            break
-          default:
-            break
-        }
+        NECommonUtils.showToast($r('app.string.mine_info_save_ok'))
+        this.pathStack.pop(this.content)
+      } catch (err) {
+        console.error(err)
       }
-      this.pathStack.pop(this.content)
-    } catch (err) {
-      console.log(err)
     }
   }
 

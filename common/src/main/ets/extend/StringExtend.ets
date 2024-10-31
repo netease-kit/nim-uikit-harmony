@@ -9,7 +9,7 @@ import { pinyin4js } from '@ohos/pinyin4js';
 
 /// 获取通讯录索引
 /// ("你好" -> "nĭ hăo" ->) "ni hao" -> "NI HAO" -> "N"
-export function initalLetter(string: string): string {
+export async function initalLetter(string: string): Promise<string> {
   /** 使用convertToPinyinString方法将汉字转换成拼音字母。
    其中参数1为待转数据，参数2为拼音间隔字符，参数3设置是否带声调符号。
    */

@@ -3,6 +3,158 @@
     {
       "name": "page_show",
       "value": "page from package"
+    },
+    {
+      "name": "team_member",
+      "value": "群成员"
+    },
+    {
+      "name": "team_nick",
+      "value": "我在群里的昵称"
+    },
+    {
+      "name": "team_mute",
+      "value": "群禁言"
+    },
+    {
+      "name": "team_dismiss",
+      "value": "解散群聊"
+    },
+    {
+      "name": "team_left",
+      "value": "退出群聊"
+    },
+    {
+      "name": "team_group_left",
+      "value": "退出讨论组"
+    },
+    {
+      "name": "team_setting",
+      "value": "设置"
+    },
+    {
+      "name": "team_info",
+      "value": "群信息"
+    },
+    {
+      "name": "team_avatar",
+      "value": "群头像"
+    },
+    {
+      "name": "team_name",
+      "value": "群名称"
+    },
+    {
+      "name": "team_des",
+      "value": "群介绍"
+    },
+    {
+      "name": "team_edit_avatar",
+      "value": "修改头像"
+    },
+    {
+      "name": "team_default_avatar_selector",
+      "value": "选择默认图标"
+    },
+    {
+      "name": "team_owner",
+      "value": "群主"
+    },
+    {
+      "name": "team_manage",
+      "value": "群管理"
+    },
+    {
+      "name": "team_owner_and_manager",
+      "value": "群主和管理员"
+    },
+    {
+      "name": "team_all_member",
+      "value": "所有人"
+    },
+    {
+      "name": "team_edit_team_info",
+      "value": "谁可以编辑群信息"
+    },
+    {
+      "name": "team_add_team_member",
+      "value": "谁可以添加群成员"
+    },
+    {
+      "name": "team_group_member",
+      "value": "讨论组成员"
+    },
+    {
+      "name": "team_select_none_member_tip",
+      "value": "请选择成员"
+    },
+    {
+      "name": "team_select_member_title",
+      "value": "人员选择"
+    },
+    {
+      "name": "team_remove_manager",
+      "value": "移除"
+    },
+    {
+      "name": "team_add_manager",
+      "value": "添加管理员"
+    },
+    {
+      "name": "team_manager",
+      "value": "群管理员"
+    },
+    {
+      "name": "team_manage_manager",
+      "value": "管理管理员"
+    },
+    {
+      "name": "team_none_manager",
+      "value": "暂无群管理人员"
+    },
+    {
+      "name": "manager",
+      "value": "管理员"
+    },
+    {
+      "name": "team_remove_member_title",
+      "value": "是否移除"
+    },
+    {
+      "name": "team_remove_member_content",
+      "value": "移除后该成员将离开当前群聊"
+    },
+    {
+      "name": "team_remove_manager_content",
+      "value": "移除后该成员将无管理权限"
+    },
+    {
+      "name": "team_add_manager_limit_tip",
+      "value": "最多只能设置%d个管理员"
+    },
+    {
+      "name": "team_add_manager_failed_tip",
+      "value": "管理员添加失败"
+    },
+    {
+      "name": "team_operate_no_permission_tip",
+      "value": "您暂无操作权限"
+    },
+    {
+      "name": "team_add_manager_empty_tip",
+      "value": "暂无成员"
+    },
+    {
+      "name": "team_dismiss_content",
+      "value": "是否解散群聊?"
+    },
+    {
+      "name": "team_left_content",
+      "value": "是否退出群聊?"
+    },
+    {
+      "name": "team_group_left_content",
+      "value": "是否退出讨论组?"
     }
   ]
 }

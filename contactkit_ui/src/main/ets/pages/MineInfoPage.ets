@@ -15,7 +15,7 @@ import {
   NavigationBackBuilder,
   NECommonUtils
 } from '@nimkit/common';
-import { NEFriendUserCache, StorageRepo } from '@nimkit/chatkit';
+import { ErrorUtils, NEFriendUserCache, StorageRepo } from '@nimkit/chatkit';
 import { EditType, MineInfoItem } from '../model/MineInfoItem';
 import { EditInfoViewModel } from '../model/EditInfoViewModel';
 import { EditInfoParam } from './EditInfoPage';
@@ -118,46 +118,41 @@ export struct MineInfoPage {
     new MineInfoItem($r("app.string.person_info_sign"), undefined, this.myUser?.sign, EditType.sign, 'EditInfoPage'),
   ]
   onDateChanged = (value?: Date) => {
-    const year = value?.getFullYear()
-    const month = (value?.getMonth() ?? 0) + 1
-    const day = value?.getDate()
-    const formattedDate = `${year}-${month}-${day}`
-    this.mineInfoItems1[4].subTitle = formattedDate
-
-    this.viewModel.saveBirthday(formattedDate)
-  }
-
-  onImageChosen = async (filePath: string) => {
-    this.mineInfoItems1[0].subIcon = filePath
-
-    try {
-      const cacheDir = getContext(this).getApplicationContext().cacheDir
-      const filePathSplit = filePath.split('/')
-      const dir = cacheDir + '/' + filePathSplit[filePathSplit.length - 1]
-      // 将文件 拷贝到 临时目录
-      const file = fs.openSync(filePath, fs.OpenMode.READ_ONLY)
-      fs.copyFileSync(file.fd, dir)
-
-      const task = StorageRepo.createUploadFileTask({
-        filePath: dir,
-        sceneName: 'nim_default_profile_icon'
-      })
-      if (task) {
-        const url = await StorageRepo.uploadFile(task, (progress: number) => {
-          // NECommonUtils.showToast($r('app.string.avatar_uploading', progress * 100))
-        })
-        this.viewModel.saveAvatar(url)
-      }
-    } catch (err) {
-      console.log(err)
+    if (value && ErrorUtils.checkNetworkAndToast()) {
+      const year = value?.getFullYear()
+      const month = (value?.getMonth() ?? 0) + 1
+      const day = value?.getDate()
+      const formattedDate = `${year}-${month}-${day}`
+      this.mineInfoItems1[4].subTitle = formattedDate
+      this.viewModel.saveBirthday(formattedDate)
     }
   }
+  onImageChosen = async (filePath: string) => {
+    if (ErrorUtils.checkNetworkAndToast()) {
+      try {
+        const cacheDir = getContext(this).getApplicationContext().cacheDir
+        const filePathSplit = filePath.split('/')
+        const dir = cacheDir + '/' + filePathSplit[filePathSplit.length - 1]
+        // 将文件 拷贝到 临时目录
+        const file = fs.openSync(filePath, fs.OpenMode.READ_ONLY)
+        fs.copyFileSync(file.fd, dir)
 
-  getGenderString() {
-    return this.gender === 2 ? $r("app.string.person_gender_female") :
-      (this.gender === 1 ? $r("app.string.person_gender_male") : $r("app.string.person_gender_unknown"))
+        const task = StorageRepo.createUploadFileTask({
+          filePath: dir,
+          sceneName: 'nim_default_profile_icon'
+        })
+        if (task) {
+          const url = await StorageRepo.uploadFile(task, (progress: number) => {
+            // NECommonUtils.showToast($r('app.string.avatar_uploading', progress * 100))
+          })
+          await this.viewModel.saveAvatar(url)
+          this.mineInfoItems1[0].subIcon = filePath
+        }
+      } catch (err) {
+        console.error(err)
+      }
+    }
   }
-
   dateDialog: CustomDialogController = new CustomDialogController({
     builder: DatePickerDialog({ dateString: this.myUser?.birthday, onDateChanged: this.onDateChanged }),
     cornerRadius: 0,
@@ -175,12 +170,18 @@ export struct MineInfoPage {
     height: 140,
   })
 
+  getGenderString() {
+    return this.gender === 2 ? $r("app.string.person_gender_female") :
+      (this.gender === 1 ? $r("app.string.person_gender_male") : $r("app.string.person_gender_unknown"))
+  }
+
   // 拷贝内容到剪切板
   setPasteboard(content?: ResourceStr) {
     const pasteboardData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, content?.toString())
     const systemPasteboard = pasteboard.getSystemPasteboard()
-    systemPasteboard.setData(pasteboardData)
-    NECommonUtils.showToast($r('app.string.copy_success'))
+    systemPasteboard.setData(pasteboardData).then(() => {
+      NECommonUtils.showToast($r('app.string.copy_success'))
+    })
   }
 
   build() {
@@ -343,7 +344,7 @@ export struct MineInfoPage {
         .margin({
           left: 20,
           right: 20,
-          bottom: 56
+          bottom: 56 + 12
         })
       }
     }

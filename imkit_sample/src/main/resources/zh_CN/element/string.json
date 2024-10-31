@@ -6,7 +6,31 @@
     },
     {
       "name": "login",
-      "value": "登录"
+      "value": "Login"
+    },
+    {
+      "name": "grid_title_label",
+      "value": "标题"
+    },
+    {
+      "name": "adaptive_layout",
+      "value": "自适应布局"
+    },
+    {
+      "name": "system_cap",
+      "value": "系统能力"
+    },
+    {
+      "name": "responsive_layout",
+      "value": "响应式布局"
+    },
+    {
+      "name": "location_cap_invalid",
+      "value": "本设备不具备位置服务基础能力"
+    },
+    {
+      "name": "location_cap_valid",
+      "value": "本设备具备位置服务基础能力"
     },
     {
       "name": "tab_conversation",

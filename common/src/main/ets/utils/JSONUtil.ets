@@ -61,17 +61,16 @@ export class JSONUtil {
    *将传入的json字符串格式化为Object对象
    * @param jsonStr
    * @returns
-   * @deprecated 使用JSONObject或者JSONArray/JSONArrayList 方法代替
    */
   static parse(jsonStr: string): Object {
     return JSON.parse(jsonStr);
   }
 
+
   /**
    * 将传入的json字符串格式化为指定的实体对象,如果实体中有日期类型默认为yyyy-MM-dd，并且支持嵌套类
    * @param jsonStr  待转换字符串
    * @param formatStr 字符串格式化模版
-   * @deprecated 使用JSONObject或者JSONArray/JSONArrayList 方法代替
    */
   static parseObject<T>(jsonStr: string, formatStr?: string): T {
     const parseValue = (value: Object): Object => {
@@ -115,7 +114,6 @@ export class JSONUtil {
    * @param jsonStr
    * @param formatStr 字符串格式化模版
    * @returns
-   * @deprecated 使用JSONObject或者JSONArray/JSONArrayList 方法代替
    */
   static parseArray<T>(jsonStr: string, formatStr?: string): Array<T> {
     let result: Array<T> = new Array<T>();
