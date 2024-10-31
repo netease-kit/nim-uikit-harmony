@@ -5,10 +5,9 @@
  *
  */
 
-import { ChatKitClient, ContactRepo } from '@nimkit/chatkit';
+import { ChatKitClient, ContactRepo, ErrorUtils } from '@nimkit/chatkit';
 import { CommonEmptyResult, CommonTextInput, NavigationBackBuilder } from '@nimkit/common';
 import { ContactViewModel } from '../viewmodel/ContactViewModel';
-import { router } from '@kit.ArkUI';
 
 // 跳转页面入口函数
 @Builder
@@ -22,27 +21,32 @@ export struct AddFriendPage {
   @Local viewModel: ContactViewModel = new ContactViewModel()
   @Local isEmpty: boolean = false
   onSubmit = async (enterKey: EnterKeyType, event: SubmitEvent) => {
-    try {
-      const users = await ContactRepo.getUserWithFriendByIds([event.text])
-      this.isEmpty = users.length <= 0
-      if (!this.isEmpty) {
-        if (event.text === ChatKitClient.getLoginUserId()) {
-          this.pathStack.pushPath({
-            name: 'MineInfoPage'
-          })
-        } else {
+    // 查询自己
+    if (event.text === ChatKitClient.getLoginUserId()) {
+      this.pathStack.pushPath({
+        name: 'MineInfoPage'
+      })
+      return
+    }
+
+    if (ErrorUtils.checkNetworkAndToast()) {
+      try {
+        const users = await ContactRepo.getUserWithFriendByIds([event.text])
+        this.isEmpty = users.length <= 0
+        if (!this.isEmpty) {
           this.pathStack.pushPath({
             name: 'PersonInfoPage',
             param: event.text
           })
         }
+      } catch (err) {
+        console.error(err)
+        this.isEmpty = true
       }
-    } catch (err) {
-      console.log(err)
     }
   }
   onTextChange = (value: string, previewText?: PreviewText) => {
-    this.isEmpty = false
+    // this.isEmpty = false
   }
 
   build() {

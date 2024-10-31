@@ -26,7 +26,7 @@ export struct MyTeamsPage {
     try {
       await this.viewModel.getJoinedTeamList()
     } catch (err) {
-      console.log(err)
+      console.error(err)
     }
   }
 

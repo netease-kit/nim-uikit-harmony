@@ -65,6 +65,22 @@
       "value": "copy"
     },
     {
+      "name": "chat_operation_forward",
+      "value": "forward"
+    },
+    {
+      "name": "chat_operation_multi_forward",
+      "value": "multi forward"
+    },
+    {
+      "name": "chat_operation_single_forward",
+      "value": "single forward"
+    },
+    {
+      "name": "chat_operation_forward_desc",
+      "value": "history of %s"
+    },
+    {
       "name": "chat_operation_delete",
       "value": "delete"
     },
@@ -73,8 +89,20 @@
       "value": "Recall"
     },
     {
+      "name": "chat_operation_pin",
+      "value": "Pin"
+    },
+    {
+      "name": "chat_operation_unpin",
+      "value": "Unpin"
+    },
+    {
       "name": "chat_msg_undo_tips",
       "value": "This message has been recalled"
+    },
+    {
+      "name": "chat_msg_undo_edit_tips",
+      "value": " Edit >"
     },
     {
       "name": "chat_msg_delete_dialog_title",
@@ -133,7 +161,7 @@
       "value": "Settings"
     },
     {
-      "name": "chat_team_notify_current_user_name",
+      "name": "chat_current_user_name",
       "value": "You"
     },
     {
@@ -191,6 +219,70 @@
     {
       "name": "chat_permission_micro_phone_desc",
       "value": "Used to send audio message"
+    },
+    {
+      "name": "chat_speak_too_short",
+      "value": "chat speak too short"
+    },
+    {
+      "name": "chat_read_receipt_title",
+      "value": "Read Receipt"
+    },
+    {
+      "name": "chat_read_receipt_read",
+      "value": "Read(%d)"
+    },
+    {
+      "name": "chat_read_receipt_unread",
+      "value": "Unread(%d)"
+    },
+    {
+      "name": "chat_read_receipt_all_unread",
+      "value": "All members unread"
+    },
+    {
+      "name": "chat_read_receipt_all_read",
+      "value": "All members have read"
+    },
+    {
+      "name": "chat_team_appoint_manager",
+      "value": "be as a admin"
+    },
+    {
+      "name": "chat_team_removed_manager",
+      "value": "Dismissed as a admin"
+    },
+    {
+      "name": "forward_dialog_leave_message",
+      "value": "Leave Message"
+    },
+    {
+      "name": "chat_pin_message_tips",
+      "value": "Pined by %s"
+    },
+    {
+      "name": "chat_team_all_mute",
+      "value": "Mute"
+    },
+    {
+      "name": "chat_network_error_tips",
+      "value": "Network Error"
+    },
+    {
+      "name": "chat_pin_limit_error_tips",
+      "value": "PIN Reached Limit"
+    },
+    {
+      "name": "chat_revoke_edit_error_tips",
+      "value": "Time out"
+    },
+    {
+      "name": "pin_list_unpin_success_tips",
+      "value": "Unpin Success"
+    },
+    {
+      "name": "chat_message_copy_success_tips",
+      "value": "Copy success"
     }
   ]
 }

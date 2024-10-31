@@ -17,7 +17,7 @@ export { SettingRepo } from './src/main/ets/repo/SettingRepo'
 
 export { StorageRepo } from './src/main/ets/repo/StorageRepo'
 
-export { NEUserWithFriend } from './src/main/ets/model/NEUserWithFriend'
+export { UserWithFriend as NEUserWithFriend } from './src/main/ets/model/UserWithFriend'
 
 export { NEFriendUserCache } from './src/main/ets/NEFriendUserCache'
 
@@ -28,3 +28,11 @@ export { IsDiscussion } from './src/main/ets/utils/Utils'
 export { TeamMemberWithUser, TeamMemberResult } from './src/main/ets/model/TeamMemberWithUser'
 
 export { PersonSelectParam } from './src/main/ets/model/PersonSelectParam'
+
+export { ConversationSelectParam } from './src/main/ets/model/ConversationSelectParam'
+
+export { ConversationSelectedParam } from './src/main/ets/model/ConversationSelectedParam'
+
+export {ErrorUtils} from './src/main/ets/utils/ErrorUtils'
+
+export {mergedMessageAvatarKey,mergedMessageNickKey} from './src/main/ets/model/MergedMessage'

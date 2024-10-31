@@ -10,14 +10,14 @@ import {
   AvatarItem,
   CommonAvatar,
   CommonEmptyResult,
+  ListGroupHeader,
   NavigationBackBuilder,
   NECommonUtils,
   ViewItemBuilder
 } from '@nimkit/common';
 import { ContactViewModel } from '../viewmodel/ContactViewModel';
 import { NEContactSection, SelectUserWithFriend } from '../model/NEContactSection';
-import { NEFriendUserCache, NEUserWithFriend, PersonSelectParam } from '@nimkit/chatkit';
-import { ListGroupHeader } from './ContactPage';
+import { NEUserWithFriend, PersonSelectParam } from '@nimkit/chatkit';
 
 // 跳转页面入口函数
 @Builder
@@ -52,7 +52,7 @@ export struct PersonSelectPage {
         }
       })
     } catch (err) {
-      console.log(err)
+      console.error(err)
     }
   }
 
@@ -128,7 +128,7 @@ export struct PersonSelectPage {
             }
 
             List({ scroller: this.listScroller }) {
-              ForEach(this.viewModel.friendSection, (item: NEContactSection) => {
+              LazyForEach(this.viewModel.friendSection, (item: NEContactSection) => {
                 ListItemGroup({
                   header: ListGroupHeader(item.initial)
                 }) {
@@ -152,8 +152,7 @@ export struct PersonSelectPage {
                           titleIconSize: 36,
                           titleFontSize: 14,
                           showDivideLine: false,
-                          routerUrl: "PersonInfoPage",
-                          routerParams: item.user?.accountId
+                          rightIcon: $r('app.string.validation_empty'), // 仅做占位
                         })
                       }
                     }
@@ -187,6 +186,7 @@ export struct PersonSelectPage {
             .width('100%')
             .margin({ top: 6 })
             .backgroundColor('#EFF1F4')
+            .sticky(StickyStyle.Header)
             .scrollBar(BarState.Off)
             // 获取联系人列表滑动位置的索引，并将索引通过selectedIndex同步给右侧字母导航
             .onScrollIndex((start: number, end: number, center: number) => {
@@ -197,7 +197,7 @@ export struct PersonSelectPage {
           .margin({ bottom: 56 + (this.selectedList.length > 0 ? 52 : 0) })
           .backgroundColor('#EFF1F4')
 
-          if (this.viewModel.friendList.length <= 0) {
+          if (this.viewModel.friendSection.contactSections.length <= 0) {
             CommonEmptyResult({
               tips: $r('app.string.no_friend')
             })
@@ -209,12 +209,12 @@ export struct PersonSelectPage {
         .alignContent(Alignment.Top)
 
         // 使用AlphabetIndexer组件实现右侧字母导航
-        AlphabetIndexer({ arrayValue: this.viewModel.getInitalList(), selected: 0 })
+        AlphabetIndexer({ arrayValue: this.viewModel.initalList, selected: 0 })
           .color('#666666')
           .selectedColor(Color.White)
           .selectedBackgroundColor('#337EFF')
           .usingPopup(true)
-          .popupPosition({ x: 30, y: (this.viewModel.friendSection.length * 16 - 48) / 2 })
+          .popupPosition({ x: 30, y: (this.viewModel.initalList.length * 16 - 48) / 2 })
           .margin({ right: 10 })
           .itemSize(16)
           .font({ size: 10 })// 指定字母导航的选择项为selectedIndex，完成跟联系人列表的同步

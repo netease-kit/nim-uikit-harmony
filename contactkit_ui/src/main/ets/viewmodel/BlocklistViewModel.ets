@@ -13,43 +13,44 @@ import { V2NIMFriend, V2NIMUser } from '@nimsdk/base'
 export class BlocklistViewModel {
   @Trace blockList: NEUserWithFriend[] = []
   listener = new EventHubUtil()
-
-  constructor() {
-    NEFriendUserCache.getInstance().listener.on('updateUserInfo', async (users: V2NIMUser[]) => {
-      for (const user of users) {
-        if (NEFriendUserCache.getInstance().isBlockAccount(user.accountId)) {
-          for (let blockUser of this.blockList) {
-            if (user.accountId === blockUser.user?.accountId) {
-              blockUser.user = user
-            }
+  updateUserInfoFun = async (users: V2NIMUser[]) => {
+    for (const user of users) {
+      if (NEFriendUserCache.getInstance().isBlockAccount(user.accountId)) {
+        for (let blockUser of this.blockList) {
+          if (user.accountId === blockUser.user?.accountId) {
+            blockUser.user = user
           }
         }
       }
-    })
-
-    NEFriendUserCache.getInstance().listener.on('updateFriendInfo', async (friend: V2NIMFriend) => {
-      for (let blockUser of this.blockList) {
-        if (friend.accountId === blockUser.user?.accountId) {
-          blockUser.friend = friend
-          break
-        }
+    }
+  }
+  updateFriendInfoFun = async (friend: V2NIMFriend) => {
+    for (let blockUser of this.blockList) {
+      if (friend.accountId === blockUser.user?.accountId) {
+        blockUser.friend = friend
+        break
       }
-    })
-
-    NEFriendUserCache.getInstance().listener.on('addBlockAccount', async (accountId: string) => {
-      const userWithFriend = NEFriendUserCache.getInstance().getFriendById(accountId)
-      if (userWithFriend) {
-        this.blockList.push(userWithFriend)
+    }
+  }
+  addBlockAccountFun = async (accountId: string) => {
+    const userWithFriend = NEFriendUserCache.getInstance().getFriendById(accountId)
+    if (userWithFriend) {
+      this.blockList.push(userWithFriend)
+    }
+  }
+  removeBlockAccountFun = async (accountId: string) => {
+    for (let index = 0; index < this.blockList.length; index++) {
+      if (this.blockList[index].user?.accountId === accountId) {
+        this.blockList.splice(index, 1)
       }
-    })
+    }
+  }
 
-    NEFriendUserCache.getInstance().listener.on('removeBlockAccount', async (accountId: string) => {
-      for (let index = 0; index < this.blockList.length; index++) {
-        if (this.blockList[index].user?.accountId === accountId) {
-          this.blockList.splice(index, 1)
-        }
-      }
-    })
+  constructor() {
+    NEFriendUserCache.getInstance().listener.on('updateUserInfo', this.updateUserInfoFun)
+    NEFriendUserCache.getInstance().listener.on('updateFriendInfo', this.updateFriendInfoFun)
+    NEFriendUserCache.getInstance().listener.on('addBlockAccount', this.addBlockAccountFun)
+    NEFriendUserCache.getInstance().listener.on('removeBlockAccount', this.removeBlockAccountFun)
   }
 
   /**
@@ -96,9 +97,15 @@ export class BlocklistViewModel {
           await ContactRepo.addUserToBlockList(user.user.accountId)
         }
       }
-      this.blockList.concat(users)
     } catch (err) {
       console.log(err)
     }
+  }
+
+  onDestroy() {
+    NEFriendUserCache.getInstance().listener.off('updateUserInfo', this.updateUserInfoFun)
+    NEFriendUserCache.getInstance().listener.off('updateFriendInfo', this.updateFriendInfoFun)
+    NEFriendUserCache.getInstance().listener.off('addBlockAccount', this.addBlockAccountFun)
+    NEFriendUserCache.getInstance().listener.off('removeBlockAccount', this.removeBlockAccountFun)
   }
 }

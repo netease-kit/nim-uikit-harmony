@@ -12,7 +12,6 @@ import {
   V2NIMFriendAddApplicationQueryOption,
   V2NIMFriendAddApplicationResult,
   V2NIMFriendAddParams,
-  V2NIMFriendAddRejection,
   V2NIMFriendDeleteParams,
   V2NIMFriendDeletionType,
   V2NIMFriendSearchOption,
@@ -23,73 +22,75 @@ import {
   V2NIMUserUpdateParams
 } from '@nimsdk/base';
 import { ChatKitClient } from '../ChatKitClient';
-import { NEUserWithFriend } from '../model/NEUserWithFriend';
+import { UserWithFriend } from '../model/UserWithFriend';
 import { NEFriendUserCache } from '../NEFriendUserCache';
-import { EventHubUtil } from '../utils/EventHubUtil';
 
 export class ContactRepo {
-  static addListener() {
-    ChatKitClient.nim.loginService.on("onLoginStatus", (status: V2NIMLoginStatus) => {
-      switch (status) {
-        case V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGOUT:
-          NEFriendUserCache.getInstance().removeAllFriendInfo()
-          NEFriendUserCache.mineUserCache = undefined
-          break;
-        default:
-          break;
+  static onBlockListAddedFun = async (user: V2NIMUser) => {
+    NEFriendUserCache.getInstance().addBlockAccount(user.accountId)
+  }
+  static onLoginStatusFun = (status: V2NIMLoginStatus) => {
+    switch (status) {
+      case V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGOUT:
+        NEFriendUserCache.getInstance().removeAllFriendInfo()
+        NEFriendUserCache.mineUserCache = undefined
+        break;
+      default:
+        break;
+    }
+  }
+  static onUserProfileChangedFun = async (users: V2NIMUser[]) => {
+    users.forEach((user) => {
+      if (NEFriendUserCache.getInstance().isFriend(user.accountId)) {
+        NEFriendUserCache.getInstance().updateFriendInfo({
+          user: user
+        })
+      }
+      if (NEFriendUserCache.isMe(user.accountId) && NEFriendUserCache.mineUserCache) {
+        NEFriendUserCache.mineUserCache.user = user
       }
     })
 
-    ChatKitClient.nim.userService?.on("onUserProfileChanged", async (users: V2NIMUser[]) => {
-      users.forEach((user) => {
-        if (NEFriendUserCache.getInstance().isFriend(user.accountId)) {
-          NEFriendUserCache.getInstance().updateFriendInfo({
-            user: user
-          })
-        }
-        if (NEFriendUserCache.isMe(user.accountId) && NEFriendUserCache.mineUserCache) {
-          NEFriendUserCache.mineUserCache.user = user
-        }
-      })
-
-      NEFriendUserCache.getInstance().listener.emit('updateUserInfo', users)
+    NEFriendUserCache.getInstance().listener.emit('updateUserInfo', users)
+  }
+  static onBlockListRemovedFun = (accountId: string) => {
+    NEFriendUserCache.getInstance().removeBlockAccount(accountId)
+  }
+  static onFriendAddedFun = (friend: V2NIMFriend) => {
+    NEFriendUserCache.getInstance().updateFriendInfo({
+      friend: friend
     })
-
-    ChatKitClient.nim.userService?.on("onBlockListAdded", async (user: V2NIMUser) => {
-      NEFriendUserCache.getInstance().addBlockAccount(user.accountId)
-      NEFriendUserCache.getInstance().listener.emit('addBlockAccount', user.accountId)
+    ContactRepo.removeUserFromBlockList(friend.accountId)
+    NEFriendUserCache.getInstance().listener.emit('updateFriendInfo', friend)
+  }
+  static onFriendDeletedFun = (accountId: string, deletionType: V2NIMFriendDeletionType) => {
+    NEFriendUserCache.getInstance().removeFriendInfo(accountId)
+  }
+  static onFriendInfoChangedFun = (friend: V2NIMFriend) => {
+    NEFriendUserCache.getInstance().updateFriendInfo({
+      friend: friend
     })
+    NEFriendUserCache.getInstance().listener.emit('updateFriendInfo', friend)
+  }
 
-    ChatKitClient.nim.userService?.on("onBlockListRemoved", (accountId: string) => {
-      NEFriendUserCache.getInstance().removeBlockAccount(accountId)
-      NEFriendUserCache.getInstance().listener.emit('removeBlockAccount', accountId)
-    })
+  static addListener() {
+    ChatKitClient.nim.loginService.on("onLoginStatus", ContactRepo.onLoginStatusFun)
+    ChatKitClient.nim.userService?.on("onUserProfileChanged", ContactRepo.onUserProfileChangedFun)
+    ChatKitClient.nim.userService?.on("onBlockListAdded", ContactRepo.onBlockListAddedFun)
+    ChatKitClient.nim.userService?.on("onBlockListRemoved", ContactRepo.onBlockListRemovedFun)
+    ChatKitClient.nim.friendService?.on("onFriendAdded", ContactRepo.onFriendAddedFun)
+    ChatKitClient.nim.friendService?.on("onFriendDeleted", ContactRepo.onFriendDeletedFun)
+    ChatKitClient.nim.friendService?.on("onFriendInfoChanged", ContactRepo.onFriendInfoChangedFun)
+  }
 
-    ChatKitClient.nim.friendService?.on("onFriendAdded", (friend: V2NIMFriend) => {
-      NEFriendUserCache.getInstance().updateFriendInfo({
-        friend: friend
-      })
-      ContactRepo.removeUserFromBlockList(friend.accountId)
-      NEFriendUserCache.getInstance().listener.emit('updateFriendInfo', friend)
-    })
-
-    ChatKitClient.nim.friendService?.on("onFriendDeleted",
-      (accountId: string, deletionType: V2NIMFriendDeletionType) => {
-        NEFriendUserCache.getInstance().removeFriendInfo(accountId)
-      })
-
-    ChatKitClient.nim.friendService?.on("onFriendAddApplication", (application: V2NIMFriendAddApplication) => {
-    })
-
-    ChatKitClient.nim.friendService?.on("onFriendAddRejected", (rejection: V2NIMFriendAddRejection) => {
-    })
-
-    ChatKitClient.nim.friendService?.on("onFriendInfoChanged", (friend: V2NIMFriend) => {
-      NEFriendUserCache.getInstance().updateFriendInfo({
-        friend: friend
-      })
-      NEFriendUserCache.getInstance().listener.emit('updateFriendInfo', friend)
-    })
+  static removeListener() {
+    ChatKitClient.nim.loginService.off("onLoginStatus", ContactRepo.onLoginStatusFun)
+    ChatKitClient.nim.userService?.off("onUserProfileChanged", ContactRepo.onUserProfileChangedFun)
+    ChatKitClient.nim.userService?.off("onBlockListAdded", ContactRepo.onBlockListAddedFun)
+    ChatKitClient.nim.userService?.off("onBlockListRemoved", ContactRepo.onBlockListRemovedFun)
+    ChatKitClient.nim.friendService?.off("onFriendAdded", ContactRepo.onFriendAddedFun)
+    ChatKitClient.nim.friendService?.off("onFriendDeleted", ContactRepo.onFriendDeletedFun)
+    ChatKitClient.nim.friendService?.off("onFriendInfoChanged", ContactRepo.onFriendInfoChangedFun)
   }
 
   /**
@@ -110,20 +111,25 @@ export class ContactRepo {
    */
   static async getUserListFromCloud(accountIds: string[]): Promise<V2NIMUser[]> {
     const userList = await ChatKitClient.nim.userService?.getUserListFromCloud(accountIds) ?? []
+
+    let friendList: V2NIMUser[] = []
     userList.forEach((user) => {
       const accountId = user.accountId
       if (accountId === ChatKitClient.getLoginUserId()) {
-        NEFriendUserCache.mineUserCache = new NEUserWithFriend({
+        NEFriendUserCache.mineUserCache = new UserWithFriend({
           user: user
         })
       }
 
       if (NEFriendUserCache.getInstance().isFriend(accountId)) {
+        friendList.push(user)
         NEFriendUserCache.getInstance().updateFriendInfo({
           user: user
         })
       }
     })
+
+    NEFriendUserCache.getInstance().listener.emit('updateUserInfo', friendList)
 
     return userList
   }
@@ -159,7 +165,9 @@ export class ContactRepo {
    * 获取黑名单列表
    */
   static async getBlockList(): Promise<string[]> {
-    return await ChatKitClient.nim.userService?.getBlockList() ?? []
+    const blockList = await ChatKitClient.nim.userService?.getBlockList() ?? []
+    NEFriendUserCache.getInstance().initBlockAccountSet(blockList)
+    return blockList
   }
 
   /**
@@ -225,10 +233,9 @@ export class ContactRepo {
    */
   static async getFriendList(): Promise<V2NIMFriend[]> {
     let friendList = await ChatKitClient.nim.friendService?.getFriendList() ?? []
-    NEFriendUserCache.getInstance().initFriendCacheWithList(friendList)
-
-    const blockList = await ContactRepo.getBlockList()
-    NEFriendUserCache.getInstance().initBlockAccountSet(blockList)
+    if (AppStorage.get<NEFriendUserCache>(NEFriendUserCache.name)) {
+      NEFriendUserCache.getInstance().initFriendCacheWithList(friendList)
+    }
 
     return friendList
   }
@@ -247,28 +254,35 @@ export class ContactRepo {
    *
    * @param accountIds 用户 ID 列表
    */
-  static async getUserWithFriendByIds(accountIds: string[]): Promise<NEUserWithFriend[]> {
-    let userWithFriends: NEUserWithFriend[] = []
+  static async getUserWithFriendByIds(accountIds: string[]): Promise<UserWithFriend[]> {
+    let userWithFriends: UserWithFriend[] = []
     const users = await ContactRepo.getUserListFromCloud(accountIds)
     const friends = await ContactRepo.getFriendByIds(accountIds)
 
-    let friendsMap: Map<string, NEUserWithFriend> = new Map<string, NEUserWithFriend>()
+    let friendsMap: Map<string, UserWithFriend> = new Map<string, UserWithFriend>()
     for (const friend of friends) {
       if (friend.accountId) {
-        friendsMap.set(friend.accountId, new NEUserWithFriend({
+        friendsMap.set(friend.accountId, new UserWithFriend({
           friend: friend
         }))
       }
     }
 
+
     for (const user of users) {
       const friend = friendsMap.get(user.accountId)?.friend
-      let userWithFriend: NEUserWithFriend = new NEUserWithFriend({
+      let userWithFriend: UserWithFriend = new UserWithFriend({
         friend: friend,
         user: user
       })
+      if (friend) {
+        NEFriendUserCache.getInstance().updateFriendInfo({
+          friendUser: userWithFriend
+        })
+      }
       userWithFriends.push(userWithFriend)
     }
+
     return userWithFriends
   }
 

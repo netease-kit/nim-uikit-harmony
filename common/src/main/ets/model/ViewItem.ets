@@ -12,6 +12,7 @@ export interface ViewItem {
   title?: ResourceStr;
   subTitle?: ResourceStr;
   titleIconSize?: number;
+  titleIconRadius?: number;
   titleFontSize?: number;
   titleFontColor?: ResourceColor;
   backgroundColor?: ResourceColor;

@@ -2,7 +2,7 @@
   "module": {
     "name": "imkit_sample",
     "type": "entry",
-    "description": "$string:module_desc",
+    "description": "$string:ability_desc",
     "mainElement": "DefaultAbility",
     "deviceTypes": [
       "phone",
@@ -17,7 +17,7 @@
       {
         "name": "DefaultAbility",
         "srcEntry": "./ets/ability/IMAbility.ets",
-        "description": "$string:module_desc",
+        "description": "$string:ability_desc",
         "icon": "$media:ic_app",
         "label": "$string:ability_label",
         "startWindowIcon": "$media:start_logo",

@@ -21,13 +21,14 @@ import {
   MediaUtils,
   NavigationBackBuilder,
   NECommonUtils,
+  NetworkBrokenBuilder,
   PermissionsUtils,
   VideoViewerDialog
 } from '@nimkit/common';
 import { NECameraSelectView } from '../view/NECameraSelectView';
 import { common } from '@kit.AbilityKit';
 import { cameraPicker } from '@kit.CameraKit';
-import { window } from '@kit.ArkUI';
+import { LengthMetrics, window } from '@kit.ArkUI';
 import { NERectData } from '../model/NERectData';
 import { MessageOperationView } from '../view/MessageOperationView';
 import { MessageOperationItem, MessageOperationType } from '../model/MessageOperationItem';
@@ -35,9 +36,18 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { DeviceUtils } from '../common/DeviceUtils';
 import { V2NIMMessageType } from '@nimsdk/base';
 import { ChatConst } from '../constants/ChatConst';
-import { TeamLeftWarningDialog } from '../view/TeamLeftWarningDialog';
-import { ChatKitClient, ConversationRepo } from '@nimkit/chatkit';
+import { ChatKitClient, ConversationRepo, ConversationSelectParam, ErrorUtils } from '@nimkit/chatkit';
 import { TeamExitDialogParam, TeamExitWarningDialog } from '../view/TeamExitWarningDialog';
+import { AudioPlayerManager } from '../manager/AudioPlayerManager';
+import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
+import { ForwardMessageDialog } from '../view/ForwardMessageDialog';
+import { photoAccessHelper } from '@kit.MediaLibraryKit';
+import {
+  downLoadAndOpenFile,
+  getMessageImageUrls,
+  getMessageVideoRatio,
+  getMessageVideoUrl
+} from '../common/MessageHelper';
 
 @ComponentV2
 export struct ChatTeamPage {
@@ -74,26 +84,30 @@ export struct ChatTeamPage {
   listScrollEndPosition: number = 0;
   //首次加载数据滚动到底部
   firstLoadData: boolean = true;
+  listScroller: Scroller = new Scroller();
+  toScroll: boolean = false
   selectVideoView: CustomDialogController = new CustomDialogController({
     builder: NECameraSelectView({
       onTakePhotoFromCamera: () => {
         const context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
         MediaUtils.showCameraPicker(context, cameraPicker.PickerMediaType.PHOTO).then((result) => {
-          if (result.type === cameraPicker.PickerMediaType.PHOTO) {
-            this.chatViewModel.sendImageMessage(result.uris[0])
-          } else if (result.type === cameraPicker.PickerMediaType.VIDEO) {
-            this.chatViewModel.sendVideoMessage(result.uris[0], result.width, result.height)
+          if (result.uri) {
+            if (result.type === photoAccessHelper.PhotoType.IMAGE) {
+              this.chatViewModel.sendImageMessage(result.uri)
+            } else if (result.type === photoAccessHelper.PhotoType.VIDEO) {
+              this.chatViewModel.sendVideoMessage(result.uri, result.duration, result.width, result.height)
+            }
           }
         });
       },
       onTakeVideoFromCamera: () => {
         const context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
-        MediaUtils.showCameraPicker(context, cameraPicker.PickerMediaType.VIDEO).then((result) => {
-          if (result.uris.length > 0) {
-            if (result.type === cameraPicker.PickerMediaType.PHOTO) {
-              this.chatViewModel.sendImageMessage(result.uris[0])
-            } else if (result.type === cameraPicker.PickerMediaType.VIDEO) {
-              this.chatViewModel.sendVideoMessage(result.uris[0], result.width, result.height)
+        MediaUtils.showCameraPicker(context, cameraPicker.PickerMediaType.VIDEO).then(async (result) => {
+          if (result.uri) {
+            if (result.type === photoAccessHelper.PhotoType.IMAGE) {
+              this.chatViewModel.sendImageMessage(result.uri)
+            } else if (result.type === photoAccessHelper.PhotoType.VIDEO) {
+              this.chatViewModel.sendVideoMessage(result.uri, result.duration, result.width, result.height)
             }
           }
         });
@@ -109,7 +123,7 @@ export struct ChatTeamPage {
   @Local currentImageIndex: number = 0
   imageViewerDialog: CustomDialogController = new CustomDialogController({
     builder: ImageViewDialog({
-      ImagesIndexModel: this.imagesIndexModel
+      imagesIndexModel: this.imagesIndexModel
     }),
     cornerRadius: 0,
     alignment: DialogAlignment.Center,
@@ -134,23 +148,30 @@ export struct ChatTeamPage {
     width: '100%',
     customStyle: true
   })
-  //群无效弹框
-  teamLeftDialogController: CustomDialogController = new CustomDialogController({
-    builder: TeamLeftWarningDialog({
-      confirm: () => {
-        this.onConfirm()
-      },
+  @Local forwardMessages: NIMMessageInfo[] = []
+  @Local forwardConversations: ConversationSelectModel[] = []
+  @Local currentConversationName?: string
+  forwardMessageDialog = new CustomDialogController({
+    builder: ForwardMessageDialog({
+      conversationList: this.forwardConversations,
+      currentConversationName: this.currentConversationName,
+      sendForwardMsg: (text: string | undefined) => {
+        this.chatViewModel.forwardMessage(this.forwardMessages, this.forwardConversations, text)
+      }
     }),
-    cancel: () => {
-      this.onConfirm()
-    },
-    autoCancel: false,
-    cornerRadius: 2,
-    borderWidth: 0.5,
-    width: '80%',
-    borderColor: '#ffDCDFE5'
+    cornerRadius: 14,
+    backgroundColor: Color.White,
+    height: 250,
+    width: 276,
   })
-  private listScroller: Scroller = new Scroller();
+  forwardMessageAction = (selectedList: ConversationSelectModel[]) => {
+    if (this.operationMsg?.message) {
+      this.forwardMessages = [this.operationMsg]
+      this.forwardConversations = selectedList
+      this.currentConversationName = this.chatTeamInfo.team?.name
+      this.forwardMessageDialog.open()
+    }
+  }
 
   @Monitor("chatTeamInfo.isReceiveMsg")
   onReceiveMsg(monitor: IMonitor) {
@@ -161,11 +182,59 @@ export struct ChatTeamPage {
     }
   }
 
+  @Monitor("chatTeamInfo.team")
+  onGetTeamInfo(monitor: IMonitor) {
+    let team = this.chatTeamInfo.team
+    if (team && !team.isValidTeam) {
+      TeamExitWarningDialog.show(this.getUIContext(), new TeamExitDialogParam(
+        () => {
+          ConversationRepo.deleteConversation(this.conversationId, true)
+          TeamExitWarningDialog.close(this.getUIContext())
+          this.pathStack.clear()
+        }
+      ))
+    }
+  }
+
+  @Monitor("chatTeamInfo.scrollIndex")
+  onScrollIndex(monitor: IMonitor) {
+    if (this.chatTeamInfo.scrollIndex > -1) {
+      let height = DeviceUtils.windowPXHeight / 2
+      this.toScroll = true
+      this.listScroller.scrollToIndex(this.chatTeamInfo.scrollIndex, false, undefined, {
+        'extraOffset': new LengthMetrics(-height, 0)
+      })
+      this.chatViewModel.setAnchorMessage(undefined)
+      this.chatTeamInfo.setScrollIndex(-1)
+    }
+  }
+
+  @Monitor("chatViewModel.anchorMsg")
+  onAnchorMsg(monitor: IMonitor) {
+    if (this.chatViewModel.anchorMsg) {
+      if (this.chatTeamInfo.msgMap.has(this.chatViewModel.anchorMsg.getMessageClientId())) {
+        let position = this.chatTeamInfo.searchPosition(this.chatViewModel.anchorMsg.getMessageClientId())
+        this.toScroll = true
+        this.listScroller.scrollToIndex(position)
+        this.chatViewModel.setAnchorMessage(undefined)
+      } else {
+        this.chatViewModel.loadAnchorMsg(this.chatViewModel.anchorMsg)
+      }
+    }
+
+  }
+
   @Monitor("expandHeight")
   onExpandInputView(monitor: IMonitor) {
     if (this.expandHeight > 10) {
-      this.listScroller.scrollEdge(Edge.Bottom)
+      // 如果是定位消息状态，收到键盘展开重新切换最新消息
+      if (this.chatViewModel.hasNew) {
+        this.chatViewModel.reloadMessageList()
+      } else {
+        this.listScroller.scrollEdge(Edge.Bottom)
+      }
     }
+
   }
 
   aboutToAppear(): void {
@@ -180,7 +249,6 @@ export struct ChatTeamPage {
       this.screenWidth = px2vp(property.windowRect.width);
       DeviceUtils.windowPXWidth = property.windowRect.width;
       DeviceUtils.windowPXHeight = property.windowRect.height;
-      console.log('net ease screen height:' + this.screenHeight);
       this.scrollHeight =
         px2vp(property.windowRect.height - avoidArea.bottomRect.height) - this.bottomHeight;
       this.defaultInputViewHeight = this.scrollHeight;
@@ -189,6 +257,10 @@ export struct ChatTeamPage {
         if (data.type == window.AvoidAreaType.TYPE_KEYBOARD) {
           this.showOperationView = false
           let keyboardHeight = px2vp(data.area.bottomRect.height);
+          // 如果是定位消息状态，收到键盘展开重新切换最新消息
+          if (keyboardHeight > 10 && this.chatViewModel.hasNew) {
+            this.chatViewModel.reloadMessageList()
+          }
           if ((this.inputStyle === InputStyleType.Emoji || this.inputStyle === InputStyleType.Record ||
             this.inputStyle === InputStyleType.More) && keyboardHeight <= 0) {
             this.scrollHeight =
@@ -211,10 +283,8 @@ export struct ChatTeamPage {
   }
 
   getMessageText(): string {
-    console.log('net ease toSendMessage')
     let text = '';
     let results = this.controller?.getSpans();
-    console.log('net ease rich editor results:' + JSON.stringify(results))
     results?.forEach((item) => {
       if (typeof (item as RichEditorImageSpanResult)['imageStyle'] != 'undefined') {
         let resourcePath = (item as RichEditorImageSpanResult).valueResourceStr;
@@ -222,7 +292,6 @@ export struct ChatTeamPage {
           let path = resourcePath.toString();
           let splits = path.split("/")
           let fileName = splits[splits.length - 1];
-          console.log('net ease file name :' + fileName)
           let emoji = NEEmojiManager.instance.getEmojiByName(String(fileName));
           if (emoji?.tag != null) {
             text += emoji.tag;
@@ -230,7 +299,6 @@ export struct ChatTeamPage {
         }
       } else {
         text += (item as RichEditorTextSpanResult).value;
-        console.log('net ease current text ', text)
       }
     })
     return text
@@ -257,13 +325,11 @@ export struct ChatTeamPage {
         }
       }
     })
-    console.log('net ease input content length ', length);
     return length
   }
 
   // 初始化数据
   setupMoreOperationData() {
-    console.log('net ease setup more operation data')
     const videoOperationData = new NEChatMoreOperationData();
     videoOperationData.operationTitle = $r("app.string.chat_camera_take");
     videoOperationData.type = NEChatMoreOperationType.Video;
@@ -276,25 +342,10 @@ export struct ChatTeamPage {
     this.operationMoreDataList.push(fileOperationData);
   }
 
-  //群无效确认操作
-  onConfirm() {
-    ConversationRepo.deleteConversation(this.conversationId, true)
-    this.pathStack.clear()
-  }
-
   async requestChatData() {
     this.chatTeamInfo.setConversationId(this.conversationId)
     this.chatViewModel.init(this.conversationId as string, this.chatTeamInfo);
-    let team = await this.chatViewModel.getTeamInfo()
-    if (team && !team.isValidTeam) {
-      this.teamLeftDialogController.open()
-      return
-    }
-    this.chatViewModel.getMessageList().then((msgList: NIMMessageInfo[]) => {
-      this.chatViewModel.getTeamMemberInfoWithMessage(msgList)
-    }).catch((error: SyntaxError) => {
-      console.error(error.message);
-    });
+    this.chatViewModel.loadData()
     this.chatViewModel.setTeamExitListener(() => {
       TeamExitWarningDialog.show(this.getUIContext(), new TeamExitDialogParam(
         () => {
@@ -305,27 +356,20 @@ export struct ChatTeamPage {
     })
   }
 
-  requestMoreMessageData(msg: NIMMessageInfo): void {
-    this.chatViewModel.getMoreMessageList(msg).then((msgList: NIMMessageInfo[]) => {
-      this.chatViewModel.getTeamMemberInfoWithMessage(msgList)
-    }).catch((error: SyntaxError) => {
-      console.error(error.message);
-    });
-  }
-
   async showImageDetail(msg?: NIMMessageInfo) {
     try {
-      const imageModel = await this.chatViewModel.getMessageImageUrls(msg)
+      const imageModel = await getMessageImageUrls(msg, this.chatTeamInfo)
       this.imagesIndexModel = imageModel
       this.imageViewerDialog.open()
     } catch (err) {
-      console.log(err)
+      console.error(err)
     }
   }
 
   showVideoDetail(msg: NIMMessageInfo) {
-    this.videoFileUrl = this.chatViewModel.getMessageVideoUrl(msg)
-    this.videoRatio = this.chatViewModel.getMessageVideoRatio(msg)
+    AudioPlayerManager.instance.stopPlayAll()
+    this.videoFileUrl = getMessageVideoUrl(msg, this.chatTeamInfo)
+    this.videoRatio = getMessageVideoRatio(msg)
     if (this.videoFileUrl) {
       this.videoViewerDialog.open()
     }
@@ -344,6 +388,11 @@ export struct ChatTeamPage {
           this.goToTeamSettingPage(this.pathStack)
         }
       })
+
+      if (this.chatViewModel.networkBroken) {
+        NetworkBrokenBuilder()
+      }
+
       RelativeContainer() {
         List({ scroller: this.listScroller }) {
           LazyForEach(this.chatTeamInfo.msgList, (msg: NIMMessageInfo) => {
@@ -351,44 +400,62 @@ export struct ChatTeamPage {
               MessageComponent({
                 message: msg,
                 chatInfo: this.chatTeamInfo,
-                onAvatarClick: ((msg: NIMMessageInfo | undefined) => {
-                  if (msg != null) {
-                    if (msg?.message.senderId == ChatKitClient.getLoginUserId()) {
-                      this.pathStack.pushPath({
-                        name: 'MineInfoPage'
-                      })
-                    } else {
-                      this.pathStack.pushPath({ name: 'PersonInfoPage', param: msg?.message.senderId })
+                onMessageClick: {
+                  onAvatarClick: (msg: NIMMessageInfo | undefined) => {
+                    if (msg != null) {
+                      if (msg?.message.senderId == ChatKitClient.getLoginUserId()) {
+                        this.pathStack.pushPath({
+                          name: 'MineInfoPage'
+                        })
+                      } else {
+                        this.pathStack.pushPath({ name: 'PersonInfoPage', param: msg?.message.senderId })
+                      }
                     }
-                  }
-                }),
-                onItemLongClick: ((event: GestureEvent, msg: NIMMessageInfo | undefined) => {
-                  this.operationMsg = msg
-                  let opMenuWidth = MessageOperationView.computeViewWidth(msg)
-                  if (event.target.area.position.x !== undefined) {
-                    let xPoint = Number(event.target.area.globalPosition.x) +
-                      (Number(event.target.area.width) - opMenuWidth) / 2
-                    if (xPoint < this.operationViewMargin) {
-                      xPoint = this.operationViewMargin;
+                  },
+                  onItemLongClick: (event: GestureEvent, msg: NIMMessageInfo | undefined) => {
+                    this.operationMsg = msg
+                    let opMenuWidth = MessageOperationView.computeViewWidth(msg)
+                    if (event.target.area.position.x !== undefined) {
+                      let xPoint = Number(event.target.area.globalPosition.x) +
+                        (Number(event.target.area.width) - opMenuWidth) / 2
+                      if (xPoint < this.operationViewMargin) {
+                        xPoint = this.operationViewMargin;
+                      }
+                      if (xPoint + opMenuWidth + this.operationViewMargin > this.screenWidth) {
+                        xPoint = this.screenWidth - opMenuWidth - this.operationViewMargin;
+                      }
+                      this.operationRect.x = xPoint;
                     }
-                    if (xPoint + opMenuWidth + this.operationViewMargin > this.screenWidth) {
-                      xPoint = this.screenWidth - opMenuWidth - this.operationViewMargin;
+                    if (event.target.area.position.y !== undefined) {
+                      this.operationRect.y =
+                        Number(event.target.area.globalPosition.y) - this.navBarHeight +
+                        Number(event.target.area.height)
                     }
-                    this.operationRect.x = xPoint;
-                  }
-                  if (event.target.area.position.y !== undefined) {
-                    this.operationRect.y =
-                      Number(event.target.area.globalPosition.y) - this.navBarHeight + Number(event.target.area.height)
-                  }
-                  this.showOperationView = true
-                }),
-                onItemClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
-                  if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
-                    this.showImageDetail(msg)
-                  } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE) {
-                    this.chatViewModel.downLoadAndOpenFile(msg, getContext(this))
-                  } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
-                    this.showVideoDetail(msg)
+                    this.showOperationView = true
+                  },
+                  onItemClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                    if (msg) {
+                      if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
+                        this.showImageDetail(msg)
+                      } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE) {
+                        downLoadAndOpenFile(msg, getContext(this), this.chatTeamInfo)
+                      } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
+                        this.showVideoDetail(msg)
+                      }
+                    }
+                  },
+                  onRevokeEditClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                    if (msg?.checkRevokeEdit()) {
+                      this.controller.deleteSpans()
+                      this.controller.addTextSpan(msg.revokeInfo?.revokeMsgText)
+                    } else if (msg?.revokeInfo !== undefined) {
+                      NECommonUtils.showToast($r('app.string.chat_revoke_edit_error_tips'))
+                    }
+                  },
+                  onReadReceiptClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                    if (ErrorUtils.checkNetworkAndToast()) {
+                      this.pathStack.pushPath({ name: 'ChatReadReceiptPage', param: msg?.message })
+                    }
                   }
                 }
               })
@@ -397,15 +464,25 @@ export struct ChatTeamPage {
         }
         .id("chatPageListView")
         .cachedCount(20)
-        .padding({ bottom: 20 })
+        .padding({ bottom: 10 })
         .maintainVisibleContentPosition(true)
         .onScrollIndex((start: number, end: number) => {
-          if (start >= 0 && start < 10
-            && this.listScrollStartPosition > start && this.chatViewModel.canLoadMore()) {
-            this.requestMoreMessageData(this.chatTeamInfo.msgList.getData(0))
+          if (!this.toScroll) {
+            if (start >= 0 && start < 3
+              && this.listScrollStartPosition > start && this.chatViewModel.canLoadMore()) {
+              this.chatViewModel.getMoreMessageList()
+            } else if (this.listScrollEndPosition < end && this.chatViewModel.canLoadNext(end)) {
+              this.chatViewModel.getNewMessageList()
+            }
           }
           this.listScrollEndPosition = end;
           this.listScrollStartPosition = start;
+        })
+        .onScrollStop(() => {
+          console.debug('netease to scroll stop:', this.toScroll)
+          if (this.toScroll) {
+            this.toScroll = false
+          }
         })
         .alignRules({
           left: { anchor: "__container__", align: HorizontalAlign.Start },
@@ -426,7 +503,6 @@ export struct ChatTeamPage {
           }
         })
 
-
         Column()
           .height(this.bottomHeight)
           .backgroundColor(Color.Transparent)
@@ -445,12 +521,12 @@ export struct ChatTeamPage {
               this.chatTeamInfo.conversationName?.substring(0, 15) + '...' : this.chatTeamInfo.conversationName,
             onDidClickImage: () => {
               this.showOperationView = false
-              MediaUtils.showMediaPicker().then((result) => {
-                if (result.errorMsg == null && result.uris.length > 0) {
-                  if (result.type === cameraPicker.PickerMediaType.PHOTO) {
-                    this.chatViewModel.sendImageMessage(result.uris[0]);
-                  } else if (result.type === cameraPicker.PickerMediaType.VIDEO) {
-                    this.chatViewModel.sendVideoMessage(result.uris[0], result.width, result.height);
+              MediaUtils.showImageVideoPicker().then((result) => {
+                if (result.errorMsg == null && result.uri) {
+                  if (result.type === photoAccessHelper.PhotoType.IMAGE) {
+                    this.chatViewModel.sendImageMessage(result.uri);
+                  } else if (result.type === photoAccessHelper.PhotoType.VIDEO) {
+                    this.chatViewModel.sendVideoMessage(result.uri, result.duration, result.width, result.height);
                   }
                 }
               })
@@ -501,23 +577,23 @@ export struct ChatTeamPage {
               }
             },
             onSendTextMessage: () => {
-              let text = this.getMessageText()
+              let text = this.getMessageText().trimEnd()
               this.showOperationView = false
-              console.log("net ease send text message " + text)
               if (text.length <= 0) {
                 NECommonUtils.showToast($r('app.string.null_message_not_support'))
                 return
               }
-              this.chatViewModel.sendMessage(text)
+              this.chatViewModel.sendTextMessage(text)
               this.controller.deleteSpans()
             },
-            inputStyle: this.inputStyle
+            inputStyle: this.inputStyle,
+            mute: this.chatViewModel.isMuteModel
           }).alignRules({
             left: { anchor: "chat_input", align: HorizontalAlign.Start },
             right: { anchor: "chat_input", align: HorizontalAlign.End },
             bottom: { anchor: "chat_input", align: VerticalAlign.Bottom },
             top: { anchor: "chat_input", align: VerticalAlign.Top },
-          }).backgroundColor($r('app.color.chat_input_background'))
+          }).backgroundColor(this.chatViewModel.isMuteModel ? '#ffE9EFF5' : $r('app.color.chat_input_background'))
         }
 
         Column() {
@@ -558,8 +634,8 @@ export struct ChatTeamPage {
                 } else if (data.type == NEChatMoreOperationType.File) {
                   console.log("net ease click file")
                   MediaUtils.showFilePicker().then((result) => {
-                    if (result.errorMsg == null && result.uris.length > 0) {
-                      this.chatViewModel.sendFileMessage(result.uris[0]);
+                    if (result.errorMsg == null && result.uri) {
+                      this.chatViewModel.sendFileMessage(result.uri);
                     }
                   })
                 }
@@ -587,13 +663,12 @@ export struct ChatTeamPage {
                 }
               },
               onEmojiSendMessage: () => {
-                let text = this.getMessageText()
-                console.log("net ease send text message " + text)
+                let text = this.getMessageText().trimEnd()
                 if (text.length <= 0) {
                   NECommonUtils.showToast($r('app.string.null_message_not_support'))
                   return
                 }
-                this.chatViewModel.sendMessage(text)
+                this.chatViewModel.sendTextMessage(text)
                 this.controller.deleteSpans()
               }
             }).padding({ top: 0 })
@@ -630,6 +705,7 @@ export struct ChatTeamPage {
                 const pasteboardData =
                   pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.operationMsg.message.text)
                 pasteboard.getSystemPasteboard().setDataSync(pasteboardData)
+                NECommonUtils.showToast($r('app.string.chat_message_copy_success_tips'))
               } else if (item.operationType == MessageOperationType.Delete ||
                 item.operationType == MessageOperationType.Undo) {
                 AlertDialog.show(
@@ -664,6 +740,15 @@ export struct ChatTeamPage {
                     }
                   }
                 )
+              } else if (item.operationType == MessageOperationType.Translate) {
+                this.pathStack.pushPath({
+                  name: 'ConversationSelectPage',
+                  param: new ConversationSelectParam([], 9, this.forwardMessageAction)
+                })
+              } else if (item.operationType == MessageOperationType.Pin) {
+                this.chatViewModel.pinMessage(this.operationMsg)
+              } else if (item.operationType == MessageOperationType.Unpin) {
+                this.chatViewModel.unpinMessage(this.operationMsg)
               }
             }
           })
@@ -685,6 +770,9 @@ export struct ChatTeamPage {
         this.pathStack.removeByName("ChatTeamPage")
       }
     })
+    .onHidden(() => {
+      AudioPlayerManager.instance.stopPlayAll()
+    })
   }
 
   goToTeamSettingPage(pathStack: NavPathStack) {
@@ -692,6 +780,7 @@ export struct ChatTeamPage {
       name: 'TeamSettingPage',
       param: this.chatTeamInfo.team?.teamId
     })
+    this.controller.stopEditing()
   }
 
   onPageHide(): void {
@@ -701,6 +790,7 @@ export struct ChatTeamPage {
   aboutToDisappear(): void {
     this.chatViewModel.clearUnreadCount()
     this.chatViewModel.onDestroy()
+    AudioPlayerManager.instance.stopPlayAll()
   }
 }
 

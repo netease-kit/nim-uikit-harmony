@@ -9,8 +9,6 @@
  * Common constants for all features.
  */
 export class ChatConst {
-  //消息撤回时间限制
-  static readonly messageRevokeTimeLimit: number = 2 * 60 * 1000;
   //消息分页拉取，每页大小
   static readonly chatMessagePageSize: number = 50;
   // 图片消息图片的高度
@@ -34,6 +32,8 @@ export class ChatConst {
   // 消息长按菜单每个item的宽度
   static readonly menuItemWidth: number = 60;
   static readonly menuItemHeight: number = 66;
+  // PIN 消息操作者名称最大长度
+  static readonly pinOperatorNameMaxLen: number = 10;
   // 消息撤回本地存储，是否为本端撤回消息
   static readonly revokeLocalKey: string = 'revoke_message_local';
   // 消息撤回本地存储，撤回时间

@@ -6,8 +6,8 @@
  */
 
 import { ChatInfo } from './ChatInfo';
-import { V2NIMUser } from '@nimsdk/base';
-import { V2NIMTeam, V2NIMTeamMember } from '@nimsdk/base/src/main/ets/nim/sdk/V2NIMTeamService'
+import { V2NIMFriend, V2NIMTeamMessageReadReceipt, V2NIMUser } from '@nimsdk/base';
+import { V2NIMTeam, V2NIMTeamMember } from '@nimsdk/base/src/main/ets/nim/sdk/V2NIMTeamService';
 import { NIMMessageInfo } from './NIMMessageInfo';
 import { NEFriendUserCache } from '@nimkit/chatkit/src/main/ets/NEFriendUserCache';
 import { ChatKitClient } from '@nimkit/chatkit';
@@ -17,6 +17,9 @@ export class ChatTeamInfo extends ChatInfo {
   @Trace team?: V2NIMTeam | undefined = undefined;
   @Trace teamMemberMap = new Map<string, V2NIMTeamMember>();
   @Trace teamUserMap = new Map<string, V2NIMUser>();
+  // 用于动态监听好友信息变更时，更新会话页面好友数据
+  @Trace teamUserFriendMap = new Map<string, V2NIMFriend>();
+  teamMessageReadReceipt = new Map<string, V2NIMTeamMessageReadReceipt>();
 
   constructor(conversationId: string) {
     super(conversationId)
@@ -30,15 +33,21 @@ export class ChatTeamInfo extends ChatInfo {
 
   setTeam(team: V2NIMTeam | undefined) {
     this.team = team;
-    console.log('net ease team info', this.team?.teamId);
     if (team !== undefined && team.name != '') {
-      console.log('net ease team name', this.team?.name);
       this.conversationName = team.name;
     }
   }
 
   setTeamMember(member: V2NIMTeamMember) {
     this.teamMemberMap.set(member.accountId, member);
+  }
+
+  setTeamReadReadReceipt(readReceipts: V2NIMTeamMessageReadReceipt[]) {
+    readReceipts.forEach((readReceipt) => {
+      this.teamMessageReadReceipt.set(readReceipt.messageClientId, readReceipt);
+      let msg = this.getMessage(readReceipt.messageClientId);
+      msg?.setReadCount(readReceipt.readCount, readReceipt.unreadCount)
+    })
   }
 
   pushDataList(msgList: NIMMessageInfo[]) {
@@ -48,10 +57,13 @@ export class ChatTeamInfo extends ChatInfo {
   }
 
   addTeamUser(userList: V2NIMUser[]) {
-
     userList.forEach((user) => {
       this.teamUserMap.set(user.accountId, user);
     });
+  }
+
+  addTeamFriend(friend: V2NIMFriend) {
+    this.teamUserFriendMap.set(friend.accountId, friend);
   }
 
   addTeamMember(member: V2NIMTeamMember[]) {
@@ -84,11 +96,15 @@ export class ChatTeamInfo extends ChatInfo {
 
   getChatUserAvatarName(accountId: string): string {
     let result = '';
-
-    if (NEFriendUserCache.getInstance().isFriend(accountId)) {
+    if (this.teamUserFriendMap.has(accountId)) {
+      let friend = this.teamUserFriendMap.get(accountId)
+      if (friend && friend.alias !== undefined) {
+        result = friend.alias ?? ''
+      }
+    } else if (NEFriendUserCache.getInstance().isFriend(accountId)) {
       let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
       if (friendInfo !== undefined) {
-        result = friendInfo.shortName(false)
+        result = friendInfo.shortName(true)
       }
     }
 
@@ -99,7 +115,10 @@ export class ChatTeamInfo extends ChatInfo {
     if (result == null || result.trim() === '') {
       result = accountId;
     }
-    return result;
+    if (result !== '' && result.length > 2) {
+      result = result.substring(result.length - 2, result.length)
+    }
+    return result
   }
 
   getCurrentUserAvatarName(): string {
@@ -112,16 +131,31 @@ export class ChatTeamInfo extends ChatInfo {
     if (result == null || result.trim() === '') {
       result = accountId;
     }
-    return result;
+    if (result !== '' && result.length > 2) {
+      result = result.substring(result.length - 2, result.length)
+    }
+    return result
   }
 
   getChatUserShowName(accountId: string): string {
     let result = '';
-    if (this.teamMemberMap.has(accountId)) {
+    if (this.teamUserFriendMap.has(accountId)) {
+      let friend = this.teamUserFriendMap.get(accountId)
+      if (friend && friend.alias !== undefined) {
+        result = friend.alias ?? ''
+      }
+    }
+    let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
+    //1,备注优先
+    if ((result == null || result.trim() === '') && friendInfo) {
+      result = friendInfo.getAlias() ?? ''
+    }
+    //2，群昵称次之
+    if ((result == null || result.trim() === '') && this.teamMemberMap.has(accountId)) {
       result = this.teamMemberMap.get(accountId)?.teamNick ?? '';
     }
+    //3，好友名称再次之
     if ((result == null || result.trim() === '') && NEFriendUserCache.getInstance().isFriend(accountId)) {
-      let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
       if (friendInfo !== undefined) {
         result = friendInfo.showName(true)
       }
@@ -150,5 +184,23 @@ export class ChatTeamInfo extends ChatInfo {
       result = accountId;
     }
     return result;
+  }
+
+  /**
+   * 获取用成员用户信息
+   * @param accountId
+   * @returns
+   */
+  getMemberUserById(accountId: string) {
+    return this.teamUserMap.get(accountId)
+  }
+
+  /**
+   * 获取当前成员的群管理员
+   * @returns
+   */
+  getCurrentUserTeamMember() {
+    let accId = ChatKitClient.getLoginUserId()
+    return this.teamMemberMap.get(accId)
   }
 }

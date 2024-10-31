@@ -5,10 +5,18 @@
  *
  */
 
-import { ChatKitClient, ContactRepo, ConversationRepo, SettingRepo } from '@nimkit/chatkit';
-import { V2NIMP2PMessageMuteMode } from '@nimsdk/base';
+import { ChatKitClient, ChatRepo, ContactRepo, ConversationRepo, SettingRepo } from '@nimkit/chatkit';
+import {
+  V2NIMFriend,
+  V2NIMMessage,
+  V2NIMP2PMessageMuteMode,
+  V2NIMP2PMessageReadReceipt,
+  V2NIMUser
+} from '@nimsdk/base';
 import { ChatUserInfo } from '../model/ChatUserInfo';
 import { ChatBaseViewModel } from './ChatBaseViewModel';
+import { NIMMessageInfo } from '../model/NIMMessageInfo';
+import { ChatKitConfig } from '../ChatKitConfig';
 
 @ObservedV2
 export class ChatP2PViewModel extends ChatBaseViewModel {
@@ -17,11 +25,88 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
   @Trace isMessageNotify: boolean = true
   //是否置顶
   @Trace isStickTop: boolean = false
+  receiptMessage: NIMMessageInfo | undefined = undefined
 
   init(conversationId: string, chatInfo: ChatUserInfo): void {
-    super.init(conversationId, chatInfo);
-    this.chatUserInfo = chatInfo;
+    super.init(conversationId, chatInfo)
+    this.chatUserInfo = chatInfo
     this.getConversationInfo()
+    ChatRepo.onP2PMessageReadReceipts(this.onReceiveP2PMessageReadReceiptFun)
+    ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onUserProfileChangedFun)
+    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChangedFun)
+  }
+
+  onReceiveP2PMessageReadReceiptFun = (readReceipts: V2NIMP2PMessageReadReceipt[]) => {
+    let receipt: V2NIMP2PMessageReadReceipt = readReceipts[0]
+    readReceipts.forEach((item, index, readReceipts) => {
+      console.debug('netease onReceiveP2PMessageReadReceiptFun item:', item.timestamp, ',index:', index)
+      if (item.timestamp > receipt.timestamp) {
+        receipt = item
+      }
+    })
+    this.chatUserInfo?.setMessageReadReceipt(receipt)
+  }
+  onUserProfileChangedFun = (user: V2NIMUser[]) => {
+    user.forEach((item) => {
+      if (item.accountId == this.chatUserInfo?.currentUser?.accountId) {
+        this.chatUserInfo?.setCurrentUser(item)
+      } else if (item.accountId == this.chatUserInfo?.chatUser?.accountId) {
+        this.chatUserInfo?.setChatUser(item)
+      }
+    })
+  }
+  onFriendInfoChangedFun = (friendInfo: V2NIMFriend) => {
+    if (friendInfo.accountId == this.chatUserInfo?.targetId) {
+      this.chatUserInfo?.updateConversationName()
+      this.chatUserInfo?.setChatFriend(friendInfo)
+    }
+  }
+
+  loadData() {
+    this.getMessageList()
+    this.getUserInfo()
+    this.getMessageReceipt()
+    this.getPinList()
+  }
+
+  reloadMessageList() {
+    this.getMessageList()
+    this.setAnchorMessage(undefined)
+    this.hasNew = false
+  }
+
+  toHandleReceiveMessage(messages: NIMMessageInfo[]): void {
+    this.toHandleReceiptMessage(messages)
+  }
+
+  toHandleQueryMessage(messages: NIMMessageInfo[], originMsg: V2NIMMessage[]): void {
+    this.toHandleReceiptMessage(messages)
+  }
+
+  toHandleDataSyncFinished(): void {
+    this.getUserInfo()
+    this.getPinList()
+    this.getMessageReceipt()
+  }
+
+  toHandleReceiptMessage(messages: NIMMessageInfo[]) {
+    // 发送已读回执
+    let receiveMsg: NIMMessageInfo | undefined = undefined
+    // 如果已读回执消息，大于当前列表中最后一条消息，则发送已读回执
+    if (this.receiptMessage !== undefined &&
+      this.receiptMessage.getCreateTime() > messages[messages.length - 1].getCreateTime()) {
+      return
+    }
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].isReceiveMessage()) {
+        receiveMsg = messages[i]
+        break
+      }
+    }
+    if (this.receiptMessage == undefined || this.receiptMessage.getCreateTime() < (receiveMsg?.getCreateTime() ?? 0)) {
+      this.sendMessageReceipt(receiveMsg)
+      this.receiptMessage = receiveMsg
+    }
   }
 
   async getUserInfo() {
@@ -75,6 +160,36 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
     } catch (e) {
       this.isMessageNotify = !isOn
     }
+  }
 
+  /**
+   * 获取消息已读未读状态
+   */
+  async getMessageReceipt() {
+    if (ChatKitConfig.messageReadState) {
+      ChatRepo.getP2PMessageReceipt(this.conversationId).then((receipt) => {
+        this.chatUserInfo?.setMessageReadReceipt(receipt)
+      })
+    }
+  }
+
+  /**
+   * 发送消息已读回执
+   * @param message
+   */
+  sendMessageReceipt(msg: NIMMessageInfo | undefined): void {
+    if (msg && ChatKitConfig.messageReadState) {
+      ChatRepo.sendP2PMessageReceipt(msg.message)
+    }
+  }
+
+  /**
+   * 退出页面，清理
+   */
+  onDestroy() {
+    super.onDestroy()
+    ChatRepo.offP2PMessageReadReceipts(this.onReceiveP2PMessageReadReceiptFun)
+    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onUserProfileChangedFun)
+    ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChangedFun)
   }
 }

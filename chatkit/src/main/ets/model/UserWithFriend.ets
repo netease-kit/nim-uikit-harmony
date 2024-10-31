@@ -7,17 +7,17 @@
 
 import { V2NIMFriend, V2NIMUser } from '@nimsdk/base';
 
-interface NEUserWithFriendParams {
+interface UserWithFriendParams {
   friend?: V2NIMFriend;
   user?: V2NIMUser;
 }
 
 @ObservedV2
-export class NEUserWithFriend {
+export class UserWithFriend {
   @Trace user?: V2NIMUser
   @Trace friend?: V2NIMFriend
 
-  constructor(params: NEUserWithFriendParams) {
+  constructor(params: UserWithFriendParams) {
     this.friend = params.friend
     if (params.user) {
       this.user = params.user
@@ -52,5 +52,13 @@ export class NEUserWithFriend {
       return name.substring(start, end)
     }
     return ""
+  }
+
+  /**
+   * 获取好友备注
+   * @returns
+   */
+  public getAlias() {
+    return this.friend?.alias
   }
 }

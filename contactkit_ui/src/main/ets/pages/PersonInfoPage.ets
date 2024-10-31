@@ -5,44 +5,38 @@
  *
  */
 
-import { router } from '@kit.ArkUI';
-import { ChatKitClient, ContactRepo, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit';
+import { ChatKitClient, ContactRepo, ErrorUtils, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
   AvatarItem,
   CommonAvatar,
   NavigationBackBuilder,
-  NECommonUtils,
   StringIsEmpty,
-  TailString,
-  ViewItem,
-  ViewItemArrow,
-  ViewItemSwitch
+  TailString
 } from '@nimkit/common';
-import { V2NIMFriend, V2NIMFriendAddMode, V2NIMFriendDeletionType } from '@nimsdk/base';
-import { it } from '@ohos/hypium';
 import { EditType, PersonInfoArrowItem, PersonInfoItem, PersonInfoSwitchItem } from '../model/MineInfoItem';
+import { PersonInfoViewModel } from '../viewmodel/PersonInfoViewModel';
 import { EditInfoParam } from './EditInfoPage';
 
 /// 删除好友底部悬浮弹窗
 @CustomDialog
 export struct DeleteFriendDialog {
-  pathStack: NavPathStack = new NavPathStack()
   controller?: CustomDialogController
   userWithFriend?: NEUserWithFriend
   alias?: string
   // 【删除好友】按钮点击事件
   onDeleteFriendClick = async () => {
-    const accountId = this.userWithFriend?.user?.accountId
-    if (accountId) {
-      try {
-        await ContactRepo.deleteFriend(accountId, { deleteAlias: true })
-      } catch (err) {
-        console.log(err)
+    if (ErrorUtils.checkNetworkAndToast()) {
+      const accountId = this.userWithFriend?.user?.accountId
+      if (accountId) {
+        try {
+          await ContactRepo.deleteFriend(accountId, { deleteAlias: true })
+        } catch (err) {
+          console.error(err)
+        }
       }
+      this.controller?.close()
     }
-    this.controller?.close()
-    this.pathStack.pop()
   }
   // 【取消】按钮点击事件
   cancel = () => {
@@ -99,7 +93,7 @@ export struct DeleteFriendDialog {
 }
 
 @Builder
-export function PersonInfItemBuilder(item: PersonInfoItem) {
+export function PersonInfoItemBuilder(item: PersonInfoItem | PersonInfoArrowItem | PersonInfoSwitchItem) {
   Column() {
     Row() {
       Text(item.title)
@@ -158,41 +152,11 @@ export function PersonInfoPageBuilder() {
 @ComponentV2
 export struct PersonInfoPage {
   pathStack: NavPathStack = new NavPathStack()
-  @Local accountId: string = ""
-  @Local userWithFriend: NEUserWithFriend | undefined = undefined
+  @Local viewModel: PersonInfoViewModel = new PersonInfoViewModel()
   @Local alias?: string =
-    StringIsEmpty(this.userWithFriend?.friend?.alias) ? undefined : this.userWithFriend?.friend?.alias
+    StringIsEmpty(this.viewModel.userWithFriend?.friend?.alias) ? undefined :
+      this.viewModel.userWithFriend?.friend?.alias
   @Local isBlock: boolean = false
-  // 【加入黑名单】开关切换事件
-  onAddBlockClick = async (isOpen: boolean) => {
-    const accountId = this.userWithFriend?.user?.accountId
-    if (accountId) {
-      try {
-        if (isOpen) {
-          await ContactRepo.addUserToBlockList(accountId)
-        } else {
-          await ContactRepo.removeUserFromBlockList(accountId)
-        }
-      } catch (err) {
-        console.log(err)
-      }
-    }
-  }
-  // 【添加好友】按钮点击事件
-  onAddFriendClick = async () => {
-    try {
-      await ContactRepo.addFriend(this.accountId, {
-        addMode: V2NIMFriendAddMode.V2NIM_FRIEND_MODE_TYPE_APPLY,
-        postscript: ''
-      })
-
-      // 移除黑名单
-      await ContactRepo.removeUserFromBlockList(this.accountId)
-      NECommonUtils.showToast($r('app.string.person_info_add_tip'))
-    } catch (err) {
-      console.log(err)
-    }
-  }
   @Local personInfoItems1: PersonInfoArrowItem[] = [
     new PersonInfoArrowItem($r("app.string.person_info_alias"))
   ]
@@ -200,8 +164,7 @@ export struct PersonInfoPage {
   @Local personInfoItems3: PersonInfoSwitchItem[] = []
   deleteFriendDialog: CustomDialogController = new CustomDialogController({
     builder: DeleteFriendDialog({
-      pathStack: this.pathStack,
-      userWithFriend: this.userWithFriend,
+      userWithFriend: this.viewModel.userWithFriend,
       alias: this.alias
     }),
     cornerRadius: 0,
@@ -211,64 +174,33 @@ export struct PersonInfoPage {
     height: 140,
   })
 
-  addListener() {
-    ChatKitClient.nim.friendService?.on("onFriendAdded", (friend: V2NIMFriend) => {
-      this.userWithFriend = new NEUserWithFriend({
-        friend: friend
-      })
-    })
-
-    ChatKitClient.nim.friendService?.on("onFriendDeleted",
-      (accountId: string, deletionType: V2NIMFriendDeletionType) => {
-        if (this.userWithFriend?.friend) {
-          this.userWithFriend.friend = undefined
-        }
-      })
-
-    ChatKitClient.nim.friendService?.on("onFriendInfoChanged", (friend: V2NIMFriend) => {
-      if (this.userWithFriend?.friend) {
-        this.userWithFriend.friend = friend
-      }
-    })
-  }
-
   getGenderString() {
-    return this.userWithFriend?.user?.gender === 2 ? $r("app.string.person_gender_female") :
-      (this.userWithFriend?.user?.gender === 1 ? $r("app.string.person_gender_male") :
+    return this.viewModel.userWithFriend?.user?.gender === 2 ? $r("app.string.person_gender_female") :
+      (this.viewModel.userWithFriend?.user?.gender === 1 ? $r("app.string.person_gender_male") :
       $r("app.string.person_gender_unknown"))
   }
 
   async requestData(): Promise<void> {
-    this.addListener()
+    const accountId = this.pathStack.getParamByName("PersonInfoPage")[0] as string
+    this.viewModel.init(accountId).then(() => {
+      this.alias = StringIsEmpty(this.viewModel.userWithFriend?.friend?.alias) ? undefined :
+        this.viewModel.userWithFriend?.friend?.alias
+      this.isBlock = NEFriendUserCache.getInstance().isBlockAccount(this.viewModel.accountId)
 
-    try {
-      this.accountId = this.pathStack.getParamByName("PersonInfoPage")[0] as string
-      const userWithFriends = await ContactRepo.getUserWithFriendByIds([this.accountId])
-      if (userWithFriends.length > 0) {
-        this.userWithFriend = userWithFriends[0]
-      } else {
-        this.userWithFriend = NEFriendUserCache.getInstance().getFriendById(this.accountId)
-      }
-    } catch (err) {
-      console.log(err)
-      this.userWithFriend = NEFriendUserCache.getInstance().getFriendById(this.accountId)
-    }
+      this.personInfoItems2 = [
+        new PersonInfoItem($r("app.string.person_info_gender"), this.getGenderString()),
+        new PersonInfoItem($r('app.string.person_info_birthday'), this.viewModel.userWithFriend?.user?.birthday),
+        new PersonInfoItem($r('app.string.person_info_mobile'), this.viewModel.userWithFriend?.user?.mobile),
+        new PersonInfoItem($r('app.string.person_info_email'), this.viewModel.userWithFriend?.user?.email),
+        new PersonInfoItem($r('app.string.person_info_sign'), this.viewModel.userWithFriend?.user?.sign, 66),
+      ]
 
-    this.alias = StringIsEmpty(this.userWithFriend?.friend?.alias) ? undefined : this.userWithFriend?.friend?.alias
-    this.isBlock = NEFriendUserCache.getInstance().isBlockAccount(this.accountId)
-
-    this.personInfoItems2 = [
-      new PersonInfoItem($r("app.string.person_info_gender"), this.getGenderString()),
-      new PersonInfoItem($r('app.string.person_info_birthday'), this.userWithFriend?.user?.birthday),
-      new PersonInfoItem($r('app.string.person_info_mobile'), this.userWithFriend?.user?.mobile),
-      new PersonInfoItem($r('app.string.person_info_email'), this.userWithFriend?.user?.email),
-      new PersonInfoItem($r('app.string.person_info_sign'), this.userWithFriend?.user?.sign, 66),
-    ]
-
-    this.personInfoItems3 = [
-    // new PersonInfoSwitchItem($r("app.string.person_setting_remind"), true),
-      new PersonInfoSwitchItem($r("app.string.person_setting_add_block"), this.isBlock, this.onAddBlockClick)
-    ]
+      this.personInfoItems3 = [
+      // new PersonInfoSwitchItem($r("app.string.person_setting_remind"), true),
+        new PersonInfoSwitchItem($r("app.string.person_setting_add_block"), this.isBlock,
+          this.viewModel.onAddBlockClick)
+      ]
+    })
   }
 
   build() {
@@ -282,9 +214,9 @@ export struct PersonInfoPage {
 
         Row() {
           CommonAvatar({
-            item: new AvatarItem(this.userWithFriend?.user?.avatar,
-              (this.alias?.length ?? 0) > 0 ? TailString(this.alias) : this.userWithFriend?.shortName(),
-              AvatarColorUntil.getBackgroundColorById(this.accountId)),
+            item: new AvatarItem(this.viewModel.userWithFriend?.user?.avatar,
+              (this.alias?.length ?? 0) > 0 ? TailString(this.alias) : this.viewModel.userWithFriend?.shortName(),
+              AvatarColorUntil.getBackgroundColorById(this.viewModel.accountId)),
             roundRadius: 30,
             textSize: 22
           })
@@ -295,7 +227,7 @@ export struct PersonInfoPage {
             })
 
           Column({ space: 8 }) {
-            Text((this.alias?.length ?? 0) > 0 ? this.alias : this.userWithFriend?.user?.name)
+            Text((this.alias?.length ?? 0) > 0 ? this.alias : this.viewModel.userWithFriend?.user?.name)
               .fontSize(22)
               .fontWeight(FontWeight.Bold)
               .maxLines(1)
@@ -304,7 +236,7 @@ export struct PersonInfoPage {
               .copyOption(CopyOptions.LocalDevice)
 
             if ((this.alias?.length ?? 0) > 0) {
-              Text($r('app.string.mine_account_nick', this.userWithFriend?.user?.name))
+              Text($r('app.string.mine_account_nick', this.viewModel.userWithFriend?.user?.name))
                 .fontSize(12)
                 .fontColor('#666666')
                 .maxLines(1)
@@ -313,7 +245,7 @@ export struct PersonInfoPage {
                 .copyOption(CopyOptions.LocalDevice)
             }
 
-            Text($r("app.string.mine_account_id_tip", this.userWithFriend?.user?.accountId))
+            Text($r("app.string.mine_account_id_tip", this.viewModel.userWithFriend?.user?.accountId))
               .fontSize(this.alias ? 12 : 16)
               .fontColor(this.alias ? '#666666' : '#333333')
               .maxLines(1)
@@ -330,11 +262,11 @@ export struct PersonInfoPage {
         .backgroundColor(Color.White)
 
         Column({ space: 6 }) {
-          if (this.userWithFriend?.friend) {
+          if (this.viewModel.userWithFriend?.friend) {
             List() {
               ForEach(this.personInfoItems1, (item: PersonInfoArrowItem) => {
                 ListItem() {
-                  PersonInfItemBuilder(item)
+                  PersonInfoItemBuilder(item)
                 }
                 .width('100%')
                 .height(item.itemHeight)
@@ -342,8 +274,8 @@ export struct PersonInfoPage {
                   if ((item as PersonInfoArrowItem).routerUrl !== undefined) {
                     this.pathStack.pushPath({
                       name: (item as PersonInfoArrowItem).routerUrl,
-                      param: new EditInfoParam(item.title, this.userWithFriend?.friend?.alias, EditType.nick,
-                        this.userWithFriend?.user?.accountId),
+                      param: new EditInfoParam(item.title, this.viewModel.userWithFriend?.friend?.alias, EditType.nick,
+                        this.viewModel.userWithFriend?.user?.accountId),
                       onPop: (popInfo: PopInfo) => {
                         const alias = popInfo.result as string
                         this.alias = alias
@@ -358,7 +290,7 @@ export struct PersonInfoPage {
             List() {
               ForEach(this.personInfoItems2, (item: PersonInfoItem) => {
                 ListItem() {
-                  PersonInfItemBuilder(item)
+                  PersonInfoItemBuilder(item)
                 }
                 .width('100%')
                 .height(item.itemHeight)
@@ -369,7 +301,7 @@ export struct PersonInfoPage {
             List() {
               ForEach(this.personInfoItems3, (item: PersonInfoSwitchItem) => {
                 ListItem() {
-                  PersonInfItemBuilder(item)
+                  PersonInfoItemBuilder(item)
                 }
                 .width('100%')
                 .height(item.itemHeight)
@@ -379,7 +311,7 @@ export struct PersonInfoPage {
           }
 
           List() {
-            if (this.userWithFriend?.friend) {
+            if (this.viewModel.userWithFriend?.friend) {
               ListItem() {
                 Column() {
                   Row() {
@@ -401,7 +333,7 @@ export struct PersonInfoPage {
               .onClick(() => {
                 this.pathStack.replacePath({
                   name: 'ChatP2PPage',
-                  param: ChatKitClient.nim.conversationIdUtil.p2pConversationId(this.userWithFriend?.user?.accountId)
+                  param: ChatKitClient.nim.conversationIdUtil.p2pConversationId(this.viewModel.userWithFriend?.user?.accountId)
                 })
               })
 
@@ -445,7 +377,7 @@ export struct PersonInfoPage {
                 }
               }
               .height(48)
-              .onClick(this.onAddFriendClick)
+              .onClick(this.viewModel.onAddFriendClick)
             }
           }
           .backgroundColor(Color.White)
@@ -465,6 +397,9 @@ export struct PersonInfoPage {
     .onReady((context: NavDestinationContext) => {
       this.pathStack = context.pathStack
       this.requestData()
+    })
+    .onDisAppear(() => {
+      this.viewModel.onDestroy()
     })
   }
 }

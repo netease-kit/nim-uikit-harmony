@@ -89,6 +89,14 @@
       "value": "标记"
     },
     {
+      "name": "setting_unpin",
+      "value": "取消标记"
+    },
+    {
+      "name": "setting_pin_empty",
+      "value": "暂无标记消息"
+    },
+    {
       "name": "setting_message_notify",
       "value": "开启消息提醒"
     },
@@ -99,6 +107,34 @@
     {
       "name": "chat_permission_deny_tips",
       "value": "请在设置页面添加相关权限"
+    },
+    {
+      "name": "copy_success",
+      "value": "复制成功"
+    },
+    {
+      "name": "person_select",
+      "value": "选择"
+    },
+    {
+      "name": "conversation_select_limit_tip",
+      "value": "最多只能选择%d个会话"
+    },
+    {
+      "name": "conversation_empty",
+      "value": "暂无会话"
+    },
+    {
+      "name": "common_network_error",
+      "value": "当前网络不可用，请检查你的网络设置。"
+    },
+    {
+      "name": "common_operate_failed",
+      "value": "操作失败"
+    },
+    {
+      "name": "common_content_empty",
+      "value": "暂无内容"
     }
   ]
 }

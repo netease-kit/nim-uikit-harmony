@@ -6,6 +6,8 @@
  */
 
 import { ChatKitClient, ContactRepo, ConversationRepo } from '@nimkit/chatkit';
+import { ChatKitConfig } from '@nimkit/chatkit_ui/src/main/ets/ChatKitConfig';
+import { CommonConstants } from '@nimkit/common';
 import { ContactPage } from '@nimkit/contactkit_ui';
 import { ConversationPage } from '@nimkit/conversationkit_ui';
 import { V2NIMFriendAddApplication } from '@nimsdk/base';
@@ -30,11 +32,11 @@ class TabBarItem {
 }
 
 @Entry
-@ComponentV2
+@Component
 struct TabIndex {
   pathStack: NavPathStack = new NavPathStack()
-  @Local currentIndex: number = 0;
-  @Local tabs: Array<TabBarItem> = [
+  @State currentIndex: number = 0;
+  @State tabs: Array<TabBarItem> = [
     new TabBarItem($r('app.string.tab_conversation'), 0, $r('app.media.tab_conversation'),
       $r('app.media.tab_conversation_light')),
     new TabBarItem($r('app.string.tab_contact'), 1, $r('app.media.tab_contact'), $r('app.media.tab_contact_light')),
@@ -62,6 +64,11 @@ struct TabIndex {
       this.tabs[0].showRedPoint = unreadCount > 0
     }
   }
+  // 加载配置信息
+  loadConfig = () => {
+    let readOrOpen: boolean = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_MESSAGE_READ_OR) ?? true
+    ChatKitConfig.messageReadState = readOrOpen
+  }
 
   async aboutToAppear(): Promise<void> {
     ChatKitClient.nim.friendService?.on("onFriendAddApplication", async (application: V2NIMFriendAddApplication) => {
@@ -74,6 +81,7 @@ struct TabIndex {
       console.log(err)
     }
     this.loadUnreadMessageCount()
+    this.loadConfig()
   }
 
   @Builder
@@ -134,6 +142,7 @@ struct TabIndex {
       .onChange((index: number) => {
         this.currentIndex = index
       })
+      .scrollable(false)
     }
     .backgroundColor(Color.Transparent)
     .mode(NavigationMode.Auto)

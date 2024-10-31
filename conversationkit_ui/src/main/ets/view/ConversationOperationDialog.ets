@@ -5,14 +5,14 @@
  *
  */
 
-import { ConversationRepo } from '@nimkit/chatkit'
+import { ConversationRepo, ErrorUtils } from '@nimkit/chatkit'
 import { V2NIMConversation } from '@nimsdk/base'
 
 @CustomDialog
 export struct ConversationOperationDialog {
   @State conversationInfo: V2NIMConversation | null = null
   private controller: CustomDialogController = new CustomDialogController({
-    builder: ConversationOperationDialog({}),
+    builder: ConversationOperationDialog(),
   })
 
   build() {
@@ -21,28 +21,47 @@ export struct ConversationOperationDialog {
         if (this.conversationInfo.stickTop) {
           Text($r('app.string.unstick_top_conversation'))
             .fontSize(16)
-            .fontColor('#222222')
+            .fontColor('#333333')
             .onClick(() => {
-              ConversationRepo.stickTopConversation(this.conversationInfo?.conversationId ?? '', false)
-              this.controller.close()
+              if (ErrorUtils.checkNetworkAndToast()) {
+                ConversationRepo.stickTopConversation(this.conversationInfo?.conversationId ?? '', false)
+                this.controller.close()
+              }
             })
+            .height(30)
+            .width('100%')
+            .margin({ top: 15 })
+            .textAlign(TextAlign.Center)
         } else {
           Text($r('app.string.stick_top_conversation'))
             .fontSize(16)
-            .fontColor('#222222')
+            .fontColor('#333333')
             .onClick(() => {
-              ConversationRepo.stickTopConversation(this.conversationInfo?.conversationId ?? '', true)
-              this.controller.close()
+              if (ErrorUtils.checkNetworkAndToast()) {
+                ConversationRepo.stickTopConversation(this.conversationInfo?.conversationId ?? '', true)
+                this.controller.close()
+              }
             })
+            .height(30)
+            .width('100%')
+            .margin({ top: 15 })
+            .textAlign(TextAlign.Center)
         }
+        Line().height(1).backgroundColor('#EFF1F4').width('100%').opacity(0.5)
         Text($r('app.string.delete_conversation'))
           .fontSize(16)
-          .fontColor('#222222')
+          .fontColor('#333333')
           .onClick(() => {
-            ConversationRepo.deleteConversation(this.conversationInfo?.conversationId ?? '')
-            this.controller.close()
+            if (ErrorUtils.checkNetworkAndToast()) {
+              ConversationRepo.deleteConversation(this.conversationInfo?.conversationId ?? '')
+              this.controller.close()
+            }
           })
-      }.padding({ top: 10, bottom: 5 })
+          .height(30)
+          .width('100%')
+          .margin({ bottom: 15 })
+          .textAlign(TextAlign.Center)
+      }.width('100%').backgroundColor($r('sys.color.white'))
     }
   }
 }

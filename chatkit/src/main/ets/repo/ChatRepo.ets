@@ -10,11 +10,15 @@ import {
   V2NIMMessageDeletedNotification,
   V2NIMMessageListOption,
   V2NIMMessagePin,
+  V2NIMMessagePinNotification,
   V2NIMMessageRefer,
   V2NIMMessageRevokeNotification,
   V2NIMMessageRevokeParams,
+  V2NIMP2PMessageReadReceipt,
   V2NIMSendMessageParams,
-  V2NIMSendMessageResult
+  V2NIMSendMessageResult,
+  V2NIMTeamMessageReadReceipt,
+  V2NIMTeamMessageReadReceiptDetail
 } from '@nimsdk/base';
 import { ChatKitClient } from '../ChatKitClient';
 
@@ -68,7 +72,7 @@ export class ChatRepo {
   }
 
   /**
-   * 撤回消息
+   * 注册撤回消息监听
    * @param receiveFn 消息接受处理方法
    */
   static onRevokeMessage(revokeFn: (messageList: V2NIMMessageRevokeNotification[]) => void) {
@@ -76,11 +80,59 @@ export class ChatRepo {
   }
 
   /**
-   * 撤回消息
+   * 取消注册撤回消息监听
    * @param receiveFn 消息接受处理方法
    */
   static offRevokeMessage(revokeFn: (messageList: V2NIMMessageRevokeNotification[]) => void) {
     ChatKitClient.nim.messageService?.off("onMessageRevokeNotifications", revokeFn);
+  }
+
+  /**
+   * 注册单聊消息已读回执监听
+   * @param receiptsFn 单聊消息已读回执处理方法
+   */
+  static onP2PMessageReadReceipts(receiptsFn: (messageList: V2NIMP2PMessageReadReceipt[]) => void) {
+    ChatKitClient.nim.messageService?.on("onReceiveP2PMessageReadReceipts", receiptsFn);
+  }
+
+  /**
+   * 取消注册单聊消息已读回执监听
+   * @param receiptsFn 单聊消息已读回执处理方法
+   */
+  static offP2PMessageReadReceipts(receiptsFn: (messageList: V2NIMP2PMessageReadReceipt[]) => void) {
+    ChatKitClient.nim.messageService?.off("onReceiveP2PMessageReadReceipts", receiptsFn);
+  }
+
+  /**
+   * 注册群消息已读回执监听
+   * @param receiptsFn 群消息已读回执处理方法
+   */
+  static onReceiveTeamMessageReadReceipts(receiptsFn: (messageList: V2NIMTeamMessageReadReceipt[]) => void) {
+    ChatKitClient.nim.messageService?.on("onReceiveTeamMessageReadReceipts", receiptsFn);
+  }
+
+  /**
+   * 取消注册群消息已读回执监听
+   * @param receiptsFn 群消息已读回执处理方法
+   */
+  static offReceiveTeamMessageReadReceipts(receiptsFn: (messageList: V2NIMTeamMessageReadReceipt[]) => void) {
+    ChatKitClient.nim.messageService?.off("onReceiveTeamMessageReadReceipts", receiptsFn);
+  }
+
+  /**
+   * 注册PIN消息监听
+   * @param pinFn PIN消息监听处理方法
+   */
+  static onMessagePinNotification(pinFn: (notification: V2NIMMessagePinNotification) => void) {
+    ChatKitClient.nim.messageService?.on("onMessagePinNotification", pinFn);
+  }
+
+  /**
+   * 取消注册PIN消息监听
+   * @param pinFn PIN消息监听处理方法
+   */
+  static offMessagePinNotification(pinFn: (notification: V2NIMMessagePinNotification) => void) {
+    ChatKitClient.nim.messageService?.off("onMessagePinNotification", pinFn);
   }
 
   /**
@@ -102,6 +154,16 @@ export class ChatRepo {
   }
 
   /**
+   * 根据 messageRefers 批量查询消息
+   * @param option
+   * @returns
+   */
+  static async getMessageListByRefers(messageRefers: V2NIMMessageRefer[]): Promise<V2NIMMessage[]> {
+    let messageList = await ChatKitClient.nim.messageService!!.getMessageListByRefers(messageRefers)
+    return messageList ?? [];
+  }
+
+  /**
    * 发送消息
    *
    * @param message 消息体, 由 V2NIMMessageCreator 的对应方法创建
@@ -114,9 +176,8 @@ export class ChatRepo {
     conversationId: string,
     params?: V2NIMSendMessageParams,
     progress?: (percentage: number) => void
-  ): Promise<V2NIMSendMessageResult> {
-    const res = await ChatKitClient.nim.messageService?.sendMessage(message, conversationId, params, progress);
-    return res!;
+  ): Promise<V2NIMSendMessageResult | undefined> {
+    return ChatKitClient.nim.messageService?.sendMessage(message, conversationId, params, progress);
   }
 
   /**
@@ -239,7 +300,7 @@ export class ChatRepo {
    * @param videoPath 视频文件地址
    * @param name 文件显示名称
    * @param sceneName 场景名
-   * @param duration 音频时长
+   * @param duration 视频时长
    * @param width 视频宽度
    * @param height 视频高度
    */
@@ -309,5 +370,55 @@ export class ChatRepo {
    */
   static saveLocalMessage(msg: V2NIMMessage, conversationId: string, senderId: string, createTime: number) {
     ChatKitClient.nim.messageService?.insertMessageToLocal(msg, conversationId, senderId, createTime)
+  }
+
+  /**
+   * 查询点对点消息已读回执
+   * @param conversationId 会话 id
+   */
+  static async getP2PMessageReceipt(conversationId: string): Promise<V2NIMP2PMessageReadReceipt | undefined> {
+    return await ChatKitClient.nim.messageService?.getP2PMessageReceipt(conversationId)
+  }
+
+  /**
+   * 获取群消息已读回执状态详情
+   *
+   * @param msg 需要查询已读回执状态的消息
+   * @param memberAccountIds 查找指定的账号列表已读未读
+   *                              为空表示查询全部
+   *                              同时作用于已读未读账号列表和人数
+   */
+  static getTeamMessageReceiptDetail(msg: V2NIMMessage,
+    memberAccountIds?: string[]): Promise<V2NIMTeamMessageReadReceiptDetail> {
+    return ChatKitClient.nim.messageService!!.getTeamMessageReceiptDetail(
+      msg, memberAccountIds
+    )
+  }
+
+  /**
+   * 发送消息已读回执
+   *
+   * @param message 点对点会话收到的对方最后一条消息
+   */
+  static async sendP2PMessageReceipt(message: V2NIMMessage): Promise<void> {
+    return ChatKitClient.nim.messageService?.sendP2PMessageReceipt(message)
+  }
+
+  /**
+   * 获取群消息已读回执状态
+   *
+   * @param messages 获取群消息已读回执状态. 限制一批最多 50 个且所有消息必须属于同一个会话
+   */
+  static async getTeamMessageReceipts(messages: V2NIMMessage[]): Promise<V2NIMTeamMessageReadReceipt[] | undefined> {
+    return ChatKitClient.nim.messageService?.getTeamMessageReceipts(messages)
+  }
+
+  /**
+   * 发送群消息已读回执
+   *
+   * @param messages 需要发送已读回执的消息列表. 限制一批最多 50 个且所有消息必须属于同一个会话
+   */
+  static async sendTeamMessageReceipt(messages: V2NIMMessage[]): Promise<void> {
+    return ChatKitClient.nim.messageService?.sendTeamMessageReceipts(messages)
   }
 }

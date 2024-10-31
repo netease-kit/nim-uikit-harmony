@@ -10,7 +10,7 @@ export class AppConfig {
   // appKey 网易云信应用appkey
   public static appKey: string = ''
   // userName 网易云信应用下账号ID
-  public static userName: string = ''
+  public static userId: string = ''
   // userName 网易云信应用下账号Token
   public static userToken: string = ''
 }

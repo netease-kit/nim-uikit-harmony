@@ -16,14 +16,20 @@ export struct TeamLeftWarningDialog {
   build() {
     Column() {
 
-      Text($r('app.string.chat_team_error_tip_content'))
-        .fontSize(16)
-        .fontColor('#ff333333')
+      Text($r('app.string.chat_team_error_tip_title'))
+        .fontSize($r('app.float.chat_title_text_font_size'))
+        .fontColor($r('app.color.color_chat_title'))
+        .margin({ top: 20 })
 
-      Blank().height(50)
+      Text($r('app.string.chat_team_error_tip_content'))
+        .fontSize($r('app.float.chat_subtitle_text_font_size'))
+        .fontColor($r('app.color.color_chat_sub_title'))
+        .margin({ top: 20, bottom: 20 })
+
+      Line().height(1).width('100%').backgroundColor($r('app.color.chat_input_background'))
 
       Text($r('app.string.common_sure'))
-        .fontSize(16)
+        .fontSize($r('app.float.chat_title_text_font_size'))
         .fontColor('#ff1861DF')
         .onClick(() => {
           this.controller?.close()
@@ -31,13 +37,12 @@ export struct TeamLeftWarningDialog {
             this.confirm()
           }
         })
-
     }
     .padding({
       top: 20,
       bottom: 5,
-      left: 12,
-      right: 12
+      left: 24,
+      right: 24
     })
 
   }

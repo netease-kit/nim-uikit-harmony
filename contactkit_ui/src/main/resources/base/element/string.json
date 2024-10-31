@@ -149,10 +149,6 @@
       "value": "头像"
     },
     {
-      "name": "person_select",
-      "value": "选择"
-    },
-    {
       "name": "validation_empty",
       "value": "暂无验证消息"
     },
@@ -169,12 +165,28 @@
       "value": "请选择联系人"
     },
     {
-      "name": "copy_success",
-      "value": "复制成功"
-    },
-    {
       "name": "let_us_chat",
       "value": "我已经同意了你的申请，现在开始聊天吧~"
+    },
+    {
+      "name": "conversation_select_conversation",
+      "value": "最近会话"
+    },
+    {
+      "name": "conversation_select_contact",
+      "value": "我的好友"
+    },
+    {
+      "name": "conversation_select_team",
+      "value": "我的群聊"
+    },
+    {
+      "name": "conversation_select_multi",
+      "value": "多选"
+    },
+    {
+      "name": "conversation_selected",
+      "value": "已选"
     }
   ]
 }

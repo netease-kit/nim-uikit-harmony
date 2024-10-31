@@ -5,34 +5,13 @@
  *
  */
 
-import { ContactRepo } from '@nimkit/chatkit';
+import { ContactRepo, NEFriendUserCache } from '@nimkit/chatkit';
 import { NECommonUtils } from '@nimkit/common';
 
 export class EditInfoViewModel {
-  public saveName(name?: string) {
-    ContactRepo.updateSelfUserProfile({
-      name: name
-    })
-    NECommonUtils.showToast($r('app.string.mine_info_save_ok'))
-  }
-
-  public saveAvatar(avatar?: string) {
-    ContactRepo.updateSelfUserProfile({
+  public async saveAvatar(avatar?: string) {
+    await ContactRepo.updateSelfUserProfile({
       avatar: avatar
-    })
-    NECommonUtils.showToast($r('app.string.mine_info_save_ok'))
-  }
-
-  public saveSign(sign?: string) {
-    ContactRepo.updateSelfUserProfile({
-      sign: sign
-    })
-    NECommonUtils.showToast($r('app.string.mine_info_save_ok'))
-  }
-
-  public saveEmail(email?: string) {
-    ContactRepo.updateSelfUserProfile({
-      email: email
     })
     NECommonUtils.showToast($r('app.string.mine_info_save_ok'))
   }
@@ -41,15 +20,12 @@ export class EditInfoViewModel {
     ContactRepo.updateSelfUserProfile({
       birthday: birthday
     })
+    if (NEFriendUserCache.mineUserCache?.user) {
+      NEFriendUserCache.mineUserCache.user.birthday = birthday
+    }
     NECommonUtils.showToast($r('app.string.mine_info_save_ok'))
   }
 
-  public saveMobile(mobile?: string) {
-    ContactRepo.updateSelfUserProfile({
-      mobile: mobile
-    })
-    NECommonUtils.showToast($r('app.string.mine_info_save_ok'))
-  }
 
   public saveGender(gender?: number) {
     ContactRepo.updateSelfUserProfile({

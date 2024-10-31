@@ -23,6 +23,22 @@
       "data": {
         "description": "this is chat setting page"
       }
+    },
+    {
+      "name": "PinMessagePage",
+      "pageSourceFile": "src/main/ets/pages/PinMessagePage.ets",
+      "buildFunction": "PinMessagePageBuilder",
+      "data": {
+        "description": "this is pin messages page"
+      }
+    },
+    {
+      "name": "ChatReadReceiptPage",
+      "pageSourceFile": "src/main/ets/pages/ChatReadReceiptPage.ets",
+      "buildFunction": "ChatReadReceiptPageBuilder",
+      "data": {
+        "description": "this is read receipt page"
+      }
     }
   ]
 }

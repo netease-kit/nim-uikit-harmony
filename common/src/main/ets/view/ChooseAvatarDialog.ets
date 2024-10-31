@@ -5,7 +5,7 @@
  *
  */
 
-import { abilityAccessCtrl, common, Permissions } from '@kit.AbilityKit';
+import { common } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { camera, cameraPicker } from '@kit.CameraKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
@@ -38,6 +38,7 @@ export struct ChooseAvatarDialog {
           let pickerResult: cameraPicker.PickerResult =
             await cameraPicker.pick(this.context, mediaTypes, pickerProfile);
           if (this.onImageChosen && pickerResult.resultCode == 0 && pickerResult.resultUri.length > 0) {
+            console.debug(`ChooseAvatarDialog seleced image url = ${pickerResult.resultUri}`)
             this.onImageChosen(pickerResult.resultUri)
           }
           console.log("the pick pickerResult is:" + JSON.stringify(pickerResult));

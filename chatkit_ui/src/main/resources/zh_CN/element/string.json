@@ -65,6 +65,22 @@
       "value": "复制"
     },
     {
+      "name": "chat_operation_forward",
+      "value": "转发"
+    },
+    {
+      "name": "chat_operation_multi_forward",
+      "value": "合并转发"
+    },
+    {
+      "name": "chat_operation_single_forward",
+      "value": "逐条转发"
+    },
+    {
+      "name": "chat_operation_forward_desc",
+      "value": "%s的会话记录"
+    },
+    {
       "name": "chat_operation_delete",
       "value": "删除"
     },
@@ -73,8 +89,20 @@
       "value": "撤回"
     },
     {
+      "name": "chat_operation_pin",
+      "value": "标记"
+    },
+    {
+      "name": "chat_operation_unpin",
+      "value": "取消标记"
+    },
+    {
       "name": "chat_msg_undo_tips",
       "value": "此消息已撤回"
+    },
+    {
+      "name": "chat_msg_undo_edit_tips",
+      "value": " 重新编辑 >"
     },
     {
       "name": "chat_msg_delete_dialog_title",
@@ -137,7 +165,7 @@
       "value": "更新群名称为"
     },
     {
-      "name": "chat_team_notify_current_user_name",
+      "name": "chat_current_user_name",
       "value": "你"
     },
     {
@@ -191,6 +219,70 @@
     {
       "name": "chat_permission_micro_phone_desc",
       "value": "用于发送语音消息"
+    },
+    {
+      "name": "chat_speak_too_short",
+      "value": "说话时间太短"
+    },
+    {
+      "name": "chat_read_receipt_title",
+      "value": "消息阅读状态"
+    },
+    {
+      "name": "chat_read_receipt_read",
+      "value": "已读(%d)"
+    },
+    {
+      "name": "chat_read_receipt_unread",
+      "value": "未读(%d)"
+    },
+    {
+      "name": "chat_read_receipt_all_unread",
+      "value": "全部成员未读"
+    },
+    {
+      "name": "chat_read_receipt_all_read",
+      "value": "全部成员已读"
+    },
+    {
+      "name": "chat_team_appoint_manager",
+      "value": "被任命为管理员"
+    },
+    {
+      "name": "chat_team_removed_manager",
+      "value": "被撤销管理员身份"
+    },
+    {
+      "name": "forward_dialog_leave_message",
+      "value": "留言"
+    },
+    {
+      "name": "chat_pin_message_tips",
+      "value": "%s 标记了这条信息"
+    },
+    {
+      "name": "chat_team_all_mute",
+      "value": "当前群主设置为禁言"
+    },
+    {
+      "name": "chat_network_error_tips",
+      "value": "网络异常"
+    },
+    {
+      "name": "chat_pin_limit_error_tips",
+      "value": "PIN消息已达最大限制"
+    },
+    {
+      "name": "chat_revoke_edit_error_tips",
+      "value": "已超过可编辑时间"
+    },
+    {
+      "name": "pin_list_unpin_success_tips",
+      "value": "已取消标记"
+    },
+    {
+      "name": "chat_message_copy_success_tips",
+      "value": "复制成功"
     }
   ]
 }

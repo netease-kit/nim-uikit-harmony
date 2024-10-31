@@ -6,7 +6,7 @@
  */
 
 import { ChatKitClient, ChatRepo, NEUserWithFriend, PersonSelectParam, TeamRepo } from '@nimkit/chatkit';
-import { CommonEmptyResult } from '@nimkit/common';
+import { CommonEmptyResult, NetworkBrokenBuilder } from '@nimkit/common';
 import { V2NIMConversation, V2NIMConversationType } from '@nimsdk/base';
 import { ConversationViewItem } from '../view/ConversationViewItem';
 import { ConversationViewModel } from '../viewmodel/ConversationViewModel';
@@ -32,6 +32,10 @@ export struct ConversationPage {
             top: 80
           })
         } else {
+          if (this.viewModel.networkBroken) {
+            NetworkBrokenBuilder()
+          }
+
           List() {
             ForEach(this.viewModel.conversationList, (item: V2NIMConversation) => {
               ListItem() {
@@ -93,11 +97,13 @@ struct ConversationNavigationTitleBar {
   build() {
     Column({ space: 10 }) {
       Row() {
+        //标题栏左侧图标
         Image($r('app.media.brand'))
           .margin({ left: 20 })
           .width(32)
           .height(32)
           .objectFit(ImageFit.Contain)
+        //标题栏左侧文字
         Text($r('app.string.conversation_title'))
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
@@ -114,6 +120,7 @@ struct ConversationNavigationTitleBar {
           .height(1)
           .layoutWeight(1)
 
+        //标题栏右侧搜索图标
         Image($r('app.media.nav_search'))
           .width(32)
           .height(32)
@@ -125,9 +132,11 @@ struct ConversationNavigationTitleBar {
           })
           .margin({ right: 10 })
           .onClick(() => {
+            //点击去搜索
             this.goSearchPage(this.pathStack)
           })
 
+        //标题栏右侧更多按钮图标
         Image($r('app.media.nav_add'))
           .width(32)
           .height(32)
@@ -142,6 +151,7 @@ struct ConversationNavigationTitleBar {
             this.conversationPopupShowed = !this.conversationPopupShowed
           })
           .bindPopup(this.conversationPopupShowed,
+            //右侧更多操作弹框
             {
               targetSpace: 'popupLocation',
               builder: this.popupBuilder,
@@ -174,6 +184,7 @@ struct ConversationNavigationTitleBar {
   @Builder
   popupBuilder() {
     Column({ space: 16 }) {
+      //添加好友
       Row() {
         Image($r('app.media.friend_add'))
           .width(14)
@@ -189,6 +200,7 @@ struct ConversationNavigationTitleBar {
         }
       })
 
+      //创建讨论组
       Row() {
         Image($r('app.media.team_discuss'))
           .width(14)
@@ -204,6 +216,7 @@ struct ConversationNavigationTitleBar {
         }
       })
 
+      //创建高级群
       Row() {
         Image($r("app.media.team_advance"))
           .width(14)
@@ -324,5 +337,11 @@ struct ConversationNavigationTitleBar {
     })
 
   }
+}
+
+// 跳转页面入口函数
+@Builder
+export function ConversationPageBuilder() {
+  ConversationPage()
 }
 

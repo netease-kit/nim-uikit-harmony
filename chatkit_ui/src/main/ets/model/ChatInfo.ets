@@ -5,9 +5,8 @@
  *
  */
 
-import { ImagesIndexModel } from '@nimkit/common';
-import { V2NIMMessageImageAttachment, V2NIMMessageType, V2NIMMessageVideoAttachment } from '@nimsdk/base';
 import { ChatKitClient } from '@nimkit/chatkit';
+import { V2NIMMessagePin } from '@nimsdk/base';
 import { V2NIMMessage, V2NIMMessageSendingState } from '@nimsdk/base/src/main/ets/nim/sdk/V2NIMMessageService';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 
@@ -17,6 +16,9 @@ export class ChatInfo {
   @Trace msgList: MessageDataSource = new MessageDataSource();
   @Trace downloadProgressMap: Map<string, number> = new Map();
   @Trace isReceiveMsg: boolean = false;
+  @Trace scrollIndex: number = -1; // 是否需要滚动到指定位置
+  msgMap: Map<string, NIMMessageInfo> = new Map();
+  @Trace msgPinMap: Map<string, V2NIMMessagePin> = new Map();
   conversationId: string = '';
   targetId: string = '';
 
@@ -32,6 +34,10 @@ export class ChatInfo {
 
   setReceiveMsg(receiveMsg: boolean) {
     this.isReceiveMsg = receiveMsg;
+  }
+
+  setScrollIndex(index: number) {
+    this.scrollIndex = index
   }
 
   getConversationName(): string {
@@ -62,7 +68,6 @@ export class ChatInfo {
     return this.targetId;
   };
 
-
   updateMessageStatus(message: V2NIMMessage) {
     if (message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SENDING) {
       return;
@@ -72,12 +77,63 @@ export class ChatInfo {
     if (targetMessage !== undefined) {
       targetMessage.updateMessageStatus(message)
     } else {
-      this.addMessage(message)
-      this.setReceiveMsg(true)
+      this.insertMessage(message)
     }
   }
 
-  addMessage(message: V2NIMMessage): NIMMessageInfo {
+  addPinMessage(pinMsg: V2NIMMessagePin[]) {
+    pinMsg.forEach(pin => {
+      this.msgPinMap.set(pin.messageRefer.messageClientId, pin)
+      this.msgMap.get(pin.messageRefer.messageClientId)?.setPinMessage(pin)
+    })
+  }
+
+  resetPinMessage(pinMsg: V2NIMMessagePin[]) {
+    this.msgPinMap.clear()
+    this.msgList.messageData.forEach(msg => {
+      msg.setPinMessage(undefined)
+    })
+    pinMsg.forEach(pin => {
+      this.msgPinMap.set(pin.messageRefer.messageClientId, pin)
+      this.msgMap.get(pin.messageRefer.messageClientId)?.setPinMessage(pin)
+    })
+  }
+
+  removePinMessage(pinMsg: V2NIMMessagePin[]) {
+    pinMsg.forEach(pin => {
+      this.msgPinMap.delete(pin.messageRefer.messageClientId)
+      this.msgMap.get(pin.messageRefer.messageClientId)?.setPinMessage(undefined)
+    })
+  }
+
+  updateMessageReadReceipt(message: NIMMessageInfo) {
+
+  }
+
+  insertMessage(message: V2NIMMessage): NIMMessageInfo {
+    let addIndex = this.msgList.searchInsertPosition(message.createTime)
+    if (addIndex > this.msgList.totalCount()) {
+      let result = this.pushMessage(message)
+      this.setReceiveMsg(true)
+      return result
+    } else {
+      let lastMessageTime = 0
+      if (addIndex > 0) {
+        lastMessageTime = this.msgList.getMessageList()[addIndex - 1]?.message.createTime;
+      }
+      let msgInfo = new NIMMessageInfo(message)
+      msgInfo.setLastMessageTime(lastMessageTime)
+      this.updateMessageReadReceipt(msgInfo)
+      this.msgMap.set(message.messageClientId, msgInfo)
+      if (this.msgPinMap.has(message.messageClientId)) {
+        msgInfo.setPinMessage(this.msgPinMap.get(message.messageClientId))
+      }
+      this.msgList.addData(addIndex, msgInfo)
+      return msgInfo;
+    }
+  }
+
+  pushMessage(message: V2NIMMessage): NIMMessageInfo {
     let current = this.getMessage(message.messageClientId)
     if (current !== undefined) {
       return current;
@@ -86,42 +142,70 @@ export class ChatInfo {
     if (this.msgList.totalCount() > 0) {
       lastMessageTime = this.msgList.getMessageList()[this.msgList.totalCount() - 1]?.message.createTime;
     }
-    let msgInfo = new NIMMessageInfo(message);
+    let msgInfo = new NIMMessageInfo(message)
     msgInfo.setLastMessageTime(lastMessageTime)
+    this.updateMessageReadReceipt(msgInfo)
     this.msgList.push(msgInfo);
+    this.msgMap.set(message.messageClientId, msgInfo)
+    if (this.msgPinMap.has(message.messageClientId)) {
+      msgInfo.setPinMessage(this.msgPinMap.get(message.messageClientId))
+    }
     return msgInfo;
   }
 
-  pushMessage(message: NIMMessageInfo) {
-    let current = this.getMessage(message.message.messageClientId)
+  pushMessageInfo(msgInfo: NIMMessageInfo) {
+    let current = this.getMessage(msgInfo.message.messageClientId)
     if (current !== undefined) {
       return;
     }
     let lastMessageTime = this.msgList.getMessageList()[this.msgList.totalCount() - 1]?.message.createTime;
-    // let msgInfo = new NIMMessageInfo(message);
-    message.setLastMessageTime(lastMessageTime)
-    this.msgList.push(message);
+    msgInfo.setLastMessageTime(lastMessageTime)
+    this.updateMessageReadReceipt(msgInfo)
+    this.msgMap.set(msgInfo.message.messageClientId, msgInfo)
+    if (this.msgPinMap.has(msgInfo.message.messageClientId)) {
+      msgInfo.setPinMessage(this.msgPinMap.get(msgInfo.message.messageClientId))
+    }
+    this.msgList.push(msgInfo);
+  }
+
+  unshiftMessage(messageList: V2NIMMessage[]): NIMMessageInfo[] {
+    let result: NIMMessageInfo[] = [];
+    for (let index = 0; index < messageList.length; index++) {
+      let msg = new NIMMessageInfo(messageList[index]);
+      if (index < messageList.length - 1) {
+        msg.setLastMessageTime(messageList[index+1].createTime);
+      }
+      this.msgMap.set(msg.message.messageClientId, msg)
+      if (this.msgPinMap.has(msg.message.messageClientId)) {
+        msg.setPinMessage(this.msgPinMap.get(msg.message.messageClientId))
+      }
+      this.msgList.unshift(msg)
+      result.push(msg);
+    }
+
+    return result;
   }
 
   deleteMessage(msgClientId: string) {
     this.msgList.delete(msgClientId)
+    this.msgMap.delete(msgClientId)
   }
 
   revokeMessage(msgClientId: string) {
     this.deleteMessage(msgClientId)
   }
 
-  insertMessage(message: V2NIMMessage) {
-    let isRecent = false;
-    for (let index = this.msgList.totalCount() - 1; index >= 0; index--) {
-      if (this.msgList.getData(index).getCreateTime() > message.createTime) {
-        isRecent = true;
-      }
-    }
+  getMessage(msgClientId: string): NIMMessageInfo | undefined {
+    return this.msgMap.get(msgClientId)
   }
 
-  getMessage(msgClientId: string): NIMMessageInfo | undefined {
-    return this.msgList.getMessageList().find(msg => msg.message.messageClientId === msgClientId)
+  searchPosition(msgClientId: string): number {
+    return this.msgList.searchPosition(msgClientId)
+  }
+
+  public cleanMessage() {
+    this.msgList.clean()
+    this.msgMap.clear()
   }
 }
 
@@ -181,6 +265,30 @@ export class MessageDataSource implements IDataSource {
         return
       }
     })
+  }
+
+  public searchInsertPosition(creatTime: number): number {
+    for (let index = this.messageData.length - 1; index >= 0; index--) {
+      if (creatTime > this.messageData[index].getCreateTime()) {
+        return index + 1;
+      }
+    }
+    return 0;
+  }
+
+  public searchPosition(clientId: string): number {
+    for (let index = this.messageData.length - 1; index >= 0; index--) {
+      if (clientId == this.messageData[index].getMessageClientId()) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  public clean() {
+    while (this.messageData.length > 0) {
+      this.messageData.pop()
+    }
   }
 
   public getMessageList(): NIMMessageInfo[] {

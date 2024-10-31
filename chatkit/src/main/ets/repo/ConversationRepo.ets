@@ -263,4 +263,20 @@ export class ConversationRepo {
   static async getConversationReadTime(conversationId: string): Promise<number | undefined> {
     return await ChatKitClient.nim.conversationService?.getConversationReadTime(conversationId)
   }
+
+  /**
+   * 移除会话的所有监听
+   */
+  static removeAllConversationListener() {
+    //移除
+    ChatKitClient.nim.conversationService?.removeAllListeners('onSyncFinished')
+
+    //会话创建
+    ChatKitClient.nim.conversationService?.removeAllListeners("onConversationCreated")
+
+    //会话删除
+    ChatKitClient.nim.conversationService?.removeAllListeners("onConversationDeleted")
+    //会话更新
+    ChatKitClient.nim.conversationService?.removeAllListeners("onConversationChanged")
+  }
 }

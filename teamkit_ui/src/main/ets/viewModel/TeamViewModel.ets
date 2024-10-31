@@ -7,7 +7,10 @@
 
 import { ChatKitClient, ContactRepo, ConversationRepo, SettingRepo, TeamRepo } from '@nimkit/chatkit';
 import {
+  V2NIMConversation,
+  V2NIMConversationType,
   V2NIMError,
+  V2NIMQueryDirection,
   V2NIMTeam,
   V2NIMTeamChatBannedMode,
   V2NIMTeamMember,
@@ -18,7 +21,7 @@ import {
 import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser';
 
 @ObservedV2
-export class TeamViewModel {
+export class TeamSettingViewModel {
   @Trace team?: V2NIMTeam
   @Trace teamMemberList: TeamMemberWithUser[] = []
   teamId: string
@@ -36,16 +39,59 @@ export class TeamViewModel {
     this.teamId = teamId
   }
 
-  initTeamInfo() {
-    this.getTeamInfo();
-    this.getConversationInfo();
-    this.getTeamMember();
-    ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', (team) => {
-      if (team.teamId === this.teamId) {
-        this.team = team
+  /**
+   * 获取群成员，附带用户信息
+   * @returns
+   */
+  async getTeamMember() {
+    let teamMemberResult = await TeamRepo.getTeamMembers(
+      this.teamId,
+      this.teamType,
+      {
+        limit: this.limit,
+        nextToken: this.nextToken,
+        direction: V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_ASC
+      }
+    )
+
+    let mine =
+      teamMemberResult?.memberList?.find(member => member.getAccId() === ChatKitClient.getLoginUserId())?.teamMember
+
+    if (mine) {
+      this.mineTeamMember = mine
+    } else {
+      this.getMineTeamMember()
+    }
+
+    if (teamMemberResult) {
+      this.teamMemberList.splice(0, this.teamMemberList.length)
+      this.teamMemberList.push(...teamMemberResult.memberList)
+    }
+  }
+
+  //获取自己的群成员信息
+  getMineTeamMember() {
+    TeamRepo.getTeamMemberListByIds(this.teamId,
+      this.teamType, [ChatKitClient.getLoginUserId()]).then((members) => {
+      if (members.length > 0) {
+        this.mineTeamMember = members[0]
       }
     })
-    ChatKitClient.nim.teamService?.on('onTeamMemberJoined', async (members) => {
+  }
+
+  onSyncFinished() {
+    this.getTeamMember()
+    this.getTeamInfo()
+  }
+
+  onTeamInfoUpdated(team: V2NIMTeam) {
+    if (team.teamId === this.teamId) {
+      this.team = team
+    }
+  }
+
+  async onTeamMemberJoined(members: V2NIMTeamMember[]) {
+    if (members[0].teamId === this.teamId) {
       let userList = await ContactRepo.getUserWithFriendByIds(members.map(member => member.accountId))
       let memberList: TeamMemberWithUser[] = members.map(e => {
         let user = userList.find((user) => user.user?.accountId === e.accountId)
@@ -53,24 +99,56 @@ export class TeamViewModel {
       })
 
       this.teamMemberList.push(...memberList)
-    })
+    }
+  }
 
-    ChatKitClient.nim.teamService?.on('onTeamMemberInfoUpdated', (members) => {
+  onTeamMemberInfoUpdated(members: V2NIMTeamMember[]) {
+    if (members[0].teamId === this.teamId) {
       let mineMember = members.find(member => member.accountId === ChatKitClient.getLoginUserId())
       if (mineMember) {
         this.mineTeamMember = mineMember
       }
-    })
+    }
+  }
 
-    ChatKitClient.nim.teamService?.on('onTeamMemberKicked', (accId, members) => {
+  onTeamMemberKicked(accId: string, members: V2NIMTeamMember[]) {
+    if (members[0].teamId === this.teamId) {
       let removeIds: string[] = members.map(member => member.accountId)
       this.teamMemberList = this.teamMemberList.filter(m =>!removeIds.includes(m.getAccId()))
-    })
-    ChatKitClient.nim.teamService?.on('onTeamMemberLeft', (members) => {
+    }
+  }
+
+  onTeamMemberLeft(members: V2NIMTeamMember[]) {
+    if (members[0].teamId === this.teamId) {
       let removeIds: string[] = members.map(member => member.accountId)
       this.teamMemberList = this.teamMemberList.filter(m =>!removeIds.includes(m.getAccId()))
-    })
+    }
+  }
 
+  onConversationChanged(updateList: V2NIMConversation[]) {
+    updateList.forEach((conversation) => {
+      if (conversation.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM &&
+        conversation.conversationId === ChatKitClient.nim.conversationIdUtil.teamConversationId(this.teamId)) {
+        this.isMessageNotify = !(conversation.mute ?? false)
+        this.isStickTop = conversation.stickTop
+      }
+    })
+  }
+
+  initTeamInfo() {
+    this.getTeamInfo();
+    this.getConversationInfo();
+    this.getTeamMember();
+    ChatKitClient.nim.teamService?.on('onSyncFinished', this.onSyncFinished.bind(this))
+    ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', this.onTeamInfoUpdated.bind(this))
+    ChatKitClient.nim.teamService?.on('onTeamMemberJoined', this.onTeamMemberJoined.bind(this))
+
+    ChatKitClient.nim.teamService?.on('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated.bind(this))
+
+    ChatKitClient.nim.teamService?.on('onTeamMemberKicked', this.onTeamMemberKicked.bind(this))
+    ChatKitClient.nim.teamService?.on('onTeamMemberLeft', this.onTeamMemberLeft.bind(this))
+
+    ChatKitClient.nim.conversationService?.on("onConversationChanged", this.onConversationChanged.bind(this))
   }
 
   /**
@@ -150,26 +228,23 @@ export class TeamViewModel {
     }
     TeamRepo.updateSelfTeamMemberInfo(this.teamId,
       V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
-      params)
+      params).then(() => {
+
+    }).catch((e: V2NIMError) => {
+      console.debug(`TeamSettingViewModel updateTeamNick error = ${e.message} `)
+    })
   }
 
-  /**
-   * 获取群成员，附带用户信息
-   * @returns
-   */
-  async getTeamMember() {
-    let teamMemberResult = await TeamRepo.getTeamMembers(
-      this.teamId,
-      this.teamType,
-      this.limit,
-      this.nextToken
-    )
+  destroy() {
+    ChatKitClient.nim.teamService?.off('onSyncFinished', this.onSyncFinished)
+    ChatKitClient.nim.teamService?.off('onTeamInfoUpdated', this.onTeamInfoUpdated)
+    ChatKitClient.nim.teamService?.off('onTeamMemberJoined', this.onTeamMemberJoined)
 
-    this.mineTeamMember =
-      teamMemberResult?.memberList?.find(member => member.getAccId() === ChatKitClient.getLoginUserId())?.teamMember
+    ChatKitClient.nim.teamService?.off('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated)
 
-    if (teamMemberResult) {
-      this.teamMemberList.push(...teamMemberResult.memberList)
-    }
+    ChatKitClient.nim.teamService?.off('onTeamMemberKicked', this.onTeamMemberKicked)
+    ChatKitClient.nim.teamService?.off('onTeamMemberLeft', this.onTeamMemberLeft)
+
+    ChatKitClient.nim.conversationService?.off("onConversationChanged", this.onConversationChanged)
   }
 }

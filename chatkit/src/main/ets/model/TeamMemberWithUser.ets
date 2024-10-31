@@ -38,14 +38,16 @@ export class TeamMemberWithUser {
    * @returns
    */
   getAvatarName(): string {
+    let avatarName = ''
     if (this.friendInfo && this.friendInfo.alias &&
       this.friendInfo.alias.length > 0) {
-      return this.friendInfo.alias
+      avatarName = this.friendInfo.alias
+    } else if (this.userInfo && this.userInfo.name && this.userInfo.name.length > 0) {
+      avatarName = this.userInfo.name
+    } else {
+      avatarName = this.teamMember.accountId
     }
-    if (this.userInfo && this.userInfo.name && this.userInfo.name.length > 0) {
-      return this.userInfo.name
-    }
-    return this.teamMember.accountId
+    return avatarName.length > 2 ? avatarName.substring(avatarName.length - 2, avatarName.length) : avatarName
   }
 
   /**
@@ -54,6 +56,14 @@ export class TeamMemberWithUser {
    */
   isOwner(): boolean {
     return this.teamMember.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_OWNER
+  }
+
+  /**
+   * 是否是管理员
+   * @returns
+   */
+  isManager(): boolean {
+    return this.teamMember.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_MANAGER
   }
 
   /**

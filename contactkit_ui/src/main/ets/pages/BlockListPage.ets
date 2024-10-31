@@ -5,7 +5,7 @@
  *
  */
 
-import { NEFriendUserCache, NEUserWithFriend, PersonSelectParam } from '@nimkit/chatkit';
+import { ErrorUtils, NEFriendUserCache, NEUserWithFriend, PersonSelectParam } from '@nimkit/chatkit';
 import { AvatarColorUntil, AvatarItem, CommonAvatar, NavigationBackBuilder } from '@nimkit/common';
 import { BlocklistViewModel } from '../viewmodel/BlocklistViewModel';
 
@@ -95,11 +95,13 @@ export struct BlockListPage {
   viewModel: BlocklistViewModel = new BlocklistViewModel()
   // 添加黑名单，【确定】按钮点击事件
   onClickSureButton = async (selectedList: NEUserWithFriend[]) => {
-    try {
-      this.pathStack.pop()
-      await this.viewModel.addUserToBlockList(selectedList)
-    } catch (err) {
-      console.log(err)
+    if (ErrorUtils.checkNetworkAndToast()) {
+      try {
+        this.pathStack.pop()
+        await this.viewModel.addUserToBlockList(selectedList)
+      } catch (err) {
+        console.error(err)
+      }
     }
   }
 
@@ -107,14 +109,16 @@ export struct BlockListPage {
     try {
       await this.viewModel.getBlockList()
     } catch (err) {
-      console.log(err)
+      console.error(err)
     }
   }
 
   // 【解除】按钮点击事件
   onRemoveClick = (accountId?: string) => {
-    if (accountId) {
-      this.viewModel.removeUserFromBlockList(accountId)
+    if (ErrorUtils.checkNetworkAndToast()) {
+      if (accountId) {
+        this.viewModel.removeUserFromBlockList(accountId)
+      }
     }
   }
   // 【➕】按钮点击事件
@@ -167,6 +171,9 @@ export struct BlockListPage {
     .onReady((context: NavDestinationContext) => {
       this.pathStack = context.pathStack
       this.requestData()
+    })
+    .onDisAppear(() => {
+      this.viewModel.onDestroy()
     })
   }
 }

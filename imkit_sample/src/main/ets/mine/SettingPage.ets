@@ -6,10 +6,11 @@
  */
 
 import { ViewItemSwitch } from '@nimkit/common/src/main/ets/model/ViewItemSwitch';
-import promptAction from '@ohos.promptAction';
 import { CommonConstants, NavigationBackBuilder, NECommonUtils, ViewItemArrow, ViewItemBuilder } from '@nimkit/common';
+import { router } from '@kit.ArkUI';
 import { ChatKitClient } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
-import { NimRepository } from '../ability/NimRepository';
+import { ConversationRepo } from '@nimkit/chatkit';
+import { ChatKitConfig } from '@nimkit/chatkit_ui/src/main/ets/ChatKitConfig';
 
 @CustomDialog
 export struct LogoutDialog {
@@ -18,14 +19,12 @@ export struct LogoutDialog {
 
   async logout() {
     try {
-      await NimRepository.getNIM().loginService.logout()
-
+      await ChatKitClient.nim.loginService.logout()
+      ConversationRepo.removeAllConversationListener()
       ChatKitClient.haveSyncedConversation = false
     } catch (err) {
-      console.log(err)
-      promptAction.showToast({
-        message: err
-      })
+      console.error(err)
+      NECommonUtils.showToast(err)
     }
   }
 
@@ -91,14 +90,11 @@ function SettingPageBuilder() {
   SettingPage()
 }
 
-PersistentStorage.persistProp(CommonConstants.KEY_SETTING_EARPIECE_MODE, true)
-PersistentStorage.persistProp(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, true)
-
 @Component
 export struct SettingPage {
   pathStack: NavPathStack = new NavPathStack()
-  earpieceOpen: boolean = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_EARPIECE_MODE) ?? true
-  readOrOpen: boolean = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_MESSAGE_READ_OR) ?? true
+  @State earpieceOpen: boolean = AppStorage.get(CommonConstants.KEY_SETTING_EARPIECE_MODE) ?? true
+  @State readOrOpen: boolean = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_MESSAGE_READ_OR) ?? true
   @State firstItem: ViewItemArrow[] = [
     {
       // title: $r("app.string.person_setting_remind"),
@@ -108,18 +104,18 @@ export struct SettingPage {
     }
   ]
   @State secondItems: ViewItemSwitch[] = [
-  // {
-  //   title: $r('app.string.mine_setting_earpiece'),
-  //   itemHeight: 48,
-  //   isOpen: this.earpieceOpen,
-  //   switchChange: this.EarpieceModeSwitchChange
-  // },
-  // {
-  //   title: $r('app.string.mine_setting_read'),
-  //   itemHeight: 48,
-  //   isOpen: this.readOrOpen,
-  //   switchChange: this.ReadOrSwitchChange
-  // },
+    {
+      title: $r('app.string.mine_setting_earpiece'),
+      itemHeight: 48,
+      isOpen: this.earpieceOpen,
+      switchChange: this.EarpieceModeSwitchChange
+    },
+    {
+      title: $r('app.string.mine_setting_read'),
+      itemHeight: 48,
+      isOpen: this.readOrOpen,
+      switchChange: this.ReadOrSwitchChange
+    },
   ]
   logoutDialog?: CustomDialogController = new CustomDialogController({
     builder: LogoutDialog(),
@@ -130,13 +126,12 @@ export struct SettingPage {
   })
 
   EarpieceModeSwitchChange(isOpen: boolean) {
-    NECommonUtils.showToast('听筒模式: ' + (isOpen ? '打开' : '关闭'))
-    AppStorage.setOrCreate<boolean>(CommonConstants.KEY_SETTING_EARPIECE_MODE, isOpen)
+    AppStorage.set(CommonConstants.KEY_SETTING_EARPIECE_MODE, isOpen)
   }
 
   ReadOrSwitchChange(isOpen: boolean) {
-    NECommonUtils.showToast('消息已读未读功能: ' + (isOpen ? '打开' : '关闭'))
-    AppStorage.setOrCreate<boolean>(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, isOpen)
+    AppStorage.set(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, isOpen)
+    ChatKitConfig.messageReadState = isOpen
   }
 
   aboutToDisappear(): void {
@@ -155,24 +150,24 @@ export struct SettingPage {
         })
 
         Column({ space: 12 }) {
-          List() {
-            ForEach(this.firstItem, (item: ViewItemSwitch) => {
-              ListItem() {
-                ViewItemBuilder(item)
-              }
-              .width('100%')
-              .height(item.itemHeight)
-              .backgroundColor(item.backgroundColor ?? Color.White)
-              .onClick(() => {
-                this.pathStack.pushPath({
-                  name: item.routerUrl
-                })
-              })
-            })
-          }
-          .borderRadius(8)
-          .backgroundColor(Color.White)
-          .margin({ left: 20, right: 20, top: 0 })
+          // List() {
+          //   ForEach(this.firstItem, (item: ViewItemSwitch) => {
+          //     ListItem() {
+          //       ViewItemBuilder(item)
+          //     }
+          //     .width('100%')
+          //     .height(item.itemHeight)
+          //     .backgroundColor(item.backgroundColor ?? Color.White)
+          //     .onClick(() => {
+          //       this.pathStack.pushPath({
+          //         name: item.routerUrl
+          //       })
+          //     })
+          //   })
+          // }
+          // .borderRadius(8)
+          // .backgroundColor(Color.White)
+          // .margin({ left: 20, right: 20, top: 0 })
 
           List() {
             ForEach(this.secondItems, (item: ViewItemSwitch) => {

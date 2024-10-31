@@ -26,7 +26,7 @@ export class FileUtils {
       const file = fs.openSync(src, fs.OpenMode.READ_ONLY)
       fs.copyFileSync(file.fd, dest)
     } catch (err) {
-      console.log('netease copy file failed', err);
+      console.error('netease copy file failed', err);
     }
   }
 
@@ -39,7 +39,7 @@ export class FileUtils {
     try {
       await fs.rmdir(path)
     } catch (err) {
-      console.log('netease delete dir failed', err);
+      console.error('netease delete dir failed', err);
     }
   }
 
@@ -52,7 +52,7 @@ export class FileUtils {
     try {
       await fs.unlink(path)
     } catch (err) {
-      console.log('netease delete file failed', err);
+      console.error('netease delete file failed', err);
     }
   }
 

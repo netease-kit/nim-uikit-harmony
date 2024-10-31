@@ -9,13 +9,14 @@ import {
   AvatarColorUntil,
   AvatarItem,
   CommonEmptyResult,
+  ListGroupHeader,
   NavigationTitleBuilder,
   ViewItem,
   ViewItemBuilder
 } from '@nimkit/common';
 import { ContactViewModel } from '../viewmodel/ContactViewModel';
 import { NEContactSection } from '../model/NEContactSection';
-import { ChatKitClient, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit';
+import { ChatKitClient, NEUserWithFriend } from '@nimkit/chatkit';
 import { NEContactItem } from '../model/NEContactItem';
 import { V2NIMFriendAddApplication } from '@nimsdk/base';
 
@@ -76,28 +77,6 @@ export function ContactItemBuilder(params: NEContactItem) {
   .height(60)
 }
 
-// 自定义组件groupHeader，作为ListItemGroup的头部组件，即A、B、C等字母列表项
-@Builder
-export function ListGroupHeader(titleLetter: ResourceStr) {
-  Column() {
-    Text(titleLetter)
-      .fontColor('#B3B7BC')
-      .fontSize(14)
-      .backgroundColor(Color.White)
-      .width('100%')
-      .margin({ top: 16, left: 40 })
-
-    Row()
-      .height(1)
-      .width('100%')
-      .backgroundColor('#DBE0E8')
-      .margin({ top: 8, left: 40 })
-  }
-  .width('100%')
-  .height(56)
-  .backgroundColor(Color.White)
-}
-
 // 跳转页面入口函数
 @Builder
 export function ContactPageBuilder() {
@@ -109,7 +88,6 @@ export struct ContactPage {
   @Param pathStack: NavPathStack = new NavPathStack()
   @Param onUnreadApplicationChange?: (countString?: string) => void = undefined
   viewModel: ContactViewModel = new ContactViewModel()
-
   loadUnreadApplication = async () => {
     try {
       const unreadCount = await this.viewModel.getUnreadApplication()
@@ -118,7 +96,7 @@ export struct ContactPage {
         this.onUnreadApplicationChange(unreadCount)
       }
     } catch (err) {
-      console.log(err)
+      console.error(err)
     }
   }
   @Local headerItems: NEContactItem[] = [
@@ -140,7 +118,7 @@ export struct ContactPage {
       await this.viewModel.getFriendList()
       await this.loadUnreadApplication()
     } catch (err) {
-      console.log(err)
+      console.error(err)
     }
   }
 
@@ -148,120 +126,112 @@ export struct ContactPage {
     try {
       await this.loadData()
     } catch (err) {
-      console.log(err)
+      console.error(err)
     }
   }
 
   build() {
     NavDestination() {
       Stack({ alignContent: Alignment.End }) {
-        Stack() {
-          Column() {
-            NavigationTitleBuilder({
-              title: $r('app.string.contact_title'),
-              firstButtonIcon: $r('app.media.nav_search'),
-              secondButtonIcon: $r('app.media.nav_add'),
-              firstButtonAction: () => {
-                this.pathStack.pushPath({ name: "SearchPage" })
-              },
-              secondButtonAction: () => {
-                this.pathStack.pushPath({
-                  name: "AddFriendPage"
-                })
+        Column() {
+          NavigationTitleBuilder({
+            title: $r('app.string.contact_title'),
+            firstButtonIcon: $r('app.media.nav_search'),
+            secondButtonIcon: $r('app.media.nav_add'),
+            firstButtonAction: () => {
+              this.pathStack.pushPath({ name: "SearchPage" })
+            },
+            secondButtonAction: () => {
+              this.pathStack.pushPath({
+                name: "AddFriendPage"
+              })
+            }
+          })
+
+          List() {
+            ForEach(this.headerItems, (item: NEContactItem) => {
+              ListItem() {
+                ContactItemBuilder(item)
               }
-            })
-
-            List() {
-              ForEach(this.headerItems, (item: NEContactItem) => {
-                ListItem() {
-                  ContactItemBuilder(item)
-                }
-                .width('100%')
-                .height(60)
-                .backgroundColor(Color.White)
-                .onClick(() => {
-                  this.pathStack.pushPath({
-                    name: item.routerUrl,
-                    onPop: (popInfo: PopInfo) => {
-                      this.loadUnreadApplication()
-                    }
-                  })
+              .width('100%')
+              .height(60)
+              .backgroundColor(Color.White)
+              .onClick(() => {
+                this.pathStack.pushPath({
+                  name: item.routerUrl,
+                  onPop: (popInfo: PopInfo) => {
+                    this.loadUnreadApplication()
+                  }
                 })
               })
-            }
-            .width('100%')
-            .height(this.headerItems.length * 61)
-            .backgroundColor(Color.White)
-            .divider({
-              strokeWidth: 1,
-              startMargin: 20,
-              color: '#F5F8FC'
-            })
-
-
-            List({ scroller: this.listScroller }) {
-              ForEach(this.viewModel.friendSection, (item: NEContactSection, index) => {
-                ListItemGroup({
-                  header: ListGroupHeader(item.initial)
-                }) {
-                  LazyForEach(item.contacts, (item: NEUserWithFriend, index) => {
-                    ListItem() {
-                      ViewItemBuilder({
-                        avatarItem: new AvatarItem(item.user?.avatar, item.shortName(),
-                          AvatarColorUntil.getBackgroundColorById(item.user?.accountId ?? "")),
-                        title: item.showName(),
-                        itemHeight: 60,
-                        titleIconSize: 36,
-                        titleFontSize: 14,
-                        showDivideLine: false,
-                        routerUrl: "PersonInfoPage",
-                        routerParams: item.user?.accountId
-                      })
-                    }
-                    .width('100%')
-                    .height(60)
-                    .backgroundColor(Color.White)
-                    .onClick(() => {
-                      this.pathStack.pushPath({
-                        name: 'PersonInfoPage',
-                        param: item.user?.accountId
-                      })
-                    })
-                  }, (item: NEUserWithFriend, index) => item.user?.accountId)
-                }
-              })
-            }
-            .width('100%')
-            .margin({ top: 6 })
-            .backgroundColor('#EFF1F4')
-            .scrollBar(BarState.Off)
-            // 获取联系人列表滑动位置的索引，并将索引通过selectedIndex同步给右侧字母导航
-            .onScrollIndex((start: number, end: number, center: number) => {
-              this.selectedIndex = start
             })
           }
           .width('100%')
-          .margin({ bottom: this.headerItems.length * 60 + 58 })
-          .backgroundColor('#EFF1F4')
+          .height(this.headerItems.length * 61)
+          .backgroundColor(Color.White)
+          .divider({
+            strokeWidth: 1,
+            startMargin: 20,
+            color: '#F5F8FC'
+          })
 
-          if (this.viewModel.friendSection.length <= 0) {
+          List({ scroller: this.listScroller }) {
+            LazyForEach(this.viewModel.friendSection, (item: NEContactSection, index) => {
+              ListItemGroup({
+                header: ListGroupHeader(item.initial)
+              }) {
+                LazyForEach(item.contacts, (item: NEUserWithFriend, index) => {
+                  ListItem() {
+                    ViewItemBuilder({
+                      avatarItem: new AvatarItem(item.user?.avatar, item.shortName(),
+                        AvatarColorUntil.getBackgroundColorById(item.user?.accountId ?? "")),
+                      title: item.showName(),
+                      itemHeight: 60,
+                      titleIconSize: 36,
+                      titleFontSize: 14,
+                    })
+                  }
+                  .width('100%')
+                  .height(60)
+                  .backgroundColor(Color.White)
+                  .onClick(() => {
+                    this.pathStack.pushPath({
+                      name: 'PersonInfoPage',
+                      param: item.user?.accountId
+                    })
+                  })
+                }, (item: NEUserWithFriend, index) => item.user?.accountId)
+              }
+            })
+          }
+          .width('100%')
+          .margin({ top: 6 })
+          .backgroundColor('#EFF1F4')
+          .sticky(StickyStyle.Header)
+          .scrollBar(BarState.Off)
+          // 获取联系人列表滑动位置的索引，并将索引通过selectedIndex同步给右侧字母导航
+          .onScrollIndex((start: number, end: number, center: number) => {
+            this.selectedIndex = start
+          })
+
+          if (this.viewModel.friendSection.contactSections.length <= 0) {
             CommonEmptyResult({
               tips: $r('app.string.no_friend')
             })
-              .margin({
-                top: this.headerItems.length * 60 + 58 + 74,
-              })
+              .backgroundColor(Color.White)
           }
         }
-        .alignContent(Alignment.Center)
+        .width('100%')
+        .margin({ bottom: this.headerItems.length * 60 + 58 })
+        .backgroundColor('#EFF1F4')
 
         // 使用AlphabetIndexer组件实现右侧字母导航
-        AlphabetIndexer({ arrayValue: this.viewModel.getInitalList(), selected: 0 })
+        AlphabetIndexer({ arrayValue: this.viewModel.initalList, selected: 0 })
           .color('#666666')
           .selectedColor(Color.White)
           .selectedBackgroundColor('#337EFF')
           .usingPopup(true)
-          .popupPosition({ x: 30, y: (this.viewModel.friendSection.length * 16 - 48) / 2 })
+          .popupPosition({ x: 30, y: (this.viewModel.initalList.length * 16 - 48) / 2 })
           .margin({ right: 10 })
           .itemSize(16)
           .font({ size: 10 })// 指定字母导航的选择项为selectedIndex，完成跟联系人列表的同步
@@ -273,5 +243,12 @@ export struct ContactPage {
     }
     .hideTitleBar(true)
     .backgroundColor(Color.White)
+    .onDisAppear(() => {
+      this.viewModel.onDestroy()
+    })
+  }
+
+  aboutToDisappear(): void {
+    this.viewModel.onDestroy()
   }
 }

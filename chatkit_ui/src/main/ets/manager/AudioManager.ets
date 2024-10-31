@@ -34,19 +34,6 @@ let audioCaptureOptions: audio.AudioCapturerOptions = {
   capturerInfo: audioCaptureInfo
 }
 
-// let path = getContext().cacheDir;
-// let filePath = path + '/StarWars10s-2C-48000-4SW.wav';
-// let file: fileIo.File = fileIo.openSync(filePath, fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE);
-//
-// let readDataCallback = (buffer: ArrayBuffer) => {
-//   let options: Options = {
-//     offset: bufferSize,
-//     length: buffer.byteLength
-//   }
-//   fileIo.writeSync(file.fd, buffer, options);
-//   bufferSize += buffer.byteLength;
-// }
-
 export class AudioManager {
   public static instance: AudioManager = new AudioManager()
   file?: fileIo.File

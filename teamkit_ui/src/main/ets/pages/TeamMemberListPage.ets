@@ -5,23 +5,39 @@
  *
  */
 
-import { ChatKitClient, TeamRepo } from '@nimkit/chatkit'
-import { AvatarColorUntil, AvatarItem, CommonAvatar, NavigationBackBuilder } from '@nimkit/common'
+import { ChatKitClient } from '@nimkit/chatkit'
+import { AvatarColorUntil, AvatarItem, CommonAvatar, CommonConfirmDialog, NavigationBackBuilder } from '@nimkit/common'
 import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
-import { V2NIMTeamMemberRole, V2NIMTeamType } from '@nimsdk/base'
+import { TeamMemberListViewModel } from '../viewModel/TeamMemberListViewModel'
+import { V2NIMTeamMemberRole } from '@nimsdk/base'
 
-@Component
+//管理员选择页面参数
+export interface MemberListParams {
+  //关注身份
+  caseRole: boolean,
+  teamId: string
+}
+
+@ComponentV2
 struct TeamMemberListPage {
   pathStack: NavPathStack = new NavPathStack()
-  //群Id
-  teamId?: string
-  //是否结束
-  isFinish: boolean = false
-  //下次请求所需token
-  nextToken?: string | undefined
-  //每次请求的条数限制
-  teamMemberLimit = 100
-  @State memberList: TeamMemberWithUser[] = []
+  @Local viewModel: TeamMemberListViewModel = new TeamMemberListViewModel()
+  //是否展示踢人按钮
+  caseRole: boolean = true
+  //踢出群组弹框
+  dialogKickMemberDialogController: CustomDialogController = new CustomDialogController({
+    builder: CommonConfirmDialog({
+      title: $r('app.string.team_remove_member_title'),
+      confirmContent: $r('app.string.team_remove_member_content'),
+      confirm: () => {
+        this.viewModel.kickTeamMember(this.kickMemberId)
+      },
+    },
+    ),
+    width: '70%'
+  })
+  //要踢的成员Id
+  kickMemberId?: string
 
   build() {
     NavDestination() {
@@ -34,7 +50,7 @@ struct TeamMemberListPage {
       })
 
       List() {
-        ForEach(this.memberList, (member: TeamMemberWithUser) => {
+        ForEach(this.viewModel.memberList, (member: TeamMemberWithUser) => {
           ListItem() {
             Row() {
               CommonAvatar({
@@ -53,9 +69,26 @@ struct TeamMemberListPage {
               Text(member.getNickname())
                 .fontColor('#ff333333')
                 .fontSize(16)
-                .width(member.isOwner() ? '70%' : '100%')
+                .width(member.isManager() && this.haveKickPermission(member) ? '50%' : '70%')
 
-              if (member.isOwner()) {
+              if (this.caseRole && member.isManager()) {
+                Blank().layoutWeight(1)
+
+                Text($r('app.string.manager'))
+                  .fontColor('#ff337EFF')
+                  .fontSize(12)
+                  .borderWidth(1)
+                  .borderRadius(4)
+                  .borderColor('#ffB9D3FF')
+                  .backgroundColor('#ffE0ECFF')
+                  .padding({
+                    top: 4,
+                    bottom: 6,
+                    left: 12,
+                    right: 12
+                  })
+              }
+              if (this.caseRole && member.isOwner()) {
                 Blank().layoutWeight(1)
 
                 Text($r('app.string.team_owner'))
@@ -70,6 +103,28 @@ struct TeamMemberListPage {
                     bottom: 6,
                     left: 12,
                     right: 12
+                  })
+              }
+
+              if (this.haveKickPermission(member)) {
+                Blank().layoutWeight(1)
+
+                Text($r('app.string.team_remove_manager'))
+                  .fontColor('#ffE6605C')
+                  .fontSize(12)
+                  .borderWidth(1)
+                  .borderRadius(4)
+                  .borderColor('#ffE6605C')
+                  .backgroundColor(Color.White)
+                  .padding({
+                    top: 4,
+                    bottom: 6,
+                    left: 12,
+                    right: 12
+                  })
+                  .onClick(() => {
+                    this.kickMemberId = member.getAccId()
+                    this.dialogKickMemberDialogController.open()
                   })
               }
 
@@ -94,9 +149,9 @@ struct TeamMemberListPage {
       }
       .listDirection(Axis.Vertical)
       .onReachEnd(() => {
-        if (!this.isFinish &&
-          this.memberList.length > 0) {
-          this.getTeamMemberList()
+        if (!this.viewModel.isFinish &&
+          this.viewModel.memberList.length > 0) {
+          this.viewModel.getTeamMemberList()
         }
       })
       .scrollBar(BarState.Off)
@@ -109,59 +164,37 @@ struct TeamMemberListPage {
     .backgroundColor('#ffffffff')
     .onReady((context: NavDestinationContext) => {
       this.pathStack = context.pathStack
-      this.teamId = context.pathStack.getParamByName('TeamMemberListPage')[0] as string
-      this.getTeamMemberList(true)
+      let params = context.pathStack.getParamByName('TeamMemberListPage')[0] as MemberListParams
+      this.viewModel.init(params.teamId)
+      this.caseRole = params.caseRole
+      this.viewModel.getTeamMemberList(true)
     })
   }
 
   /**
-   * 拉取群成员列表
-   * @param first
+   * 是否有踢人的权力
+   * @param member
+   * @returns
    */
-  async getTeamMemberList(first?: boolean) {
-    if (first === true) {
-      this.isFinish = false
-      this.nextToken = undefined
+  haveKickPermission(member: TeamMemberWithUser): boolean {
+    if (!this.caseRole) {
+      return false
     }
-    if (this.isFinish) {
-      return
+    if (member.isOwner()) {
+      return false
     }
-    if (this.teamId) {
-      try {
-        let result = await TeamRepo.getTeamMembers(this.teamId,
-          V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, this.teamMemberLimit, this.nextToken)
-        if (result) {
-          this.isFinish = result.finished
-          this.nextToken = result.nextToken
-          this.memberList.push(...result.memberList)
-          this.memberList.sort((a, b) => this.sortTeamMember(a, b))
-        }
-      } catch (e) {
-
-      }
-
+    if (member.isManager()) {
+      return this.viewModel.mineTeamMember?.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_OWNER
     }
-
+    if (this.viewModel.mineTeamMember) {
+      return this.viewModel.mineTeamMember.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_OWNER ||
+        this.viewModel.mineTeamMember.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_MANAGER
+    }
+    return false
   }
 
-  //群成员排序
-  sortTeamMember(a: TeamMemberWithUser, b: TeamMemberWithUser): number {
-    if (a.teamMember.memberRole === b.teamMember.memberRole) {
-      return b.teamMember.joinTime - a.teamMember.joinTime
-    }
-    if (a.teamMember.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_OWNER) {
-      return -1
-    }
-    if (b.teamMember.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_OWNER) {
-      return 1
-    }
-    if (a.teamMember.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_MANAGER) {
-      return -1
-    }
-    if (b.teamMember.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_MANAGER) {
-      return 1
-    }
-    return b.teamMember.joinTime - a.teamMember.joinTime
+  aboutToDisappear(): void {
+    this.viewModel.onDestroy()
   }
 }
 

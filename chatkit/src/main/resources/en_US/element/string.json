@@ -1,8 +1,12 @@
 {
   "string": [
     {
-      "name": "page_show",
-      "value": "page from package"
+      "name": "chat_network_error_tips",
+      "value": "network error"
+    },
+    {
+      "name": "chat_pin_limit_error_tips",
+      "value": "PIN Message Limit reached"
     }
   ]
 }

@@ -35,16 +35,13 @@ export class DateUtils {
       minute: '2-digit',
     };
 
-    if (msgTime - lastTime > 300000) {
-      if (nowDate.getFullYear() !== msgDate.getFullYear()) {
-        return msgDate.toLocaleString('zh-CN', yearOptions);
-      } else if (nowDate.getMonth() !== msgDate.getMonth() || nowDate.getDay() !== msgDate.getDay()) {
-        return msgDate.toLocaleString('zh-CN', monthOptions);
-      } else {
-        return msgDate.toLocaleString('zh-CN', minuteOptions);
-      }
+    if (nowDate.getFullYear() !== msgDate.getFullYear()) {
+      return msgDate.toLocaleString('zh-CN', yearOptions);
+    } else if (nowDate.getMonth() !== msgDate.getMonth() || nowDate.getUTCDate() !== msgDate.getUTCDate()) {
+      return msgDate.toLocaleString('zh-CN', monthOptions);
+    } else {
+      return msgDate.toLocaleString('zh-CN', minuteOptions);
     }
-    return '';
   }
 
   static formatCallTime(time: number): string {

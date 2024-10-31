@@ -91,6 +91,21 @@ export struct VideoItemView {
   async init(): Promise<void> {
     await this.release();
     const context = getContext(this);
+    // 获取applicationContext
+    let applicationContext = context.getApplicationContext();
+    // 通过applicationContext注册应用前后台状态监听
+    let that = this
+    applicationContext.on('applicationStateChange', {
+      onApplicationForeground() {
+        if (that.currentTime > 0 && that.currentTime < that.totalDuration) {
+          that.isPlaying = true
+        }
+      },
+      onApplicationBackground() {
+        that.isPlaying = false
+      }
+    });
+
     // 获取fdSrc用于注册AVPlayer
     // context.resourceManager.getRawFd(this.fileName).then(async (value: resourceManager.RawFileDescriptor) => {
     //   this.avPlayer = await media.createAVPlayer();

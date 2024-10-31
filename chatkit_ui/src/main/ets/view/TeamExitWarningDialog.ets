@@ -18,18 +18,28 @@ export class TeamExitDialogParam {
 @Builder
 export function teamExitWarningDialogBuilder(params: TeamExitDialogParam) {
   Column() {
+    Text($r('app.string.chat_team_error_tip_title'))
+      .fontSize($r('app.float.chat_title_text_font_size'))
+      .fontColor($r('app.color.color_chat_title'))
+      .margin({ top: 20 })
+
     Text($r('app.string.chat_team_error_tip_content'))
-      .fontSize(20)
-      .fontColor('#ff333333')
-      .margin({ top: 40, bottom: 50 })
+      .fontSize($r('app.float.chat_subtitle_text_font_size'))
+      .fontColor($r('app.color.color_chat_sub_title'))
+      .margin({ top: 20, bottom: 20 })
+
+    Line().height(1).width('100%').backgroundColor($r('app.color.chat_input_background'))
+
     Flex({ justifyContent: FlexAlign.SpaceAround }) {
-
-
       Button($r('app.string.common_sure'))
+        .fontSize($r('app.float.chat_subtitle_text_font_size'))
         .onClick(() => {
           params.onConfirm()
-        }).backgroundColor(0xffffff).fontColor('#ff007AFF')
-    }.margin({ bottom: 10 })
+        })
+        .backgroundColor(0xffffff)
+        .fontColor('#ff007AFF')
+        .width('50%')
+    }
   }.backgroundColor(Color.White)
   .width('80%')
   .borderRadius(8)

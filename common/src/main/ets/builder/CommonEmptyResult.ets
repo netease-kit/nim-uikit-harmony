@@ -20,6 +20,7 @@ export struct CommonEmptyResult {
         .width(this.emptyImageWidth)
         .height(this.emptyImageHeight)
         .objectFit(ImageFit.Contain)
+        .margin({ top: 80 })
 
       Text(this.tips)
         .fontSize(this.fontSize)
@@ -29,6 +30,7 @@ export struct CommonEmptyResult {
         })
 
     }
+    .width('100%').height('100%')
     .backgroundColor(Color.Transparent)
   }
 }

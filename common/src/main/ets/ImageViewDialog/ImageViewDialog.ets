@@ -14,12 +14,12 @@ import { ImagesIndexModel } from './model/ImagesIndexModel';
 @CustomDialog
 export struct ImageViewDialog {
   controller?: CustomDialogController
-  @BuilderParam ImagesIndexModel?: ImagesIndexModel;
+  @BuilderParam imagesIndexModel?: ImagesIndexModel;
   swipeController: SwiperController = new SwiperController();
 
   build() {
     Swiper(this.swipeController) {
-      ForEach(this.ImagesIndexModel?.imageUrls, (item: string, index: number) => {
+      ForEach(this.imagesIndexModel?.imageUrls, (item: string, index: number) => {
         ImageItemView({ imageUri: item })
           .width('100%')
           .height('100%')
@@ -32,8 +32,8 @@ export struct ImageViewDialog {
     .loop(false)
     .indicator(false)
     .effectMode(EdgeEffect.Fade)
-    .index(this.ImagesIndexModel?.currentIndex)
-    .cachedCount(this.ImagesIndexModel?.imageUrls.length)
+    .index(this.imagesIndexModel?.currentIndex)
+    .cachedCount(this.imagesIndexModel?.imageUrls.length)
     .onClick(() => {
       this.controller?.close()
     })
