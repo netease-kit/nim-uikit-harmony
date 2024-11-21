@@ -88,7 +88,6 @@ export struct ContactPage {
   @Param pathStack: NavPathStack = new NavPathStack()
   @Param onUnreadApplicationChange?: (countString?: string) => void = undefined
   @Local viewModel: ContactViewModel = new ContactViewModel()
-
   loadUnreadApplication = async () => {
     try {
       const unreadCount = await this.viewModel.getUnreadApplication()
@@ -106,11 +105,9 @@ export struct ContactPage {
     new NEContactItem($r('app.media.contact_blocklist'), $r('app.string.contact_blocklist'), "BlockListPage"),
     new NEContactItem($r('app.media.contact_my_teams'), $r('app.string.contact_my_teams'), "MyTeamsPage")
   ]
-
   @Local selectedIndex: number = 0; // 用于指定字母导航的选择项
   // List组件的scroller控制器：listScroller，用于控制联系人列表的滑动位置
   private listScroller: Scroller = new Scroller()
-
   loadData = async () => {
     try {
       await this.viewModel.getFriendList()

@@ -6,23 +6,23 @@
  */
 
 import {
-    AitAllPermission,
-    ChatKitClient,
-    ErrorUtils,
-    keyExtensionAtAll,
-    TeamRepo,
-    typeExtensionAllowAll,
-    typeExtensionAllowManager
+  AitAllPermission,
+  ChatKitClient,
+  ErrorUtils,
+  keyExtensionAtAll,
+  TeamRepo,
+  typeExtensionAllowAll,
+  typeExtensionAllowManager
 } from '@nimkit/chatkit'
 import { CommonChooseDialog, NavigationBackBuilder, NECommonUtils } from '@nimkit/common'
 import {
-    V2NIMError,
-    V2NIMErrorCode,
-    V2NIMTeam,
-    V2NIMTeamInviteMode,
-    V2NIMTeamType,
-    V2NIMTeamUpdateInfoMode,
-    V2NIMUpdateTeamInfoParams
+  V2NIMError,
+  V2NIMErrorCode,
+  V2NIMTeam,
+  V2NIMTeamInviteMode,
+  V2NIMTeamType,
+  V2NIMTeamUpdateInfoMode,
+  V2NIMUpdateTeamInfoParams
 } from '@nimsdk/base'
 import { TeamManageViewModel } from '../viewModel/TeamManageViewModel'
 

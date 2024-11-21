@@ -7,7 +7,6 @@
 
 import { ViewItemSwitch } from '@nimkit/common/src/main/ets/model/ViewItemSwitch';
 import { CommonConstants, NavigationBackBuilder, NECommonUtils, ViewItemArrow, ViewItemBuilder } from '@nimkit/common';
-import { router } from '@kit.ArkUI';
 import { ChatKitClient } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
 import { ConversationRepo } from '@nimkit/chatkit';
 import { ChatKitConfig } from '@nimkit/chatkit_ui/src/main/ets/ChatKitConfig';

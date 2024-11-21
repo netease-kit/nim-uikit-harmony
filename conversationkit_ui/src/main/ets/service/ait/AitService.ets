@@ -114,7 +114,7 @@ export class AitServer {
    * @param aitSession
    */
   sendAitChange(aitSession: AitSession) {
-      getContext().eventHub.emit(AitSessionChangeEvent, aitSession)
+    getContext().eventHub.emit(AitSessionChangeEvent, aitSession)
   }
 
   /**

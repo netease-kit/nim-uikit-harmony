@@ -383,7 +383,8 @@
     {
       "name": "chat_team_at_permission_all_tips",
       "value": "更新@所有人权限更新为所有人"
-    },    {
+    },
+    {
       "name": "mine_remove_collection_tip",
       "value": "确认要删除该收藏吗？"
     },

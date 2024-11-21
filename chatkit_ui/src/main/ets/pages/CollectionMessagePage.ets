@@ -6,33 +6,33 @@
  */
 
 import {
-  CommonEmptyResult,
-  DoubleAlertDialog,
-  ImagesIndexModel,
-  ImageViewDialog,
-  NavigationBackBuilder,
-  NECommonUtils,
-  VideoViewerDialog
+    CommonEmptyResult,
+    DoubleAlertDialog,
+    ImagesIndexModel,
+    ImageViewDialog,
+    NavigationBackBuilder,
+    NECommonUtils,
+    VideoViewerDialog
 } from '@nimkit/common';
 import { V2NIMMessageType } from '@nimsdk/base';
 import pasteboard from '@ohos.pasteboard';
 import { ConversationSelectParam } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectParam';
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
 import {
-  conversationSelectLimitCount,
-  CustomMessageUtils,
-  ErrorUtils,
-  MergedMessageAttachment,
-  mergedMessageCustomType
+    conversationSelectLimitCount,
+    CustomMessageUtils,
+    ErrorUtils,
+    MergedMessageAttachment,
+    mergedMessageCustomType
 } from '@nimkit/chatkit';
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { DeviceUtils } from '../common/DeviceUtils';
 import { AudioPlayerManager } from '../manager/AudioPlayerManager';
 import {
-  downLoadAndOpenFile,
-  getMessageVideoRatio,
-  getMessageVideoUrl
+    downLoadAndOpenFile,
+    getMessageVideoRatio,
+    getMessageVideoUrl
 } from '../common/MessageHelper';
 import { CollectionMessageViewModel } from '../viewmodel/CollectionMessageViewModel';
 import { CollectionMessageModel } from '../model/CollectionMessageModel';
@@ -41,8 +41,7 @@ import { common } from '@kit.AbilityKit';
 import { showLocationDetail } from '../common/ChatUtils';
 import { TextMessageDetailDialog } from '../view/TextMessageDetailDialog';
 import { NEEmojiManager } from '../manager/NEEmojiManager';
-
-@CustomDialog
+omDialog
 export struct CollectionMoreActionDialog {
   @BuilderParam collectionMessageModel: CollectionMessageModel
   @BuilderParam dialogHeight: number
@@ -228,7 +227,6 @@ export struct CollectionMessagePage {
     backgroundColor: Color.Transparent,
     backgroundBlurStyle: BlurStyle.NONE,
   })
-
   textMessageDetailDialog: CustomDialogController = new CustomDialogController({
     builder: TextMessageDetailDialog({
       message: this.tapCollectionMessage?.message

@@ -383,7 +383,8 @@
     {
       "name": "chat_team_at_permission_all_tips",
       "value": "Update Everyone can @all"
-    },    {
+    },
+    {
       "name": "mine_remove_collection_tip",
       "value": "Are you sure you want to delete this bookmark?"
     },

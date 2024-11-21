@@ -6,10 +6,7 @@
  */
 
 import { taskpool } from '@kit.ArkTS';
-import {
-    LogLevel,
-    NetWorkingInStance, NIMEStrAnyObj, V2NIMErrorImpl
-} from '@nimsdk/base';
+import { LogLevel, NetWorkingInStance, NIMEStrAnyObj, V2NIMErrorImpl } from '@nimsdk/base';
 
 import fs from '@ohos.file.fs';
 

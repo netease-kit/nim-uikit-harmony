@@ -424,17 +424,17 @@ export struct ChatP2PPage {
   @Builder
   build() {
     NavDestination() {
-        NavigationBackBuilder({
-          title: this.chatUserInfo.conversationName,
-          rightButtonIcon: this.showMultiSelect ? undefined : $r('app.media.ic_public_more_dot'),
-          rightButtonTitle: this.showMultiSelect ? $r('app.string.chat_msg_dialog_cancel') : undefined,
-          rightButtonAction: () => {
-            this.goToSettingPage(this.pathStack)
-          },
-          leftButtonAction: () => {
-            this.pathStack.pop()
-          }
-        })
+      NavigationBackBuilder({
+        title: this.chatUserInfo.conversationName,
+        rightButtonIcon: this.showMultiSelect ? undefined : $r('app.media.ic_public_more_dot'),
+        rightButtonTitle: this.showMultiSelect ? $r('app.string.chat_msg_dialog_cancel') : undefined,
+        rightButtonAction: () => {
+          this.goToSettingPage(this.pathStack)
+        },
+        leftButtonAction: () => {
+          this.pathStack.pop()
+        }
+      })
       RelativeContainer() {
         List({ scroller: this.listScroller }) {
           LazyForEach(this.chatUserInfo.msgList, (msg: NIMMessageInfo) => {

@@ -84,7 +84,6 @@ export struct ConversationViewItem {
               .width('100%')
           }.width(this.conversationInfo.mute ? '80%' : '100%')
 
-
         }
         .width('60%')
         .margin({

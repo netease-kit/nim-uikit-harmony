@@ -14,7 +14,6 @@ export default class ConversationListData implements IDataSource {
   @Trace aitConversationList: Set<string> = new Set()
   private listeners: DataChangeListener[] = [];
 
-
   registerDataChangeListener(listener: DataChangeListener): void {
     if (this.listeners.indexOf(listener) < 0) {
       console.info('add listener');
