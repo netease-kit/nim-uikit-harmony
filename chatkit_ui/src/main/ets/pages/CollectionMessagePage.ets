@@ -41,7 +41,8 @@ import { common } from '@kit.AbilityKit';
 import { showLocationDetail } from '../common/ChatUtils';
 import { TextMessageDetailDialog } from '../view/TextMessageDetailDialog';
 import { NEEmojiManager } from '../manager/NEEmojiManager';
-omDialog
+
+@CustomDialog
 export struct CollectionMoreActionDialog {
   @BuilderParam collectionMessageModel: CollectionMessageModel
   @BuilderParam dialogHeight: number
