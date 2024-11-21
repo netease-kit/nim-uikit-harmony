@@ -13,10 +13,17 @@ export enum MessageOperationType {
   // 撤回
   Undo = 3,
   // 转发
-  Translate = 4,
+  Forward = 4,
   //标记
   Pin = 5,
-  Unpin = 6
+  //取消标记
+  Unpin = 6,
+  // 多选
+  Select = 7,
+  // 收藏
+  Collection = 8,
+  // 回复
+  Reply = 9
 }
 
 export class MessageOperationItem {

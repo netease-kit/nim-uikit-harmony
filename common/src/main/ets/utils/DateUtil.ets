@@ -44,6 +44,31 @@ export class DateUtil {
   }
 
   /**
+   * 时间戳序列化
+   * @param timestamp
+   * @returns
+   */
+  static formatTimestamp(timestamp: number): string {
+    const currentDate = new Date();
+    const targetDate = new Date(timestamp);
+    const yearDiff = currentDate.getFullYear() - targetDate.getFullYear();
+    const monthDiff = currentDate.getMonth() - targetDate.getMonth();
+    const dayDiff = currentDate.getDate() - targetDate.getDate();
+
+    if (yearDiff > 0) {
+      return `${targetDate.getFullYear()}-${targetDate.getMonth() + 1}-${targetDate.getDate()}`;
+    } else if (monthDiff > 0 || dayDiff > 0) {
+      const hours = targetDate.getHours().toString().padStart(2, '0');
+      const minutes = targetDate.getMinutes().toString().padStart(2, '0');
+      return `${targetDate.getMonth() + 1}-${targetDate.getDate()} ${hours}:${minutes}`;
+    } else {
+      const hours = targetDate.getHours().toString().padStart(2, '0');
+      const minutes = targetDate.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+  }
+
+  /**
    *将日期类型的Date根据传入的format格式化成日期字符串(format必传)
    * @param date
    * @param formatString  格式化字符串

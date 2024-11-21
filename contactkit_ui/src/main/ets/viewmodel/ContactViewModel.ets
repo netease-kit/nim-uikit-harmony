@@ -21,13 +21,15 @@ export class ContactViewModel {
   updateUserInfoFun = async (users: V2NIMUser[]) => {
     await Promise.all(
       users.map(async (user) => {
-        const oldUser = this.findContactModel(user.accountId)
-        if (oldUser && (oldUser?.user?.name !== user.name || oldUser?.user?.avatar !== user.avatar)) {
-          this.removeFromContact(user.accountId)
-        }
-        const userWithFriend = NEFriendUserCache.getInstance().getFriendById(user.accountId)
-        if (userWithFriend) {
-          await this.addToContact(userWithFriend)
+        if (NEFriendUserCache.getInstance().isFriend(user.accountId)) {
+          const oldUser = this.findContactModel(user.accountId)
+          if (oldUser && (oldUser?.user?.name !== user.name || oldUser?.user?.avatar !== user.avatar)) {
+            this.removeFromContact(user.accountId)
+          }
+          const userWithFriend = NEFriendUserCache.getInstance().getFriendById(user.accountId)
+          if (userWithFriend) {
+            await this.addToContact(userWithFriend)
+          }
         }
       })
     )
@@ -56,11 +58,11 @@ export class ContactViewModel {
   }
 
   constructor() {
-    NEFriendUserCache.getInstance().listener.on('updateUserInfo', this.updateUserInfoFun)
-    NEFriendUserCache.getInstance().listener.on('updateFriendInfo', this.updateFriendInfoFun)
-    NEFriendUserCache.getInstance().listener.on('removeFriendInfo', this.removeFriendInfoFun)
-    NEFriendUserCache.getInstance().listener.on('addBlockAccount', this.addBlockAccountFun)
-    NEFriendUserCache.getInstance().listener.on('removeBlockAccount', this.removeBlockAccountFun)
+    ContactRepo.listener.on('updateUserInfo', this.updateUserInfoFun)
+    ContactRepo.listener.on('updateFriendInfo', this.updateFriendInfoFun)
+    ContactRepo.listener.on('removeFriendInfo', this.removeFriendInfoFun)
+    ContactRepo.listener.on('addBlockAccount', this.addBlockAccountFun)
+    ContactRepo.listener.on('removeBlockAccount', this.removeBlockAccountFun)
   }
 
   // 获取好友列表
@@ -79,7 +81,7 @@ export class ContactViewModel {
         return contactList
       }
     } catch (err) {
-      console.log(err)
+      console.error(err)
     }
     return undefined
   }
@@ -226,10 +228,12 @@ export class ContactViewModel {
 
   // 查询好友并返回
   findContactModel(accountId: string): SelectUserWithFriend | undefined {
-    for (const section of this.friendSection.contactSections) {
-      let model = section?.contacts.contacts.find(contact => contact.user?.accountId === accountId)
-      if (model) {
-        return model
+    if (NEFriendUserCache.getInstance().isFriend(accountId)) {
+      for (const section of this.friendSection.contactSections) {
+        let model = section?.contacts.contacts.find(contact => contact.user?.accountId === accountId)
+        if (model) {
+          return model
+        }
       }
     }
     return undefined
@@ -250,12 +254,10 @@ export class ContactViewModel {
   }
 
   onDestroy() {
-    if (AppStorage.get<NEFriendUserCache>(NEFriendUserCache.name)) {
-      NEFriendUserCache.getInstance().listener.off('updateUserInfo', this.updateUserInfoFun)
-      NEFriendUserCache.getInstance().listener.off('updateFriendInfo', this.updateFriendInfoFun)
-      NEFriendUserCache.getInstance().listener.off('removeFriendInfo', this.removeFriendInfoFun)
-      NEFriendUserCache.getInstance().listener.off('addBlockAccount', this.addBlockAccountFun)
-      NEFriendUserCache.getInstance().listener.off('removeBlockAccount', this.removeBlockAccountFun)
-    }
+    ContactRepo.listener.off('updateUserInfo', this.updateUserInfoFun)
+    ContactRepo.listener.off('updateFriendInfo', this.updateFriendInfoFun)
+    ContactRepo.listener.off('removeFriendInfo', this.removeFriendInfoFun)
+    ContactRepo.listener.off('addBlockAccount', this.addBlockAccountFun)
+    ContactRepo.listener.off('removeBlockAccount', this.removeBlockAccountFun)
   }
 }

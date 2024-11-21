@@ -5,7 +5,7 @@
  *
  */
 
-import { ErrorUtils, NEFriendUserCache, NEUserWithFriend, PersonSelectParam } from '@nimkit/chatkit';
+import { ErrorUtils, NEUserWithFriend, PersonSelectParam } from '@nimkit/chatkit';
 import { AvatarColorUntil, AvatarItem, CommonAvatar, NavigationBackBuilder } from '@nimkit/common';
 import { BlocklistViewModel } from '../viewmodel/BlocklistViewModel';
 

@@ -1,12 +1,76 @@
 {
   "string": [
     {
+      "name": "unknown_error",
+      "value": "Unknown error"
+    },
+    {
       "name": "chat_network_error_tips",
       "value": "network error"
     },
     {
       "name": "chat_pin_limit_error_tips",
       "value": "PIN Message Limit reached"
+    },
+    {
+      "name": "chat_collection_limit_error_tips",
+      "value": "Collection Message Limit reached"
+    },
+    {
+      "name": "chatMessageNonsupportType",
+      "value": "[Nonsupport Message]"
+    },
+    {
+      "name": "audioMessageType",
+      "value": "[Audio Message]"
+    },
+    {
+      "name": "imageMessageType",
+      "value": "[Image Message]"
+    },
+    {
+      "name": "videoMessageType",
+      "value": "[Video Message]"
+    },
+    {
+      "name": "locationMessageType",
+      "value": "[Location Message]"
+    },
+    {
+      "name": "fileMessageType",
+      "value": "[File Message]"
+    },
+    {
+      "name": "notificationMessageType",
+      "value": "[Notification Message]"
+    },
+    {
+      "name": "tipMessageType",
+      "value": "[Tip Message]"
+    },
+    {
+      "name": "chatHistoryBrief",
+      "value": "Chat History"
+    },
+    {
+      "name": "msg_type_rtc_video",
+      "value": "[Video Chat]"
+    },
+    {
+      "name": "msg_type_rtc_audio",
+      "value": "[Audio Chat]"
+    },
+    {
+      "name": "msg_send_failed_in_block",
+      "value": "The other party has blocked you, message sending failed"
+    },
+    {
+      "name": "msg_send_failed_no_friend",
+      "value": "The relationship between both parties has been terminated, please "
+    },
+    {
+      "name": "msg_send_failed_friend_application",
+      "value": "reapply for contact"
     }
   ]
 }

@@ -8,7 +8,7 @@
 import { systemDateTime } from '@kit.BasicServicesKit';
 
 export class DateUtils {
-  static formatTime(lastTime: number, msgTime: number): string {
+  static formatTime(msgTime: number, lastTime?: number): string {
     const msgDate = new Date(msgTime);
     const nowDate = new Date(systemDateTime.getTime());
 

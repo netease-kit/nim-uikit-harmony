@@ -1,6 +1,6 @@
 {
   "name": "imkit_sample",
-  "version": "10.0.0",
+  "version": "10.2.0",
   "description": "Please describe the basic information.",
   "main": "",
   "author": "",
@@ -14,7 +14,6 @@
     "@nimkit/common": "file:../common",
     "@nimkit/corekit": "file:../corekit",
     "@nimsdk/conversation": "file:../libs/conversation.har",
-    "@nimsdk/conversationgroup": "file:../libs/conversationgroup.har",
     "@nimsdk/message": "file:../libs/message.har",
     "@nimsdk/team": "file:../libs/team.har",
     "@nimsdk/user": "file:../libs/user.har",

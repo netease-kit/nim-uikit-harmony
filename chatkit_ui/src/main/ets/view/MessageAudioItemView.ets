@@ -19,6 +19,8 @@ export struct MessageAudioItemView {
   message: NIMMessageInfo
   @BuilderParam
   onMessageClick: MessageItemClick | undefined
+  @BuilderParam
+  isReceiveStyle: boolean | undefined
   @Local
   receiveSoundIndex: number = 2
   sendSoundImages = [
@@ -49,23 +51,27 @@ export struct MessageAudioItemView {
     this.sendSoundIndex = 2
   }
 
+  showReceiveStyle(): boolean {
+    return this.message.isReceiveMessage() || (this.isReceiveStyle !== undefined && this.isReceiveStyle)
+  }
+
   build() {
     Row() {
-      if (!this.message.isReceiveMessage()) {
-        Text(getAudioMessageText(this.message))
-          .margin({ right: 8 }).maxLines(1)
-          .fontColor('#ff333333')
-          .fontSize(14)
-        Image(this.receiveSoundImages[this.receiveSoundIndex]).objectFit(ImageFit.Auto).width(28).height(28)
-      } else {
+      if (this.showReceiveStyle()) {
         Image(this.sendSoundImages[this.sendSoundIndex]).objectFit(ImageFit.Auto).width(28).height(28)
         Text(getAudioMessageText(this.message))
           .margin({ left: 8 }).maxLines(1)
           .fontColor('#ff333333')
           .fontSize(14)
+      } else {
+        Text(getAudioMessageText(this.message))
+          .margin({ right: 8 }).maxLines(1)
+          .fontColor('#ff333333')
+          .fontSize(14)
+        Image(this.receiveSoundImages[this.receiveSoundIndex]).objectFit(ImageFit.Auto).width(28).height(28)
       }
     }
-    .justifyContent(this.message.isReceiveMessage() ? FlexAlign.Start : FlexAlign.End)
+    .justifyContent(this.showReceiveStyle() ? FlexAlign.Start : FlexAlign.End)
     .margin({
       left: 12,
       top: 4,
@@ -83,6 +89,9 @@ export struct MessageAudioItemView {
         )
       }
     })
+    .gesture(LongPressGesture({ duration: 300 }).onAction((event: GestureEvent) => {
+      this.onMessageClick?.onItemLongClick?.(event, this.message)
+    }))
     .width(getAudioMessageWidth(this.message))
     .height(ChatConst.audioMessageWidth)
   }

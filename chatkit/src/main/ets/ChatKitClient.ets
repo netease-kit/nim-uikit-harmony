@@ -7,6 +7,7 @@
 
 import {
   IM_SDK_VERSION,
+  NIM,
   NIMInterface,
   V2NIMConnectStatus,
   V2NIMDataSyncState,
@@ -19,6 +20,10 @@ import { ChatRepo } from './repo/ChatRepo';
 import { saveLocalRevokeMessageFormOther } from './utils/MessageUtils';
 import { NEFriendUserCache } from './NEFriendUserCache';
 import { CoreKitClient } from '@nimkit/coreKit';
+import { LoggerKitImpl } from './logger/LoggerKitImpl';
+import { KitLogger } from './logger/AppLogger';
+
+export const currentConversationChanged: string = 'CurrentConversationChanged'
 
 export class ChatKitClient {
   declare static nim: NIMInterface
@@ -28,48 +33,21 @@ export class ChatKitClient {
   static hasInitListener = false
   static currentConversationId: string = ''
   static networkAvailable: boolean = true
+  static logger: KitLogger | undefined = undefined
 
-  static init(nimSdk: NIMInterface, appKey: string) {
+  static init(nimSdk: NIMInterface, appKey: string, disableLog?: boolean) {
     ChatKitClient.nim = nimSdk
+    if (disableLog !== true) {
+      if (nimSdk instanceof NIM) {
+        let logger = new LoggerKitImpl(nimSdk.context.cacheDir)
+        ChatKitClient.logger = new KitLogger(logger)
+      }
+    }
     ChatKitClient.haveSyncedConversation = false
     ChatKitClient.initListener()
     CoreKitClient.init({
       appKey: appKey,
       imVersion: IM_SDK_VERSION,
-    })
-  }
-
-  /**
-   * 初始化监听
-   */
-  private static initListener() {
-    if (ChatKitClient.hasInitListener) {
-      return
-    }
-    console.info("netease ChatKitClient initListener ");
-    // 数据同步监听
-    ChatKitClient.nim.conversationService?.on('onSyncFinished', ChatKitClient.onSyncFinishedFun)
-    // 消息撤回监听，消息撤回后，会收到通知
-    ChatRepo.onRevokeMessage(ChatKitClient.onRevokeFun)
-
-    ChatKitClient.nim.loginService.on('onDataSync',
-      (type: V2NIMDataSyncType, state: V2NIMDataSyncState, error?: V2NIMError) => {
-        if (state === V2NIMDataSyncState.V2NIM_DATA_SYNC_STATE_COMPLETED) {
-          NEFriendUserCache.getInstance()
-        }
-      })
-    ChatKitClient.hasInitListener = true
-
-  }
-
-  private static onSyncFinishedFun = () => {
-    ChatKitClient.haveSyncedConversation = true
-  }
-  private static onRevokeFun = (messages: V2NIMMessageRevokeNotification[]) => {
-    messages.forEach((msg, index, messages) => {
-      if (msg.messageRefer.conversationId !== ChatKitClient.currentConversationId) {
-        saveLocalRevokeMessageFormOther(msg.messageRefer.conversationId, msg, false)
-      }
     })
   }
 
@@ -87,6 +65,7 @@ export class ChatKitClient {
    */
   static setCurrentConversationId(conversationId: string) {
     ChatKitClient.currentConversationId = conversationId
+    getContext().eventHub.emit(currentConversationChanged, conversationId)
   }
 
   /**
@@ -94,6 +73,7 @@ export class ChatKitClient {
    */
   static clearCurrentConversationId() {
     ChatKitClient.currentConversationId = ''
+    getContext().eventHub.emit(currentConversationChanged, '')
   }
 
   /**
@@ -140,11 +120,13 @@ export class ChatKitClient {
     if (ChatKitClient.nim.loginService?.getLoginStatus() === V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED) {
       fn()
     } else {
-      ChatKitClient.nim.loginService.on('onLoginStatus', (status: V2NIMLoginStatus) => {
+      const onLoginStatusFunc = (status: V2NIMLoginStatus) => {
         if (status === V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED) {
           fn()
+          ChatKitClient.nim.loginService.off('onLoginStatus', onLoginStatusFunc)
         }
-      })
+      }
+      ChatKitClient.nim.loginService.on('onLoginStatus', onLoginStatusFunc)
     }
   }
 
@@ -153,5 +135,48 @@ export class ChatKitClient {
   */
   static onDestroy() {
     ChatKitClient.hasInitListener = false
+    ChatKitClient.haveSyncedConversation = false
+    ChatKitClient.selfLeaveTeam = false
+    ChatKitClient.currentConversationId = ''
+    ChatRepo.offRevokeMessage(ChatKitClient.onRevokeFun)
+    ChatKitClient.nim.conversationService?.off('onSyncFinished', ChatKitClient.onSyncFinishedFun)
+    ChatKitClient.nim.loginService.off('onDataSync', ChatKitClient.dataSyncFun)
+
+  }
+
+  /**
+   * 初始化监听
+   */
+  private static initListener() {
+    if (ChatKitClient.hasInitListener) {
+      return
+    }
+    console.info("netease ChatKitClient initListener ");
+    // 数据同步监听
+    ChatKitClient.nim.conversationService?.on('onSyncFinished', ChatKitClient.onSyncFinishedFun)
+    ChatKitClient.nim.loginService.on('onDataSync', ChatKitClient.dataSyncFun)
+    // 消息撤回监听，消息撤回后，会收到通知
+    ChatRepo.onRevokeMessage(ChatKitClient.onRevokeFun)
+    ChatKitClient.hasInitListener = true
+
+  }
+
+  private static onSyncFinishedFun = () => {
+    console.debug(`Performance Test onSyncFinishedFun`)
+    ChatKitClient.haveSyncedConversation = true
+  }
+
+  private static dataSyncFun = (type: V2NIMDataSyncType, state: V2NIMDataSyncState, error?: V2NIMError) => {
+    if (state === V2NIMDataSyncState.V2NIM_DATA_SYNC_STATE_COMPLETED) {
+      NEFriendUserCache.getInstance()
+    }
+  }
+
+  private static onRevokeFun = (messages: V2NIMMessageRevokeNotification[]) => {
+    messages.forEach((msg, index, messages) => {
+      if (msg.messageRefer.conversationId !== ChatKitClient.currentConversationId) {
+        saveLocalRevokeMessageFormOther(msg.messageRefer.conversationId, msg, false)
+      }
+    })
   }
 }

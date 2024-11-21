@@ -57,6 +57,10 @@
       "value": "拍摄"
     },
     {
+      "name": "chat_send_location",
+      "value": "位置"
+    },
+    {
       "name": "chat_send_file",
       "value": "文件"
     },
@@ -69,6 +73,18 @@
       "value": "转发"
     },
     {
+      "name": "chat_operation_collection",
+      "value": "收藏"
+    },
+    {
+      "name": "chat_reply_not_exist",
+      "value": "该消息已撤回或删除"
+    },
+    {
+      "name": "chat_collection_success",
+      "value": "已收藏"
+    },
+    {
       "name": "chat_operation_multi_forward",
       "value": "合并转发"
     },
@@ -79,6 +95,14 @@
     {
       "name": "chat_operation_forward_desc",
       "value": "%s的会话记录"
+    },
+    {
+      "name": "chat_merged_message_title",
+      "value": "%s 的消息"
+    },
+    {
+      "name": "chat_merged_message_desc",
+      "value": "聊天记录"
     },
     {
       "name": "chat_operation_delete",
@@ -221,6 +245,10 @@
       "value": "用于发送语音消息"
     },
     {
+      "name": "chat_permission_location_desc",
+      "value": "用于发送地理位置消息"
+    },
+    {
       "name": "chat_speak_too_short",
       "value": "说话时间太短"
     },
@@ -283,6 +311,58 @@
     {
       "name": "chat_message_copy_success_tips",
       "value": "复制成功"
+    },
+    {
+      "name": "team_history_record_tip",
+      "value": "搜索聊天内容"
+    },
+    {
+      "name": "team_history_record_empty_tip",
+      "value": "暂无聊天记录"
+    },
+    {
+      "name": "chat_message_ait_select_tips",
+      "value": "选择提醒"
+    },
+    {
+      "name": "chat_team_ait_all",
+      "value": "所有人"
+    },
+    {
+      "name": "chat_forward_limit",
+      "value": "%s限制%d条消息"
+    },
+    {
+      "name": "multiForward_exist_invalid",
+      "value": "存在不可转发的消息体，是否去除后发送？"
+    },
+    {
+      "name": "file_md5_check_failed",
+      "value": "文件校验失败"
+    },
+    {
+      "name": "chat_multi_delete_limit_tips",
+      "value": "批量删除限制50条消息"
+    },
+    {
+      "name": "chat_single_forward_limit_tips",
+      "value": "逐条转发限制10条消息"
+    },
+    {
+      "name": "chat_multi_forward_limit_tips",
+      "value": "合并转发限制100条消息"
+    },
+    {
+      "name": "chat_multi_forward_failed",
+      "value": "系统异常，转发失败"
+    },
+    {
+      "name": "chat_team_at_permission_manager_tips",
+      "value": "更新@所有人权限更新为群主和管理员"
+    },
+    {
+      "name": "chat_team_at_permission_all_tips",
+      "value": "更新@所有人权限更新为所有人"
     }
   ]
 }

@@ -12,7 +12,7 @@ export class DeviceUtils {
   private static msgLineWidth: number = 0;
 
   static getMessageLineWidth(): number {
-    DeviceUtils.msgLineWidth = DeviceUtils.windowPXWidth - vp2px(144);
+    DeviceUtils.msgLineWidth = DeviceUtils.windowPXWidth * 0.75 - vp2px(50);
     return DeviceUtils.msgLineWidth;
   }
 

@@ -157,9 +157,10 @@ export class NEContactSection {
   }
 }
 
+@ObservedV2
 export class NEContactSectionDataSource implements IDataSource {
   listeners: DataChangeListener[] = [];
-  contactSections: NEContactSection[] = [];
+  @Trace contactSections: NEContactSection[] = [];
 
   public totalCount(): number {
     return this.contactSections.length;

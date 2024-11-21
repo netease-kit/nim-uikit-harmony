@@ -42,7 +42,7 @@ export class PermissionsUtils {
         resolve(permissionsRequestResult);
 
       }).catch((err: BusinessError) => {
-        console.error(`net ease Failed to request permissions from user. Code is ${err.code}, message is ${err.message}`);
+        console.error(`netease Failed to request permissions from user. Code is ${err.code}, message is ${err.message}`);
         let permissionsRequestResult = new PermissionsRequestResult();
         permissionsRequestResult.error = err;
         resolve(permissionsRequestResult);

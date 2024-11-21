@@ -28,6 +28,26 @@
           ],
           "when": "always"
         }
+      },
+      {
+        "name": "ohos.permission.LOCATION",
+        "reason": "$string:chat_permission_location_desc",
+        "usedScene": {
+          "abilities": [
+            "FormAbility"
+          ],
+          "when": "always"
+        }
+      },
+      {
+        "name": "ohos.permission.APPROXIMATELY_LOCATION",
+        "reason": "$string:chat_permission_location_desc",
+        "usedScene": {
+          "abilities": [
+            "FormAbility"
+          ],
+          "when": "always"
+        }
       }
     ]
   }

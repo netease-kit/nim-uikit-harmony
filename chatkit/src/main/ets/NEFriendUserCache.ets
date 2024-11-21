@@ -6,25 +6,24 @@
  */
 
 import { ChatKitClient } from './ChatKitClient';
-import { UserWithFriend } from './model/UserWithFriend';
+import { NEUserWithFriend } from './model/NEUserWithFriend';
 import { V2NIMFriend, V2NIMUser } from '@nimsdk/base';
 import { ContactRepo } from './repo/ContactRepo';
 
 interface updateFriendInfoParams {
   user?: V2NIMUser;
   friend?: V2NIMFriend;
-  friendUser?: UserWithFriend;
+  friendUser?: NEUserWithFriend;
 }
 
 /// 好友信息缓存，只缓存好友
 @ObservedV2
 export class NEFriendUserCache {
-  @Trace public static mineUserCache?: UserWithFriend
+  @Trace public static mineUserCache?: NEUserWithFriend
   // 黑名单账号集合
   public blockAccountList: string[] = []
   // 好友列表,包括黑名单中好友
-  public friendCache: Map<string, UserWithFriend> = new Map<string, UserWithFriend>()
-  public listener = getContext(this).eventHub
+  public friendCache: Map<string, NEUserWithFriend> = new Map<string, NEUserWithFriend>()
 
   private constructor() {
     ContactRepo.addListener()
@@ -57,7 +56,7 @@ export class NEFriendUserCache {
 
   /// 是否是好友
   public isFriend(accountId: string): Boolean {
-    return this.friendCache.has(accountId)
+    return this.friendCache.has(accountId) && !this.blockAccountList.includes(accountId)
   }
 
   /// 添加（更新）好友信息
@@ -69,7 +68,7 @@ export class NEFriendUserCache {
       if (friendUser) {
         friendUser.user = params.user
       } else {
-        this.friendCache.set(accountId, new UserWithFriend({
+        this.friendCache.set(accountId, new NEUserWithFriend({
           user: params.user
         }))
       }
@@ -82,7 +81,7 @@ export class NEFriendUserCache {
         friendUser.friend = params.friend
         friendUser.user = params.friend.userProfile
       } else {
-        this.friendCache.set(accountId, new UserWithFriend({
+        this.friendCache.set(accountId, new NEUserWithFriend({
           friend: params.friend
         }))
       }
@@ -101,6 +100,8 @@ export class NEFriendUserCache {
         friend: friend
       })
     })
+
+    ContactRepo.listener.emit('initFriendCache')
   }
 
   /// 获取缓存的好友信息
@@ -114,7 +115,7 @@ export class NEFriendUserCache {
    * @returns
    */
   public getFriendsByIds(accIds: string[]) {
-    let result: UserWithFriend[] = []
+    let result: NEUserWithFriend[] = []
     accIds.forEach((accId) => {
       let user = this.friendCache.get(accId)
       if (user) {
@@ -131,7 +132,7 @@ export class NEFriendUserCache {
 
   /// 获取缓存的好友信息列表，不包含黑名单中的好友
   public getFriendListNotInBlocklist() {
-    let friends: Map<string, UserWithFriend> = new Map<string, UserWithFriend>()
+    let friends: Map<string, NEUserWithFriend> = new Map<string, NEUserWithFriend>()
     this.friendCache.forEach((value, key) => {
       if (!this.blockAccountList.includes(key)) {
         friends.set(key, value)
@@ -149,7 +150,7 @@ export class NEFriendUserCache {
   /// 删除好友信息缓存
   public removeFriendInfo(accountId: string) {
     this.friendCache.delete(accountId)
-    this.listener.emit('removeFriendInfo', accountId)
+    ContactRepo.listener.emit('removeFriendInfo', accountId)
   }
 
   /// 删除所有好友信息缓存
@@ -174,7 +175,7 @@ export class NEFriendUserCache {
   public addBlockAccount(accountId: string) {
     if (!this.blockAccountList.includes(accountId)) {
       this.blockAccountList.push(accountId)
-      this.listener.emit('addBlockAccount', accountId)
+      ContactRepo.listener.emit('addBlockAccount', accountId)
     }
   }
 
@@ -184,7 +185,7 @@ export class NEFriendUserCache {
       for (let index = 0; index < this.blockAccountList.length; index++) {
         if (this.blockAccountList[index] === accountId) {
           this.blockAccountList.splice(index, 1)
-          this.listener.emit('removeBlockAccount', accountId)
+          ContactRepo.listener.emit('removeBlockAccount', accountId)
           break
         }
       }

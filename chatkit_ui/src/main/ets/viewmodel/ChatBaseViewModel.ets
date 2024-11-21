@@ -5,7 +5,16 @@
  *
  */
 
-import { ChatKitClient, ChatRepo, ConversationRepo, ErrorUtils, StorageRepo } from '@nimkit/chatkit';
+import {
+  AitModel,
+  ChatKitClient,
+  ChatRepo,
+  collectionTypeOffset,
+  ConversationRepo,
+  ErrorUtils,
+  StorageRepo,
+  YxAitMsg
+} from '@nimkit/chatkit';
 import fs from '@ohos.file.fs';
 import {
   V2NIMConnectStatus,
@@ -28,7 +37,6 @@ import {
 } from '@nimsdk/base';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { ChatInfo } from '../model/ChatInfo';
-import '../common/MessageHelper';
 import { ChatConst } from '../constants/ChatConst';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { DeviceUtils } from '../common/DeviceUtils';
@@ -39,14 +47,23 @@ import {
 } from '@nimkit/chatkit/src/main/ets/utils/MessageUtils';
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
 import { ChatKitConfig } from '../ChatKitConfig';
+import { sceneMap } from '@kit.MapKit';
+import { clearForwardAtMark, createForwardMessageListFileDetail, sendMessageFailedTips } from '../common/MessageHelper';
+import { instanceToPlain } from 'class-transformer';
+import { NECommonUtils } from '@nimkit/common';
+import { JSON } from '@kit.ArkTS';
 
 @ObservedV2
 export class ChatBaseViewModel {
   @Trace static currentViewModel: ChatBaseViewModel | undefined = undefined
   @Trace anchorMsg: NIMMessageInfo | undefined = undefined
   @Trace conversationId: string = ""
-  accountId: string = ""
-  @Trace chatInfo: ChatInfo | undefined = undefined;
+  // p2p 会话是对方账号ID，群聊是为群ID teamId
+  targetId: string = ""
+  @Trace chatInfo: ChatInfo | undefined = undefined
+  @Trace selectMsgMap: Map<string, NIMMessageInfo> = new Map()
+  @Trace selectMsgCount = 0
+  @Trace needScrollToBottom = false
   isLoading = false
   hasMore = false
   hasNew = false
@@ -59,9 +76,6 @@ export class ChatBaseViewModel {
   // 发送消息
   onSendFun = async (message: V2NIMMessage): Promise<void> => {
     if (message.conversationId === this.conversationId) {
-      if (this.hasNew) {
-        let result = await this.getMessageList()
-      }
       if (message.sendingState == V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SENDING) {
         if (message.messageClientId !== this.sendingMsgClientId) {
           this.sendingMsgClientId = message.messageClientId
@@ -70,7 +84,10 @@ export class ChatBaseViewModel {
         }
 
       } else {
-        this.chatInfo?.updateMessageStatus(message)
+        let result = this.chatInfo?.updateMessageStatus(message)
+        if (!result) {
+          this.chatInfo?.setReceiveMsg(true)
+        }
       }
     }
   }
@@ -82,7 +99,7 @@ export class ChatBaseViewModel {
 
   init(conversationId: string, chatInfo: ChatInfo) {
     this.conversationId = conversationId
-    this.accountId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversationId)
+    this.targetId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversationId)
     this.chatInfo = chatInfo;
     // 设置当前会话
     ChatKitClient.setCurrentConversationId(this.conversationId)
@@ -144,16 +161,21 @@ export class ChatBaseViewModel {
       }
     }
     if (hasNew) {
-      this.chatInfo?.setReceiveMsg(true);
       this.toHandleReceiveMessage(receiveMsg)
       this.clearUnreadCount()
+      this.chatInfo?.setReceiveMsg(true);
     }
   }
   // 删除消息
   onDeleteFun = (messages: V2NIMMessageDeletedNotification[]) => {
     messages.forEach((msg, index, messages) => {
       if (msg.messageRefer.conversationId === this.conversationId) {
+        this.removeReplyInfo(msg.messageRefer.messageClientId)
         this.chatInfo?.deleteMessage(msg.messageRefer.messageClientId)
+        if (this.selectMsgMap.has(msg.messageRefer.messageClientId)) {
+          this.selectMsgMap.delete(msg.messageRefer.messageClientId)
+          this.selectMsgCount = this.selectMsgMap.size
+        }
       }
     })
   }
@@ -161,10 +183,13 @@ export class ChatBaseViewModel {
   onRevokeFun = (messages: V2NIMMessageRevokeNotification[]) => {
     messages.forEach((msg, index, messages) => {
       if (msg.messageRefer.conversationId === this.conversationId) {
-        console.debug('netease viewmodel onRevokeFun revoke message', msg.revokeAccountId,
-          msg.messageRefer.messageClientId)
         let revokeMsg = this.chatInfo?.getMessage(msg.messageRefer.messageClientId)
+        this.removeReplyInfo(msg.messageRefer.messageClientId)
         this.chatInfo?.revokeMessage(msg.messageRefer.messageClientId)
+        if (this.selectMsgMap.has(msg.messageRefer.messageClientId)) {
+          this.selectMsgMap.delete(msg.messageRefer.messageClientId)
+          this.selectMsgCount = this.selectMsgMap.size
+        }
         if (this.saveRevokeClientId == revokeMsg?.message.messageServerId) {
           return
         }
@@ -185,9 +210,11 @@ export class ChatBaseViewModel {
   onPinFun = ((notification: V2NIMMessagePinNotification) => {
     if (notification.pinState == V2NIMMessagePinState.V2NIM_MESSAGE_PIN_STATE_PINNED) {
       this.chatInfo?.addPinMessage([notification.pin])
+      this.needScrollToBottom = true
 
     } else if (notification.pinState == V2NIMMessagePinState.V2NIM_MESSAGE_PIN_STATE_UPDATED) {
       this.chatInfo?.addPinMessage([notification.pin])
+      this.needScrollToBottom = true
 
     } else if (notification.pinState == V2NIMMessagePinState.V2NIM_MESSAGE_PIN_STATE_NOT_PINNED) {
       this.chatInfo?.removePinMessage([notification.pin])
@@ -215,7 +242,8 @@ export class ChatBaseViewModel {
     if (hasError) {
       return result
     }
-    if (messageList.length == ChatConst.chatMessagePageSize) {
+    // 拉回的消息数据存在误差
+    if (messageList.length >= ChatConst.chatMessagePageSize - 10) {
       this.hasMore = true;
     } else {
       this.hasMore = false;
@@ -268,7 +296,7 @@ export class ChatBaseViewModel {
         }
       }
     }
-    this.chatInfo?.msgList.push(anchorMsg)
+    this.chatInfo?.pushMessageInfo(anchorMsg)
     let anchorIndex = this.chatInfo?.msgList.totalCount() ?? 1 - 1
     if (messageAfterList.length > 0) {
       for (let index = 0; index < messageAfterList.length; index++) {
@@ -283,7 +311,6 @@ export class ChatBaseViewModel {
     } else if (!this.networkBroken) {
       this.hasNew = false;
     }
-    console.debug('netease loadMessageListWithAnchor,lenght:', messageAfterList.length, 'hasNew:', this.hasNew)
     // // 修改接受消息标志，如果有新消息则更新接受消息标志，否则列表滚动到底部
     // this.chatInfo?.setReceiveMsg(true)
     this.toHandleQueryMessage(result, messageAfterList)
@@ -401,12 +428,33 @@ export class ChatBaseViewModel {
   getPinList() {
     ChatRepo.getPinnedMessageList(this.conversationId).then((pinMessageList) => {
       this.chatInfo?.resetPinMessage(pinMessageList)
+      this.needScrollToBottom = true
     })
   }
 
   // 删除消息
-  deleteMessage(msg: NIMMessageInfo) {
-    ChatRepo.deleteMessage(msg.message, undefined, false).catch((err: BusinessError) => {
+  deleteMessage(messages: NIMMessageInfo[]) {
+    for (const message of messages) {
+      ChatRepo.deleteMessage(message.message, undefined, false).then(() => {
+        this.removeReplyInfo(message.message.messageClientId)
+      }).catch((err: BusinessError) => {
+        ErrorUtils.handleErrorToast(err.code)
+      });
+    }
+  }
+
+  // 批量删除消息
+  deleteMessageList(messages: NIMMessageInfo[]) {
+    let msgList: V2NIMMessage[] = []
+    messages.forEach((msg, index, messages) => {
+      msgList.push(msg.message)
+    })
+
+    ChatRepo.deleteMessages(msgList, undefined, false).then(() => {
+      messages.forEach((msg) => {
+        this.removeReplyInfo(msg.message.messageClientId)
+      })
+    }).catch((err: BusinessError) => {
       ErrorUtils.handleErrorToast(err.code)
     });
   }
@@ -417,10 +465,56 @@ export class ChatBaseViewModel {
       if (msg.isPinMsg && msg.pinInfo) {
         ChatRepo.unpinMessage(msg.pinInfo?.messageRefer)
       }
+      this.removeReplyInfo(msg.message.messageClientId)
     }).catch((err: BusinessError) => {
       ErrorUtils.handleErrorToast(err.code)
       console.error(`netease Invoke startAbility failed, code is ${err.code}, message is ${err.message}`);
     });
+  }
+
+  /// 移除被回复信息
+  removeReplyInfo(invalidMessageClientId: string) {
+    const invalidMessage = this.chatInfo?.getMessage(invalidMessageClientId)
+    if (invalidMessage) {
+      const invalidIndex = this.chatInfo?.msgList.getMessageList().indexOf(invalidMessage)
+      if (invalidIndex) {
+        for (let index = invalidIndex; index < (this.chatInfo?.msgList.totalCount() ?? invalidIndex); index++) {
+          let message = this.chatInfo?.msgList.getMessageList()[index]
+          if (message && message.replyMsg?.message.messageClientId === invalidMessage.message.messageClientId) {
+            message.replyMsg = undefined
+          }
+        }
+      }
+    }
+  }
+
+  // 收藏消息
+  collectionMessage(msg: NIMMessageInfo) {
+    if (ErrorUtils.checkNetworkAndToast()) {
+      let collectionDic: Record<string, Object> = {}
+      let message = msg.message
+      clearForwardAtMark(message)
+      const messageString = ChatKitClient.nim.messageConverter.messageSerialization(message)
+      if (messageString) {
+        collectionDic["message"] = messageString
+      }
+
+      collectionDic['conversationName'] = this.chatInfo?.conversationName ?? ''
+      collectionDic['senderName'] = this.chatInfo?.getChatUserShowName(message) ?? ''
+      collectionDic['avatar'] = this.chatInfo?.getChatUserAvatarUrl(message) ?? ''
+
+      const collectionData = JSON.stringify(collectionDic)
+
+      ChatRepo.addCollection({
+        collectionType: message.messageType.valueOf() + collectionTypeOffset,
+        collectionData: collectionData,
+        uniqueId: message.messageServerId
+      }).catch((err: BusinessError) => {
+        ErrorUtils.handleErrorToast(err.code)
+      }).finally(() => {
+        NECommonUtils.showToast($r('app.string.chat_collection_success'))
+      })
+    }
   }
 
   // PIN消息
@@ -481,8 +575,41 @@ export class ChatBaseViewModel {
   }
 
   // 发送文本消息
-  async sendTextMessage(text: string) {
+  async sendTextMessage(text: string, replyMsg?: NIMMessageInfo, aitModel?: AitModel, pushList?: string[]) {
     const message = ChatRepo.createTextMessage(text)
+    //设置Ait
+    if (aitModel && aitModel.aitBlocks.size > 0) {
+      let extensionMap: YxAitMsg = {
+        yxAitMsg: aitModel.aitBlocks
+      }
+      let extension = JSON.stringify(instanceToPlain(extensionMap))
+      message.serverExtension = extension
+    }
+
+    //设置推送
+    let params: V2NIMSendMessageParams | undefined = undefined
+    if (pushList) {
+      params = {
+        pushConfig: {
+          forcePush: true,
+          forcePushAccountIds: pushList.length >= 0 ? pushList : undefined
+        }
+      }
+    }
+
+    // 回复
+    if (replyMsg) {
+      this.replyMessage(message, replyMsg.message, params)
+      return
+    }
+
+    this.sendMessage(message, params)
+  }
+
+  // 发送位置消息
+  async sendLocationMessage(data: sceneMap.LocationChoosingResult) {
+    const message = ChatRepo.createLocationMessage(data.location.latitude, data.location.longitude, data.address)
+    message.text = data.name
     this.sendMessage(message)
   }
 
@@ -499,7 +626,7 @@ export class ChatBaseViewModel {
           fileType = subStrings[subStrings.length - 1];
         }
         // 将文件 拷贝到 临时目录
-        const file = fs.openSync(uri, fs.OpenMode.READ_ONLY)
+        const file = await fs.open(uri, fs.OpenMode.READ_ONLY)
         // （以时间戳）生成一个新的文件名
         const fileName = Date.now() + '.' + fileType
         // 通过缓存路径+文件名 拼接出完整的路径
@@ -508,7 +635,7 @@ export class ChatBaseViewModel {
         if (!fs.accessSync(fileDir)) {
           await fs.mkdir(fileDir)
         }
-        fs.copyFileSync(file.fd, copyFilePath)
+        await fs.copyFile(file.fd, copyFilePath)
         const imageSource = image.createImageSource(file.fd);
         let imageInfo = imageSource.getImageInfoSync()
         const message = await ChatRepo.createImageMessage(copyFilePath, file.name, undefined, imageInfo?.size.width,
@@ -517,6 +644,8 @@ export class ChatBaseViewModel {
           this.sendMessageAndSetProgress(message)
         }
         ChatKitClient.runAfterLoggedIn(fn)
+
+        await fs.close(file)
       }
     } catch (err) {
       console.log("net ease send image error", err);
@@ -530,7 +659,7 @@ export class ChatBaseViewModel {
    * @param width 视频宽度
    * @param height 视频高度
    */
-  async sendVideoMessage(uri: string, duration?: number, width?: number, height?: number) {
+  async sendVideoMessage(uri: string, duration?: number, width?: number, height?: number, thumbnail?: PixelMap) {
     try {
       let fileType = ""
       const subStrings = uri.split(".");
@@ -538,7 +667,7 @@ export class ChatBaseViewModel {
         fileType = subStrings[subStrings.length - 1];
       }
       // 将文件 拷贝到 临时目录
-      const file = fs.openSync(uri, fs.OpenMode.READ_ONLY)
+      const file = await fs.open(uri, fs.OpenMode.READ_ONLY)
       // （以时间戳）生成一个新的文件名
       const fileName = Date.now() + '.' + fileType
       // 通过缓存路径+文件名 拼接出完整的路径
@@ -547,12 +676,14 @@ export class ChatBaseViewModel {
       if (!fs.accessSync(fileDir)) {
         await fs.mkdir(fileDir)
       }
-      fs.copyFileSync(file.fd, copyFilePath)
+      await fs.copyFile(file.fd, copyFilePath)
       const message = await ChatRepo.createVideoMessage(copyFilePath, file.name, undefined, duration, width, height);
       const fn: Function = () => {
         this.sendMessageAndSetProgress(message)
       }
       ChatKitClient.runAfterLoggedIn(fn)
+
+      await fs.close(file)
     } catch (err) {
       console.log("net ease send video error", err);
     }
@@ -570,7 +701,7 @@ export class ChatBaseViewModel {
         fileType = subStrings[subStrings.length - 1];
       }
       // 将文件 拷贝到 临时目录
-      const file = fs.openSync(uri, fs.OpenMode.READ_ONLY)
+      const file = await fs.open(uri, fs.OpenMode.READ_ONLY)
       // （以时间戳）生成一个新的文件名
       const fileName = Date.now() + '.' + fileType
       // 通过缓存路径+文件名 拼接出完整的路径
@@ -579,7 +710,7 @@ export class ChatBaseViewModel {
       if (!fs.accessSync(fileDir)) {
         await fs.mkdir(fileDir)
       }
-      fs.copyFileSync(file.fd, copyFilePath)
+      await fs.copyFile(file.fd, copyFilePath)
       const message = await ChatRepo.createFileMessage(copyFilePath, file.name);
       this.sendMessage(message, undefined, (percentage: number) => {
         let msgInfo = this.chatInfo?.getMessage(message.messageClientId)
@@ -591,6 +722,8 @@ export class ChatBaseViewModel {
           }
         }
       });
+
+      await fs.close(file)
     } catch (err) {
       console.log("net ease send file error", err);
     }
@@ -602,8 +735,12 @@ export class ChatBaseViewModel {
    * @param duration 单位 s
    */
   async sendAudioMessage(uri: string, duration: number) {
-    const message = await ChatRepo.createAudioMessage(uri, undefined, undefined, duration * 1000);
-    this.sendMessage(message)
+    try {
+      const message = await ChatRepo.createAudioMessage(uri, undefined, undefined, duration * 1000);
+      this.sendMessage(message)
+    } catch (err) {
+      console.error("net ease send audio message error", err.code, err.message)
+    }
   }
 
   /**
@@ -613,29 +750,44 @@ export class ChatBaseViewModel {
    * @param progress 消息发送进度
    */
   async sendMessage(msg: V2NIMMessage, params?: V2NIMSendMessageParams, progress?: (percentage: number) => void) {
-    try {
-      ChatRepo.sendMessage(this.beforeSendMessage(msg), this.conversationId!!, params, progress)
-    } catch (err) {
-      console.log("net ease send message error", err, msg.sendingState.toString());
-    }
+    ChatRepo.sendMessage(this.beforeSendMessage(msg), this.conversationId!, params, progress)
+      .catch((err: BusinessError) => {
+        console.error("net ease send message error", err.code, err.message);
+        sendMessageFailedTips(msg, err, this.conversationId!)
+      })
+  }
+
+  /**
+   * 回复消息
+   * @param msg 消息
+   * @param replyMsg 被回复的消息
+   * @param params 消息配置参数
+   * @param progress 消息发送进度
+   */
+  async replyMessage(msg: V2NIMMessage, replyMsg: V2NIMMessage, params?: V2NIMSendMessageParams,
+    progress?: (percentage: number) => void) {
+    ChatRepo.replyMessage(this.beforeSendMessage(msg), replyMsg, params, progress)
+      .catch((err: BusinessError) => {
+        console.error("net ease reply message error", err.code, err.message);
+        sendMessageFailedTips(msg, err, this.conversationId!)
+      })
   }
 
   /**
    * 转发消息
    * @param msg 消息体
-   * @param conversationId 转发到某个绘画
+   * @param conversationId 转发到某个会话
    * @param params 消息参数
    * @param progress 消息发送进度
    */
   async sendForwardMessage(msg: V2NIMMessage, conversationId: string, params?: V2NIMSendMessageParams,
     progress?: (percentage: number) => void) {
-    try {
-      ChatRepo.sendMessage(this.beforeSendMessage(msg), conversationId, params, progress)
-    } catch (err) {
-      console.log("net ease send message error", err, msg.sendingState.toString());
-    }
+    ChatRepo.sendMessage(this.beforeSendMessage(msg), conversationId, params, progress)
+      .catch((err: BusinessError) => {
+        console.error("net ease send message error", err.code, err.message);
+        sendMessageFailedTips(msg, err, conversationId)
+      })
   }
-
 
   // 消息附件下载
   async downloadAttachment(msg: NIMMessageInfo, path: string) {
@@ -666,20 +818,21 @@ export class ChatBaseViewModel {
   }
 
   /**
-   * 将多个消息转发到多个会话中，并将留言发送到多个会话中
+   * 【逐条转发】将多个消息转发到多个会话中，并将留言发送到多个会话中
    * @param messages 待转发的消息
-   * @param conversationIds 带转发的会话
+   * @param conversationIds 待转发的会话
    * @param leaveText 留言
    */
-  forwardMessage(messages: NIMMessageInfo[], conversationIds: ConversationSelectModel[],
+  forwardMessage(messages: V2NIMMessage[], conversationIds: ConversationSelectModel[],
     leaveText: string | undefined) {
 
     if (ErrorUtils.checkNetworkAndToast()) {
       conversationIds.forEach((conversation) => {
         messages.forEach((message) => {
-          const forwardMsg = ChatRepo.createForwardMessage(message.message)
+          const forwardMsg = ChatRepo.createForwardMessage(message)
           try {
             if (forwardMsg && conversation.conversationId) {
+              clearForwardAtMark(forwardMsg)
               this.sendForwardMessage(forwardMsg, conversation.conversationId)
             }
           } catch (err) {
@@ -692,12 +845,88 @@ export class ChatBaseViewModel {
           const leaveMsg = ChatRepo.createTextMessage(leaveText)
           if (leaveMsg && conversation.conversationId) {
             setTimeout(() => {
-              ChatRepo.sendMessage(this.beforeSendMessage(leaveMsg), conversation.conversationId ?? '')
+              ChatRepo.sendMessage(this.beforeSendMessage(leaveMsg), conversation.conversationId!)
+                .catch((err: BusinessError) => {
+                  console.error("net ease send message error", err.code, err.message);
+                  sendMessageFailedTips(leaveMsg, err, conversation.conversationId!)
+                })
             }, 200)
           }
         }
       })
     }
+  }
+
+  /**
+   * 将多个消息合并为一条自定义消息
+   * @param messages 待合并的消息
+   * @param depth 合并转发消息的深度
+   */
+  async mergeForwardMessage(messages: NIMMessageInfo[], depth: number): Promise<V2NIMMessage | undefined> {
+    // 校验网络
+    if (ErrorUtils.checkNetworkAndToast()) {
+      // 排序（发送时间正序）
+      let sortMessages = messages.sort((m1, m2) => {
+        if (m1.message.createTime < m2.message.createTime) {
+          return -1
+        }
+        if (m1.message.createTime > m2.message.createTime) {
+          return 1
+        }
+        return 0
+      })
+
+      let rawMessages = sortMessages.map(msg => msg.message)
+      if (this.chatInfo) {
+        try {
+          return await createForwardMessageListFileDetail(rawMessages, this.chatInfo, depth)
+        } catch (err) {
+          console.error(err)
+        }
+      }
+    }
+
+    return undefined
+  }
+
+  // 多选数据，添加新的选中消息
+  addSelectMessage(msg: NIMMessageInfo) {
+    this.selectMsgMap.set(msg.getMessageClientId(), msg)
+    this.chatInfo?.getMessage(msg.getMessageClientId())?.setSelected(true)
+    this.selectMsgCount = this.selectMsgMap.size
+  }
+
+  // 多选数据，移除选中消息
+  removeSelectMessage(msg: NIMMessageInfo) {
+    this.selectMsgMap.delete(msg.getMessageClientId())
+    this.chatInfo?.getMessage(msg.getMessageClientId())?.setSelected(false)
+    this.selectMsgCount = this.selectMsgMap.size
+  }
+
+  // 多选数据，清空所有选中消息
+  clearSelectMessage() {
+    this.selectMsgMap.forEach((msg) => {
+      this.chatInfo?.getMessage(msg.getMessageClientId())?.setSelected(false)
+    })
+    this.selectMsgMap.clear()
+    this.selectMsgCount = this.selectMsgMap.size
+  }
+
+  // 获取多选数据
+  getSelectMessageList(): NIMMessageInfo[] {
+    return Array.from(this.selectMsgMap.values());
+  }
+
+  // 获取多选数据数量
+  getSelectMessageSize(): number {
+    return this.selectMsgMap.size;
+  }
+
+  isSelect(msgClientId: string) {
+    let result = this.selectMsgMap.has(msgClientId)
+    let msg = this.chatInfo?.getMessage(msgClientId)
+    console.debug('netease isSelect', msgClientId, result, ',content:', msg?.message.text)
+    return result
   }
 
   /**

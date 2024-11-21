@@ -1,19 +1,20 @@
 {
   "name": "chatkit",
-  "version": "10.0.0",
+  "version": "10.2.0",
   "description": "Please describe the basic information.",
   "main": "Index.ets",
   "author": "",
   "license": "Apache-2.0",
   "dependencies": {
     "@nimsdk/conversation": "file:../libs/conversation.har",
-    "@nimsdk/conversationgroup": "file:../libs/conversationgroup.har",
     "@nimsdk/message": "file:../libs/message.har",
     "@nimsdk/team": "file:../libs/team.har",
     "@nimsdk/user": "file:../libs/user.har",
     "@nimsdk/friend": "file:../libs/friend.har",
     "@nimsdk/nim": "file:../libs/nim.har",
     "@nimsdk/base": "file:../libs/base.har",
-    "@nimkit/coreKit": "file:../corekit"
+    "@nimkit/coreKit": "file:../corekit",
+    "class-transformer": "^0.5.1",
+    "reflect-metadata": "^0.1.13"
   }
 }

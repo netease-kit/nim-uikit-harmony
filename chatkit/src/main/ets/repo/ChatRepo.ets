@@ -6,6 +6,9 @@
  */
 
 import {
+  V2NIMAddCollectionParams,
+  V2NIMCollection,
+  V2NIMCollectionOption,
   V2NIMMessage,
   V2NIMMessageDeletedNotification,
   V2NIMMessageListOption,
@@ -14,6 +17,7 @@ import {
   V2NIMMessageRefer,
   V2NIMMessageRevokeNotification,
   V2NIMMessageRevokeParams,
+  V2NIMMessageSearchParams,
   V2NIMP2PMessageReadReceipt,
   V2NIMSendMessageParams,
   V2NIMSendMessageResult,
@@ -164,6 +168,16 @@ export class ChatRepo {
   }
 
   /**
+   * 检索云端的消息
+   *
+   * @param params 检索参数
+   */
+  static async searchCloudMessages(params: V2NIMMessageSearchParams): Promise<V2NIMMessage[]> {
+    let messageList = await ChatKitClient.nim.messageService!!.searchCloudMessages(params)
+    return messageList ?? [];
+  }
+
+  /**
    * 发送消息
    *
    * @param message 消息体, 由 V2NIMMessageCreator 的对应方法创建
@@ -195,6 +209,19 @@ export class ChatRepo {
   }
 
   /**
+   * 插入一条本地消息， 该消息不会发送。该消息不会多端同步，只是本端显示
+   * @param message 需要插入的消息体
+   * @param conversationId 会话 ID
+   * @param senderId 消息发送者账号
+   * @param createTime 指定插入消息时间
+   * @returns 插入成功的 message
+   */
+  static async insertMessageToLocal(message: V2NIMMessage, conversationId: string, senderId?: string, createTime?: number): Promise<V2NIMMessage> {
+    const res = ChatKitClient.nim.messageService?.insertMessageToLocal(message, conversationId, senderId, createTime);
+    return res!;
+  }
+
+  /**
    * 撤回消息
    *
    * @param message 需要撤回的消息
@@ -216,6 +243,22 @@ export class ChatRepo {
   static async deleteMessage(message: V2NIMMessage, serverExtension?: string,
     onlyDeleteLocal?: boolean): Promise<void> {
     const res = await ChatKitClient.nim.messageService?.deleteMessage(message, serverExtension, onlyDeleteLocal);
+    return res!;
+  }
+
+  /**
+   * 批量删除消息
+   *
+   * 注: 操作成功后, SDK 会抛出事件 {@link V2NIMMessageListener.onMessageDeletedNotifications | V2NIMMessageListener.onMessageDeletedNotifications} <br/>
+   * - 所删除的消息必须是同一会话的消息 <br/>
+   * - 限制一次最多删除 50 条消息
+   *
+   * @param messages 需要删除的消息
+   * @param serverExtension 扩展字段
+   */
+  static async deleteMessages(messages: V2NIMMessage[], serverExtension?: string,
+    onlyDeleteLocal?: boolean): Promise<void> {
+    const res = await ChatKitClient.nim.messageService?.deleteMessages(messages, serverExtension, onlyDeleteLocal);
     return res!;
   }
 
@@ -250,6 +293,36 @@ export class ChatRepo {
    */
   static async getPinnedMessageList(conversationId: string): Promise<V2NIMMessagePin[]> {
     const res = ChatKitClient.nim.messageService?.getPinnedMessageList(conversationId);
+    return res!;
+  }
+
+  /**
+   * 添加一个收藏
+   *
+   * @param params 添加收藏的相关参数
+   */
+  static async addCollection(params: V2NIMAddCollectionParams): Promise<V2NIMCollection> {
+    const res = await ChatKitClient.nim.messageService?.addCollection(params)
+    return res!;
+  }
+
+  /**
+   * 移除相关收藏
+   *
+   * @param collections 需要移除的相关收藏
+   */
+  static async removeCollections(collections: V2NIMCollection[]): Promise<number> {
+    const res = await ChatKitClient.nim.messageService?.removeCollections(collections)
+    return res!;
+  }
+
+  /**
+   * 按条件分页获取收藏信息
+   *
+   * @param option 查询参数
+   */
+  static async getCollectionListByOption(option: V2NIMCollectionOption): Promise<V2NIMCollection[]>{
+    const res = ChatKitClient.nim.messageService?.getCollectionListByOption(option)
     return res!;
   }
 

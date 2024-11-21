@@ -7,7 +7,7 @@
 
 import { ChatTeamInfo } from '../model/ChatTeamInfo';
 import { ChatBaseViewModel } from './ChatBaseViewModel';
-import { ChatKitClient, ChatRepo, ContactRepo, TeamRepo } from '@nimkit/chatkit';
+import { ChatKitClient, ChatRepo, ContactRepo, TeamMemberCache, TeamRepo } from '@nimkit/chatkit';
 import {
   V2NIMFriend,
   V2NIMMessage,
@@ -30,6 +30,27 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
   @Trace chatTeamInfo: ChatTeamInfo | undefined
   dialogToExit?: () => void
   private needUserMessageList: NIMMessageInfo[] = []
+  //拉取全量成员的阈值
+  private static allMemberLimit = 500
+
+  /**
+   * 是否展示禁言模式
+   * @returns
+   */
+  @Computed
+  get isMuteModel(): boolean {
+    let isMuteModel = false
+    if (this.chatTeamInfo?.getCurrentUserTeamMember()?.memberRole ===
+    V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL) {
+      isMuteModel = this.chatTeamInfo.team?.chatBannedMode ===
+      V2NIMTeamChatBannedMode.V2NIM_TEAM_CHAT_BANNED_MODE_BANNED_NORMAL
+        || this.chatTeamInfo.team?.chatBannedMode === V2NIMTeamChatBannedMode.V2NIM_TEAM_CHAT_BANNED_MODE_BANNED_ALL
+    } else {
+      isMuteModel =
+        this.chatTeamInfo?.team?.chatBannedMode === V2NIMTeamChatBannedMode.V2NIM_TEAM_CHAT_BANNED_MODE_BANNED_ALL
+    }
+    return isMuteModel
+  }
 
   //初始化，获取会话ID和页面UI需要群相关信息ChatTeamInfo
   init(conversationId: string, chatInfo: ChatTeamInfo): void {
@@ -49,6 +70,12 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
     //群消息已读回执
     if (ChatKitConfig.messageReadState) {
       ChatRepo.onReceiveTeamMessageReadReceipts(this.onReceiveMessageReadReceiptFun)
+    }
+    let teamMemberCache = TeamMemberCache.getInstance()
+    let teamId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversationId)
+    teamMemberCache.intTeamInfo(teamId, chatInfo.team)
+    if (chatInfo.team && chatInfo.team.memberCount < ChatTeamViewModel.allMemberLimit) {
+      teamMemberCache.loadAllTeamMember()
     }
   }
 
@@ -71,7 +98,15 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
 
   }
   onReceiveMessageReadReceiptFun = (readReceipts: V2NIMTeamMessageReadReceipt[]) => {
-    this.chatTeamInfo?.setTeamReadReadReceipt(readReceipts)
+    let currentReadReceipt: V2NIMTeamMessageReadReceipt[] = []
+    readReceipts.forEach((item) => {
+      if (this.conversationId == item.conversationId) {
+        currentReadReceipt.push(item)
+      }
+    })
+    if (currentReadReceipt.length > 0) {
+      this.chatTeamInfo?.setTeamReadReadReceipt(currentReadReceipt)
+    }
   }
   teamUpdateFun = (team: V2NIMTeam) => {
     if (team.teamId === ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(this.conversationId)) {
@@ -79,10 +114,26 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
     }
   }
   onTeamMemberJoinedFun = (teamMembers: V2NIMTeamMember[]) => {
-    this.getTeamMemberUserInfo(teamMembers)
+    let currentTeamMember: V2NIMTeamMember[] = []
+    teamMembers.forEach((item) => {
+      if (this.targetId == item.teamId) {
+        currentTeamMember.push(item)
+      }
+    })
+    if (currentTeamMember.length > 0) {
+      this.getTeamMemberUserInfo(teamMembers)
+    }
   }
   onTeamMemberInfoUpdatedFun = (teamMembers: V2NIMTeamMember[]) => {
-    this.chatTeamInfo?.addTeamMember(teamMembers)
+    let currentTeamMember: V2NIMTeamMember[] = []
+    teamMembers.forEach((item) => {
+      if (this.targetId == item.teamId) {
+        currentTeamMember.push(item)
+      }
+    })
+    if (currentTeamMember.length > 0) {
+      this.chatTeamInfo?.addTeamMember(teamMembers)
+    }
   }
   onTeamDismissedFun = (team: V2NIMTeam) => {
     if (team.teamId === this.chatTeamInfo?.team?.teamId) {
@@ -193,30 +244,9 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
     return teamInfo
   }
 
-
-  /**
-   * 是否展示禁言模式
-   * @returns
-   */
-  @Computed
-  get isMuteModel(): boolean {
-    let isMuteModel = false
-    if (this.chatTeamInfo?.getCurrentUserTeamMember()?.memberRole ===
-    V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL) {
-      isMuteModel = this.chatTeamInfo.team?.chatBannedMode ===
-      V2NIMTeamChatBannedMode.V2NIM_TEAM_CHAT_BANNED_MODE_BANNED_NORMAL
-        || this.chatTeamInfo.team?.chatBannedMode === V2NIMTeamChatBannedMode.V2NIM_TEAM_CHAT_BANNED_MODE_BANNED_ALL
-    } else {
-      isMuteModel =
-        this.chatTeamInfo?.team?.chatBannedMode === V2NIMTeamChatBannedMode.V2NIM_TEAM_CHAT_BANNED_MODE_BANNED_ALL
-    }
-    return isMuteModel
-  }
-
-
   //获取群信息和群成员信息，包括群成员信息、用户信息
   getTeamMemberListInfo(accountList: string[]) {
-    TeamRepo.getTeamMemberListByIds(this.accountId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, accountList)
+    TeamRepo.getTeamMemberListByIds(this.targetId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, accountList)
       .then((teamMemberList: V2NIMTeamMember[]) => {
         this.chatTeamInfo?.addTeamMember(teamMemberList)
       })
@@ -269,7 +299,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
       }
     })
     if (requestAccountList.length > 0) {
-      TeamRepo.getTeamMemberListByIds(this.accountId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, requestAccountList)
+      TeamRepo.getTeamMemberListByIds(this.targetId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, requestAccountList)
         .then((teamMemberList: V2NIMTeamMember[]) => {
           if (teamMemberList) {
             this.chatTeamInfo?.addTeamMember(teamMemberList)

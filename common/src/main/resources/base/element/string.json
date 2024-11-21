@@ -135,6 +135,18 @@
     {
       "name": "common_content_empty",
       "value": "暂无内容"
+    },
+    {
+      "name": "team_history_record",
+      "value": "历史记录"
+    },
+    {
+      "name": "exception_description",
+      "value": "异常说明"
+    },
+    {
+      "name": "delete_success",
+      "value": "删除成功"
     }
   ]
 }

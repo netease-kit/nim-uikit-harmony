@@ -79,7 +79,7 @@ export class TeamMemberListViewModel {
 
   onTeamMemberJoined(members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
-      let accIds = members.map(m => m.accountId)
+      let accIds: string[] = members.map(m => m.accountId)
       TeamRepo.getTeamMembersByIds(this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
         accIds).then((newMembers) => {
         this.memberList.push(...newMembers)

@@ -25,6 +25,8 @@ export { NetworkBrokenBuilder } from './src/main/ets/builder/NetworkBrokenBuilde
 
 export { ListGroupHeader } from './src/main/ets/builder/ListGroupHeader';
 
+export { DoubleAlertDialog } from './src/main/ets/builder/DoubleAlertDialog';
+
 export type { ViewItem } from './src/main/ets/model/ViewItem';
 
 export type { ViewItemArrow } from './src/main/ets/model/ViewItemArrow';
@@ -68,4 +70,6 @@ export { ImageViewDialog } from './src/main/ets/ImageViewDialog/ImageViewDialog'
 export { VideoViewerDialog } from './src/main/ets/VideoViewDialog/VideoViewDialog';
 
 export { CommonConfirmDialog } from './src/main/ets/view/CommonConfirmDialog'
+
+export { MatchSearchText } from './src/main/ets/view/MatchSearchText'
 

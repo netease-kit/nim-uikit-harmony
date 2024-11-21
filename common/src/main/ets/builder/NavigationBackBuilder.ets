@@ -113,5 +113,8 @@ export function NavigationBackBuilder(params?: NavigationBackBuilderParams) {
   }
   .height(56)
   .width('100%')
+  .justifyContent(FlexAlign.End)
   .backgroundColor(params?.backgroundColor ?? Color.White)
+  .expandSafeArea([SafeAreaType.KEYBOARD])
+  .zIndex(1)
 }

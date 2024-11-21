@@ -7,17 +7,17 @@
 
 import { V2NIMFriend, V2NIMUser } from '@nimsdk/base';
 
-interface UserWithFriendParams {
+interface NEUserWithFriendParams {
   friend?: V2NIMFriend;
   user?: V2NIMUser;
 }
 
 @ObservedV2
-export class UserWithFriend {
+export class NEUserWithFriend {
   @Trace user?: V2NIMUser
   @Trace friend?: V2NIMFriend
 
-  constructor(params: UserWithFriendParams) {
+  constructor(params: NEUserWithFriendParams) {
     this.friend = params.friend
     if (params.user) {
       this.user = params.user

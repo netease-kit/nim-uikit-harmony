@@ -235,6 +235,27 @@ export struct TeamSettingPage {
             })
 
             Row() {
+              Text($r('app.string.team_history_record'))
+                .fontSize(16)
+                .fontColor('#ff333333')
+
+              Blank().layoutWeight(1)
+
+              Image($r('app.media.arrow_right'))
+                .width(4.92)
+                .height(9.54)
+            }
+            .height(40)
+            .width('100%')
+            .alignItems(VerticalAlign.Center)
+            .onClick(() => {
+              this.pathStack.pushPath({
+                name: 'TeamHistoryPage',
+                param: this.teamViewModel?.teamId,
+              })
+            })
+
+            Row() {
               Text($r("app.string.setting_message_notify"))
                 .fontSize(16)
                 .fontColor('#ff333333')
@@ -581,14 +602,14 @@ export struct TeamSettingPage {
         V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
         invitees
       ).then((accIds) => {
-        console.debug(`inviteMember success ${accIds.join(',')}`)
+        ChatKitClient.logger?.debug(`inviteMember success ${accIds.join(',')}`)
       })
         .catch((e: V2NIMError) => {
-          console.debug(`inviteMember faile ${e.message}`)
+          ChatKitClient.logger?.debug(`inviteMember faile ${e.message}`)
           NECommonUtils.showToast($r('app.string.common_operate_failed'))
         })
     } catch (err) {
-      console.log(err)
+      ChatKitClient.logger?.debug(err)
     }
   }
 

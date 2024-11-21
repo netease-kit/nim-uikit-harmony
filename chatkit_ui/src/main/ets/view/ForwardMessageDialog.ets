@@ -5,9 +5,7 @@
  *
  */
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel'
-import { ChatRepo } from '@nimkit/chatkit/src/main/ets/repo/ChatRepo'
 import { AvatarColorUntil, AvatarItem, CommonAvatar, NECommonUtils } from '@nimkit/common'
-import { V2NIMMessage } from '@nimsdk/base/src/main/ets/nim/sdk/V2NIMMessageService'
 
 /**
  * 转发弹框

@@ -97,7 +97,7 @@ struct TeamManagerListPage {
               //使用监听回调，处理多端同步
               // this.viewModel.addNewManager(selectList)
             }).catch((e: Error) => {
-              console.log(`add manager failed ${e.message}`)
+              ChatKitClient.logger?.debug(`add manager failed ${e.message}`)
               NECommonUtils.showToast($r('app.string.team_add_manager_failed_tip'))
             })
           }
@@ -167,6 +167,12 @@ struct TeamManagerListPage {
                 })
               }
             })
+
+            ListItem() {
+              Column() {
+              }
+              .height(42)
+            }
           }
           .listDirection(Axis.Vertical)
           .onReachEnd(() => {

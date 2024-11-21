@@ -5,17 +5,24 @@
  *
  */
 
-import { ChatKitClient, ErrorUtils, TeamRepo } from '@nimkit/chatkit'
+import {
+    AitAllPermission,
+    ChatKitClient,
+    ErrorUtils,
+    keyExtensionAtAll,
+    TeamRepo,
+    typeExtensionAllowAll,
+    typeExtensionAllowManager
+} from '@nimkit/chatkit'
 import { CommonChooseDialog, NavigationBackBuilder, NECommonUtils } from '@nimkit/common'
 import {
-  V2NIMConnectStatus,
-  V2NIMError,
-  V2NIMErrorCode,
-  V2NIMTeam,
-  V2NIMTeamInviteMode,
-  V2NIMTeamType,
-  V2NIMTeamUpdateInfoMode,
-  V2NIMUpdateTeamInfoParams
+    V2NIMError,
+    V2NIMErrorCode,
+    V2NIMTeam,
+    V2NIMTeamInviteMode,
+    V2NIMTeamType,
+    V2NIMTeamUpdateInfoMode,
+    V2NIMUpdateTeamInfoParams
 } from '@nimsdk/base'
 import { TeamManageViewModel } from '../viewModel/TeamManageViewModel'
 
@@ -66,6 +73,48 @@ struct TeamManagePage {
             const param: V2NIMUpdateTeamInfoParams = {
               inviteMode: index === 1 ? V2NIMTeamInviteMode.V2NIM_TEAM_INVITE_MODE_ALL :
               V2NIMTeamInviteMode.V2NIM_TEAM_INVITE_MODE_MANAGER
+            }
+            TeamRepo.updateTeamInfo(this.viewModel.teamInfo?.teamId,
+              V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, param)
+              .catch((e: V2NIMError) => {
+                if (e.code === V2NIMErrorCode.V2NIM_ERROR_CODE_TEAM_OWNER_OR_MANAGER_OPERATION_PERMISSION_REQUIRED) {
+                  NECommonUtils.showToast($r('app.string.team_operate_no_permission_tip'))
+                }
+              })
+          }
+        }
+      }
+    }),
+    cornerRadius: 0,
+    alignment: DialogAlignment.Bottom,
+    backgroundColor: Color.Transparent,
+    backgroundBlurStyle: BlurStyle.NONE,
+    height: 140,
+  })
+  //编辑群信息选择
+  aitAllPermissionDialog: CustomDialogController = new CustomDialogController({
+    builder: CommonChooseDialog({
+      content1: $r('app.string.team_all_member'),
+      content2: $r('app.string.team_owner_and_manager'),
+      onItemChosen: (index) => {
+        if (this.viewModel.teamInfo) {
+          //判断网络连接状态
+          if (ErrorUtils.checkNetworkAndToast()) {
+            let extension = this.viewModel.teamInfo.serverExtension
+            let permission = index === 1 ? typeExtensionAllowAll : typeExtensionAllowManager
+            if (extension) {
+              let objectExt = JSON.parse(extension) as object
+              objectExt[keyExtensionAtAll] = permission
+              extension = JSON.stringify(objectExt)
+            } else {
+              let jsonObject: AitAllPermission = {
+                yxAllowAt: permission,
+                lastOpt: keyExtensionAtAll
+              }
+              extension = JSON.stringify(jsonObject)
+            }
+            const param: V2NIMUpdateTeamInfoParams = {
+              serverExtension: extension
             }
             TeamRepo.updateTeamInfo(this.viewModel.teamInfo?.teamId,
               V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, param)
@@ -182,6 +231,41 @@ struct TeamManagePage {
           Divider()
             .color('#ffF5F8FC').height(1)
 
+          Row() {
+            Column() {
+              Text($r('app.string.team_ait_permission'))
+                .fontSize(16)
+                .fontColor('#ff333333')
+                .margin({
+                  bottom: 6
+                })
+
+              Text(this.viewModel.getAitAllPermission() === typeExtensionAllowAll ?
+              $r('app.string.team_all_member') : $r('app.string.team_owner_and_manager'))
+                .fontSize(16)
+                .fontColor('#ff999999')
+            }.alignItems(HorizontalAlign.Start)
+
+            Blank().layoutWeight(1)
+
+
+            Image($r('app.media.arrow_right'))
+              .width(4.92)
+              .height(9.54)
+          }
+          .padding({
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: 16
+          })
+          .onClick(() => {
+            this.aitAllPermissionDialog.open()
+          })
+
+          Divider()
+            .color('#ffF5F8FC').height(1)
+
 
           Row() {
             Column() {
@@ -240,6 +324,7 @@ struct TeamManagePage {
   aboutToDisappear(): void {
     this.editTeamInfoDialog.close()
     this.inviteTeamMemberDialog.close()
+    this.aitAllPermissionDialog.close()
     this.viewModel.destroy()
   }
 }

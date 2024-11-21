@@ -8,6 +8,7 @@
 import { ChatKitClient, ChatRepo, NEUserWithFriend, PersonSelectParam, TeamRepo } from '@nimkit/chatkit';
 import { CommonEmptyResult, NetworkBrokenBuilder } from '@nimkit/common';
 import { V2NIMConversation, V2NIMConversationType } from '@nimsdk/base';
+import { AitServer } from '../service/ait/AitService';
 import { ConversationViewItem } from '../view/ConversationViewItem';
 import { ConversationViewModel } from '../viewmodel/ConversationViewModel';
 
@@ -19,6 +20,8 @@ export struct ConversationPage {
 
   aboutToAppear(): void {
     this.viewModel.onUreadMessageChange = this.onUreadMessageChange
+    //初始化@ 服务
+    AitServer.instance.init()
     this.viewModel.initConversation()
   }
 
@@ -41,6 +44,7 @@ export struct ConversationPage {
               ListItem() {
                 ConversationViewItem({
                   conversationInfo: item,
+                  haveBeanAit: this.viewModel.aitConversationList.has(item.conversationId),
                   onItemClick: () => {
                     //goto ChatPage
                     this.goToChatPage(item)

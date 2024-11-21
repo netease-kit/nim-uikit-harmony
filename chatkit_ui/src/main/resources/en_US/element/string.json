@@ -57,6 +57,10 @@
       "value": "Camera"
     },
     {
+      "name": "chat_send_location",
+      "value": "Location"
+    },
+    {
       "name": "chat_send_file",
       "value": "File"
     },
@@ -81,8 +85,20 @@
       "value": "history of %s"
     },
     {
+      "name": "chat_merged_message_title",
+      "value": "Message From %s"
+    },
+    {
+      "name": "chat_merged_message_desc",
+      "value": "Chat history"
+    },
+    {
       "name": "chat_operation_delete",
       "value": "delete"
+    },
+    {
+      "name": "chat_reply_not_exist",
+      "value": "This message is gone"
     },
     {
       "name": "chat_operation_undo",
@@ -95,6 +111,14 @@
     {
       "name": "chat_operation_unpin",
       "value": "Unpin"
+    },
+    {
+      "name": "chat_operation_collection",
+      "value": "Collection"
+    },
+    {
+      "name": "chat_collection_success",
+      "value": "Favorite"
     },
     {
       "name": "chat_msg_undo_tips",
@@ -221,6 +245,10 @@
       "value": "Used to send audio message"
     },
     {
+      "name": "chat_permission_location_desc",
+      "value": "Used to send location message"
+    },
+    {
       "name": "chat_speak_too_short",
       "value": "chat speak too short"
     },
@@ -283,6 +311,58 @@
     {
       "name": "chat_message_copy_success_tips",
       "value": "Copy success"
+    },
+    {
+      "name": "team_history_record_tip",
+      "value": "search message history"
+    },
+    {
+      "name": "team_history_record_empty_tip",
+      "value": "No message history"
+    },
+    {
+      "name": "chat_message_ait_select_tips",
+      "value": "Select Notification"
+    },
+    {
+      "name": "chat_team_ait_all",
+      "value": "Everyone"
+    },
+    {
+      "name": "chat_forward_limit",
+      "value": "%s limits %d messages"
+    },
+    {
+      "name": "multiForward_exist_invalid",
+      "value": "There are messages cannot be forwarded. Can it be removed and sent?"
+    },
+    {
+      "name": "file_md5_check_failed",
+      "value": "File verification failed"
+    },
+    {
+      "name": "chat_multi_delete_limit_tips",
+      "value": "Delete limits 50 messages"
+    },
+    {
+      "name": "chat_single_forward_limit_tips",
+      "value": "Forward one by one to limit 10 message"
+    },
+    {
+      "name": "chat_multi_forward_limit_tips",
+      "value": "Delete limits 50 messages"
+    },
+    {
+      "name": "chat_multi_forward_failed",
+      "value": "The system is abnormal. Forwarding fails"
+    },
+    {
+      "name": "chat_team_at_permission_manager_tips",
+      "value": "Update Only admin and manager can @all"
+    },
+    {
+      "name": "chat_team_at_permission_all_tips",
+      "value": "Update Everyone can @all"
     }
   ]
 }

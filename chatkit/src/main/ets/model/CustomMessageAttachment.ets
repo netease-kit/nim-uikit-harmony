@@ -5,27 +5,23 @@
  *
  */
 
-// 用于显示合并后的消息的发送方Nick的key
-export const mergedMessageNickKey: string = 'mergedMessageNickKey';
-
-// 用于显示合并后的消息的发送方avatar的key
-export const mergedMessageAvatarKey: string = 'mergedMessageAvatarKey';
-
-
-//默认合并转发最大深度
-export const defaultMaxDepth: number = 3;
+// 自定义消息附件
+export interface CustomMessageAttachment {
+  // 自定义消息类型
+  type?: string;
+}
 
 // 合并消息
-export interface MergedMessage {
+export interface MergedMessageAttachment extends CustomMessageAttachment {
 
   // 会话id
-  sessionId: string;
+  sessionId?: string;
 
   // 会话名称
-  sessionName: string;
+  sessionName?: string;
 
   // 合并消息上传NOS后的url
-  url: string;
+  url?: string;
 
   // 合并消息文件的md5
   md5?: string;
@@ -34,7 +30,7 @@ export interface MergedMessage {
   depth?: number;
 
   // 合并消息的摘要，用于在消息列表展示，默认三条
-  abstracts: MergeMessageAbstract[];
+  abstracts?: MergeMessageAbstract[];
 
   // 合并消息的id，用于标识合并消息
   // 通[NIMMessage.uuid]获取
