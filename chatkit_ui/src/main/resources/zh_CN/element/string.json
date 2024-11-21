@@ -69,8 +69,20 @@
       "value": "复制"
     },
     {
+      "name": "chat_operation_reply",
+      "value": "回复 "
+    },
+    {
+      "name": "chat_input_reply_text",
+      "value": "回复 | "
+    },
+    {
       "name": "chat_operation_forward",
       "value": "转发"
+    },
+    {
+      "name": "chat_operation_multi_select",
+      "value": "多选"
     },
     {
       "name": "chat_operation_collection",
@@ -179,6 +191,14 @@
     {
       "name": "chat_team_error_tip_content",
       "value": "您已被移出群聊或该群聊已被解散"
+    },
+    {
+      "name": "chat_team_error_tip_title",
+      "value": "提示"
+    },
+    {
+      "name": "chat_msg_download_tips",
+      "value": "消息正在下载中..."
     },
     {
       "name": "chat_setting",
@@ -363,6 +383,21 @@
     {
       "name": "chat_team_at_permission_all_tips",
       "value": "更新@所有人权限更新为所有人"
+    },    {
+      "name": "mine_remove_collection_tip",
+      "value": "确认要删除该收藏吗？"
+    },
+    {
+      "name": "mine_collection_empty",
+      "value": "暂无收藏消息"
+    },
+    {
+      "name": "mine_collection_from_team",
+      "value": "来自于 %s"
+    },
+    {
+      "name": "mine_collection_from_p2p",
+      "value": "来自于 与%s的会话"
     }
   ]
 }
