@@ -32,14 +32,14 @@ export struct MinePage {
       titleFontSize: 16,
       routerUrl: "SettingPage"
     },
-    // {
-    //   avatarItem: new AvatarItem($r('app.media.mine_collection')),
-    //   title: $r("app.string.mine_collection"),
-    //   itemHeight: 52,
-    //   titleIconSize: 24,
-    //   titleFontSize: 16,
-    //   routerUrl: "Mine/"
-    // },
+    {
+      avatarItem: new AvatarItem($r('app.media.mine_collection')),
+      title: $r("app.string.chat_operation_collection"),
+      itemHeight: 52,
+      titleIconSize: 24,
+      titleFontSize: 16,
+      routerUrl: "CollectionMessagePage"
+    },
     {
       avatarItem: new AvatarItem($r('app.media.mine_about')),
       title: $r("app.string.mine_about"),

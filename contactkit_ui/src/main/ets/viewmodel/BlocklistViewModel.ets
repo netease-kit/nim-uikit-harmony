@@ -11,7 +11,6 @@ import { V2NIMFriend, V2NIMUser } from '@nimsdk/base'
 @ObservedV2
 export class BlocklistViewModel {
   @Trace blockList: NEUserWithFriend[] = []
-
   updateUserInfoFun = async (users: V2NIMUser[]) => {
     for (const user of users) {
       if (NEFriendUserCache.getInstance().isBlockAccount(user.accountId)) {

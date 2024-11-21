@@ -55,6 +55,14 @@
       "data": {
         "description": "this is merge message detail page"
       }
+    },
+    {
+      "name": "CollectionMessagePage",
+      "pageSourceFile": "src/main/ets/pages/CollectionMessagePage.ets",
+      "buildFunction": "CollectionMessagePageBuilder",
+      "data": {
+        "description": "this is collection message page"
+      }
     }
   ]
 }

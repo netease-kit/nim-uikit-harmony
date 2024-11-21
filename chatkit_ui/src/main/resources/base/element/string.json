@@ -383,6 +383,22 @@
     {
       "name": "chat_team_at_permission_all_tips",
       "value": "更新@所有人权限更新为所有人"
+    },
+    {
+      "name": "mine_remove_collection_tip",
+      "value": "确认要删除该收藏吗？"
+    },
+    {
+      "name": "mine_collection_empty",
+      "value": "暂无收藏消息"
+    },
+    {
+      "name": "mine_collection_from_team",
+      "value": "来自于 %s"
+    },
+    {
+      "name": "mine_collection_from_p2p",
+      "value": "来自于 与%s的会话"
     }
   ]
 }

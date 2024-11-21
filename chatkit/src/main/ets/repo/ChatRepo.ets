@@ -216,7 +216,8 @@ export class ChatRepo {
    * @param createTime 指定插入消息时间
    * @returns 插入成功的 message
    */
-  static async insertMessageToLocal(message: V2NIMMessage, conversationId: string, senderId?: string, createTime?: number): Promise<V2NIMMessage> {
+  static async insertMessageToLocal(message: V2NIMMessage, conversationId: string, senderId?: string,
+    createTime?: number): Promise<V2NIMMessage> {
     const res = ChatKitClient.nim.messageService?.insertMessageToLocal(message, conversationId, senderId, createTime);
     return res!;
   }
@@ -321,7 +322,7 @@ export class ChatRepo {
    *
    * @param option 查询参数
    */
-  static async getCollectionListByOption(option: V2NIMCollectionOption): Promise<V2NIMCollection[]>{
+  static async getCollectionListByOption(option: V2NIMCollectionOption): Promise<V2NIMCollection[]> {
     const res = ChatKitClient.nim.messageService?.getCollectionListByOption(option)
     return res!;
   }

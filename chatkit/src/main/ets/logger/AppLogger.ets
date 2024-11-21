@@ -6,7 +6,7 @@
  */
 
 import { LogLevel } from '@nimsdk/base'
-import {LoggerKitImpl} from './LoggerKitImpl'
+import { LoggerKitImpl } from './LoggerKitImpl'
 
 export class KitLogger {
   private core: LoggerKitImpl

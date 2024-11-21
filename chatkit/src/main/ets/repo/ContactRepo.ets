@@ -6,20 +6,20 @@
  */
 
 import {
-    V2NIMCheckFriendResult,
-    V2NIMFriend,
-    V2NIMFriendAddApplication,
-    V2NIMFriendAddApplicationQueryOption,
-    V2NIMFriendAddApplicationResult,
-    V2NIMFriendAddParams,
-    V2NIMFriendDeleteParams,
-    V2NIMFriendDeletionType,
-    V2NIMFriendSearchOption,
-    V2NIMFriendSetParams,
-    V2NIMLoginStatus,
-    V2NIMUser,
-    V2NIMUserSearchOption,
-    V2NIMUserUpdateParams
+  V2NIMCheckFriendResult,
+  V2NIMFriend,
+  V2NIMFriendAddApplication,
+  V2NIMFriendAddApplicationQueryOption,
+  V2NIMFriendAddApplicationResult,
+  V2NIMFriendAddParams,
+  V2NIMFriendDeleteParams,
+  V2NIMFriendDeletionType,
+  V2NIMFriendSearchOption,
+  V2NIMFriendSetParams,
+  V2NIMLoginStatus,
+  V2NIMUser,
+  V2NIMUserSearchOption,
+  V2NIMUserUpdateParams
 } from '@nimsdk/base';
 import { ChatKitClient } from '../ChatKitClient';
 import { NEUserWithFriend } from '../model/NEUserWithFriend';
@@ -27,7 +27,6 @@ import { NEFriendUserCache } from '../NEFriendUserCache';
 
 export class ContactRepo {
   public static listener = getContext(this).eventHub
-
   static onBlockListAddedFun = async (user: V2NIMUser) => {
     NEFriendUserCache.getInstance().addBlockAccount(user.accountId)
   }
@@ -53,7 +52,7 @@ export class ContactRepo {
       }
     })
 
-      ContactRepo.listener.emit('updateUserInfo', users)
+    ContactRepo.listener.emit('updateUserInfo', users)
   }
   static onBlockListRemovedFun = (accountId: string) => {
     NEFriendUserCache.getInstance().removeBlockAccount(accountId)

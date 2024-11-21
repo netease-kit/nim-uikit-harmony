@@ -165,13 +165,11 @@ export class ChatKitClient {
     console.debug(`Performance Test onSyncFinishedFun`)
     ChatKitClient.haveSyncedConversation = true
   }
-
   private static dataSyncFun = (type: V2NIMDataSyncType, state: V2NIMDataSyncState, error?: V2NIMError) => {
     if (state === V2NIMDataSyncState.V2NIM_DATA_SYNC_STATE_COMPLETED) {
       NEFriendUserCache.getInstance()
     }
   }
-
   private static onRevokeFun = (messages: V2NIMMessageRevokeNotification[]) => {
     messages.forEach((msg, index, messages) => {
       if (msg.messageRefer.conversationId !== ChatKitClient.currentConversationId) {

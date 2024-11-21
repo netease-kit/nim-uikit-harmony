@@ -7,12 +7,12 @@
 
 import { ErrorUtils } from '@nimkit/chatkit'
 import {
-    AvatarColorUntil,
-    AvatarItem,
-    CommonAvatar,
-    CommonEmptyResult,
-    NavigationBackBuilder,
-    NECommonUtils
+  AvatarColorUntil,
+  AvatarItem,
+  CommonAvatar,
+  CommonEmptyResult,
+  NavigationBackBuilder,
+  NECommonUtils
 } from '@nimkit/common'
 import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
 import { TeamMemberSelectorViewModel } from '../viewModel/TeamMemberSelectorViewModel'
