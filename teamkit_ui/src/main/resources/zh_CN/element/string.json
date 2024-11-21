@@ -155,6 +155,10 @@
     {
       "name": "team_group_left_content",
       "value": "是否退出讨论组?"
+    },
+    {
+      "name": "team_ait_permission",
+      "value": "谁可以@所有人"
     }
   ]
 }

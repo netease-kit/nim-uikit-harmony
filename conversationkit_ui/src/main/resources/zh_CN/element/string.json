@@ -33,52 +33,8 @@
       "value": "上拉加载更多"
     },
     {
-      "name": "chatMessageNonsupportType",
-      "value": "[当前版本暂不支持该消息体]"
-    },
-    {
-      "name": "audioMessageType",
-      "value": "[语音]"
-    },
-    {
-      "name": "imageMessageType",
-      "value": "[图片]"
-    },
-    {
-      "name": "videoMessageType",
-      "value": "[视频]"
-    },
-    {
-      "name": "locationMessageType",
-      "value": "[位置]"
-    },
-    {
-      "name": "fileMessageType",
-      "value": "[文件]"
-    },
-    {
-      "name": "notificationMessageType",
-      "value": "[通知消息]"
-    },
-    {
-      "name": "tipMessageType",
-      "value": "[提醒消息]"
-    },
-    {
-      "name": "chatHistoryBrief",
-      "value": "[聊天记录]"
-    },
-    {
       "name": "createAdvancedTeamSuccess",
       "value": "成功创建高级群"
-    },
-    {
-      "name": "msg_type_rtc_video",
-      "value": "[视频通话]"
-    },
-    {
-      "name": "msg_type_rtc_audio",
-      "value": "[语音通话]"
     }
   ]
 }

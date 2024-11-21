@@ -7,7 +7,7 @@
 
 import { ChatTeamInfo } from '../model/ChatTeamInfo';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
-import { MessageComponent } from '../view/MessageComponent';
+import { PinMessageComponent } from '../view/MessageComponent';
 import { NEEmojiManager } from '../manager/NEEmojiManager';
 import {
   CommonEmptyResult,
@@ -33,10 +33,18 @@ import { ConversationSelectParam } from '@nimkit/chatkit/src/main/ets/model/Conv
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog';
 import { ChatPinViewModel } from '../viewmodel/ChatPinViewModel';
-import { ErrorUtils } from '@nimkit/chatkit';
+import {
+  conversationSelectLimitCount,
+  CustomMessageUtils,
+  ErrorUtils,
+  MergedMessageAttachment,
+  mergedMessageCustomType
+} from '@nimkit/chatkit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { ChatBaseViewModel } from '../viewmodel/ChatBaseViewModel';
 import { AudioPlayerManager } from '../manager/AudioPlayerManager';
+import { common } from '@kit.AbilityKit';
+import { showLocationDetail } from '../common/ChatUtils';
 
 @CustomDialog
 export struct PinMoreActionDialog {
@@ -180,16 +188,6 @@ export struct PinMessagePage {
   @Local forwardMessages: NIMMessageInfo[] = []
   @Local forwardConversations: ConversationSelectModel[] = []
   @Local currentConversationName?: string
-  private listScroller: Scroller = new Scroller()
-  private scrollIndex: number = 0
-  forwardMessageClick = () => {
-    if (ErrorUtils.checkNetworkAndToast()) {
-      this.pathStack.pushPath({
-        name: 'ConversationSelectPage',
-        param: new ConversationSelectParam([], 9, this.forwardMessageAction)
-      })
-    }
-  }
   forwardMessageDialog = new CustomDialogController({
     builder: ForwardMessageDialog({
       conversationList: this.forwardConversations,
@@ -203,6 +201,14 @@ export struct PinMessagePage {
     height: 250,
     width: 276,
   })
+  forwardMessageClick = () => {
+    if (ErrorUtils.checkNetworkAndToast()) {
+      this.pathStack.pushPath({
+        name: 'ConversationSelectPage',
+        param: new ConversationSelectParam([], conversationSelectLimitCount, this.forwardMessageAction)
+      })
+    }
+  }
   pinMoreActionDialog: CustomDialogController = new CustomDialogController({
     builder: PinMoreActionDialog({
       message: this.tapMessage,
@@ -225,6 +231,8 @@ export struct PinMessagePage {
     width: '100%',
     customStyle: true
   })
+  private listScroller: Scroller = new Scroller()
+  private scrollIndex: number = 0
 
   @Monitor("viewModel.topInsert")
   scrollToTop() {
@@ -282,7 +290,7 @@ export struct PinMessagePage {
   }
 
   showVideoDetail(msg: NIMMessageInfo) {
-    //点击视频消息前关闭所以音频
+    //点击视频消息前关闭所有音频
     AudioPlayerManager.instance.stopPlayAll()
     this.videoFileUrl = getMessageVideoUrl(msg, this.chatTeamInfo)
     this.videoRatio = getMessageVideoRatio(msg)
@@ -313,10 +321,9 @@ export struct PinMessagePage {
         List({ space: 12, scroller: this.listScroller }) {
           LazyForEach(this.chatTeamInfo.msgList, (msg: NIMMessageInfo) => {
             ListItem() {
-              MessageComponent({
-                isPinPage: true,
+              PinMessageComponent({
                 message: msg,
-                chatInfo: this.chatTeamInfo,
+                chatUserInfo: this.chatTeamInfo,
                 onMessageClick: {
                   onAvatarClick: undefined,
                   onItemLongClick: undefined,
@@ -330,6 +337,22 @@ export struct PinMessagePage {
                       this.showVideoDetail(msg)
                     } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
                       this.textMessageDetailDialog.open()
+                    } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
+                      showLocationDetail(msg, getContext(this) as common.UIAbilityContext)
+                    } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM) {
+                      const attachment = msg.message.attachment
+                      if (attachment) {
+                        const type = CustomMessageUtils.typeOfCustomMessage(attachment)
+                        if (type === mergedMessageCustomType) {
+                          let data = CustomMessageUtils.dataOfCustomMessage(attachment)
+                          if (data as MergedMessageAttachment) {
+                            this.pathStack.pushPath({
+                              name: 'MergeMessageDetailPage',
+                              param: data as MergedMessageAttachment
+                            })
+                          }
+                        }
+                      }
                     }
                   }
                 },
@@ -347,7 +370,6 @@ export struct PinMessagePage {
                       this.pathStack.popToName('ChatP2PPage')
                     } else if (msg.message.conversationType == V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
                       this.pathStack.popToName('ChatTeamPage')
-
                     }
                   }
                 }

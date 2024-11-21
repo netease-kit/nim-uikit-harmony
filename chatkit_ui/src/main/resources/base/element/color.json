@@ -47,6 +47,22 @@
     {
       "name": "color_chat_pin_tips",
       "value": "#3EAF96"
+    },
+    {
+      "name": "color_chat_op_bg",
+      "value": "#EFF1F3"
+    },
+    {
+      "name": "color_chat_bottom_bg",
+      "value": "#EFF1F2"
+    },
+    {
+      "name": "color_chat_divider_line",
+      "value": "#F0F1F5"
+    },
+    {
+      "name": "color_chat_mute_bg",
+      "value": "#ffE3E4E4"
     }
   ]
 }

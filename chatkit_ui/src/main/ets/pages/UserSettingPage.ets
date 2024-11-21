@@ -14,7 +14,6 @@ import {
   PersonSelectParam,
   TeamRepo
 } from '@nimkit/chatkit'
-import { ChatP2PViewModel } from '../viewmodel/ChatP2PViewModel'
 import {
   AvatarColorUntil,
   AvatarItem,

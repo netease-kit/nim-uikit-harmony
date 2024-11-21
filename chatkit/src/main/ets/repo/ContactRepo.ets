@@ -6,26 +6,28 @@
  */
 
 import {
-  V2NIMCheckFriendResult,
-  V2NIMFriend,
-  V2NIMFriendAddApplication,
-  V2NIMFriendAddApplicationQueryOption,
-  V2NIMFriendAddApplicationResult,
-  V2NIMFriendAddParams,
-  V2NIMFriendDeleteParams,
-  V2NIMFriendDeletionType,
-  V2NIMFriendSearchOption,
-  V2NIMFriendSetParams,
-  V2NIMLoginStatus,
-  V2NIMUser,
-  V2NIMUserSearchOption,
-  V2NIMUserUpdateParams
+    V2NIMCheckFriendResult,
+    V2NIMFriend,
+    V2NIMFriendAddApplication,
+    V2NIMFriendAddApplicationQueryOption,
+    V2NIMFriendAddApplicationResult,
+    V2NIMFriendAddParams,
+    V2NIMFriendDeleteParams,
+    V2NIMFriendDeletionType,
+    V2NIMFriendSearchOption,
+    V2NIMFriendSetParams,
+    V2NIMLoginStatus,
+    V2NIMUser,
+    V2NIMUserSearchOption,
+    V2NIMUserUpdateParams
 } from '@nimsdk/base';
 import { ChatKitClient } from '../ChatKitClient';
-import { UserWithFriend } from '../model/UserWithFriend';
+import { NEUserWithFriend } from '../model/NEUserWithFriend';
 import { NEFriendUserCache } from '../NEFriendUserCache';
 
 export class ContactRepo {
+  public static listener = getContext(this).eventHub
+
   static onBlockListAddedFun = async (user: V2NIMUser) => {
     NEFriendUserCache.getInstance().addBlockAccount(user.accountId)
   }
@@ -51,7 +53,7 @@ export class ContactRepo {
       }
     })
 
-    NEFriendUserCache.getInstance().listener.emit('updateUserInfo', users)
+      ContactRepo.listener.emit('updateUserInfo', users)
   }
   static onBlockListRemovedFun = (accountId: string) => {
     NEFriendUserCache.getInstance().removeBlockAccount(accountId)
@@ -61,7 +63,7 @@ export class ContactRepo {
       friend: friend
     })
     ContactRepo.removeUserFromBlockList(friend.accountId)
-    NEFriendUserCache.getInstance().listener.emit('updateFriendInfo', friend)
+    ContactRepo.listener.emit('updateFriendInfo', friend)
   }
   static onFriendDeletedFun = (accountId: string, deletionType: V2NIMFriendDeletionType) => {
     NEFriendUserCache.getInstance().removeFriendInfo(accountId)
@@ -70,7 +72,7 @@ export class ContactRepo {
     NEFriendUserCache.getInstance().updateFriendInfo({
       friend: friend
     })
-    NEFriendUserCache.getInstance().listener.emit('updateFriendInfo', friend)
+    ContactRepo.listener.emit('updateFriendInfo', friend)
   }
 
   static addListener() {
@@ -116,7 +118,7 @@ export class ContactRepo {
     userList.forEach((user) => {
       const accountId = user.accountId
       if (accountId === ChatKitClient.getLoginUserId()) {
-        NEFriendUserCache.mineUserCache = new UserWithFriend({
+        NEFriendUserCache.mineUserCache = new NEUserWithFriend({
           user: user
         })
       }
@@ -129,7 +131,7 @@ export class ContactRepo {
       }
     })
 
-    NEFriendUserCache.getInstance().listener.emit('updateUserInfo', friendList)
+    ContactRepo.listener.emit('updateUserInfo', friendList)
 
     return userList
   }
@@ -254,15 +256,15 @@ export class ContactRepo {
    *
    * @param accountIds 用户 ID 列表
    */
-  static async getUserWithFriendByIds(accountIds: string[]): Promise<UserWithFriend[]> {
-    let userWithFriends: UserWithFriend[] = []
+  static async getUserWithFriendByIds(accountIds: string[]): Promise<NEUserWithFriend[]> {
+    let userWithFriends: NEUserWithFriend[] = []
     const users = await ContactRepo.getUserListFromCloud(accountIds)
     const friends = await ContactRepo.getFriendByIds(accountIds)
 
-    let friendsMap: Map<string, UserWithFriend> = new Map<string, UserWithFriend>()
+    let friendsMap: Map<string, NEUserWithFriend> = new Map<string, NEUserWithFriend>()
     for (const friend of friends) {
       if (friend.accountId) {
-        friendsMap.set(friend.accountId, new UserWithFriend({
+        friendsMap.set(friend.accountId, new NEUserWithFriend({
           friend: friend
         }))
       }
@@ -271,7 +273,7 @@ export class ContactRepo {
 
     for (const user of users) {
       const friend = friendsMap.get(user.accountId)?.friend
-      let userWithFriend: UserWithFriend = new UserWithFriend({
+      let userWithFriend: NEUserWithFriend = new NEUserWithFriend({
         friend: friend,
         user: user
       })

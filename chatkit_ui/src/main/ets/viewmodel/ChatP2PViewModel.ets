@@ -110,15 +110,15 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
   }
 
   async getUserInfo() {
-    const userList = await ContactRepo.getUserList([this.accountId, ChatKitClient.getLoginUserId()]);
+    const userList = await ContactRepo.getUserList([this.targetId, ChatKitClient.getLoginUserId()]);
     if (userList.length > 1) {
-      let currentUser = userList[0].accountId == this.accountId ? userList[1] : userList[0];
-      let chatUser = userList[0].accountId == this.accountId ? userList[0] : userList[1];
+      let currentUser = userList[0].accountId == this.targetId ? userList[1] : userList[0];
+      let chatUser = userList[0].accountId == this.targetId ? userList[0] : userList[1];
       this.chatUserInfo?.setCurrentUser(currentUser);
       this.chatUserInfo?.setChatUser(chatUser);
     } else if (userList.length == 1) {
-      let currentUser = userList[0].accountId == this.accountId ? undefined : userList[0];
-      let chatUser = userList[0].accountId == this.accountId ? userList[0] : undefined;
+      let currentUser = userList[0].accountId == this.targetId ? undefined : userList[0];
+      let chatUser = userList[0].accountId == this.targetId ? userList[0] : undefined;
       this.chatUserInfo?.setCurrentUser(currentUser);
       this.chatUserInfo?.setChatUser(chatUser);
     }
@@ -153,7 +153,7 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
    */
   async setP2PNotify(isOn: boolean) {
     try {
-      await SettingRepo.setP2PMessageMuteMode(this.accountId,
+      await SettingRepo.setP2PMessageMuteMode(this.targetId,
         isOn ? V2NIMP2PMessageMuteMode.V2NIM_P2P_MESSAGE_MUTE_MODE_OFF :
         V2NIMP2PMessageMuteMode.V2NIM_P2P_MESSAGE_MUTE_MODE_ON)
       this.isMessageNotify = isOn

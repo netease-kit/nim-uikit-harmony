@@ -44,23 +44,29 @@ export class ChatInfo {
     return '';
   };
 
-  getChatUserAvatarUrl(accountId: string): string {
+  getChatUserAvatarUrl(param?: string | V2NIMMessage): string {
     return '';
   };
 
-  getChatUserAvatarName(accountId: string): string {
-    return accountId;
+  getChatUserAvatarName(param?: string | V2NIMMessage): string {
+    if (param as V2NIMMessage) {
+      return (param as V2NIMMessage).senderId
+    }
+    return param as string;
   };
 
-  getChatUserShowName(accountId: string): string {
-    return accountId;
+  getChatUserShowName(param?: string | V2NIMMessage, alias: boolean = true, teamNick: boolean = true): string {
+    if (param as V2NIMMessage) {
+      return (param as V2NIMMessage).senderId
+    }
+    return param as string;
   };
 
   getCurrentUserShowName(): string {
     return this.targetId;
   };
 
-  getCurrentUserAvatarUrl(): string {
+  getCurrentUserAvatarUrl(message?: V2NIMMessage): string {
     return '';
   };
 
@@ -68,16 +74,18 @@ export class ChatInfo {
     return this.targetId;
   };
 
-  updateMessageStatus(message: V2NIMMessage) {
+  updateMessageStatus(message: V2NIMMessage): boolean {
     if (message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SENDING) {
-      return;
+      return false
     }
     let targetMessage =
       this.msgList.getMessageList().find(msg => msg.message.messageClientId === message.messageClientId);
     if (targetMessage !== undefined) {
       targetMessage.updateMessageStatus(message)
+      return true
     } else {
       this.insertMessage(message)
+      return false
     }
   }
 

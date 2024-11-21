@@ -5,7 +5,6 @@
  *
  */
 
-import { router } from '@kit.ArkUI';
 import { ChatKitClient, ContactRepo, ErrorUtils } from '@nimkit/chatkit';
 import { NavigationBackBuilder, NECommonUtils } from '@nimkit/common';
 import { EditType } from '../model/MineInfoItem';

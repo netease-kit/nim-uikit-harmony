@@ -5,7 +5,7 @@
  *
  */
 
-import { TeamRepo } from '@nimkit/chatkit'
+import { ChatKitClient, TeamRepo } from '@nimkit/chatkit'
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -158,7 +158,7 @@ struct TeamInfoPage {
             V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
             params
           ).catch((e: Error) => {
-            console.debug(`update team info error:${e.message}`)
+            ChatKitClient.logger?.debug(`update team info error:${e.message}`)
             NECommonUtils.showToast($r('app.string.common_operate_failed'))
           })
         }
@@ -190,7 +190,7 @@ struct TeamInfoPage {
             V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
             params
           ).catch((e: Error) => {
-            console.debug(`update team info error:${e.message}`)
+            ChatKitClient.logger?.debug(`update team info error:${e.message}`)
             NECommonUtils.showToast($r('app.string.common_operate_failed'))
           })
         }
@@ -226,7 +226,7 @@ struct TeamInfoPage {
             V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
             params
           ).catch((e: Error) => {
-            console.debug(`update team info error:${e.message}`)
+            ChatKitClient.logger?.debug(`update team info error:${e.message}`)
             NECommonUtils.showToast($r('app.string.common_operate_failed'))
           })
         }

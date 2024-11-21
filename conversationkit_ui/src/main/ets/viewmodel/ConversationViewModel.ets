@@ -16,6 +16,7 @@ import {
   V2NIMTeamType
 } from '@nimsdk/base'
 import { Constant } from '../loader/Constant'
+import { AitServer, AitSession, AitSessionChangeEvent } from '../service/ait/AitService'
 
 @ObservedV2
 export class ConversationViewModel {
@@ -31,6 +32,8 @@ export class ConversationViewModel {
   private offset: number = 0
   //每次请求拉取的上限
   private limit: number = Constant.PAGE_SIZE
+  //被@的会话
+  @Trace aitConversationList: Set<string> = new Set()
 
   //会话排序
   sortConversation(a: V2NIMConversation, b: V2NIMConversation): number {
@@ -46,7 +49,7 @@ export class ConversationViewModel {
     ChatKitClient.nim.conversationService?.on('onSyncFinished',
       () => {
         //同步完成拉一次
-        console.debug(`${ConversationViewModel.logTag} onSyncFinished`)
+        ChatKitClient.logger?.debug(`${ConversationViewModel.logTag} onSyncFinished`)
         this.loadConversation(0)
       }
     )
@@ -71,7 +74,7 @@ export class ConversationViewModel {
 
     //好友信息变更修改
     ChatKitClient.nim.friendService?.on('onFriendInfoChanged', async (friend: V2NIMFriend) => {
-      console.debug(`${ConversationViewModel.logTag} onFriendInfoChanged ${friend.accountId} alias = ${friend.alias}`)
+      ChatKitClient.logger?.debug(`${ConversationViewModel.logTag} onFriendInfoChanged ${friend.accountId} alias = ${friend.alias}`)
       await this.updateConversationById(ChatKitClient.nim.conversationIdUtil.p2pConversationId(friend.accountId))
     })
 
@@ -95,7 +98,7 @@ export class ConversationViewModel {
 
     //会话创建
     ChatKitClient.nim.conversationService?.on("onConversationCreated", (conversation: V2NIMConversation) => {
-      console.debug(`${ConversationViewModel.logTag} onConversationCreated type is ${conversation.type}`)
+      ChatKitClient.logger?.debug(`${ConversationViewModel.logTag} onConversationCreated type is ${conversation.type}`)
       if (conversation.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
         this.addTeamConversation(conversation)
       } else {
@@ -125,7 +128,9 @@ export class ConversationViewModel {
             this.conversationList?.splice(index, 1)
           }
           if (changedItem.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
-            this.addTeamConversation(changedItem)
+            setTimeout(() => {
+              this.addTeamConversation(changedItem)
+            }, 100)
           } else {
             this.conversationList?.push(...[changedItem])
           }
@@ -134,12 +139,31 @@ export class ConversationViewModel {
 
       this.conversationList?.sort((a, b) => this.sortConversation(a, b))
     })
+    //监听@的回调
+    getContext().eventHub.on(AitSessionChangeEvent, (session: AitSession) => {
+      ChatKitClient.logger?.debug(ConversationViewModel.logTag,
+        `AitSessionChangeEvent ConversationID = ${session.sessionId} been ait ${session.isAit}`)
+      if (session.isAit) {
+        this.aitConversationList.add(session.sessionId)
+      } else if (this.aitConversationList.has(session.sessionId)) {
+        this.aitConversationList.delete(session.sessionId)
+      }
+
+    })
+    //获取数据库中所有的@数据
+    AitServer.instance.getAllAitSession(ChatKitClient.getLoginUserId()).then((
+      aitSessions: string[]
+    ) => {
+      aitSessions.forEach((session) => {
+        this.aitConversationList.add(session)
+      })
+    })
   }
 
   //按照会话ID更新会话
   async updateConversationById(conversationId: string) {
     const newConversation = await ConversationRepo.getConversation(conversationId)
-    console.debug(`${ConversationViewModel.logTag} updateConversationById ${newConversation?.conversationId} name = ${newConversation?.name}`)
+    ChatKitClient.logger?.debug(`${ConversationViewModel.logTag} updateConversationById ${newConversation?.conversationId} name = ${newConversation?.name}`)
     if (newConversation) {
       const index = this.conversationList?.findIndex(e => e.conversationId === newConversation.conversationId)
       if (index !== undefined && this.conversationList) {
@@ -150,7 +174,7 @@ export class ConversationViewModel {
 
   //添加群会话
   async addTeamConversation(conversation: V2NIMConversation) {
-    let teamId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversation.conversationId)
+    let teamId: string = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversation.conversationId)
     //添加之前判断是否合法team
     let team = await TeamRepo.getTeamInfo(teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL)
     if (team?.isValidTeam) {
@@ -186,6 +210,7 @@ export class ConversationViewModel {
       if (!this.conversationList) {
         this.conversationList = []
       }
+      console.debug(`Performance Test start  loadConversation`)
       if (offset === 0) {
         this.conversationList?.splice(0, this.conversationList.length);
       }
@@ -204,6 +229,7 @@ export class ConversationViewModel {
         }
         this.conversationList?.push(...newConversation)
         this.conversationList?.sort((a, b) => this.sortConversation(a, b))
+        console.debug(`Performance Test finish  loadConversation`)
       }
     } catch (e) {
 

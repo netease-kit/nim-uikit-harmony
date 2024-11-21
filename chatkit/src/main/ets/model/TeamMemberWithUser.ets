@@ -51,6 +51,24 @@ export class TeamMemberWithUser {
   }
 
   /**
+   * 获取@的名称，不包含好友备注
+   */
+  getAitName(): string {
+    //群昵称
+    if (this.teamMember.teamNick &&
+      this.teamMember.teamNick.length > 0) {
+      return this.teamMember.teamNick
+    }
+
+    //用户名
+    if (this.userInfo && this.userInfo.name && this.userInfo.name.length > 0) {
+      return this.userInfo.name
+    }
+    //最后accId
+    return this.teamMember.accountId
+  }
+
+  /**
    * 是否是群主
    * @returns
    */

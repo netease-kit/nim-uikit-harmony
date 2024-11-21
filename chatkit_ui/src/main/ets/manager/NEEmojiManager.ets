@@ -22,6 +22,8 @@ export enum EmojiParseType {
 export class NEEmojiParseResult {
   // 解析类型
   type: EmojiParseType = EmojiParseType.text;
+  //开始坐标
+  startIndex: number = 0
   // 解析文本内容
   text?: string;
   // 解析表情
@@ -47,6 +49,7 @@ export class NEEmojiManager {
   private fileEmojiCache: Map<string, NIMInputEmoticon> = new Map();
   // 根据tag获取表情
   private tagEmojiCache: Map<string, NIMInputEmoticon> = new Map();
+  private pattern = /\[([^\]]+)\]/g;
 
   private constructor() {
   }
@@ -98,29 +101,38 @@ export class NEEmojiManager {
     return this.tagEmojiCache.get(tag)
   }
 
+  public hasEmoji(inputString: string): boolean {
+    let match = this.pattern.exec(inputString)
+    if (match !== null) {
+      return true
+    }
+    return false
+  }
+
   public parseEmojiText(inputString: string): Array<NEEmojiParseResult> {
     // const inputString: string = "This is a [sample] input [string] with [multiple] occurrences of [brackets].";
     let array = new Array<NEEmojiParseResult>();
-    const pattern = /\[([^\]]+)\]/g;
     let finish = false;
     let lastMatchIndex = 0;
     while (finish == false) {
-      let match = pattern.exec(inputString)
+      let match = this.pattern.exec(inputString)
       if (match !== null) {
         let tag = match[0];
         let emoji = this.getEmojiByTag(tag);
         if (emoji !== undefined) {
           const nonMatchString = inputString.substring(lastMatchIndex, match.index);
-          lastMatchIndex = match.index + match[0].length;
           if (nonMatchString.length > 0) {
             let textResult = new NEEmojiParseResult();
             textResult.type = EmojiParseType.text;
             textResult.text = nonMatchString;
+            textResult.startIndex = lastMatchIndex
             array.push(textResult);
           }
+          lastMatchIndex = match.index + match[0].length;
           let emojiResult = new NEEmojiParseResult();
           emojiResult.type = EmojiParseType.emoji;
           emojiResult.emoji = emoji;
+          emojiResult.startIndex = match.index
           array.push(emojiResult);
         }
       } else {
@@ -128,6 +140,7 @@ export class NEEmojiManager {
           let textResult = new NEEmojiParseResult();
           textResult.type = EmojiParseType.text;
           textResult.text = inputString.substring(lastMatchIndex, inputString.length);
+          textResult.startIndex = lastMatchIndex
           array.push(textResult);
         }
         finish = true;

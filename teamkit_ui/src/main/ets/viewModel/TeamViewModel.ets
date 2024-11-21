@@ -213,7 +213,7 @@ export class TeamSettingViewModel {
       banned ? V2NIMTeamChatBannedMode.V2NIM_TEAM_CHAT_BANNED_MODE_BANNED_NORMAL :
       V2NIMTeamChatBannedMode.V2NIM_TEAM_CHAT_BANNED_MODE_UNBAN
     ).catch((e: V2NIMError) => {
-      console.log(e.desc)
+      ChatKitClient.logger?.debug(e.desc)
     })
   }
 
@@ -231,7 +231,7 @@ export class TeamSettingViewModel {
       params).then(() => {
 
     }).catch((e: V2NIMError) => {
-      console.debug(`TeamSettingViewModel updateTeamNick error = ${e.message} `)
+      ChatKitClient.logger?.debug(`TeamSettingViewModel updateTeamNick error = ${e.message} `)
     })
   }
 

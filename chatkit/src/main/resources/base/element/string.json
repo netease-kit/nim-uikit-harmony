@@ -1,12 +1,76 @@
 {
   "string": [
     {
+      "name": "unknown_error",
+      "value": "未知错误"
+    },
+    {
       "name": "chat_network_error_tips",
       "value": "当前网络不可用，请检查你的网络设置。"
     },
     {
       "name": "chat_pin_limit_error_tips",
       "value": "PIN消息已达最大限制"
+    },
+    {
+      "name": "chat_collection_limit_error_tips",
+      "value": "收藏数已达到限制值"
+    },
+    {
+      "name": "chatMessageNonsupportType",
+      "value": "[当前版本暂不支持该消息体]"
+    },
+    {
+      "name": "audioMessageType",
+      "value": "[语音消息]"
+    },
+    {
+      "name": "imageMessageType",
+      "value": "[图片消息]"
+    },
+    {
+      "name": "videoMessageType",
+      "value": "[视频消息]"
+    },
+    {
+      "name": "locationMessageType",
+      "value": "[地理位置]"
+    },
+    {
+      "name": "fileMessageType",
+      "value": "[文件消息]"
+    },
+    {
+      "name": "notificationMessageType",
+      "value": "[通知消息]"
+    },
+    {
+      "name": "tipMessageType",
+      "value": "[提醒消息]"
+    },
+    {
+      "name": "chatHistoryBrief",
+      "value": "聊天记录"
+    },
+    {
+      "name": "msg_type_rtc_video",
+      "value": "[视频通话]"
+    },
+    {
+      "name": "msg_type_rtc_audio",
+      "value": "[语音通话]"
+    },
+    {
+      "name": "msg_send_failed_in_block",
+      "value": "对方已将你拉黑，发送消息失败"
+    },
+    {
+      "name": "msg_send_failed_no_friend",
+      "value": "双方好友关系已解除，如需沟通，请申请"
+    },
+    {
+      "name": "msg_send_failed_friend_application",
+      "value": "好友验证"
     }
   ]
 }

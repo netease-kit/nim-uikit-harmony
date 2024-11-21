@@ -7,7 +7,6 @@
 
 import { ChatKitClient, ContactRepo, ErrorUtils } from '@nimkit/chatkit';
 import { CommonEmptyResult, CommonTextInput, NavigationBackBuilder } from '@nimkit/common';
-import { ContactViewModel } from '../viewmodel/ContactViewModel';
 
 // 跳转页面入口函数
 @Builder
@@ -18,7 +17,6 @@ export function AddFriendPageBuilder() {
 @ComponentV2
 export struct AddFriendPage {
   pathStack: NavPathStack = new NavPathStack()
-  @Local viewModel: ContactViewModel = new ContactViewModel()
   @Local isEmpty: boolean = false
   onSubmit = async (enterKey: EnterKeyType, event: SubmitEvent) => {
     // 查询自己

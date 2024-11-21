@@ -6,29 +6,28 @@
  */
 
 import {
-  V2NIMAntispamConfig,
-  V2NIMCreateTeamParams,
-  V2NIMCreateTeamResult,
-  V2NIMTeam,
-  V2NIMTeamAgreeMode,
-  V2NIMTeamChatBannedMode,
-  V2NIMTeamInviteMode,
-  V2NIMTeamJoinActionInfo,
-  V2NIMTeamJoinActionInfoQueryOption,
-  V2NIMTeamJoinActionInfoResult,
-  V2NIMTeamJoinMode,
-  V2NIMTeamMember,
-  V2NIMTeamMemberListResult,
-  V2NIMTeamMemberQueryOption,
-  V2NIMTeamMemberRole,
-  V2NIMTeamMemberSearchOption,
-  V2NIMTeamMemberSearchResult,
-  V2NIMTeamType,
-  V2NIMTeamUpdateExtensionMode,
-  V2NIMTeamUpdateInfoMode,
-  V2NIMUpdateSelfMemberInfoParams,
-  V2NIMUpdateTeamInfoParams,
-  V2NIMUser
+    V2NIMAntispamConfig,
+    V2NIMCreateTeamParams,
+    V2NIMCreateTeamResult, V2NIMTeam,
+    V2NIMTeamAgreeMode,
+    V2NIMTeamChatBannedMode,
+    V2NIMTeamInviteMode,
+    V2NIMTeamJoinActionInfo,
+    V2NIMTeamJoinActionInfoQueryOption,
+    V2NIMTeamJoinActionInfoResult,
+    V2NIMTeamJoinMode,
+    V2NIMTeamMember,
+    V2NIMTeamMemberListResult,
+    V2NIMTeamMemberQueryOption,
+    V2NIMTeamMemberRole,
+    V2NIMTeamMemberSearchOption,
+    V2NIMTeamMemberSearchResult,
+    V2NIMTeamType,
+    V2NIMTeamUpdateExtensionMode,
+    V2NIMTeamUpdateInfoMode,
+    V2NIMUpdateSelfMemberInfoParams,
+    V2NIMUpdateTeamInfoParams,
+    V2NIMUser
 } from '@nimsdk/base'
 import { ChatKitClient } from '../ChatKitClient'
 import { TeamMemberResult, TeamMemberWithUser } from '../model/TeamMemberWithUser'
@@ -83,10 +82,15 @@ export class TeamRepo {
    */
   static isGroupTeam(team: V2NIMTeam) {
     if (team.serverExtension && team.serverExtension.length > 0) {
-      let obj: TeamExtension = JSON.parse(team.serverExtension)
-      if (obj.im_ui_kit_group === true) {
-        return true
+      try {
+        let obj = JSON.parse(team.serverExtension) as object | undefined
+        if (obj && obj['im_ui_kit_group'] === true) {
+          return true
+        }
+      } catch (e) {
+        console.error('TeamRepo isGroupTeam json parse error')
       }
+
     }
     return false
   }
@@ -580,11 +584,17 @@ export class TeamRepo {
    */
   static async getTeamMembersByIds(teamId: string,
     teamType: V2NIMTeamType, accountIds: string[]): Promise<TeamMemberWithUser[]> {
-    let teamMemberList = await TeamRepo.getTeamMemberListByIds(
-      teamId,
-      teamType,
-      accountIds
-    )
+    let teamMemberList: V2NIMTeamMember[] = []
+    try {
+      teamMemberList = await TeamRepo.getTeamMemberListByIds(
+        teamId,
+        teamType,
+        accountIds
+      )
+      console.debug(`TeamRepo getTeamMembersByIds  result = ${teamMemberList.length} `);
+    } catch (e) {
+      console.error(`TeamRepo getTeamMembersByIds  ${e}`);
+    }
 
     let teamMembers: TeamMemberWithUser[] = teamMemberList.map((teamMember) => {
       return new TeamMemberWithUser(teamMember,

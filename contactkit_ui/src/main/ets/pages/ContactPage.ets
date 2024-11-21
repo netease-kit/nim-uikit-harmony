@@ -16,7 +16,7 @@ import {
 } from '@nimkit/common';
 import { ContactViewModel } from '../viewmodel/ContactViewModel';
 import { NEContactSection } from '../model/NEContactSection';
-import { ChatKitClient, NEUserWithFriend } from '@nimkit/chatkit';
+import { ChatKitClient, ContactRepo, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit';
 import { NEContactItem } from '../model/NEContactItem';
 import { V2NIMFriendAddApplication } from '@nimsdk/base';
 
@@ -87,7 +87,8 @@ export function ContactPageBuilder() {
 export struct ContactPage {
   @Param pathStack: NavPathStack = new NavPathStack()
   @Param onUnreadApplicationChange?: (countString?: string) => void = undefined
-  viewModel: ContactViewModel = new ContactViewModel()
+  @Local viewModel: ContactViewModel = new ContactViewModel()
+
   loadUnreadApplication = async () => {
     try {
       const unreadCount = await this.viewModel.getUnreadApplication()
@@ -105,15 +106,12 @@ export struct ContactPage {
     new NEContactItem($r('app.media.contact_blocklist'), $r('app.string.contact_blocklist'), "BlockListPage"),
     new NEContactItem($r('app.media.contact_my_teams'), $r('app.string.contact_my_teams'), "MyTeamsPage")
   ]
+
   @Local selectedIndex: number = 0; // 用于指定字母导航的选择项
   // List组件的scroller控制器：listScroller，用于控制联系人列表的滑动位置
   private listScroller: Scroller = new Scroller()
 
-  async loadData() {
-    ChatKitClient.nim.friendService?.on("onFriendAddApplication", async (application: V2NIMFriendAddApplication) => {
-      await this.loadUnreadApplication()
-    })
-
+  loadData = async () => {
     try {
       await this.viewModel.getFriendList()
       await this.loadUnreadApplication()
@@ -123,10 +121,14 @@ export struct ContactPage {
   }
 
   async aboutToAppear(): Promise<void> {
-    try {
-      await this.loadData()
-    } catch (err) {
-      console.error(err)
+    ChatKitClient.nim.friendService?.on("onFriendAddApplication", async (application: V2NIMFriendAddApplication) => {
+      await this.loadUnreadApplication()
+    })
+
+    if (NEFriendUserCache.getInstance().isEmpty()) {
+      ContactRepo.listener.on('initFriendCache', this.loadData)
+    } else {
+      this.loadData()
     }
   }
 
@@ -202,19 +204,20 @@ export struct ContactPage {
                   })
                 }, (item: NEUserWithFriend, index) => item.user?.accountId)
               }
-            })
+            }, (item: NEContactSection, index) => item.initial)
           }
           .width('100%')
           .margin({ top: 6 })
           .backgroundColor('#EFF1F4')
           .sticky(StickyStyle.Header)
+          .cachedCount(7)
           .scrollBar(BarState.Off)
           // 获取联系人列表滑动位置的索引，并将索引通过selectedIndex同步给右侧字母导航
           .onScrollIndex((start: number, end: number, center: number) => {
             this.selectedIndex = start
           })
 
-          if (this.viewModel.friendSection.contactSections.length <= 0) {
+          if (this.viewModel.friendSection.totalCount() <= 0) {
             CommonEmptyResult({
               tips: $r('app.string.no_friend')
             })
@@ -250,5 +253,6 @@ export struct ContactPage {
 
   aboutToDisappear(): void {
     this.viewModel.onDestroy()
+    ContactRepo.listener.off('initFriendCache', this.loadData)
   }
 }

@@ -6,7 +6,6 @@
  */
 
 import { media } from '@kit.MediaKit';
-import { common } from '@kit.AbilityKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { AsyncCallback } from '@kit.BasicServicesKit';
 import { image } from '@kit.ImageKit';

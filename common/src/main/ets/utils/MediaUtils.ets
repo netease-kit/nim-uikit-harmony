@@ -22,6 +22,8 @@ export class SelectResult {
   public height?: number;
   // 视频时长(只支持视频)
   public duration?: number;
+  // 视频首帧(只支持视频)
+  public thumbnail?: PixelMap;
   // 文件类型
   public type: photoAccessHelper.PhotoType = photoAccessHelper.PhotoType.IMAGE;
 }
@@ -144,8 +146,9 @@ export class MediaUtils {
 
   }
 
-  // 获取媒体信息
-  static async getMediaInfo(context: Context, uri?: string): Promise<SelectResult> {
+  // 获取 photoAsset
+  // 得到uri对应的PhotoAsset对象，读取文件的部分信息
+  static async getPhotoAsset(context: Context, uri?: string): Promise<photoAccessHelper.PhotoAsset> {
     let phAccessHelper = photoAccessHelper.getPhotoAccessHelper(context);
     let predicates: dataSharePredicates.DataSharePredicates = new dataSharePredicates.DataSharePredicates();
     // 配置查询条件，使用PhotoViewPicker选择图片返回的uri进行查询
@@ -161,7 +164,13 @@ export class MediaUtils {
     let fetchResult: photoAccessHelper.FetchResult<photoAccessHelper.PhotoAsset> =
       await phAccessHelper.getAssets(fetchOption);
     // 得到uri对应的PhotoAsset对象，读取文件的部分信息
-    const photoAsset: photoAccessHelper.PhotoAsset = await fetchResult.getFirstObject();
+    return await fetchResult.getFirstObject();
+  }
+
+  // 获取媒体信息
+  static async getMediaInfo(context: Context, uri?: string): Promise<SelectResult> {
+    // 得到uri对应的PhotoAsset对象，读取文件的部分信息
+    const photoAsset: photoAccessHelper.PhotoAsset = await MediaUtils.getPhotoAsset(context, uri);
     const selectResult = new SelectResult();
     // let srcName = photoAsset.get(photoAccessHelper.PhotoKeys.TITLE) as string;  // 不带后缀
     let srcName = photoAsset.displayName; // 带后缀
@@ -181,6 +190,11 @@ export class MediaUtils {
     selectResult.width = srcWidth;
     selectResult.height = srcHeight;
     selectResult.duration = srcDuration;
+
+    selectResult.thumbnail = await photoAsset.getThumbnail({
+      height: srcHeight,
+      width: srcWidth
+    })
     return selectResult;
   }
 }

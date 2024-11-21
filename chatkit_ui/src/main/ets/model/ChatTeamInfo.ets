@@ -6,7 +6,7 @@
  */
 
 import { ChatInfo } from './ChatInfo';
-import { V2NIMFriend, V2NIMTeamMessageReadReceipt, V2NIMUser } from '@nimsdk/base';
+import { V2NIMFriend, V2NIMMessage, V2NIMTeamMessageReadReceipt, V2NIMUser } from '@nimsdk/base';
 import { V2NIMTeam, V2NIMTeamMember } from '@nimsdk/base/src/main/ets/nim/sdk/V2NIMTeamService';
 import { NIMMessageInfo } from './NIMMessageInfo';
 import { NEFriendUserCache } from '@nimkit/chatkit/src/main/ets/NEFriendUserCache';
@@ -79,7 +79,14 @@ export class ChatTeamInfo extends ChatInfo {
     return undefined;
   }
 
-  getChatUserAvatarUrl(accountId: string): string {
+  getChatUserAvatarUrl(param?: string | V2NIMMessage): string {
+    let accountId: string = ""
+    if ((param as V2NIMMessage).senderId) {
+      accountId = (param as V2NIMMessage).senderId
+    } else {
+      accountId = param as string;
+    }
+
     if (this.teamUserMap.has(accountId)) {
       return this.teamUserMap.get(accountId)?.avatar ?? '';
     }
@@ -94,7 +101,14 @@ export class ChatTeamInfo extends ChatInfo {
     return '';
   }
 
-  getChatUserAvatarName(accountId: string): string {
+  getChatUserAvatarName(param?: string | V2NIMMessage): string {
+    let accountId: string = ""
+    if ((param as V2NIMMessage).senderId) {
+      accountId = (param as V2NIMMessage).senderId
+    } else {
+      accountId = param as string;
+    }
+
     let result = '';
     if (this.teamUserFriendMap.has(accountId)) {
       let friend = this.teamUserFriendMap.get(accountId)
@@ -137,7 +151,14 @@ export class ChatTeamInfo extends ChatInfo {
     return result
   }
 
-  getChatUserShowName(accountId: string): string {
+  getChatUserShowName(param?: string | V2NIMMessage, alias: boolean = true, teamNick: boolean = true): string {
+    let accountId: string = ""
+    if ((param as V2NIMMessage).senderId) {
+      accountId = (param as V2NIMMessage).senderId
+    } else {
+      accountId = param as string;
+    }
+
     let result = '';
     if (this.teamUserFriendMap.has(accountId)) {
       let friend = this.teamUserFriendMap.get(accountId)
@@ -147,17 +168,17 @@ export class ChatTeamInfo extends ChatInfo {
     }
     let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
     //1,备注优先
-    if ((result == null || result.trim() === '') && friendInfo) {
+    if (alias && (result == null || result.trim() === '') && friendInfo) {
       result = friendInfo.getAlias() ?? ''
     }
     //2，群昵称次之
-    if ((result == null || result.trim() === '') && this.teamMemberMap.has(accountId)) {
+    if (teamNick && (result == null || result.trim() === '') && this.teamMemberMap.has(accountId)) {
       result = this.teamMemberMap.get(accountId)?.teamNick ?? '';
     }
     //3，好友名称再次之
     if ((result == null || result.trim() === '') && NEFriendUserCache.getInstance().isFriend(accountId)) {
       if (friendInfo !== undefined) {
-        result = friendInfo.showName(true)
+        result = friendInfo.showName(alias)
       }
     }
     if (result == null || result.trim() === '') {

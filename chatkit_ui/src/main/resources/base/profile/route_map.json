@@ -39,6 +39,22 @@
       "data": {
         "description": "this is read receipt page"
       }
+    },
+    {
+      "name": "TeamHistoryPage",
+      "pageSourceFile": "src/main/ets/pages/TeamHistoryPage.ets",
+      "buildFunction": "TeamHistoryPageBuilder",
+      "data": {
+        "description": "this is team history search page"
+      }
+    },
+    {
+      "name": "MergeMessageDetailPage",
+      "pageSourceFile": "src/main/ets/pages/MergeMessageDetailPage.ets",
+      "buildFunction": "MergeMessageDetailPageBuilder",
+      "data": {
+        "description": "this is merge message detail page"
+      }
     }
   ]
 }

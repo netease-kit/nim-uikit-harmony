@@ -24,7 +24,6 @@ export default class DefaultAbility extends UIAbility {
     let context = this.context;
     let pathDir = context.filesDir;
     Logger.info('netease Ability onWindowStageCreate', pathDir);
-    this.context
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
         Logger.error('Failed to load the content. Cause: %{public}s', JSON.stringify(err) ?? '');

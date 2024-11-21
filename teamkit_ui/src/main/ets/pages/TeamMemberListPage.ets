@@ -146,6 +146,11 @@ struct TeamMemberListPage {
             })
           }
         })
+        ListItem() {
+          Column() {
+          }
+          .height(42)
+        }
       }
       .listDirection(Axis.Vertical)
       .onReachEnd(() => {

@@ -27,15 +27,16 @@ import {
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { HashSet } from '@kit.ArkTS';
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
+import { BusinessError } from '@kit.BasicServicesKit';
+import { sendMessageFailedTips } from '../common/MessageHelper';
 
 @ObservedV2
 export class ChatPinViewModel {
   @Trace pinListEmpty: boolean = false;
   @Trace conversationId: string = "";
-  @Trace chatTeamInfo: ChatTeamInfo | undefined;
+  @Trace chatTeamInfo?: ChatTeamInfo;
   @Trace topInsert = false
   networkBroken = false
-  dialogToExit?: () => void
   onMessagePinNotification = async (notification: V2NIMMessagePinNotification) => {
     switch (notification.pinState) {
       case V2NIMMessagePinState.V2NIM_MESSAGE_PIN_STATE_NOT_PINNED:
@@ -218,17 +219,16 @@ export class ChatPinViewModel {
   /**
    * 转发消息
    * @param msg 消息体
-   * @param conversationId 转发到某个绘画
+   * @param conversationId 转发到某个会话
    * @param params 消息参数
    * @param progress 消息发送进度
    */
   async sendForwardMessage(msg: V2NIMMessage, conversationId: string, params?: V2NIMSendMessageParams,
     progress?: (percentage: number) => void) {
-    try {
-      ChatRepo.sendMessage(this.beforeSendMessage(msg), conversationId, params, progress)
-    } catch (err) {
-      console.log("net ease send message error", err, msg.sendingState.toString());
-    }
+    ChatRepo.sendMessage(this.beforeSendMessage(msg), conversationId, params, progress).catch((err: BusinessError) => {
+      console.error("net ease send message error", err.code, err.message);
+      sendMessageFailedTips(msg, err, conversationId)
+    })
   }
 
   /**
@@ -256,7 +256,11 @@ export class ChatPinViewModel {
         const leaveMsg = ChatRepo.createTextMessage(leaveText)
         if (leaveMsg && conversation.conversationId) {
           setTimeout(() => {
-            ChatRepo.sendMessage(leaveMsg, conversation.conversationId ?? '')
+            ChatRepo.sendMessage(leaveMsg, conversation.conversationId!)
+              .catch((err: BusinessError) => {
+                console.error("net ease send message error", err.code, err.message);
+                sendMessageFailedTips(leaveMsg, err, conversation.conversationId!)
+              })
           }, 200)
         }
       }

@@ -5,7 +5,7 @@
  *
  */
 
-export { ChatKitClient } from './src/main/ets/ChatKitClient'
+export { ChatKitClient, currentConversationChanged } from './src/main/ets/ChatKitClient'
 
 export { ChatRepo } from './src/main/ets/repo/ChatRepo'
 
@@ -17,13 +17,15 @@ export { SettingRepo } from './src/main/ets/repo/SettingRepo'
 
 export { StorageRepo } from './src/main/ets/repo/StorageRepo'
 
-export { UserWithFriend as NEUserWithFriend } from './src/main/ets/model/UserWithFriend'
+export { NEUserWithFriend } from './src/main/ets/model/NEUserWithFriend'
 
 export { NEFriendUserCache } from './src/main/ets/NEFriendUserCache'
 
 export { ConversationRepo } from './src/main/ets/repo/ConversationRepo'
 
 export { IsDiscussion } from './src/main/ets/utils/Utils'
+
+export { ErrorUtils } from './src/main/ets/utils/ErrorUtils'
 
 export { TeamMemberWithUser, TeamMemberResult } from './src/main/ets/model/TeamMemberWithUser'
 
@@ -33,6 +35,40 @@ export { ConversationSelectParam } from './src/main/ets/model/ConversationSelect
 
 export { ConversationSelectedParam } from './src/main/ets/model/ConversationSelectedParam'
 
-export {ErrorUtils} from './src/main/ets/utils/ErrorUtils'
+export { CustomMessageUtils } from './src/main/ets/utils/CustomMessageUtils'
 
-export {mergedMessageAvatarKey,mergedMessageNickKey} from './src/main/ets/model/MergedMessage'
+export { MergedMessageAttachment,
+  MergeMessageAbstract,
+  MessageUploadInfo } from './src/main/ets/model/CustomMessageAttachment'
+
+export { mergedMessageNickKey,
+  mergedMessageAvatarKey,
+  multiForwardFileName,
+  mergedMessageMaxDepth,
+  mergedMessageLimitCount,
+  singleMessageLimitCount,
+  deleteMessagesLimitCount,
+  mergedMessageCustomType,
+  mergedMessageCellHeight,
+  conversationSelectLimitCount,
+  keyExtensionLastOptType,
+  keyExtensionAtAll,
+  typeExtensionAllowAll,
+  typeExtensionAllowManager,
+  collectionTypeOffset,
+  keyReplyMsgKey,
+  errCodeInBlock,
+  errCodeNoFriend
+} from './src/main/ets/constant/Constant'
+
+export { TeamMemberCache } from './src/main/ets/cache/TeamMemberCache'
+
+export { AitModel, accountAll, aitKey, getAitModelFromJson, YxAitMsg } from './src/main/ets/model/ait/AitModel'
+
+export { AitMessage } from './src/main/ets/model/ait/AitMessage'
+
+export { AitSegment } from './src/main/ets/model/ait/AitSegment'
+
+export { AitAllPermission } from './src/main/ets/model/ait/AitAllPermission'
+
+export { KitLogger as Logger } from './src/main/ets/logger/AppLogger'

@@ -5,17 +5,16 @@
  *
  */
 
-import { ChatKitClient, ErrorUtils } from '@nimkit/chatkit'
+import { ErrorUtils } from '@nimkit/chatkit'
 import {
-  AvatarColorUntil,
-  AvatarItem,
-  CommonAvatar,
-  CommonEmptyResult,
-  NavigationBackBuilder,
-  NECommonUtils
+    AvatarColorUntil,
+    AvatarItem,
+    CommonAvatar,
+    CommonEmptyResult,
+    NavigationBackBuilder,
+    NECommonUtils
 } from '@nimkit/common'
 import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
-import { V2NIMConnectStatus } from '@nimsdk/base'
 import { TeamMemberSelectorViewModel } from '../viewModel/TeamMemberSelectorViewModel'
 
 //管理员选择页面参数
@@ -104,6 +103,12 @@ struct TeamMemberSelectorPage {
             })
           }
         })
+
+        ListItem() {
+          Column() {
+          }
+          .height(42)
+        }
       }
       .listDirection(Axis.Vertical)
       .onReachEnd(() => {

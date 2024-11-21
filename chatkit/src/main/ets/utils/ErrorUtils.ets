@@ -11,10 +11,13 @@ import { ChatKitClient } from '../ChatKitClient';
 export class ErrorUtils {
   static handleErrorToast(errorCode: number) {
 
-    let msg: ResourceStr = '未知错误';
+    let msg: ResourceStr = $r('app.string.unknown_error');
     switch (errorCode) {
       case V2NIMErrorCode.V2NIM_ERROR_CODE_PIN_LIMIT:
         msg = $r('app.string.chat_pin_limit_error_tips')
+        break
+      case V2NIMErrorCode.V2NIM_ERROR_CODE_COLLECTION_LIMIT:
+        msg = $r('app.string.chat_collection_limit_error_tips')
         break
       case V2NIMErrorCode.V2NIM_ERROR_CODE_ILLEGAL_STATE:
         msg = $r('app.string.chat_network_error_tips')

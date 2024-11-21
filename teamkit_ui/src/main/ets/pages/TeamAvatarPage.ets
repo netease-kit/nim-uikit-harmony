@@ -33,20 +33,14 @@ struct TeamAvatarPage {
       const file = fs.openSync(filePath, fs.OpenMode.READ_ONLY)
       fs.copyFileSync(file.fd, dir)
 
-      if (ChatKitClient.nim.loginService?.getLoginStatus() === V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED) {
-        console.debug(`TeamAvatarPage uploadFile loginStatus logined`)
+      const fn: Function = () => {
+        ChatKitClient.logger?.debug(`TeamAvatarPage uploadFile loginStatus logined`)
         this.uploadFile(dir)
-      } else {
-        ChatKitClient.nim.loginService.on('onLoginStatus', (status: V2NIMLoginStatus) => {
-          console.debug(`TeamAvatarPage uploadFile loginStatus changed ${status}}`)
-          if (status === V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED) {
-            this.uploadFile(dir)
-          }
-        })
       }
 
+      ChatKitClient.runAfterLoggedIn(fn)
     } catch (err) {
-      console.log(err)
+      ChatKitClient.logger?.debug(err)
     }
   }
 
@@ -63,10 +57,10 @@ struct TeamAvatarPage {
       StorageRepo.uploadFile(task, (progress: number) => {
         // NECommonUtils.showToast($r('app.string.avatar_uploading', progress * 100))
       }).then((url) => {
-        console.debug(`TeamAvatarPage uploadFile success url = ${url}`)
+        ChatKitClient.logger?.debug(`TeamAvatarPage uploadFile success url = ${url}`)
         this.avatar = url
       }).catch((e: V2NIMError) => {
-        console.debug(`TeamAvatarPage uploadFile error = ${e.detail.reason}`)
+        ChatKitClient.logger?.debug(`TeamAvatarPage uploadFile error = ${e.detail.reason}`)
       })
 
 
@@ -107,10 +101,12 @@ struct TeamAvatarPage {
                 .width(80)
                 .borderRadius(40)
             }
-            Image($r('app.media.camera'))
-              .width(24)
-              .height(24)
-              .borderRadius(12)
+            if (this.showSave) {
+              Image($r('app.media.camera'))
+                .width(24)
+                .height(24)
+                .borderRadius(12)
+            }
 
           }
           .height(80)

@@ -6,13 +6,12 @@
  */
 
 import { ContactRepo, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit'
-import { EventHubUtil } from '@nimkit/chatkit/src/main/ets/utils/EventHubUtil'
 import { V2NIMFriend, V2NIMUser } from '@nimsdk/base'
 
 @ObservedV2
 export class BlocklistViewModel {
   @Trace blockList: NEUserWithFriend[] = []
-  listener = new EventHubUtil()
+
   updateUserInfoFun = async (users: V2NIMUser[]) => {
     for (const user of users) {
       if (NEFriendUserCache.getInstance().isBlockAccount(user.accountId)) {
@@ -47,10 +46,10 @@ export class BlocklistViewModel {
   }
 
   constructor() {
-    NEFriendUserCache.getInstance().listener.on('updateUserInfo', this.updateUserInfoFun)
-    NEFriendUserCache.getInstance().listener.on('updateFriendInfo', this.updateFriendInfoFun)
-    NEFriendUserCache.getInstance().listener.on('addBlockAccount', this.addBlockAccountFun)
-    NEFriendUserCache.getInstance().listener.on('removeBlockAccount', this.removeBlockAccountFun)
+    ContactRepo.listener.on('updateUserInfo', this.updateUserInfoFun)
+    ContactRepo.listener.on('updateFriendInfo', this.updateFriendInfoFun)
+    ContactRepo.listener.on('addBlockAccount', this.addBlockAccountFun)
+    ContactRepo.listener.on('removeBlockAccount', this.removeBlockAccountFun)
   }
 
   /**
@@ -103,9 +102,9 @@ export class BlocklistViewModel {
   }
 
   onDestroy() {
-    NEFriendUserCache.getInstance().listener.off('updateUserInfo', this.updateUserInfoFun)
-    NEFriendUserCache.getInstance().listener.off('updateFriendInfo', this.updateFriendInfoFun)
-    NEFriendUserCache.getInstance().listener.off('addBlockAccount', this.addBlockAccountFun)
-    NEFriendUserCache.getInstance().listener.off('removeBlockAccount', this.removeBlockAccountFun)
+    ContactRepo.listener.off('updateUserInfo', this.updateUserInfoFun)
+    ContactRepo.listener.off('updateFriendInfo', this.updateFriendInfoFun)
+    ContactRepo.listener.off('addBlockAccount', this.addBlockAccountFun)
+    ContactRepo.listener.off('removeBlockAccount', this.removeBlockAccountFun)
   }
 }

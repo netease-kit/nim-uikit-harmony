@@ -331,6 +331,8 @@ export struct PersonInfoPage {
               }
               .height(48)
               .onClick(() => {
+                this.pathStack.popToName('ChatP2PPage')
+                this.pathStack.popToName('ChatTeamPage')
                 this.pathStack.replacePath({
                   name: 'ChatP2PPage',
                   param: ChatKitClient.nim.conversationIdUtil.p2pConversationId(this.viewModel.userWithFriend?.user?.accountId)

@@ -12,44 +12,13 @@ import {
   CommonEmptyResult,
   CommonTextInput,
   ListGroupHeader,
+  MatchSearchText,
   NavigationBackBuilder,
   TailString
 } from '@nimkit/common';
 import { SearchViewModel } from '../viewmodel/SearchViewModel';
 import { SearchListModel } from '../model/SearchListModel';
 import { ChatKitClient } from '@nimkit/chatkit';
-
-@ComponentV2
-struct MatchSearchText {
-  @Param allText: string = ""
-  @Param searchText: string = ""
-  @Param fontSize: number = 14
-
-  startOfSearchText() {
-    return this.allText?.indexOf(this.searchText)
-  }
-
-  endOfSearchText() {
-    return this.startOfSearchText() + this.searchText.length
-  }
-
-  build() {
-    Text() {
-      Span(this.allText.substring(0, this.startOfSearchText()))
-        .fontSize(this.fontSize)
-        .fontColor('#333333')
-
-      Span(this.searchText)
-        .fontColor('#337EFF')
-        .fontSize(this.fontSize)
-
-      Span(this.allText.substring(this.endOfSearchText(), this.allText.length))
-        .fontSize(this.fontSize)
-        .fontColor('#333333')
-
-    }
-  }
-}
 
 // 跳转页面入口函数
 @Builder

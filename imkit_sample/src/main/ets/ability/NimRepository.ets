@@ -13,7 +13,6 @@ import { V2NIMConversationServiceImpl } from '@nimsdk/conversation'
 import { V2NIMUserServiceImpl } from '@nimsdk/user'
 import { V2NIMFriendServiceImpl } from '@nimsdk/friend'
 import { V2NIMClientAntispamUtil, V2NIMMessageServiceImpl } from '@nimsdk/message'
-import { V2NIMConversationGroupServiceImpl } from '@nimsdk/conversationgroup'
 import { AppConfig } from '../constants/AppConfig'
 import { ChatKitClient } from '@nimkit/chatkit'
 import { router } from '@kit.ArkUI'
@@ -100,8 +99,6 @@ export class NimRepository {
       (core, serviceName, serviceConfig) => new V2NIMClientAntispamUtil(core, serviceName, serviceConfig));
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_CONVERSATION,
       (core, serviceName, serviceConfig) => new V2NIMConversationServiceImpl(core, serviceName, serviceConfig));
-    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_CONVERSATION_GROUP,
-      (core, serviceName, serviceConfig) => new V2NIMConversationGroupServiceImpl(core, serviceName, serviceConfig));
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_MESSAGE,
       (core, serviceName, serviceConfig) => new V2NIMMessageServiceImpl(core, serviceName, serviceConfig));
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_USER,

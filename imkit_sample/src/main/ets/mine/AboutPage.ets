@@ -22,7 +22,7 @@ export struct AboutPage {
   @Local aboutItems: ViewItemArrow[] = [
     {
       title: $r('app.string.mine_about_uikit_version'),
-      subTitle: "1.0.0",
+      subTitle: "10.2.0",
       itemHeight: 48
     },
     {

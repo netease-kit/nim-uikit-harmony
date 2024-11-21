@@ -15,8 +15,12 @@ export class ChatConst {
   static readonly imageMessageHeight: number = 124;
   // 图片消息图片的宽度
   static readonly imageMessageWidth: number = 222;
+  // 合并转发消息高度
+  static readonly mergedMessageHeight: number = 130;
+  // 合并转发消息最小宽度
+  static readonly mergedMessageMinHeight: number = 80;
   // 消息单行高度 vp
-  static readonly messageLineHeight: number = 45;
+  static readonly messageLineHeight: number = 60;
   // 文本消息单行高度 vp
   static readonly textLineHeight: number = 20;
   //文本消息字体大小
@@ -32,8 +36,10 @@ export class ChatConst {
   // 消息长按菜单每个item的宽度
   static readonly menuItemWidth: number = 60;
   static readonly menuItemHeight: number = 66;
+  // 消息长按菜单列数
+  static readonly menuItemColumnNum: number = 5;
   // PIN 消息操作者名称最大长度
-  static readonly pinOperatorNameMaxLen: number = 10;
+  static readonly pinOperatorNameMaxLen: number = 15;
   // 消息撤回本地存储，是否为本端撤回消息
   static readonly revokeLocalKey: string = 'revoke_message_local';
   // 消息撤回本地存储，撤回时间
@@ -44,4 +50,6 @@ export class ChatConst {
   static readonly revokeMsgTextKey: string = 'revoke_message_local_content';
   // 消息撤回本地存储，撤回的消息是否为编辑状态
   static readonly revokeMsgEditKey: string = 'revoke_message_local_edit';
+  // 消息删除限制
+  static readonly messageDeleteLimit: number = 50;
 }

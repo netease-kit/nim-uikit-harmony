@@ -4,7 +4,8 @@
  * found in the LICENSE file.
  *
  */
-import { ChatKitClient, TeamRepo } from '@nimkit/chatkit'
+import { ChatKitClient, keyExtensionAtAll, TeamRepo, typeExtensionAllowAll } from '@nimkit/chatkit'
+import { JSONUtil } from '@nimkit/common'
 import { V2NIMTeam, V2NIMTeamMember, V2NIMTeamMemberRole, V2NIMTeamMemberRoleQueryType } from '@nimsdk/base'
 
 @ObservedV2
@@ -31,7 +32,7 @@ export class TeamManageViewModel {
           this.managerCount = result.memberList.length - 1
         }
       }).catch((e: Error) => {
-        console.debug(`getTeamManagerCount ${e.message}`)
+        ChatKitClient.logger?.debug(`getTeamManagerCount ${e.message}`)
       })
     }
   }
@@ -81,6 +82,23 @@ export class TeamManageViewModel {
 
       this.managerCount = this.managerList.length - 1;
     }
+  }
+
+  /**
+   * 获取@所有人的权限
+   * @param team
+   */
+  getAitAllPermission(): string {
+    let result = typeExtensionAllowAll
+    if (this.teamInfo?.serverExtension) {
+      if (JSONUtil.isJSONString(this.teamInfo.serverExtension)) {
+        let localObject = JSON.parse(this.teamInfo.serverExtension) as object
+        if (localObject?.[keyExtensionAtAll]) {
+          result = localObject?.[keyExtensionAtAll]
+        }
+      }
+    }
+    return result
   }
 
   /**

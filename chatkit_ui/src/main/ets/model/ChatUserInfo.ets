@@ -7,7 +7,7 @@
 
 import { ChatKitClient, NEFriendUserCache } from '@nimkit/chatkit';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
-import { V2NIMFriend, V2NIMP2PMessageReadReceipt, V2NIMUser } from '@nimsdk/base';
+import { V2NIMFriend, V2NIMMessage, V2NIMP2PMessageReadReceipt, V2NIMUser } from '@nimsdk/base';
 import { ChatInfo } from './ChatInfo';
 
 @ObservedV2
@@ -70,9 +70,19 @@ export class ChatUserInfo extends ChatInfo {
     message.readCount = hasRead ? 1 : 0;
   }
 
-  getChatUserAvatarName(): string {
+  getChatUserAvatarName(param?: string | V2NIMMessage): string {
+    let accountId: string = ""
+    if ((param as V2NIMMessage).senderId) {
+      accountId = (param as V2NIMMessage).senderId
+    } else {
+      accountId = param as string;
+    }
+
+    if (accountId === ChatKitClient.getLoginUserId()) {
+      return this.getCurrentUserAvatarName()
+    }
+
     let name = '';
-    let accountId = this.targetId;
     if (this.chatFriend) {
       name = this.chatFriend?.alias ?? '';
     }
@@ -110,12 +120,23 @@ export class ChatUserInfo extends ChatInfo {
     return name;
   }
 
-  getChatUserShowName(): string {
+  getChatUserShowName(param?: string | V2NIMMessage, alias: boolean = true, teamNick: boolean = true): string {
+    let accountId: string = ""
+    if ((param as V2NIMMessage).senderId) {
+      accountId = (param as V2NIMMessage).senderId
+    } else {
+      accountId = param as string;
+    }
+
+    if (accountId === ChatKitClient.getLoginUserId()) {
+      return this.getCurrentUserShowName()
+    }
+
     let name = '';
-    if (NEFriendUserCache.getInstance().isFriend(this.targetId)) {
-      let friendInfo = NEFriendUserCache.getInstance().getFriendById(this.targetId)
+    if (NEFriendUserCache.getInstance().isFriend(accountId)) {
+      let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
       if (friendInfo !== undefined) {
-        name = friendInfo.showName(true)
+        name = friendInfo.showName(alias)
       }
     }
     if (name === '' && this.chatUser !== undefined) {
@@ -123,7 +144,7 @@ export class ChatUserInfo extends ChatInfo {
     }
 
     if (name === '') {
-      name = this.targetId;
+      name = accountId;
     }
     return name;
   }
@@ -139,7 +160,18 @@ export class ChatUserInfo extends ChatInfo {
     return name;
   }
 
-  getChatUserAvatarUrl(): string {
+  getChatUserAvatarUrl(param?: string | V2NIMMessage): string {
+    let accountId: string = ""
+    if ((param as V2NIMMessage).senderId) {
+      accountId = (param as V2NIMMessage).senderId
+    } else {
+      accountId = param as string;
+    }
+
+    if (accountId === ChatKitClient.getLoginUserId()) {
+      return this.getCurrentUserAvatarUrl()
+    }
+
     let result: string = '';
     if (this.chatUser !== undefined) {
       result = this.chatUser?.avatar ? this.chatUser?.avatar : '';

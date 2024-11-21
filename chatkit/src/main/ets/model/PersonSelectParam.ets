@@ -5,14 +5,14 @@
  *
  */
 
-import { UserWithFriend } from './UserWithFriend';
+import { NEUserWithFriend } from './NEUserWithFriend';
 
 export class PersonSelectParam {
   filterList?: string[] = [];
   selectLimit: number = 200;
-  onClickSureButton?: (selectedList: UserWithFriend[]) => void = undefined
+  onClickSureButton?: (selectedList: NEUserWithFriend[]) => void = undefined
 
-  constructor(onClickSureButton?: (selectedList: UserWithFriend[]) => void, filterList: string[] = [],
+  constructor(onClickSureButton?: (selectedList: NEUserWithFriend[]) => void, filterList: string[] = [],
     selectLimit: number = 200) {
     this.filterList = filterList
     this.selectLimit = selectLimit

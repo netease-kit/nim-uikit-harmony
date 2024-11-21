@@ -7,12 +7,14 @@
 
 import { ChatKitClient } from '@nimkit/chatkit';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
+import { DateUtil } from '@nimkit/common/src/main/ets/utils/DateUtil';
 import { V2NIMConversation, V2NIMMessageCallAttachment, V2NIMMessageType } from '@nimsdk/base';
 import { ConversationOperationDialog } from './ConversationOperationDialog';
 
 @Component
 export struct ConversationViewItem {
   @State conversationInfo: V2NIMConversation | null = null
+  @State haveBeanAit: boolean = false
   public onItemClick?: () => void
   dialogController: CustomDialogController = new CustomDialogController({
     builder: ConversationOperationDialog({
@@ -66,13 +68,23 @@ export struct ConversationViewItem {
               bottom: 8
             })
 
-          //item 最后一条消息显示
-          Text(this.getConversationContent(this.conversationInfo))
-            .fontSize(13)
-            .maxLines(1)
-            .fontColor("#ff999999")
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .width(this.conversationInfo.mute ? '80%' : '100%')
+          Row() {
+            if (this.haveBeanAit && this.conversationInfo.unreadCount > 0) {
+              Text('[有人@我]')
+                .fontSize(13)
+                .maxLines(1)
+                .fontColor("#fff24957")
+            }
+            //item 最后一条消息显示
+            Text(this.getConversationContent(this.conversationInfo))
+              .fontSize(13)
+              .maxLines(1)
+              .fontColor("#ff999999")
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .width('100%')
+          }.width(this.conversationInfo.mute ? '80%' : '100%')
+
+
         }
         .width('60%')
         .margin({
@@ -82,7 +94,7 @@ export struct ConversationViewItem {
 
         //时间戳和mute
         Column() {
-          Text(this.formatTimestamp(this.conversationInfo.lastMessage?.messageRefer?.createTime ??
+          Text(DateUtil.formatTimestamp(this.conversationInfo.lastMessage?.messageRefer?.createTime ??
           this.conversationInfo.updateTime))
             .fontColor('#ffCCCCCC')
             .fontSize(12)
@@ -161,31 +173,6 @@ export struct ConversationViewItem {
       return sourceName
     } else {
       return sourceName.substring(size - 2)
-    }
-  }
-
-  /**
-   * 时间戳序列化
-   * @param timestamp
-   * @returns
-   */
-  formatTimestamp(timestamp: number): string {
-    const currentDate = new Date();
-    const targetDate = new Date(timestamp);
-    const yearDiff = currentDate.getFullYear() - targetDate.getFullYear();
-    const monthDiff = currentDate.getMonth() - targetDate.getMonth();
-    const dayDiff = currentDate.getDate() - targetDate.getDate();
-
-    if (yearDiff > 0) {
-      return `${targetDate.getFullYear()}-${targetDate.getMonth() + 1}-${targetDate.getDate()}`;
-    } else if (monthDiff > 0 || dayDiff > 0) {
-      const hours = targetDate.getHours().toString().padStart(2, '0');
-      const minutes = targetDate.getMinutes().toString().padStart(2, '0');
-      return `${targetDate.getMonth() + 1}-${targetDate.getDate()} ${hours}:${minutes}`;
-    } else {
-      const hours = targetDate.getHours().toString().padStart(2, '0');
-      const minutes = targetDate.getMinutes().toString().padStart(2, '0');
-      return `${hours}:${minutes}`;
     }
   }
 
