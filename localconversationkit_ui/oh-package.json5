@@ -1,0 +1,13 @@
+{
+  "name": "localconversationkit_ui",
+  "version": "10.1.0",
+  "description": "Please describe the basic information.",
+  "main": "Index.ets",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@nimkit/common": "file:../common",
+    "@nimkit/chatkit": "../chatkit",
+    "@nimsdk/base": "10.8.5"
+  }
+}

@@ -22,6 +22,7 @@ export class TeamInfoViewModel {
   initTeamData(teamInfo?: V2NIMTeam) {
     this.teamInfo = teamInfo
     ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', this.onTeamInfoUpdated.bind(this))
+    TeamRepo
   }
 
   getMineTeamMember() {

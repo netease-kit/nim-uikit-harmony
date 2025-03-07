@@ -5,13 +5,14 @@
  *
  */
 
-import { ChatKitClient, ContactRepo, ConversationRepo } from '@nimkit/chatkit';
+import { ChatKitClient, ContactRepo, ConversationRepo, IMKitConfigCenter } from '@nimkit/chatkit';
 import { ChatKitConfig } from '@nimkit/chatkit_ui/src/main/ets/ChatKitConfig';
 import { CommonConstants } from '@nimkit/common';
 import { ContactPage } from '@nimkit/contactkit_ui';
 import { ConversationPage } from '@nimkit/conversationkit_ui';
+import { LocalConversationPage } from '@nimkit/localconversationkit_ui';
 import { V2NIMFriendAddApplication } from '@nimsdk/base';
-import { MinePage } from '../mine/MinePage';
+import { MinePage } from '../mine/pages/MinePage';
 
 @ObservedV2
 class TabBarItem {
@@ -32,16 +33,17 @@ class TabBarItem {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct TabIndex {
   pathStack: NavPathStack = new NavPathStack()
-  @State currentIndex: number = 0;
-  @State tabs: Array<TabBarItem> = [
+  @Local currentIndex: number = 0;
+  @Local tabs: Array<TabBarItem> = [
     new TabBarItem($r('app.string.tab_conversation'), 0, $r('app.media.tab_conversation'),
       $r('app.media.tab_conversation_light')),
     new TabBarItem($r('app.string.tab_contact'), 1, $r('app.media.tab_contact'), $r('app.media.tab_contact_light')),
     new TabBarItem($r('app.string.tab_mine'), 2, $r('app.media.tab_mine'), $r('app.media.tab_mine_light'))
   ];
+  @Local useLocalConversation: boolean = IMKitConfigCenter.enableLocalConversation;
   loadUnreadApplication = async () => {
     try {
       const unreadCount = await ContactRepo.getAddApplicationUnreadCount()
@@ -74,14 +76,13 @@ struct TabIndex {
     ChatKitClient.nim.friendService?.on("onFriendAddApplication", async (application: V2NIMFriendAddApplication) => {
       await this.loadUnreadApplication()
     })
-
     try {
       await this.loadUnreadApplication()
     } catch (err) {
       console.log(err)
     }
-    this.loadUnreadMessageCount()
     this.loadConfig()
+    this.loadUnreadMessageCount()
   }
 
   @Builder
@@ -118,10 +119,18 @@ struct TabIndex {
         ForEach(this.tabs, (item: TabBarItem) => {
           TabContent() {
             if (item.targetIndex == 0) {
-              ConversationPage({
-                pathStack: this.pathStack,
-                onUreadMessageChange: this.onUreadMessageChange
-              })
+              if (this.useLocalConversation) {
+                LocalConversationPage({
+                  pathStack: this.pathStack,
+                  onUreadMessageChange: this.onUreadMessageChange
+                })
+              } else {
+                ConversationPage({
+                  pathStack: this.pathStack,
+                  onUreadMessageChange: this.onUreadMessageChange
+                })
+              }
+
             } else if (item.targetIndex == 1) {
               ContactPage({
                 pathStack: this.pathStack,

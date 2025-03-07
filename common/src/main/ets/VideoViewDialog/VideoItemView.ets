@@ -44,20 +44,21 @@ class AVPlayerConstants {
     }];
 }
 
-@Component
+@ComponentV2
 export struct VideoItemView {
-  @State currentTime: number = 0; // 视频当前时间
-  @State totalDuration: number = 0; // 视频总时长
-  @State videoRatio: number = 0; // 元素宽高比
-  @State @Watch('onChangePlay') isPlaying: boolean = false; // 是否播放状态
-  @State @Watch('changeOrientation') isLandscape: boolean = false; // 是否横屏状态
-  @State isSpeedShow: boolean = false; // 是否倍速状态
-  @State showFullScreen: boolean = false; // 是否展示全屏按钮
-  @State showSpeed: boolean = false; // 是否展示倍速按钮
-  @State speed: string = '1.0x'; // 倍速大小
-  @State @Watch('createOrFinish') videoUrl: string = ''; // 视频url
-  @State topRectHeight: number = 0; // 系统状态栏高度
-  @State bottomRectHeight: number = 0; // 系统状态栏高度
+  @Local currentTime: number = 0; // 视频当前时间
+  @Local totalDuration: number = 0; // 视频总时长
+  @Param videoRatio: number = 0; // 元素宽高比
+  @Local videoRatioLocal: number = 0; // 元素宽高比
+  @Local isPlaying: boolean = false; // 是否播放状态
+  @Local isLandscape: boolean = false; // 是否横屏状态
+  @Local isSpeedShow: boolean = false; // 是否倍速状态
+  @Local showFullScreen: boolean = false; // 是否展示全屏按钮
+  @Local showSpeed: boolean = false; // 是否展示倍速按钮
+  @Local speed: string = '1.0x'; // 倍速大小
+  @Param videoUrl: string = ''; // 视频url
+  @Local topRectHeight: number = 0; // 系统状态栏高度
+  @Local bottomRectHeight: number = 0; // 系统状态栏高度
   private avPlayer: media.AVPlayer = {} as media.AVPlayer; // 视频播放器对象
   private surfaceID: string | undefined = undefined; // 视频播放器ID
   private isCreate: boolean = false; // 视频播放器是否被创建
@@ -79,6 +80,7 @@ export struct VideoItemView {
     this.setTimeUpdateCallback((time) => {
       this.currentTime = time
     });
+    this.videoRatioLocal = this.videoRatio
     this.init()
   }
 
@@ -132,6 +134,7 @@ export struct VideoItemView {
   }
 
   // 创建或注销AVPlayer
+  @Monitor('videoUrl')
   createOrFinish(): void {
     if (this.videoUrl !== '') {
       this.init();
@@ -232,7 +235,7 @@ export struct VideoItemView {
     });
     // 视频宽高上报回调函数
     this.avPlayer.on('videoSizeChange', (width: number, height: number) => {
-      this.videoRatio = width / height
+      this.videoRatioLocal = width / height
       console.log('videoSizeChange success,and width is:' + width + ', height is :' + height);
     });
     // 焦点上报回调函数
@@ -307,10 +310,12 @@ export struct VideoItemView {
   }
 
   // isPlaying状态变化时调用
+  @Monitor('isPlaying')
   onChangePlay() {
     this.isPlaying ? this.getPlay() : this.getPause();
   }
 
+  @Monitor('isLandscape')
   changeOrientation() {
     // 获取UIAbility实例的上下文信息
     let context = getContext(this);
@@ -377,7 +382,7 @@ export struct VideoItemView {
           controller: this.xComponentController
         })
           .width('100%')
-          .aspectRatio(this.videoRatio)
+          .aspectRatio(this.videoRatioLocal)
           .onLoad(() => {
             this.surfaceID = this.xComponentController.getXComponentSurfaceId();
           })
@@ -453,7 +458,7 @@ export struct VideoItemView {
               .opacity(0.6)
               .onClick(() => {
                 this.isLandscape = !this.isLandscape;
-                this.videoRatio = this.videoRatio > 0 ? 1 / this.videoRatio : 0
+                this.videoRatioLocal = this.videoRatioLocal > 0 ? 1 / this.videoRatioLocal : 0
               })
           }
 

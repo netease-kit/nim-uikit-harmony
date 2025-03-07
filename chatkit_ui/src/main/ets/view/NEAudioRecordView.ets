@@ -11,11 +11,11 @@ import { AudioRecordManager } from '../manager/AudioRecordManager';
 import { NECommonUtils } from '@nimkit/common';
 
 @Entry
-@Component
+@ComponentV2
 export struct NEAudioRecordView {
   audioManager: AudioManager = AudioManager.instance;
-  @State press: boolean = false;
-  @State scaleValue: ScaleOptions = { x: 1, y: 1 };
+  @Param press: boolean = false;
+  @Param scaleValue: ScaleOptions = { x: 1, y: 1 };
   options: AnimatorOptions = {
     duration: 1500,
     easing: "friction",
@@ -26,14 +26,14 @@ export struct NEAudioRecordView {
     begin: 200.0,
     end: 400.0
   };
-  @State wid: number = 104
-  @State hei: number = 104
-  @State radius: number = 52
-  @State isRecording: boolean = false
+  @Local wid: number = 104
+  @Local hei: number = 104
+  @Local radius: number = 52
+  @Local isRecording: boolean = false
   path: string = ""
-  public onRecordAudio?: (path: string, duration: number) => void;
-  public onRecordStart?: () => void;
-  public onRecordEnd?: () => void;
+  @Param @Require onRecordAudio?: (path: string, duration: number) => void;
+  @Param @Require onRecordStart?: () => void;
+  @Param @Require onRecordEnd?: () => void;
   duration: number = 0;
   intervalID?: number;
   maxRecordTimer: number = 60;

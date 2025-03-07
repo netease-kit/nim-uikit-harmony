@@ -28,7 +28,6 @@ export enum InputStyleType {
   More = 4,
 }
 
-@Entry
 @ComponentV2
 export struct NEChatInputView {
   inputSpans: Array<RichEditorImageSpanResult | RichEditorTextSpanResult> = []
@@ -71,7 +70,6 @@ export struct NEChatInputView {
   replyMsg: NIMMessageInfo | undefined = undefined
   @Param
   chatInfo: ChatInfo | undefined = undefined
-  private isPasteText = false
   /**
    * @弹框
    */
@@ -99,7 +97,7 @@ export struct NEChatInputView {
   }
 
   @Monitor('mute')
-  onMute(monitor: IMonitor) {
+  onMute() {
     if (this.mute) {
       this.controller?.deleteSpans()
       this.controller?.stopEditing()
@@ -270,7 +268,7 @@ export struct NEChatInputView {
         if (!this.mute && this.replyMsg) {
           Row() {
             Image($r('app.media.ic_chat_reply_close')).height(20).width(20).margin({ right: 12 })
-              .onClick((event) => {
+              .onClick(() => {
                 this.onDidClickCloseReply?.()
               })
             Text() {
@@ -320,7 +318,6 @@ export struct NEChatInputView {
           .aboutToDelete(this.aboutToDelete)
           .onDidChange((rangeBefore: TextRange, rangeAfter: TextRange) => {
             console.debug(`ChatInputView onDidChange before ${rangeBefore.start} ~ ${rangeBefore.end} after ${rangeAfter.start} ~ ${rangeAfter.end}`)
-            this.isPasteText = false
             this.inputSpans = this.controller?.getSpans() ?? []
           })
           .onSelectionChange((range: RichEditorRange) => {
@@ -352,8 +349,7 @@ export struct NEChatInputView {
 
             event.preventDefault!()
           })
-          .onPaste((event: PasteEvent) => {
-            this.isPasteText = true
+          .onPaste(() => {
             console.debug(`ChatInputView onPaste`)
           })
           .borderRadius(8)
@@ -395,7 +391,7 @@ export struct NEChatInputView {
               .height(40)
 
             NEImageButton({
-              image: $r("app.media.ic_public_chat_image"), onDidClick: async (): Promise<void> => {
+              image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
                 console.log("net ease click image");
                 if (this.onDidClickImage) {
                   this.onDidClickImage()
@@ -442,7 +438,7 @@ export struct NEChatInputView {
               .height(40)
 
             NEImageButton({
-              image: $r("app.media.ic_public_chat_image"), onDidClick: async (): Promise<void> => {
+              image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
                 console.log("net ease click image");
                 if (this.onDidClickImage) {
                   this.onDidClickImage()
@@ -489,7 +485,7 @@ export struct NEChatInputView {
               .height(40)
 
             NEImageButton({
-              image: $r("app.media.ic_public_chat_image"), onDidClick: async (): Promise<void> => {
+              image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
                 console.log("net ease click image");
                 if (this.onDidClickImage) {
                   this.onDidClickImage()
@@ -536,7 +532,7 @@ export struct NEChatInputView {
               .height(40)
 
             NEImageButton({
-              image: $r("app.media.ic_public_chat_image"), onDidClick: async (): Promise<void> => {
+              image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
                 console.log("net ease click image");
                 if (this.onDidClickImage) {
                   this.onDidClickImage()

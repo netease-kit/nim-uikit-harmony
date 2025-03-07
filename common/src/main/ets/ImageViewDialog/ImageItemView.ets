@@ -16,16 +16,16 @@ import { WindowSizeManager } from '../utils/WindowSizeManagers';
 /*
   图片查看器 item
  */
-@Component
+@ComponentV2
 export struct ImageItemView {
-  @State isEnableOffset: boolean = false;
-  @State imageScaleInfo: ScaleModel = new ScaleModel(1.0, 1.0, 1.5, 0.3);
-  @State imageOffsetInfo: OffsetModel = new OffsetModel(0, 0);
-  @State matrix: matrix4.Matrix4Transit = matrix4.identity().copy();
-  @State imagePixelMap: image.PixelMap | null = null; // 当前图片pixelMap，用于Image组件显示
-  @State fitWH: "width" | "height" | undefined = "width"; // 表示当前图片是根据宽度适配还是高度适配
-  @State imageDefaultSize: image.Size = { width: 0, height: 0 }; // 图片默认大小，即，与屏幕大小最适配的显示大小
-  @State imageUri: string = ""; // 当前图片uri
+  @Local isEnableOffset: boolean = false;
+  @Local imageScaleInfo: ScaleModel = new ScaleModel(1.0, 1.0, 1.5, 0.3);
+  @Local imageOffsetInfo: OffsetModel = new OffsetModel(0, 0);
+  @Local matrix: matrix4.Matrix4Transit = matrix4.identity().copy();
+  @Local imagePixelMap: image.PixelMap | null = null; // 当前图片pixelMap，用于Image组件显示
+  @Local fitWH: "width" | "height" | undefined = "width"; // 表示当前图片是根据宽度适配还是高度适配
+  @Local imageDefaultSize: image.Size = { width: 0, height: 0 }; // 图片默认大小，即，与屏幕大小最适配的显示大小
+  @Param imageUri: string = ""; // 当前图片uri
   imageWHRatio: number = 0; // 图片原始宽高比
   imageW: number = 0; // 图片原始宽
   imageH: number = 0; // 图片原始高

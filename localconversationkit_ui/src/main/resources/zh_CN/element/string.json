@@ -1,0 +1,40 @@
+{
+  "string": [
+    {
+      "name": "conversation_title",
+      "value": "云信 Demo"
+    },
+    {
+      "name": "stick_top_conversation",
+      "value": "置顶该聊天"
+    },
+    {
+      "name": "unstick_top_conversation",
+      "value": "取消置顶"
+    },
+    {
+      "name": "delete_conversation",
+      "value": "删除该聊天"
+    },
+    {
+      "name": "add_friend",
+      "value": "添加好友"
+    },
+    {
+      "name": "create_discuss_team",
+      "value": "创建讨论组"
+    },
+    {
+      "name": "create_advance_team",
+      "value": "创建高级群"
+    },
+    {
+      "name": "pull_up_load_text",
+      "value": "上拉加载更多"
+    },
+    {
+      "name": "createAdvancedTeamSuccess",
+      "value": "成功创建高级群"
+    }
+  ]
+}

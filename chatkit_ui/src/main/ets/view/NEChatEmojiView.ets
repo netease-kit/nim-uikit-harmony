@@ -9,16 +9,16 @@ import { NEChatEmojiListItem } from './NEChatEmojiListItem';
 import display from '@ohos.display';
 
 @Entry
-@Component
+@ComponentV2
 export struct NEChatEmojiView {
-  @State data: EmojiDataModel = NEEmojiManager.instance.dataModel;
-  @State page: number = 0;
-  @State currentIndex: number = 0
-  onDidClick?: (emoji: NIMInputEmoticon) => void;
-  @State deviceWidth: number = 0;
-  @State deviceHeight: number = 0;
+  @Local data: EmojiDataModel = NEEmojiManager.instance.dataModel;
+  @Local page: number = 0;
+  @Local currentIndex: number = 0
+  @Param @Require onDidClick?: (emoji: NIMInputEmoticon) => void;
+  @Local deviceWidth: number = 0;
+  @Local deviceHeight: number = 0;
   scroller: Scroller = new Scroller()
-  onEmojiSendMessage?: () => void;
+  @Param @Require onEmojiSendMessage?: () => void;
   private pageSize = 3 * 8 - 1;
   private pageData: Array<Array<NIMInputEmoticon>> = [];
 

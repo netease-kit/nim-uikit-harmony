@@ -8,10 +8,10 @@
 import { NEChatMoreOperationData } from '../model/NEChatMoreOperationData';
 
 @Entry
-@Component
+@ComponentV2
 export struct OperationItem {
-  onItemClick?: (data: NEChatMoreOperationData) => void;
-  @Prop operationData: NEChatMoreOperationData;
+  @Param @Require onItemClick?: (data: NEChatMoreOperationData) => void;
+  @Param @Require operationData: NEChatMoreOperationData;
 
   build() {
     RelativeContainer() {

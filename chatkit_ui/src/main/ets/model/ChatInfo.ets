@@ -275,6 +275,13 @@ export class MessageDataSource implements IDataSource {
     })
   }
 
+  public deleteWithIndex(index: number) {
+    if (index >= 0 && index < this.messageData.length) {
+      this.messageData.splice(index, 1)
+      this.notifyDataDelete(index)
+    }
+  }
+
   public searchInsertPosition(creatTime: number): number {
     for (let index = this.messageData.length - 1; index >= 0; index--) {
       if (creatTime > this.messageData[index].getCreateTime()) {

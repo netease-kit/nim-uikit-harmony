@@ -4,9 +4,12 @@
  * found in the LICENSE file.
  *
  */
+import { IMKitConfigCenter } from '@nimkit/chatkit';
+import { CommonConstants, NECommonUtils } from '@nimkit/common';
 
 import { NimRepository } from '../ability/NimRepository';
 import { AppConfig } from '../constants/AppConfig';
+import { preferences } from '@kit.ArkData';
 
 /**
  * Index is the entry of application and Here is a list showing three buttons,
@@ -15,10 +18,34 @@ import { AppConfig } from '../constants/AppConfig';
 
 
 @Entry
-@Component
+@ComponentV2
 struct Index {
   pathStack: NavPathStack = new NavPathStack()
-  @State showLoginPage: boolean = true
+  @Local showLoginPage: boolean = false
+  login = async (accountId: string, token: string) => {
+    const nimRepository = NimRepository.getInstance(getContext(this))
+    try {
+      await nimRepository.login(accountId, token, AppConfig.appKey)
+    } catch (err) {
+      this.showLoginPage = true
+      const tips = getContext(this).resourceManager.getStringSync($r('app.string.login_failed').id)
+      NECommonUtils.showToast(tips + err)
+      console.error(err)
+    }
+  }
+
+  async onPageShow(): Promise<void> {
+    let dataPreferences: preferences.Preferences | null = null;
+    let options: preferences.Options = { name: 'imkit_data' };
+    dataPreferences = preferences.getPreferencesSync(getContext(this), options);
+    IMKitConfigCenter.enableLocalConversation =
+      dataPreferences.getSync(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, true) as boolean
+    if (AppConfig.userId) {
+      this.login(AppConfig.userId, AppConfig.userToken)
+    } else {
+      this.showLoginPage = true
+    }
+  }
 
   build() {
     Navigation(this.pathStack) {
@@ -74,8 +101,7 @@ struct Index {
         .width('100%')
         .margin({ top: 10 })
       }
-
-
     }.mode(NavigationMode.Auto)
+    .hideTitleBar(true)
   }
 }

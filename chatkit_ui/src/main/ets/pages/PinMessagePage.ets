@@ -7,7 +7,7 @@
 
 import { ChatTeamInfo } from '../model/ChatTeamInfo';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
-import { PinMessageComponent } from '../view/MessageComponent';
+import { PinMessageComponent } from '../view/PinMessageComponent';
 import { NEEmojiManager } from '../manager/NEEmojiManager';
 import {
   CommonEmptyResult,
@@ -327,7 +327,7 @@ export struct PinMessagePage {
                 onMessageClick: {
                   onAvatarClick: undefined,
                   onItemLongClick: undefined,
-                  onItemClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                  onItemClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
                     this.tapMessage = msg
                     if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
                       this.showImageDetail(msg)
@@ -356,12 +356,12 @@ export struct PinMessagePage {
                     }
                   }
                 },
-                onMoreButtonClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                onMoreButtonClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
                   this.tapMessage = msg
                   this.pinMoreActionDialogHeight = this.getPinMoreActionDialogHeight(msg)
                   this.pinMoreActionDialog.open()
                 },
-                onPinItemClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                onPinItemClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
                   if (msg) {
                     if (ChatBaseViewModel.currentViewModel) {
                       ChatBaseViewModel.currentViewModel.setAnchorMessage(msg)
@@ -375,7 +375,7 @@ export struct PinMessagePage {
                 }
               })
             }
-          }, (item: NIMMessageInfo, index?: number) => item.message.messageClientId)
+          }, (item: NIMMessageInfo) => item.message.messageClientId)
         }
         .id("pinPageListView")
         .cachedCount(20)
@@ -388,7 +388,7 @@ export struct PinMessagePage {
         })
         .width('100%')
         .height('100%')
-        .onScrollIndex((start: number, end: number, center: number) => {
+        .onScrollIndex((start: number, _end: number) => {
           this.scrollIndex = start
         })
       }

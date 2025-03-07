@@ -20,13 +20,13 @@ export interface TextEditParams {
 /**
  * 通用文本编辑页面
  */
-@Component
+@ComponentV2
 export struct TextEditPage {
   pathStack: NavPathStack = new NavPathStack()
-  @State params: TextEditParams | null = null
-  @State content: string = ''
-  @State maxLine: number = 3
-  @State textHeight: Length = 100
+  @Local params: TextEditParams | null = null
+  @Local content: string = ''
+  @Local maxLine: number = 3
+  @Local textHeight: Length = 100
 
   build() {
     NavDestination() {

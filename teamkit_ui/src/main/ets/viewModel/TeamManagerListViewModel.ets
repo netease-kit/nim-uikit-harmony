@@ -66,7 +66,7 @@ export class TeamMangerListViewModel {
       V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL
         && this.managerList.find((a) => a.teamMember.accountId === e.accountId))
 
-      this.managerList = this.managerList.filter((m) =>!normalMembers.find((e) => e.accountId === m.getAccId()))
+      this.managerList = this.managerList.filter((m) => !normalMembers.find((e) => e.accountId === m.getAccId()))
 
 
     }
@@ -75,14 +75,14 @@ export class TeamMangerListViewModel {
   onTeamMemberLeft(members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
       let removeIds: string[] = members.map(member => member.accountId)
-      this.managerList = this.managerList.filter(m =>!removeIds.includes(m.getAccId()))
+      this.managerList = this.managerList.filter(m => !removeIds.includes(m.getAccId()))
     }
   }
 
   onTeamMemberKicked(accId: string, members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
       let removeIds: string[] = members.map(member => member.accountId)
-      this.managerList = this.managerList.filter(m =>!removeIds.includes(m.getAccId()))
+      this.managerList = this.managerList.filter(m => !removeIds.includes(m.getAccId()))
     }
   }
 
@@ -143,7 +143,7 @@ export class TeamMangerListViewModel {
           this.isFinish = result.finished
           this.nextToken = result.nextToken
           this.managerList.push(...result.memberList)
-          this.managerList = this.managerList.filter((member) =>!member.isOwner())
+          this.managerList = this.managerList.filter((member) => !member.isOwner())
           this.managerList.sort((a, b) => this.sortTeamMember(a, b))
           this.haveInitData = true
         }

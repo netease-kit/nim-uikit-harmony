@@ -90,18 +90,18 @@ function MineInfoPageBuilder() {
   MineInfoPage()
 }
 
-@Component
+@ComponentV2
 export struct MineInfoPage {
   pathStack: NavPathStack = new NavPathStack()
   viewModel: EditInfoViewModel = new EditInfoViewModel()
-  @State myUser?: V2NIMUser = NEFriendUserCache.mineUserCache?.user;
-  @State nick?: string = this.myUser?.name;
-  @State gender?: number = this.myUser?.gender;
-  @State birthday?: string = this.myUser?.birthday;
-  @State mobile?: string = this.myUser?.mobile;
-  @State email?: string = this.myUser?.email;
-  @State sign?: string = this.myUser?.sign;
-  @State mineInfoItems1: MineInfoItem[] = [
+  @Local myUser?: V2NIMUser = NEFriendUserCache.mineUserCache?.user;
+  @Local nick?: string = this.myUser?.name;
+  @Local gender?: number = this.myUser?.gender;
+  @Local birthday?: string = this.myUser?.birthday;
+  @Local mobile?: string = this.myUser?.mobile;
+  @Local email?: string = this.myUser?.email;
+  @Local sign?: string = this.myUser?.sign;
+  @Local mineInfoItems1: MineInfoItem[] = [
     new MineInfoItem($r('app.string.mine_info_avatar'), this.myUser?.avatar, undefined, EditType.avatar),
     new MineInfoItem($r("app.string.person_info_nick"), undefined, this.myUser?.name, EditType.nick, 'EditInfoPage'),
     new MineInfoItem($r("app.string.mine_account_id"), undefined, this.myUser?.accountId, EditType.accountId, undefined,
@@ -114,7 +114,7 @@ export struct MineInfoPage {
     new MineInfoItem($r("app.string.person_info_email"), undefined, this.myUser?.email, EditType.email, 'EditInfoPage'),
 
   ]
-  @State mineInfoItems2: MineInfoItem[] = [
+  @Local mineInfoItems2: MineInfoItem[] = [
     new MineInfoItem($r("app.string.person_info_sign"), undefined, this.myUser?.sign, EditType.sign, 'EditInfoPage'),
   ]
   onDateChanged = (value?: Date) => {

@@ -228,7 +228,7 @@ export struct ChatTeamPage {
   }
 
   @Monitor("chatTeamInfo.isReceiveMsg")
-  onReceiveMsg(monitor: IMonitor) {
+  onReceiveMsg() {
     if (this.firstLoadData || this.chatTeamInfo.isReceiveMsg) {
       this.listScroller.scrollEdge(Edge.Bottom)
       this.chatTeamInfo.setReceiveMsg(false)
@@ -237,7 +237,7 @@ export struct ChatTeamPage {
   }
 
   @Monitor("chatViewModel.needScrollToBottom")
-  onNeedScrollToBottom(monitor: IMonitor) {
+  onNeedScrollToBottom() {
     if (this.chatViewModel.needScrollToBottom &&
       this.listScrollEndPosition >= this.chatTeamInfo.msgList.totalCount() - 2) {
       this.listScroller.scrollEdge(Edge.Bottom)
@@ -246,7 +246,7 @@ export struct ChatTeamPage {
   }
 
   @Monitor("chatTeamInfo.team")
-  onGetTeamInfo(monitor: IMonitor) {
+  onGetTeamInfo() {
     let team = this.chatTeamInfo.team
     if (team && !team.isValidTeam) {
       TeamExitWarningDialog.show(this.getUIContext(), new TeamExitDialogParam(
@@ -260,7 +260,7 @@ export struct ChatTeamPage {
   }
 
   @Monitor("chatTeamInfo.scrollIndex")
-  onScrollIndex(monitor: IMonitor) {
+  onScrollIndex() {
     if (this.chatTeamInfo.scrollIndex > -1) {
       let height = DeviceUtils.windowPXHeight / 2
       this.toScroll = true
@@ -273,7 +273,7 @@ export struct ChatTeamPage {
   }
 
   @Monitor("chatViewModel.anchorMsg")
-  onAnchorMsg(monitor: IMonitor) {
+  onAnchorMsg() {
     if (this.chatViewModel.anchorMsg) {
       if (this.chatTeamInfo.msgMap.has(this.chatViewModel.anchorMsg.getMessageClientId())) {
         let position = this.chatTeamInfo.searchPosition(this.chatViewModel.anchorMsg.getMessageClientId())
@@ -287,19 +287,19 @@ export struct ChatTeamPage {
   }
 
   @Monitor("chatViewModel.isMuteModel")
-  onMuteModel(monitor: IMonitor) {
+  onMuteModel() {
     if (this.chatViewModel.isMuteModel) {
       this.clearInput(true)
     }
   }
 
   @Monitor("chatViewModel.selectMsgCount")
-  onSelectMsg(monitor: IMonitor) {
+  onSelectMsg() {
     this.multiSelectCount = this.chatViewModel.getSelectMessageSize()
   }
 
   @Monitor("expandHeight")
-  onExpandInputView(monitor: IMonitor) {
+  onExpandInputView() {
     if (this.expandHeight > 10) {
       // 如果是定位消息状态，收到键盘展开重新切换最新消息
       if (this.chatViewModel.hasNew) {
@@ -374,7 +374,7 @@ export struct ChatTeamPage {
     let text = '';
     let builderSpanIndex = 0;
     if (this.controller) {
-      this.controller.getSpans().forEach((span, index) => {
+      this.controller.getSpans().forEach((span) => {
         const textSpan = span as RichEditorTextSpanResult;
         const imageSpan = span as RichEditorImageSpanResult;
         if (textSpan.value) {
@@ -610,7 +610,7 @@ export struct ChatTeamPage {
                     }
                     this.showMessageDetail(msg)
                   },
-                  onRevokeEditClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                  onRevokeEditClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
                     if (msg?.checkRevokeEdit()) {
                       const controller = this.controller
                       if (msg.isReplyMsg && msg.replyMsg) {
@@ -652,7 +652,7 @@ export struct ChatTeamPage {
                       NECommonUtils.showToast($r('app.string.chat_revoke_edit_error_tips'))
                     }
                   },
-                  onReadReceiptClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                  onReadReceiptClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
                     if (ErrorUtils.checkNetworkAndToast()) {
                       this.pathStack.pushPath({ name: 'ChatReadReceiptPage', param: msg?.message })
                     }
@@ -680,7 +680,7 @@ export struct ChatTeamPage {
                 }
               })
             }
-          }, (item: NIMMessageInfo, index?: number) => item.message.messageClientId)
+          }, (item: NIMMessageInfo) => item.message.messageClientId)
         }
         .id("chatPageListView")
         .cachedCount(20)
@@ -838,21 +838,21 @@ export struct ChatTeamPage {
         } else if (this.showMultiSelect) {
           ChatMultiSelectView({
             isEnable: this.multiSelectCount > 0,
-            onMultiForward: (clickEvent) => {
+            onMultiForward: () => {
               if (ChatKitClient.connectBroken()) {
                 NECommonUtils.showToast($r('app.string.chat_network_error_tips'))
               } else {
                 this.multiForwardMessage()
               }
             },
-            onSingleForward: (clickEvent) => {
+            onSingleForward: () => {
               if (ChatKitClient.connectBroken()) {
                 NECommonUtils.showToast($r('app.string.chat_network_error_tips'))
               } else {
                 this.singleForwardMessage()
               }
             },
-            onMultiDelete: (clickEvent) => {
+            onMultiDelete: () => {
               let selectMsg = this.chatViewModel.getSelectMessageList()
               if (selectMsg.length > ChatConst.messageDeleteLimit) {
                 NECommonUtils.showToast($r('app.string.chat_multi_delete_limit_tips', ChatConst.messageDeleteLimit))

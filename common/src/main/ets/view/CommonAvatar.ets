@@ -24,6 +24,8 @@ export struct CommonAvatar {
    */
   @Param textColor: ResourceColor = '#ffFFFFFF'
 
+  @Param longPressGesture:((event: GestureEvent) => void) | undefined = undefined
+
   build() {
     if (this.item != null) {
 
@@ -43,9 +45,11 @@ export struct CommonAvatar {
             })
             .width('100%')
             .maxLines(1)
-        }
+        }.gesture(LongPressGesture().onAction(this.longPressGesture))
       } else {
-        Image(this.item.avatarUrl).borderRadius(this.roundRadius)
+        Image(this.item.avatarUrl).borderRadius(this.roundRadius).gesture(LongPressGesture().onAction(event => {
+          this.longPressGesture?.(event)
+        }))
       }
 
     }

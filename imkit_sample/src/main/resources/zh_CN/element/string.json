@@ -6,7 +6,7 @@
     },
     {
       "name": "login",
-      "value": "Login"
+      "value": "登录"
     },
     {
       "name": "grid_title_label",
@@ -49,15 +49,27 @@
       "value": "收藏"
     },
     {
+      "name": "mine_remove_collection_tip",
+      "value": "确认要删除该收藏吗？"
+    },
+    {
+      "name": "mine_collection_empty",
+      "value": "暂无收藏消息"
+    },
+    {
+      "name": "mine_collection_from_team",
+      "value": "来自于 %s"
+    },
+    {
+      "name": "mine_collection_from_p2p",
+      "value": "来自于 与%s的会话"
+    },
+    {
       "name": "mine_about",
       "value": "关于云信"
     },
     {
       "name": "mine_setting",
-      "value": "设置"
-    },
-    {
-      "name": "mine_setting_",
       "value": "设置"
     },
     {
@@ -75,6 +87,10 @@
     {
       "name": "mine_setting_read",
       "value": "消息已读未读功能"
+    },
+    {
+      "name": "mine_setting_conversation",
+      "value": "本地会话功能"
     },
     {
       "name": "mine_setting_logout",
@@ -107,6 +123,18 @@
     {
       "name": "mine_about_introduce",
       "value": "产品介绍"
+    },
+    {
+      "name": "yunxin_comment",
+      "value": "真正稳定的IM 云服务"
+    },
+    {
+      "name": "login_privatized_configuration",
+      "value": "私有化配置"
+    },
+    {
+      "name": "login_by_account",
+      "value": "账号登录"
     }
   ]
 }

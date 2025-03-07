@@ -6,10 +6,10 @@
  */
 
 @Entry
-@Component
+@ComponentV2
 export struct NEImageButton {
-  @Prop image: Resource;
-  onDidClick?: () => void;
+  @Param @Require image: Resource
+  @Param onDidClick?: () => void | undefined = undefined
 
   build() {
     RelativeContainer() {

@@ -66,14 +66,14 @@ export class TeamMemberListViewModel {
   onTeamMemberLeft(members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
       let removeIds: string[] = members.map(member => member.accountId)
-      this.memberList = this.memberList.filter(m =>!removeIds.includes(m.getAccId()))
+      this.memberList = this.memberList.filter(m => !removeIds.includes(m.getAccId()))
     }
   }
 
   onTeamMemberKicked(accId: string, members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
       let removeIds: string[] = members.map(member => member.accountId)
-      this.memberList = this.memberList.filter(m =>!removeIds.includes(m.getAccId()))
+      this.memberList = this.memberList.filter(m => !removeIds.includes(m.getAccId()))
     }
   }
 

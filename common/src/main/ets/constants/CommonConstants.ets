@@ -57,4 +57,10 @@ export class CommonConstants {
    * 【消息已读未读功能】存储 key
    */
   static readonly KEY_SETTING_MESSAGE_READ_OR: string = 'KEY_SETTING_MESSAGE_READ_OR';
+  /**
+   * use local conversation kit
+   * if true , use local conversation kit
+   * if false , use remote conversation kit
+   */
+  static readonly KEY_SETTING_LOCAL_CONVERSATION: string = 'KEY_SETTING_MESSAGE_READ_OR';
 }

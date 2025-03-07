@@ -2,8 +2,8 @@
   "module": {
     "name": "imkit_sample",
     "type": "entry",
-    "description": "$string:ability_desc",
-    "mainElement": "DefaultAbility",
+    "description": "$string:module_desc",
+    "mainElement": "IMAbility",
     "deviceTypes": [
       "phone",
       "tablet",
@@ -15,7 +15,7 @@
     "routerMap": "$profile:router_map",
     "abilities": [
       {
-        "name": "DefaultAbility",
+        "name": "IMAbility",
         "srcEntry": "./ets/ability/IMAbility.ets",
         "description": "$string:ability_desc",
         "icon": "$media:ic_app",

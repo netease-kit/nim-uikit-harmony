@@ -174,6 +174,14 @@ export struct PersonInfoPage {
     height: 140,
   })
 
+  @Monitor('viewModel.userWithFriend.friend')
+  onFriendChange(){
+    this.alias =
+      StringIsEmpty(this.viewModel.userWithFriend?.friend?.alias) ? undefined :
+        this.viewModel.userWithFriend?.friend?.alias
+  }
+
+
   getGenderString() {
     return this.viewModel.userWithFriend?.user?.gender === 2 ? $r("app.string.person_gender_female") :
       (this.viewModel.userWithFriend?.user?.gender === 1 ? $r("app.string.person_gender_male") :

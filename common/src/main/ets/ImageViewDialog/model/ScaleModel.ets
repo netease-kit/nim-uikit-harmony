@@ -8,7 +8,7 @@
 /*
   图片缩放模型
  */
-@Observed
+@ObservedV2
 export class ScaleModel {
   /**
    * scaleValue: 本次缩放因子，用于控制图片的大小显示

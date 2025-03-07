@@ -11,6 +11,7 @@ import {
   V2NIMConversation,
   V2NIMConversationType,
   V2NIMFriend,
+  V2NIMFriendDeletionType,
   V2NIMLoginStatus,
   V2NIMTeam,
   V2NIMTeamType
@@ -74,9 +75,14 @@ export class ConversationViewModel {
 
     //好友信息变更修改
     ChatKitClient.nim.friendService?.on('onFriendInfoChanged', async (friend: V2NIMFriend) => {
-      ChatKitClient.logger?.debug(`${ConversationViewModel.logTag} onFriendInfoChanged ${friend.accountId} alias = ${friend.alias}`)
       await this.updateConversationById(ChatKitClient.nim.conversationIdUtil.p2pConversationId(friend.accountId))
     })
+
+    //好友删除，别名不存在需要更新
+    ChatKitClient.nim.friendService?.on('onFriendDeleted',
+      async (accountId: string, deletionType: V2NIMFriendDeletionType) => {
+        await this.updateConversationById(ChatKitClient.nim.conversationIdUtil.p2pConversationId(accountId))
+      })
 
 
     //群解散
@@ -116,7 +122,7 @@ export class ConversationViewModel {
     //会话删除
     ChatKitClient.nim.conversationService?.on("onConversationDeleted", (conversationIds: string[]) => {
       this.conversationList =
-        this.conversationList?.filter(conversation =>!conversationIds.includes(conversation.conversationId))
+        this.conversationList?.filter(conversation => !conversationIds.includes(conversation.conversationId))
     })
     //会话更新
     ChatKitClient.nim.conversationService?.on("onConversationChanged", (updateList: V2NIMConversation[]) => {
@@ -224,7 +230,7 @@ export class ConversationViewModel {
         let newConversation = result.conversationList
         if (this.conversationList.length > 0 && newConversation.length > 0) {
           this.conversationList =
-            this.conversationList.filter(conversation =>!newConversation.find((m) => m.conversationId ===
+            this.conversationList.filter(conversation => !newConversation.find((m) => m.conversationId ===
             conversation.conversationId))
         }
         this.conversationList?.push(...newConversation)

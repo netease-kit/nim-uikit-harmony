@@ -86,7 +86,7 @@ export class ChatUserInfo extends ChatInfo {
     if (this.chatFriend) {
       name = this.chatFriend?.alias ?? '';
     }
-    if (name === '' && NEFriendUserCache.getInstance().isFriend(accountId)) {
+    if (name === '' && NEFriendUserCache.getInstance().getFriendById(accountId)) {
       let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
       if (friendInfo !== undefined) {
         name = friendInfo.showName()
@@ -133,11 +133,9 @@ export class ChatUserInfo extends ChatInfo {
     }
 
     let name = '';
-    if (NEFriendUserCache.getInstance().isFriend(accountId)) {
-      let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
-      if (friendInfo !== undefined) {
-        name = friendInfo.showName(alias)
-      }
+    let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
+    if (friendInfo !== undefined) {
+      name = friendInfo.showName(alias)
     }
     if (name === '' && this.chatUser !== undefined) {
       name = this.chatUser?.name ?? '';
@@ -196,11 +194,9 @@ export class ChatUserInfo extends ChatInfo {
 
   getConversationName(): string {
     let result: string = '';
-    if (NEFriendUserCache.getInstance().isFriend(this.targetId)) {
-      let friendInfo = NEFriendUserCache.getInstance().getFriendById(this.targetId)
-      if (friendInfo !== undefined) {
-        result = friendInfo.showName(true)
-      }
+    let friendInfo = NEFriendUserCache.getInstance().getFriendById(this.targetId)
+    if (friendInfo !== undefined) {
+      result = friendInfo.showName(true)
     } else if (this.chatUser !== undefined) {
       result = this.chatUser?.name !== null ? this.chatUser?.name : this.chatUser?.accountId;
     }

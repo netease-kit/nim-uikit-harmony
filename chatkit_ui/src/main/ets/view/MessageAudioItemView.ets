@@ -89,9 +89,9 @@ export struct MessageAudioItemView {
         )
       }
     })
-    .gesture(LongPressGesture({ duration: 300 }).onAction((event: GestureEvent) => {
-      this.onMessageClick?.onItemLongClick?.(event, this.message)
-    }))
+    // .gesture(LongPressGesture({ duration: 300 }).onAction((event: GestureEvent) => {
+    //   this.onMessageClick?.onItemLongClick?.(event, this.message)
+    // }))
     .width(getAudioMessageWidth(this.message))
     .height(ChatConst.audioMessageWidth)
   }

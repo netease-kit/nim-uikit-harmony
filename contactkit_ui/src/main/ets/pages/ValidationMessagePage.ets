@@ -12,8 +12,7 @@ import {
   CommonAvatar,
   CommonEmptyResult,
   GetUnreadCountStr,
-  NavigationBackBuilder,
-  NECommonUtils
+  NavigationBackBuilder
 } from '@nimkit/common';
 import { V2NIMFriendAddApplication, V2NIMFriendAddApplicationStatus } from '@nimsdk/base';
 import { NEFriendAddApplication } from '../model/NEFriendAddApplication';
@@ -213,7 +212,7 @@ export struct ValidationMessagePage {
   // 【清空】按钮点击事件
   onCleanClick = () => {
     if (ErrorUtils.checkNetworkAndToast()) {
-      NECommonUtils.showToast("清空")
+      this.viewModel.clearAllAddApplication()
     }
   }
 
@@ -223,9 +222,9 @@ export struct ValidationMessagePage {
         NavigationBackBuilder({
           title: $r('app.string.contact_validation_message'),
           showDivideLine: true,
-          // rightButtonTitle: $r('app.string.contact_clean'),
-          // rightButtonColor: "#666666",
-          // rightButtonAction: this.onCleanClick,
+          rightButtonTitle: $r('app.string.contact_clean'),
+          rightButtonColor: "#666666",
+          rightButtonAction: this.onCleanClick,
           leftButtonAction: () => {
             this.backAction()
           }

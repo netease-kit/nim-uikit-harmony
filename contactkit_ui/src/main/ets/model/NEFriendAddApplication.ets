@@ -44,13 +44,10 @@ export class NEFriendAddApplication {
   }
 
   // 是否是同一申请
-  isEqualTo(nimApplication: V2NIMFriendAddApplication, compareStatus = true): boolean {
+  isEqualTo(nimApplication: V2NIMFriendAddApplication): boolean {
     if (this.friendAddApplication.applicantAccountId === nimApplication.applicantAccountId &&
       this.friendAddApplication.recipientAccountId === nimApplication.recipientAccountId) {
-      if (compareStatus) {
-        return this.status === nimApplication.status
-      }
-      return true
+      return this.status === nimApplication.status
     }
     return false
   }

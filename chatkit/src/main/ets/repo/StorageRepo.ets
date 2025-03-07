@@ -20,7 +20,7 @@ export class StorageRepo {
    * @param sceneName 自定义的场景名
    * @param expireTime 文件过期时间. 单位秒. 数值要求大于等于 86400 秒, 即 1 天.
    */
-  static addCustomStorageScene(sceneName: string, expireTime: number): void {
+  static addCustomStorageScene(sceneName: string, expireTime: number): V2NIMStorageScene | undefined {
     return ChatKitClient.nim.storageService?.addCustomStorageScene(sceneName, expireTime)
   }
 

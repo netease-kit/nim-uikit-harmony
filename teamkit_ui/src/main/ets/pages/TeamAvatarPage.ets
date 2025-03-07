@@ -7,7 +7,7 @@
 
 import { ChatKitClient, StorageRepo, TeamRepo } from '@nimkit/chatkit';
 import { ChooseAvatarDialog, NavigationBackBuilder } from '@nimkit/common';
-import { V2NIMError, V2NIMLoginStatus } from '@nimsdk/base';
+import { V2NIMError } from '@nimsdk/base';
 import fs from '@ohos.file.fs';
 
 export interface AvatarEditParams {
@@ -16,12 +16,12 @@ export interface AvatarEditParams {
 }
 
 
-@Component
+@ComponentV2
 struct TeamAvatarPage {
   pathStack: NavPathStack = new NavPathStack()
-  @State avatar?: string | null = null
+  @Local avatar?: string | null = null
   //显示保存按钮
-  @State showSave: boolean = true
+  @Local showSave: boolean = true
   //图片选择结果处理
   onImageChosen = async (filePath: string) => {
 

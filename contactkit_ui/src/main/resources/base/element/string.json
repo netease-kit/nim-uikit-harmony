@@ -187,6 +187,10 @@
     {
       "name": "conversation_selected",
       "value": "已选"
+    },
+    {
+      "name": "validate_processed",
+      "value": "Already done on other devices"
     }
   ]
 }

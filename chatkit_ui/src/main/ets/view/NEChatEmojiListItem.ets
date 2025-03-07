@@ -7,10 +7,10 @@
 import { NIMEmoticonType, NIMInputEmoticon } from '../manager/NEEmojiManager';
 
 @Entry
-@Component
+@ComponentV2
 export struct NEChatEmojiListItem {
-  @State emoji: NIMInputEmoticon = new NIMInputEmoticon();
-  onDidClick?: (emoji: NIMInputEmoticon) => void;
+  @Param emoji: NIMInputEmoticon = new NIMInputEmoticon();
+  @Param @Require onDidClick?: (emoji: NIMInputEmoticon) => void;
 
   build() {
     RelativeContainer() {

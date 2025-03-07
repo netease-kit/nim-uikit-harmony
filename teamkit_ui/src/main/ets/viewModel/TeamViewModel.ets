@@ -5,7 +5,15 @@
  *
  */
 
-import { ChatKitClient, ContactRepo, ConversationRepo, SettingRepo, TeamRepo } from '@nimkit/chatkit';
+import {
+  ChatKitClient,
+  ContactRepo,
+  ConversationRepo,
+  IMKitConfigCenter,
+  LocalConversationRepo,
+  SettingRepo,
+  TeamRepo
+} from '@nimkit/chatkit';
 import {
   V2NIMConversation,
   V2NIMConversationType,
@@ -114,14 +122,14 @@ export class TeamSettingViewModel {
   onTeamMemberKicked(accId: string, members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
       let removeIds: string[] = members.map(member => member.accountId)
-      this.teamMemberList = this.teamMemberList.filter(m =>!removeIds.includes(m.getAccId()))
+      this.teamMemberList = this.teamMemberList.filter(m => !removeIds.includes(m.getAccId()))
     }
   }
 
   onTeamMemberLeft(members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
       let removeIds: string[] = members.map(member => member.accountId)
-      this.teamMemberList = this.teamMemberList.filter(m =>!removeIds.includes(m.getAccId()))
+      this.teamMemberList = this.teamMemberList.filter(m => !removeIds.includes(m.getAccId()))
     }
   }
 
@@ -166,11 +174,19 @@ export class TeamSettingViewModel {
    * 获取是否置顶和通知
    */
   getConversationInfo() {
-    ConversationRepo.getConversation(ChatKitClient.nim.conversationIdUtil
-      .teamConversationId(this.teamId)).then((conversation) => {
-      this.isStickTop = conversation?.stickTop ?? false
-      this.isMessageNotify = !(conversation?.mute ?? false)
-    })
+    if (IMKitConfigCenter.enableLocalConversation) {
+      LocalConversationRepo.getConversation(ChatKitClient.nim.conversationIdUtil.teamConversationId(this.teamId))
+        .then((conversation) => {
+          this.isStickTop = conversation?.stickTop ?? false
+          this.isMessageNotify = !(conversation?.mute ?? false)
+        })
+    } else {
+      ConversationRepo.getConversation(ChatKitClient.nim.conversationIdUtil
+        .teamConversationId(this.teamId)).then((conversation) => {
+        this.isStickTop = conversation?.stickTop ?? false
+        this.isMessageNotify = !(conversation?.mute ?? false)
+      })
+    }
   }
 
   /**
@@ -179,8 +195,13 @@ export class TeamSettingViewModel {
    */
   stickTopConversation(stickTop: boolean) {
     try {
-      ConversationRepo.stickTopConversation(ChatKitClient.nim.conversationIdUtil
-        .teamConversationId(this.teamId), stickTop)
+      if (IMKitConfigCenter.enableLocalConversation) {
+        LocalConversationRepo.stickTopConversation(ChatKitClient.nim.conversationIdUtil.teamConversationId(this.teamId),
+          stickTop)
+      } else {
+        ConversationRepo.stickTopConversation(ChatKitClient.nim.conversationIdUtil
+          .teamConversationId(this.teamId), stickTop)
+      }
       this.isStickTop = stickTop
     } catch (error) {
       this.isStickTop = !stickTop

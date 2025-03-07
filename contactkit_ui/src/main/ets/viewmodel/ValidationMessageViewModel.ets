@@ -7,6 +7,8 @@
 
 import { ChatKitClient, ChatRepo, ContactRepo } from '@nimkit/chatkit'
 import {
+  V2NIMError,
+  V2NIMErrorCode,
   V2NIMFriendAddApplication,
   V2NIMFriendAddApplicationResult,
   V2NIMFriendAddApplicationStatus,
@@ -14,6 +16,7 @@ import {
 } from '@nimsdk/base'
 import { NEFriendAddApplication } from '../model/NEFriendAddApplication'
 import { common } from '@kit.AbilityKit'
+import { NECommonUtils } from '@nimkit/common'
 
 @ObservedV2
 export class ValidationMessageViewModel {
@@ -30,7 +33,6 @@ export class ValidationMessageViewModel {
    */
   finished: boolean = false
   @Trace friendAddApplications: NEFriendAddApplication[] = []
-  private context = getContext(this) as common.UIAbilityContext
   onFriendAddApplicationFun = async (application: V2NIMFriendAddApplication) => {
     try {
       const neApplication = await this.convertToNEFriendAddApplication(application, true)
@@ -42,14 +44,32 @@ export class ValidationMessageViewModel {
     }
   }
   onFriendAddRejectedFun = async (rejection: V2NIMFriendAddRejection) => {
+    let currentApplication: V2NIMFriendAddApplication | undefined
+
     for (let item of this.friendAddApplications) {
       if (item.friendAddApplication.applicantAccountId === ChatKitClient.getLoginUserId() &&
-        item.friendAddApplication.recipientAccountId === rejection.operatorAccountId) {
-        item.status = V2NIMFriendAddApplicationStatus.V2NIM_FRIEND_ADD_APPLICATION_STATUS_REJECTED
-        item.unreadCount = 0
+        item.friendAddApplication.recipientAccountId === rejection.operatorAccountId &&
+        item.status === V2NIMFriendAddApplicationStatus.V2NIM_FRIEND_ADD_APPLICATION_STATUS_INIT) {
+        currentApplication = item.friendAddApplication
       }
     }
+
+    if (currentApplication === undefined) {
+      for (let item of this.friendAddApplications) {
+        if (item.friendAddApplication.applicantAccountId === ChatKitClient.getLoginUserId() &&
+          item.friendAddApplication.recipientAccountId === rejection.operatorAccountId &&
+          item.status === V2NIMFriendAddApplicationStatus.V2NIM_FRIEND_ADD_APPLICATION_STATUS_REJECTED) {
+          currentApplication = item.friendAddApplication
+        }
+      }
+    }
+
+    if (currentApplication) {
+      this.setApplicationStatus(currentApplication,
+        V2NIMFriendAddApplicationStatus.V2NIM_FRIEND_ADD_APPLICATION_STATUS_REJECTED)
+    }
   }
+  private context = getContext(this) as common.UIAbilityContext
 
   constructor() {
     ChatKitClient.nim.friendService?.on("onFriendAddApplication", this.onFriendAddApplicationFun)
@@ -194,21 +214,47 @@ export class ValidationMessageViewModel {
         await ContactRepo.rejectAddApplication(application)
       }
 
-      let hasChange = false
-      for (let index = 0; index < this.friendAddApplications.length; index++) {
-        if (this.friendAddApplications[index].isEqualTo(application, false)) {
-          if (hasChange) {
-            this.friendAddApplications.splice(index, 1)
-            index--
-          } else {
-            this.friendAddApplications[index].status = status
-            this.friendAddApplications[index].unreadCount = 0
-            hasChange = true
-          }
-        }
-      }
+      this.setApplicationStatus(application, status)
     } catch (err) {
       console.log(err)
+      let v2Error = err as V2NIMError
+      if (v2Error) {
+        switch (v2Error.code) {
+          case V2NIMErrorCode.V2NIM_ERROR_CODE_FRIEND_ALREADY_EXIST:
+            this.setApplicationStatus(application,
+              V2NIMFriendAddApplicationStatus.V2NIM_FRIEND_ADD_APPLICATION_STATUS_AGREED)
+            NECommonUtils.showToast($r('app.string.validate_processed'))
+            break
+          default:
+            break
+        }
+      }
+    }
+  }
+
+  async setApplicationStatus(application: V2NIMFriendAddApplication, status: V2NIMFriendAddApplicationStatus) {
+    let currenApplication: NEFriendAddApplication | undefined
+
+    for (let index = 0; index < this.friendAddApplications.length; index++) {
+      const neApplication = this.friendAddApplications[index]
+      if (neApplication.friendAddApplication === application) {
+        currenApplication = neApplication
+      }
+    }
+
+    if (currenApplication) {
+      application.status = status
+      for (let index = this.friendAddApplications.length - 1; index >= 0; index--) {
+        const neApplication = this.friendAddApplications[index]
+        // 验证消息中（不包含第一条）已存在相同消息
+        if (neApplication.isEqualTo(application)) {
+          this.friendAddApplications.splice(index, 1)
+        }
+      }
+
+      /// 改变当前消息的状态
+      currenApplication.unreadCount = 0
+      currenApplication.status = status
     }
   }
 
@@ -218,6 +264,18 @@ export class ValidationMessageViewModel {
   async setAddApplicationRead() {
     try {
       await ContactRepo.setAddApplicationRead()
+    } catch (err) {
+      console.log(err)
+    }
+  }
+
+  async clearAllAddApplication() {
+    if (this.friendAddApplications.length < 1){
+      return
+    }
+    try {
+      await ContactRepo.clearAllAddApplication()
+      this.friendAddApplications = []
     } catch (err) {
       console.log(err)
     }

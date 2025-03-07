@@ -23,4 +23,6 @@ export interface MessageItemClick {
   onMultiSelect?: (select: boolean, msg: NIMMessageInfo | undefined) => void
   // 点击回复消息
   onReplyClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void
+  // 发送失败点击
+  onSendFailClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void
 }

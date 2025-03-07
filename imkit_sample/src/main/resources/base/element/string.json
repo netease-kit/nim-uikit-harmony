@@ -1,16 +1,16 @@
 {
   "string": [
     {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
       "name": "ability_desc",
       "value": "云信IM"
     },
     {
       "name": "ability_label",
       "value": "云信IM"
-    },
-    {
-      "name": "login",
-      "value": "Login"
     },
     {
       "name": "grid_title_label",
@@ -53,6 +53,22 @@
       "value": "收藏"
     },
     {
+      "name": "mine_remove_collection_tip",
+      "value": "确认要删除该收藏吗？"
+    },
+    {
+      "name": "mine_collection_empty",
+      "value": "暂无收藏消息"
+    },
+    {
+      "name": "mine_collection_from_team",
+      "value": "来自于 %s"
+    },
+    {
+      "name": "mine_collection_from_p2p",
+      "value": "来自于 与%s的会话"
+    },
+    {
       "name": "mine_about",
       "value": "关于云信"
     },
@@ -75,6 +91,10 @@
     {
       "name": "mine_setting_read",
       "value": "消息已读未读功能"
+    },
+    {
+      "name": "mine_setting_conversation",
+      "value": "本地会话功能"
     },
     {
       "name": "mine_setting_logout",
@@ -111,6 +131,134 @@
     {
       "name": "yunxin_comment",
       "value": "真正稳定的IM 云服务"
+    },
+    {
+      "name": "login_privatized_configuration",
+      "value": "私有化配置"
+    },
+    {
+      "name": "login_privatized_cloud_configuration",
+      "value": "私有云环境配置"
+    },
+    {
+      "name": "login_by_account",
+      "value": "账号登录"
+    },
+    {
+      "name": "login_placeholder_account",
+      "value": "用户名"
+    },
+    {
+      "name": "login_placeholder_token",
+      "value": "密码"
+    },
+    {
+      "name": "login",
+      "value": "登录"
+    },
+    {
+      "name": "login_clean_config",
+      "value": "清除私有化配置"
+    },
+    {
+      "name": "login_config_effect",
+      "value": "私有化环境配置生效"
+    },
+    {
+      "name": "login_config",
+      "value": "配置私有化参数配置"
+    },
+    {
+      "name": "login_config_mode",
+      "value": "配置方式"
+    },
+    {
+      "name": "login_config_mode_auto",
+      "value": "一键自动解析"
+    },
+    {
+      "name": "login_config_mode_manually",
+      "value": "手动填写"
+    },
+    {
+      "name": "login_config_content",
+      "value": "填写私有化配置内容"
+    },
+    {
+      "name": "login_config_input",
+      "value": "请填写"
+    },
+    {
+      "name": "login_config_appKey",
+      "value": "AppKey"
+    },
+    {
+      "name": "login_config_encrypt",
+      "value": "数据库是否需要加密%s"
+    },
+    {
+      "name": "login_config_link",
+      "value": "服务器Link地址"
+    },
+    {
+      "name": "login_config_lbs",
+      "value": "LBS服务器地址"
+    },
+    {
+      "name": "login_config_custom_tag",
+      "value": "客户端自定义 tag"
+    },
+    {
+      "name": "login_config_https",
+      "value": "使用https 进行 socket 链接%s"
+    },
+    {
+      "name": "login_config_certificate_name",
+      "value": "鸿蒙推送证书名"
+    },
+    {
+      "name": "login_config_custom_client_type",
+      "value": "自定义客户端类型%s"
+    },
+    {
+      "name": "login_config_nos_download",
+      "value": "NOS下载地址"
+    },
+    {
+      "name": "login_config_nos_download_replaceFormat",
+      "value": "NOS下载通配符地址"
+    },
+    {
+      "name": "login_config_nos_upload",
+      "value": "NOS上传地址（分片）"
+    },
+    {
+      "name": "login_config_nos_upload_replaceFormat",
+      "value": "NOS上传通配符地址"
+    },
+    {
+      "name": "login_config_input_empty",
+      "value": "请输入用户名和密码"
+    },
+    {
+      "name": "login_failed",
+      "value": "登录失败"
+    },
+    {
+      "name": "login_config_clean_tip",
+      "value": "确定要清除私有化配置吗？"
+    },
+    {
+      "name": "login_config_clean_success",
+      "value": "清除成功，请重新启动应用"
+    },
+    {
+      "name": "login_config_save_success",
+      "value": "保存成功，请重新启动应用登录"
+    },
+    {
+      "name": "login_config_illegal",
+      "value": "私有化配置内容不符合规范"
     }
   ]
 }
