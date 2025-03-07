@@ -1,0 +1,28 @@
+{
+	"app": {
+		"bundleName": "com.netease.yunxin.app.hm.im",
+		"debug": true,
+		"versionCode": 1000000,
+		"versionName": "1.0.0",
+		"minAPIVersion": 50000012,
+		"targetAPIVersion": 50002014,
+		"apiReleaseType": "Release",
+		"compileSdkVersion": "5.0.2.123",
+		"compileSdkType": "HarmonyOS",
+		"appEnvironments": [],
+		"bundleType": "app",
+		"buildMode": "debug"
+	},
+	"module": {
+		"routerMap": "$profile:route_map",
+		"name": "common",
+		"type": "har",
+		"deviceTypes": [
+			"phone",
+			"tablet",
+			"2in1"
+		],
+		"packageName": "@ohos/common",
+		"installationFree": false
+	}
+}

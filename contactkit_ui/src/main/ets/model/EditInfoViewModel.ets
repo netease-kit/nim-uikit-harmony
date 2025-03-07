@@ -21,7 +21,7 @@ export class EditInfoViewModel {
       birthday: birthday
     })
     if (NEFriendUserCache.mineUserCache?.user) {
-      NEFriendUserCache.mineUserCache.user.birthday = birthday
+      // NEFriendUserCache.mineUserCache.user.birthday = birthday
     }
     NECommonUtils.showToast($r('app.string.mine_info_save_ok'))
   }

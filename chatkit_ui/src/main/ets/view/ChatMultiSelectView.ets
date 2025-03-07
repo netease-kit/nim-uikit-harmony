@@ -9,13 +9,13 @@
 @ComponentV2
 export struct ChatMultiSelectView {
   @Param
-  private onMultiForward?: (event: ClickEvent) => void = undefined
+  onMultiForward?: (event: ClickEvent) => void = undefined
   @Param
-  private onSingleForward?: (event: ClickEvent) => void = undefined
+  onSingleForward?: (event: ClickEvent) => void = undefined
   @Param
-  private onMultiDelete?: (event: ClickEvent) => void = undefined
+  onMultiDelete?: (event: ClickEvent) => void = undefined
   @Param
-  private isEnable?: boolean = true
+  isEnable?: boolean = true
 
   build() {
     Row() {

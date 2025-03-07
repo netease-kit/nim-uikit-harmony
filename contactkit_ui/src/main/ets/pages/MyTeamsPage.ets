@@ -14,7 +14,7 @@ import {
   TailString,
   ViewItemBuilder
 } from '@nimkit/common';
-import { V2NIMConversationType, V2NIMTeam } from '@nimsdk/base';
+import { V2NIMTeam } from '@nimsdk/base';
 import { MyTeamsViewModel } from '../viewmodel/MyTeamsViewModel';
 
 @ComponentV2

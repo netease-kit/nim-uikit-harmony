@@ -1,6 +1,14 @@
 {
   "string": [
     {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "ability_desc",
+      "value": "description"
+    },
+    {
       "name": "ability_label",
       "value": "NetEase IM"
     },
@@ -34,75 +42,107 @@
     },
     {
       "name": "tab_conversation",
-      "value": "会话"
+      "value": "Conversation"
     },
     {
       "name": "tab_contact",
-      "value": "通讯录"
+      "value": "Contacts"
     },
     {
       "name": "tab_mine",
-      "value": "我的"
+      "value": "Mine"
     },
     {
       "name": "mine_collection",
-      "value": "收藏"
+      "value": "Collection"
+    },
+    {
+      "name": "mine_remove_collection_tip",
+      "value": "确认要删除该收藏吗？"
+    },
+    {
+      "name": "mine_collection_empty",
+      "value": "暂无收藏消息"
+    },
+    {
+      "name": "mine_collection_from_team",
+      "value": "From %s"
+    },
+    {
+      "name": "mine_collection_from_p2p",
+      "value": "来自于 与%s的会话"
     },
     {
       "name": "mine_about",
-      "value": "关于云信"
+      "value": "About CommSEase"
     },
     {
       "name": "mine_setting",
-      "value": "设置"
+      "value": "setting"
     },
     {
       "name": "mine_setting_earpiece",
-      "value": "听筒模式"
+      "value": "Handset Mode"
     },
     {
       "name": "mine_setting_show_remind",
-      "value": "新消息提醒"
+      "value": "Notification"
     },
     {
       "name": "mine_setting_show_remind_detail",
-      "value": "通知栏显示消息详情"
+      "value": "show message details"
     },
     {
       "name": "mine_setting_read",
-      "value": "消息已读未读功能"
+      "value": "Read/Unread"
+    },
+    {
+      "name": "mine_setting_conversation",
+      "value": "Local conversation"
     },
     {
       "name": "mine_setting_logout",
-      "value": "退出登录"
+      "value": "Logout"
     },
     {
       "name": "mine_setting_logout_confirm",
-      "value": "确认注销当前登录账号？"
+      "value": "do you want to logout?"
     },
     {
       "name": "mine_setting_logout_yes",
-      "value": "是"
+      "value": "Yes"
     },
     {
       "name": "mine_setting_logout_no",
-      "value": "否"
+      "value": "No"
     },
     {
       "name": "mine_about_logo",
-      "value": "网易云信"
+      "value": "Netease CommsEase"
     },
     {
       "name": "mine_about_uikit_version",
-      "value": "版本号"
+      "value": "Version"
     },
     {
       "name": "mine_about_nim_version",
-      "value": "NIM 版本"
+      "value": "NIM Version"
     },
     {
       "name": "mine_about_introduce",
-      "value": "产品介绍"
+      "value": "Introduce"
+    },
+    {
+      "name": "yunxin_comment",
+      "value": "Stable instant messaging service"
+    },
+    {
+      "name": "login_privatized_configuration",
+      "value": "Privatized configuration"
+    },
+    {
+      "name": "login_by_account",
+      "value": "login"
     }
   ]
 }

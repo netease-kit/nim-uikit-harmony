@@ -26,11 +26,12 @@ export class EditInfoParam {
   }
 }
 
-@Component
+@ComponentV2
 export struct EditTextInput {
-  @Link content: string;
-  @State maxLength: number = 0;
-  @State type: InputType = InputType.Normal;
+  @Param content: string | undefined = undefined;
+  @Param maxLength: number = 0;
+  @Param type: InputType = InputType.Normal;
+  @Param onTextChange?: (value: string) => void = undefined
 
   build() {
     TextInput({ text: this.content })
@@ -54,7 +55,7 @@ export struct EditTextInput {
         thresholdPercentage: 1
       })
       .onChange((value: string) => {
-        this.content = value
+        this.onTextChange?.(value)
       })
   }
 }
@@ -65,15 +66,15 @@ export function EditInfoPageBuilder() {
   EditInfoPage()
 }
 
-@Component
+@ComponentV2
 export struct EditInfoPage {
   pathStack: NavPathStack = new NavPathStack()
-  @State title?: ResourceStr = undefined
-  @State content?: string = undefined
-  @State editType?: EditType = undefined
-  @State accountId?: string = undefined
-  @State maxLength?: number = 0
-  @State showCleanButton: boolean = false
+  @Local title?: ResourceStr = undefined
+  @Local content?: string = undefined
+  @Local editType?: EditType = undefined
+  @Local accountId?: string = undefined
+  @Local maxLength?: number = 0
+  @Local showCleanButton: boolean = false
   // 【保存】按钮点击事件
   saveInfo = async () => {
     if (ErrorUtils.checkNetworkAndToast()) {
@@ -166,15 +167,36 @@ export struct EditInfoPage {
       })
 
       if (this.editType === EditType.nick || this.editType === EditType.alias) {
-        EditTextInput({ content: this.content, maxLength: this.maxLength, type: InputType.Normal })
+        EditTextInput({
+          content: this.content,
+          maxLength: this.maxLength,
+          type: InputType.Normal,
+          onTextChange: (value) => {
+            this.content = value
+          }
+        })
       }
 
       if (this.editType === EditType.mobile) {
-        EditTextInput({ content: this.content, maxLength: this.maxLength, type: InputType.PhoneNumber })
+        EditTextInput({
+          content: this.content,
+          maxLength: this.maxLength,
+          type: InputType.PhoneNumber,
+          onTextChange: (value) => {
+            this.content = value
+          }
+        })
       }
 
       if (this.editType === EditType.email) {
-        EditTextInput({ content: this.content, maxLength: this.maxLength, type: InputType.Email })
+        EditTextInput({
+          content: this.content,
+          maxLength: this.maxLength,
+          type: InputType.Email,
+          onTextChange: (value) => {
+            this.content = value
+          }
+        })
       }
 
       if (this.editType == EditType.sign) {

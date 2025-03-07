@@ -17,7 +17,6 @@ import {
 import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
 import { TeamMemberSelectorViewModel } from '../viewModel/TeamMemberSelectorViewModel'
 
-//管理员选择页面参数
 export interface ManagerSelectorParams {
   managerCount: number,
   teamId: string

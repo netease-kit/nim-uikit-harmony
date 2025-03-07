@@ -5,7 +5,7 @@
  *
  */
 
-import { ChatKitClient, ConversationRepo } from '@nimkit/chatkit'
+import { ChatKitClient, ConversationRepo, IMKitConfigCenter, LocalConversationRepo } from '@nimkit/chatkit'
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel'
 import { ContactViewModel } from './ContactViewModel'
 import { MyTeamsViewModel } from './MyTeamsViewModel'
@@ -41,34 +41,67 @@ export class ConversationSelectViewModel {
   ///   - filters: 需要过滤的会话id列表
   async getConversationList(filters?: string[]) {
     try {
-      const conversationResult = await ConversationRepo.getConversationList(0, this.conversationLimit)
-      let conversations = conversationResult?.conversationList
-      if (conversations) {
-        // 过滤数据
-        if (filters) {
-          conversations.filter(conversation =>!filters.includes(conversation.conversationId))
+      if (IMKitConfigCenter.enableLocalConversation) {
+        const conversationLocalResult = await LocalConversationRepo.getConversationList(0, this.conversationLimit)
+        let localConversations = conversationLocalResult?.conversationList
+        if (localConversations) {
+          // 过滤数据
+          if (filters) {
+            localConversations.filter(conversation => !filters.includes(conversation.conversationId))
+          }
+
+          for (const conversation of localConversations) {
+            // 校验好友是否已存在
+            let contactModel = this.findContact(conversation.conversationId)
+            if (contactModel) {
+              this.conversationList.push(contactModel)
+              continue
+            }
+
+            // 校验群聊是否已存在
+            let teamModel = this.findTeam(conversation.conversationId)
+            if (teamModel) {
+              this.conversationList.push(teamModel)
+              continue
+            }
+
+            let model = new ConversationSelectModel()
+            model.conversationId = conversation.conversationId
+            model.name = conversation.name
+            model.avatar = conversation.avatar
+            this.conversationList.push(model)
+          }
         }
-
-        for (const conversation of conversations) {
-          // 校验好友是否已存在
-          let contactModel = this.findContact(conversation.conversationId)
-          if (contactModel) {
-            this.conversationList.push(contactModel)
-            continue
+      } else {
+        const conversationResult = await ConversationRepo.getConversationList(0, this.conversationLimit)
+        let conversations = conversationResult?.conversationList
+        if (conversations) {
+          // 过滤数据
+          if (filters) {
+            conversations.filter(conversation => !filters.includes(conversation.conversationId))
           }
 
-          // 校验群聊是否已存在
-          let teamModel = this.findTeam(conversation.conversationId)
-          if (teamModel) {
-            this.conversationList.push(teamModel)
-            continue
-          }
+          for (const conversation of conversations) {
+            // 校验好友是否已存在
+            let contactModel = this.findContact(conversation.conversationId)
+            if (contactModel) {
+              this.conversationList.push(contactModel)
+              continue
+            }
 
-          let model = new ConversationSelectModel()
-          model.conversationId = conversation.conversationId
-          model.name = conversation.name
-          model.avatar = conversation.avatar
-          this.conversationList.push(model)
+            // 校验群聊是否已存在
+            let teamModel = this.findTeam(conversation.conversationId)
+            if (teamModel) {
+              this.conversationList.push(teamModel)
+              continue
+            }
+
+            let model = new ConversationSelectModel()
+            model.conversationId = conversation.conversationId
+            model.name = conversation.name
+            model.avatar = conversation.avatar
+            this.conversationList.push(model)
+          }
         }
       }
     } catch (err) {
@@ -88,7 +121,7 @@ export class ConversationSelectViewModel {
           let contacts = section.contacts.contacts
           // 过滤数据
           if (filters) {
-            contacts.filter(contact =>!filters.includes(contact.user?.accountId ?? ""))
+            contacts.filter(contact => !filters.includes(contact.user?.accountId ?? ""))
           }
 
           for (const contact of contacts) {
@@ -114,7 +147,7 @@ export class ConversationSelectViewModel {
       let teams = this.teamViewModel.teamList
       // 过滤数据
       if (filters) {
-        teams.filter(team =>!filters.includes(team.teamId))
+        teams.filter(team => !filters.includes(team.teamId))
       }
 
       for (const team of teams) {

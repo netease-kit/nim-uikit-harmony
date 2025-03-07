@@ -21,6 +21,7 @@ import {
 import {
   IM_ELITE_SDK_VERSION_HUMAN,
   V2NIMConversationType,
+  V2NIMErrorCode,
   V2NIMMessageNotificationAttachment,
   V2NIMMessageSendingState,
   V2NIMTeamChatBannedMode,
@@ -32,8 +33,6 @@ import {
   ChatKitClient,
   ChatRepo,
   CustomMessageUtils,
-  errCodeInBlock,
-  errCodeNoFriend,
   getAitModelFromJson,
   keyExtensionAtAll,
   keyExtensionLastOptType,
@@ -187,9 +186,6 @@ export function measureMessageHeight(uicontext: UIContext, messageInfo: NIMMessa
       constraintWidth: px2vp(lineWidth),
       lineHeight: ChatConst.textLineHeight
     });
-    console.debug('netease measureMessageHeight text', messageInfo.message.text)
-    console.debug('netease measureMessageHeight', 'linewidth:', lineWidth, ',', px2vp(lineWidth), 'textHeight',
-      textSize.height as number, ',,', px2vp(textSize.height as number))
     messageHeight = px2vp(textSize.height as number)
     if (messageHeight < ChatConst.textLineHeight) {
       messageHeight = ChatConst.textLineHeight
@@ -240,43 +236,6 @@ export function measureMessageHeight(uicontext: UIContext, messageInfo: NIMMessa
 
   // if (messageInfo?.isPinMsg) {
   //   messageHeight = messageHeight + 30
-  // }
-  return messageHeight;
-}
-
-// 获取消息高度，单位为VP
-export function getPinMessageHeight(uicontext: UIContext, messageInfo: NIMMessageInfo | undefined): number {
-  let messageHeight = ChatConst.messageLineHeight;
-  if (messageInfo?.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
-    // 文本消息体最大宽度，单位为VP
-    let lineWidth = DeviceUtils.getPinMessageLineWidth()
-    let textSize = uicontext.getMeasureUtils().measureTextSize({
-      textContent: translateEmojiText(messageInfo?.message.text ?? ''),
-      fontSize: ChatConst.messageTextFontSize,
-      constraintWidth: px2vp(lineWidth),
-      lineHeight: ChatConst.textLineHeight
-    });
-    let viewHeight = px2vp(textSize.height as number)
-    messageHeight = viewHeight
-  } else if (messageInfo?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
-    messageHeight = ChatConst.mapMessageHeight;
-  } else if (messageInfo?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE ||
-    messageInfo?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
-    messageHeight = getImageHeight(messageInfo);
-  } else if (messageInfo?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE) {
-    messageHeight = ChatConst.fileMessageWidth;
-  } else if (messageInfo?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
-    messageHeight = ChatConst.messageLineHeight;
-  }
-  // 群消息需要展示发送者昵称，所有高度增加
-  if (messageInfo?.message.conversationType !== V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P
-    && messageInfo?.isReceiveMessage()) {
-    messageHeight = messageHeight + ChatConst.textLineHeight;
-  }
-
-  // 需要展示发送消息时间的，高度增加
-  // if (messageInfo?.getMessageTime() != null) {
-  //   messageHeight = messageHeight + 10
   // }
   return messageHeight;
 }
@@ -928,6 +887,9 @@ export async function createForwardMessageListFileDetail(messages: V2NIMMessage[
   } catch (err) {
     console.error(err)
     NECommonUtils.showToast($r('app.string.chat_multi_forward_failed'))
+    if (fs.accessSync(filePath)) {
+      fs.unlink(filePath)
+    }
     return undefined
   }
 }
@@ -1227,10 +1189,10 @@ export function sendMessageFailedTips(msg: V2NIMMessage, err: BusinessError, con
   let text: string | undefined
   const resourceManager = getContext().resourceManager
   switch (err.code) {
-    case errCodeInBlock:
+    case V2NIMErrorCode.V2NIM_ERROR_CODE_ACCOUNT_IN_BLOCK_LIST:
       text = resourceManager.getStringSync($r('app.string.msg_send_failed_in_block').id)
       break
-    case errCodeNoFriend:
+    case V2NIMErrorCode.V2NIM_ERROR_CODE_FRIEND_NOT_EXIST:
       text = resourceManager.getStringSync($r('app.string.msg_send_failed_no_friend').id) +
       resourceManager.getStringSync($r('app.string.msg_send_failed_friend_application').id)
       break

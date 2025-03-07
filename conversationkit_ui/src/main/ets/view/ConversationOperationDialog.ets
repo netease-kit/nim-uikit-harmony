@@ -25,8 +25,8 @@ export struct ConversationOperationDialog {
             .onClick(() => {
               if (ErrorUtils.checkNetworkAndToast()) {
                 ConversationRepo.stickTopConversation(this.conversationInfo?.conversationId ?? '', false)
-                this.controller.close()
               }
+              this.controller.close()
             })
             .height(30)
             .width('100%')
@@ -39,8 +39,8 @@ export struct ConversationOperationDialog {
             .onClick(() => {
               if (ErrorUtils.checkNetworkAndToast()) {
                 ConversationRepo.stickTopConversation(this.conversationInfo?.conversationId ?? '', true)
-                this.controller.close()
               }
+              this.controller.close()
             })
             .height(30)
             .width('100%')
@@ -54,8 +54,8 @@ export struct ConversationOperationDialog {
           .onClick(() => {
             if (ErrorUtils.checkNetworkAndToast()) {
               ConversationRepo.deleteConversation(this.conversationInfo?.conversationId ?? '')
-              this.controller.close()
             }
+            this.controller.close()
           })
           .height(30)
           .width('100%')

@@ -5,11 +5,10 @@
  *
  */
 
-import { router } from '@kit.ArkUI'
-import { ViewItem } from '../model/ViewItem'
-import { ViewItemArrow } from '../model/ViewItemArrow'
-import { ViewItemSwitch } from '../model/ViewItemSwitch'
-import { CommonAvatar } from '../view/CommonAvatar'
+import { ViewItem } from '../model/ViewItem';
+import { ViewItemArrow } from '../model/ViewItemArrow';
+import { ViewItemSwitch } from '../model/ViewItemSwitch';
+import { CommonAvatar } from '../view/CommonAvatar';
 
 interface ViewHolderItemBuilderParams {
   items: ViewItem[];

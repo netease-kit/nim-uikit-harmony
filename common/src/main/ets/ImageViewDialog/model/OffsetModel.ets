@@ -8,7 +8,7 @@
 /*
   图片偏移模型
  */
-@Observed
+@ObservedV2
 export class OffsetModel {
   public currentX: number;
   public currentY: number;

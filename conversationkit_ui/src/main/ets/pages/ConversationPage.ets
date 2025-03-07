@@ -93,10 +93,10 @@ export struct ConversationPage {
   }
 }
 
-@Component
+@ComponentV2
 struct ConversationNavigationTitleBar {
-  @State conversationPopupShowed: boolean = false
-  pathStack: NavPathStack = new NavPathStack()
+  @Local conversationPopupShowed: boolean = false
+  @Param pathStack: NavPathStack = new NavPathStack()
 
   build() {
     Column({ space: 10 }) {

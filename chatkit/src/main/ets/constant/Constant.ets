@@ -45,9 +45,3 @@ export let collectionTypeOffset = 1000
 
 /// 回复消息key, 用于不使用 thread 的消息回复方案
 export let keyReplyMsgKey = "yxReplyMsg"
-
-/// 被拉入黑名单
-export let errCodeInBlock = 102426
-
-/// 非好友
-export let errCodeNoFriend = 104404

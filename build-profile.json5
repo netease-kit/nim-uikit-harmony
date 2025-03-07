@@ -57,6 +57,18 @@
       ]
     },
     {
+      "name": "localconversationkit_ui",
+      "srcPath": "./localconversationkit_ui",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    },
+    {
       "name": "chatkit_ui",
       "srcPath": "./chatkit_ui",
       "targets": [

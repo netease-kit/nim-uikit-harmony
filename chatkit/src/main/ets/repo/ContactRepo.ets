@@ -130,7 +130,9 @@ export class ContactRepo {
       }
     })
 
-    ContactRepo.listener.emit('updateUserInfo', friendList)
+    if (friendList.length > 0) {
+      ContactRepo.listener.emit('updateUserInfo', friendList)
+    }
 
     return userList
   }
@@ -217,6 +219,14 @@ export class ContactRepo {
    */
   static async rejectAddApplication(application: V2NIMFriendAddApplication, postscript?: string): Promise<void> {
     await ChatKitClient.nim.friendService?.rejectAddApplication(application, postscript)
+  }
+
+  /**
+   * 清空所有好友申请
+   *
+   */
+  static async clearAllAddApplication(): Promise<void> {
+    await ChatKitClient.nim.friendService?.clearAllAddApplication()
   }
 
   /**

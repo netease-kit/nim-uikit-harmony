@@ -5,8 +5,8 @@
  *
  */
 
-import common from '@ohos.app.ability.common'
-import { preferences } from '@kit.ArkData'
+import common from '@ohos.app.ability.common';
+import { preferences } from '@kit.ArkData';
 
 let preference: preferences.Preferences | undefined = undefined
 const context = getContext(this) as common.UIAbilityContext

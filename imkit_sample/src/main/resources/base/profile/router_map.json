@@ -2,7 +2,7 @@
   "routerMap": [
     {
       "name": "SettingPage",
-      "pageSourceFile": "src/main/ets/mine/SettingPage.ets",
+      "pageSourceFile": "src/main/ets/mine/pages/SettingPage.ets",
       "buildFunction": "SettingPageBuilder",
       "data": {
         "description": "this is setting page"
@@ -10,7 +10,7 @@
     },
     {
       "name": "AboutPage",
-      "pageSourceFile": "src/main/ets/mine/AboutPage.ets",
+      "pageSourceFile": "src/main/ets/mine/pages/AboutPage.ets",
       "buildFunction": "AboutPageBuilder",
       "data": {
         "description": "this is about page"
@@ -18,7 +18,7 @@
     },
     {
       "name": "IntroducePage",
-      "pageSourceFile": "src/main/ets/mine/IntroducePage.ets",
+      "pageSourceFile": "src/main/ets/mine/pages/IntroducePage.ets",
       "buildFunction": "IntroducePageBuilder",
       "data": {
         "description": "this is introduce page"
@@ -26,7 +26,7 @@
     },
     {
       "name": "MinePage",
-      "pageSourceFile": "src/main/ets/mine/MinePage.ets",
+      "pageSourceFile": "src/main/ets/mine/pages/MinePage.ets",
       "buildFunction": "MinePageBuilder",
       "data": {
         "description": "this is mine page"
@@ -34,10 +34,34 @@
     },
     {
       "name": "MessageRemindPage",
-      "pageSourceFile": "src/main/ets/mine/MessageRemindPage.ets",
+      "pageSourceFile": "src/main/ets/mine/pages/MessageRemindPage.ets",
       "buildFunction": "MessageRemindPageBuilder",
       "data": {
         "description": "this is message remind page"
+      }
+    },
+    {
+      "name": "CollectionMessagePage",
+      "pageSourceFile": "src/main/ets/mine/pages/CollectionMessagePage.ets",
+      "buildFunction": "CollectionMessagePageBuilder",
+      "data": {
+        "description": "this is collection message page"
+      }
+    },
+    {
+      "name": "LoginByAccountPage",
+      "pageSourceFile": "src/main/ets/pages/LoginByAccountPage.ets",
+      "buildFunction": "LoginByAccountPageBuilder",
+      "data": {
+        "description": "login by account page"
+      }
+    },
+    {
+      "name": "IMSDKConfigPage",
+      "pageSourceFile": "src/main/ets/pages/IMSDKConfigPage.ets",
+      "buildFunction": "IMSDKConfigPageBuilder",
+      "data": {
+        "description": "IM SDK config page"
       }
     }
   ]

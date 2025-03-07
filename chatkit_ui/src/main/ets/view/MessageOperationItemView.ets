@@ -8,9 +8,10 @@
 import { MessageOperationItem } from '../model/MessageOperationItem';
 
 @Entry
-@Component
+@ComponentV2
 export struct MessageOperationItemView {
-  @Prop operationData: MessageOperationItem;
+  @Param @Require
+  operationData: MessageOperationItem;
 
   build() {
     Column() {

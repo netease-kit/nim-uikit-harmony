@@ -10,7 +10,7 @@ import { V2NIMConversationType, V2NIMMessageSendingState, V2NIMMessageType } fro
 import { ChatInfo } from '../model/ChatInfo';
 import { getNotificationMessageContent, getPinMessagesTips } from '../common/MessageHelper';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
-import { messageContent, pinMessageContent } from './MessageComponentBuilder';
+import { messageContent } from './MessageComponentBuilder';
 import { MessageItemClick } from './MessageItemClick';
 import { ChatKitConfig } from '../ChatKitConfig';
 
@@ -19,33 +19,23 @@ import { ChatKitConfig } from '../ChatKitConfig';
  */
 @ComponentV2
 export struct MessageComponent {
-  @Param
-  private isPinPage: boolean = false;
   @Require
   @Param
-  private message: NIMMessageInfo | undefined = undefined;
+  message: NIMMessageInfo | undefined = undefined;
   @Require
   @Param
-  private chatInfo: ChatInfo
+  chatInfo: ChatInfo
   @Param
-  private onMessageClick: MessageItemClick | undefined = undefined
+  onMessageClick: MessageItemClick | undefined = undefined
   @Param
-  private onMoreButtonClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void = undefined
+  onMoreButtonClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void = undefined
   @Param
-  private onPinItemClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void = undefined
+  onPinItemClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void = undefined
   @Param
-  private showSelect: boolean = false;
+  showSelect: boolean = false;
 
   build() {
-    if (this.isPinPage) {
-      PinMessageComponent({
-        message: this.message,
-        chatUserInfo: this.chatInfo,
-        onMessageClick: this.onMessageClick,
-        onMoreButtonClick: this.onMoreButtonClick,
-        onPinItemClick: this.onPinItemClick
-      });
-    } else if (this.message?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_NOTIFICATION) {
+    if (this.message?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_NOTIFICATION) {
       NotificationMessageComponent({
         message: this.message,
         messageContent: getNotificationMessageContent(this.message, this.chatInfo)
@@ -83,16 +73,16 @@ export struct SenderMessageComponent {
   }
   @Require
   @Param
-  private message: NIMMessageInfo | undefined = undefined
+  message: NIMMessageInfo | undefined = undefined
   @Require
   @Param
-  private chatUserInfo: ChatInfo | undefined = undefined
+  chatUserInfo: ChatInfo | undefined = undefined
   @Param
-  private onMessageClick: MessageItemClick | undefined = undefined
+  onMessageClick: MessageItemClick | undefined = undefined
   @Param
-  private showRadio: boolean = false
+  showRadio: boolean = false
   @Local
-  private radioOn: boolean = false
+  radioOn: boolean = false
 
   build() {
     Column() {
@@ -123,11 +113,16 @@ export struct SenderMessageComponent {
           Column() {
             Row() {
               if (this.message.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED) {
-                Image($r('app.media.ic_chat_message_status')).width(16).height(16)
+                Image($r("app.media.ic_chat_message_status_fail")).width(16).height(16)
                   .alignRules({
                     bottom: { anchor: "msgContainer", align: VerticalAlign.Bottom },
                     right: { anchor: "msgContainer", align: HorizontalAlign.Start }
                   }).margin({ right: 6 })
+                  .onClick((event: ClickEvent) => {
+                    if (this.onMessageClick) {
+                      this.onMessageClick?.onSendFailClick?.(event, this.message)
+                    }
+                  })
               } else if (this.message.message.sendingState ===
               V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SENDING) {
                 Progress({ value: 0, total: 100, type: ProgressType.Ring })
@@ -202,9 +197,6 @@ export struct SenderMessageComponent {
               })
                 .backgroundColor($r('app.color.color_chat_send_message_bg'))
                 .borderRadius(6)
-                .gesture(LongPressGesture().onAction((event: GestureEvent) => {
-                  this.onMessageClick?.onItemLongClick?.(event, this.message)
-                }))
                 .onClick((event: ClickEvent) => {
                   if (this.showRadio) {
                     this.radioOn = !this.radioOn
@@ -220,6 +212,10 @@ export struct SenderMessageComponent {
             .margin({ right: 8 })
             .width('100%')
             .height(this.message.getMessageHeight(this.getUIContext()))
+            .gesture(LongPressGesture()
+              .onAction((event: GestureEvent) => {
+                this.onMessageClick?.onItemLongClick?.(event, this.message)
+              }))
 
             if (this.message?.isPinMsg) {
               Row() {
@@ -239,23 +235,19 @@ export struct SenderMessageComponent {
             this.chatUserInfo?.getCurrentUserAvatarUrl() : '',
               this.chatUserInfo?.getCurrentUserAvatarName() ?? '',
               AvatarColorUntil.getBackgroundColorById(this.message.message.senderId),
-            )
+            ),
+            longPressGesture: () => {
+              this.onMessageClick?.onAvatarLongPress?.( this.message)
+            }
           })
             .width(36)
             .height(36)
             .borderRadius(20)
             .margin({ right: 16, top: 6 })
             .id("mineAvatar")
-            .onClick((event: ClickEvent) => {
+            .onClick(() => {
               this.onMessageClick?.onAvatarClick?.(this.message)
             })
-            .gesture(LongPressGesture({ duration: 300 }).onAction((event: GestureEvent) => {
-              this.onMessageClick?.onAvatarLongPress?.( this.message)
-            }).onActionEnd((event: GestureEvent) => {
-
-            })
-            )
-
         }
         .width('100%')
         .backgroundColor(this.message.isPinMsg ? $r('app.color.color_chat_pin_bg') :
@@ -277,16 +269,16 @@ export struct ReceiveMessageComponent {
   }
   @Require
   @Param
-  private message: NIMMessageInfo | undefined = undefined
+  message: NIMMessageInfo | undefined = undefined
   @Require
   @Param
-  private chatUserInfo: ChatInfo | undefined = undefined
+  chatUserInfo: ChatInfo | undefined = undefined
   @Param
-  private showRadio: boolean = false
+  showRadio: boolean = false
   @Param
-  private onMessageClick: MessageItemClick | undefined = undefined
+  onMessageClick: MessageItemClick | undefined = undefined
   @Local
-  private radioOn: boolean = false
+  radioOn: boolean = false
 
   build() {
     Column() {
@@ -320,23 +312,19 @@ export struct ReceiveMessageComponent {
             item: new AvatarItem(this.chatUserInfo != null ?
             this.chatUserInfo?.getChatUserAvatarUrl(this.message?.message) : '',
               this.chatUserInfo?.getChatUserAvatarName(this.message?.message) ?? '',
-              AvatarColorUntil.getBackgroundColorById(this.message?.message.senderId ?? ''))
+              AvatarColorUntil.getBackgroundColorById(this.message?.message.senderId ?? '')),
+            longPressGesture: () => {
+              this.onMessageClick?.onAvatarLongPress?.( this.message)
+            }
           })
             .width(36)
             .height(36)
             .borderRadius(20)
             .margin({ left: 16, top: 6 })
             .id("otherAvatar")
-            .onClick((event: ClickEvent) => {
+            .onClick(() => {
               this.onMessageClick?.onAvatarClick?.(this.message)
             })
-            .gesture(LongPressGesture({ duration: 300 }).onAction((event: GestureEvent) => {
-              this.onMessageClick?.onAvatarLongPress?.( this.message)
-            })
-              .onActionEnd((event: GestureEvent) => {
-
-              }))
-
           Column() {
             if (this.message?.message.conversationType !== V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
               Text(this.chatUserInfo?.getChatUserShowName(this.message?.message))
@@ -360,9 +348,6 @@ export struct ReceiveMessageComponent {
                 .borderRadius(6)
                 .id("msgContainer")
                 .alignRules(this.AlignLeft)
-                .gesture(LongPressGesture().onAction((event: GestureEvent) => {
-                  this.onMessageClick?.onItemLongClick?.(event, this.message)
-                }))
                 .onClick((event: ClickEvent) => {
                   if (this.showRadio) {
                     this.radioOn = !this.radioOn
@@ -374,6 +359,9 @@ export struct ReceiveMessageComponent {
             .height(this.message?.getMessageHeight(this.getUIContext()))
             .alignItems(HorizontalAlign.Start)
             .justifyContent(FlexAlign.Center)
+            .gesture(LongPressGesture().onAction((event: GestureEvent) => {
+              this.onMessageClick?.onItemLongClick?.(event, this.message)
+            }))
 
             if (this.message?.isPinMsg) {
               Row() {
@@ -406,7 +394,7 @@ export struct NotificationMessageComponent {
   message: NIMMessageInfo | null = null;
   @Require
   @Param
-  private messageContent: string;
+  messageContent: string;
 
   build() {
     Column() {
@@ -447,7 +435,7 @@ export struct NotificationMessageComponent {
 export struct TipsMessageComponent {
   @Require
   @Param
-  private message: NIMMessageInfo | null = null;
+  message: NIMMessageInfo | null = null;
 
   build() {
     Column() {
@@ -483,131 +471,6 @@ export struct TipsMessageComponent {
 }
 
 /**
- * 标记页面中的消息组件
- */
-@ComponentV2
-export struct PinMessageComponent {
-  AlignLeft: Record<string, Record<string, string | VerticalAlign | HorizontalAlign>> = {
-    'top': { 'anchor': '__container__', 'align': VerticalAlign.Top },
-    'left': { 'anchor': '__container__', 'align': HorizontalAlign.Start }
-  }
-  @Require
-  @Param
-  private message?: NIMMessageInfo = undefined;
-  @Require
-  @Param
-  private chatUserInfo?: ChatInfo = undefined;
-  @Param
-  private onMessageClick?: MessageItemClick = undefined
-  @Param
-  private onMoreButtonClick?: (event: ClickEvent, msg?: NIMMessageInfo) => void = undefined
-  @Param
-  private onPinItemClick?: (event: ClickEvent, msg?: NIMMessageInfo) => void = undefined
-
-  build() {
-    Column() {
-      if (this.message) {
-        Row() {
-          CommonAvatar({
-            item: new AvatarItem(this.chatUserInfo?.getChatUserAvatarUrl(this.message?.message.senderId ?? '') ?? '',
-              this.chatUserInfo?.getChatUserAvatarName(this.message?.message.senderId ?? '') ?? '',
-              AvatarColorUntil.getBackgroundColorById(this.message?.message.senderId ?? ''))
-          })
-            .width(36)
-            .height(36)
-            .borderRadius(20)
-            .margin({ left: 16, top: 16 })
-            .id("otherAvatar")
-            .onClick((event: ClickEvent) => {
-              this.onMessageClick?.onAvatarClick?.(this.message)
-            })
-            .gesture(LongPressGesture({ duration: 300 }).onAction((event: GestureEvent) => {
-              this.onMessageClick?.onAvatarLongPress?.( this.message)
-            })
-              .onActionEnd((event: GestureEvent) => {
-
-              }))
-          Column() {
-            Text(this.chatUserInfo?.getChatUserShowName(this.message?.message.senderId ?? ''))
-              .fontColor($r('app.color.color_chat_sub_title'))
-              .fontSize($r('app.float.chat_subtitle_text_font_size'))
-              .maxLines(1)
-              .width(150)
-              .textAlign(TextAlign.Start)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .ellipsisMode(EllipsisMode.END)
-
-            Text(this.message?.getMessageFormatTime())
-              .fontColor($r('app.color.color_chat_desc'))
-              .fontSize($r('app.float.chat_desc_text_font_size'))
-              .margin({ top: 3 })
-          }
-          .layoutWeight(1)
-          .alignItems(HorizontalAlign.Start)
-          .margin({ left: 10, top: 16 })
-
-          Image($r('app.media.ic_public_more_dot'))
-            .width(32)
-            .height(32)
-            .padding({
-              left: 3,
-              right: 3,
-              top: 3,
-              bottom: 3
-            })
-            .margin({ top: 16, right: 16 })
-            .onClick((event: ClickEvent) => {
-              this.onMoreButtonClick?.(event, this.message)
-            })
-        }
-        .alignSelf(ItemAlign.Start)
-
-        Blank()
-          .height(1)
-          .backgroundColor('#E4E9F2')
-          .margin({
-            left: 16,
-            right: 16,
-            top: 12
-          })
-
-        Column() {
-          pinMessageContent({ message: this.message, onMessageClick: this.onMessageClick })
-            .backgroundColor(this.message?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ?
-            Color.Transparent : $r('app.color.color_chat_receive_message_bg'))
-            .borderRadius(6)
-            .id("msgContainer")
-            .alignRules(this.AlignLeft)
-            .gesture(LongPressGesture().onAction((event: GestureEvent) => {
-              this.onMessageClick?.onItemLongClick?.(event, this.message)
-            }))
-            .onClick((event: ClickEvent) => {
-              this.onMessageClick?.onItemClick?.(event, this.message)
-            })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .alignSelf(ItemAlign.Start)
-        .margin({
-          left: 16,
-          right: 16,
-          top: 12,
-          bottom: 16
-        })
-      }
-    }
-    .margin({
-      left: 20,
-      right: 20
-    })
-    .backgroundColor(Color.White)
-    .borderRadius(8)
-    .onClick((event: ClickEvent) => {
-      this.onPinItemClick?.(event, this.message)
-    })
-  }
-}
-
-/**
  * 合并转发详情页中的消息组件
  */
 @ComponentV2
@@ -618,12 +481,12 @@ export struct MergeDetailMessageComponent {
   }
   @Require
   @Param
-  private message: NIMMessageInfo | undefined = undefined
+  message: NIMMessageInfo | undefined = undefined
   @Require
   @Param
-  private chatUserInfo: ChatInfo | undefined = undefined
+  chatUserInfo: ChatInfo | undefined = undefined
   @Param
-  private onMessageClick: MessageItemClick | undefined = undefined
+  onMessageClick: MessageItemClick | undefined = undefined
 
   build() {
     Column() {
@@ -634,29 +497,26 @@ export struct MergeDetailMessageComponent {
               .fontColor($r('app.color.color_chat_desc'))
               .fontSize($r('app.float.chat_desc_text_font_size'))
           }.justifyContent(FlexAlign.Center).width('100%').height(20)
-          .margin({ top: 6 })
+          .margin({ top: 4 })
         }
         Row() {
           CommonAvatar({
             item: new AvatarItem(this.chatUserInfo != null ?
             this.chatUserInfo?.getChatUserAvatarUrl(this.message?.message) : '',
               this.chatUserInfo?.getChatUserAvatarName(this.message?.message) ?? '',
-              AvatarColorUntil.getBackgroundColorById(this.message?.message.senderId ?? ''))
+              AvatarColorUntil.getBackgroundColorById(this.message?.message.senderId ?? '')),
+            longPressGesture: () => {
+              this.onMessageClick?.onAvatarLongPress?.( this.message)
+            }
           })
             .width(36)
             .height(36)
             .borderRadius(20)
-            .margin({ left: 16, top: 6 })
+            .margin({ left: 16, top: 3 })
             .id("otherAvatar")
-            .onClick((event: ClickEvent) => {
+            .onClick(() => {
               this.onMessageClick?.onAvatarClick?.(this.message)
             })
-            .gesture(LongPressGesture({ duration: 300 }).onAction((event: GestureEvent) => {
-              this.onMessageClick?.onAvatarLongPress?.( this.message)
-            })
-              .onActionEnd((event: GestureEvent) => {
-
-              }))
 
           Column() {
             Text(this.chatUserInfo?.getChatUserShowName(this.message?.message))
@@ -667,39 +527,29 @@ export struct MergeDetailMessageComponent {
               .textAlign(TextAlign.Start)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .ellipsisMode(EllipsisMode.END)
+            Column() {
+              messageContent({ message: this.message, onMessageClick: this.onMessageClick })
+                .backgroundColor($r('app.color.color_chat_receive_message_bg'))
+                .borderRadius(6)
+                .id("msgContainer")
+                .alignRules(this.AlignLeft)
+                .onClick((event: ClickEvent) => {
+                  this.onMessageClick?.onItemClick?.(event, this.message)
+                })
+            } .height(this.message?.getMessageHeight(this.getUIContext()))
+            .margin({ top: 6 })
+          }.alignItems(HorizontalAlign.Start).margin({ left: 8 }).width('68%')
+          .gesture(LongPressGesture().onAction((event: GestureEvent) => {
+            this.onMessageClick?.onItemLongClick?.(event, this.message)
+          }))
 
-            messageContent({ message: this.message, onMessageClick: this.onMessageClick })
-              .backgroundColor($r('app.color.color_chat_receive_message_bg'))
-              .borderRadius(6)
-              .id("msgContainer")
-              .margin({ top: 6 })
-              .alignRules(this.AlignLeft)
-              .gesture(LongPressGesture().onAction((event: GestureEvent) => {
-                this.onMessageClick?.onItemLongClick?.(event, this.message)
-              }))
-              .onClick((event: ClickEvent) => {
-                this.onMessageClick?.onItemClick?.(event, this.message)
-              })
-            if (this.message?.isPinMsg) {
-              Row() {
-                Image($r('app.media.ic_chat_message_pin')).height(12).width(12).margin({ top: 6 })
-                Text(getPinMessagesTips(this.message, this.chatUserInfo))
-                  .fontSize(12)
-                  .fontColor($r('app.color.color_chat_pin_tips'))
-                  .margin({ top: 6, left: 6 })
-                  .maxLines(1)
-                  .ellipsisMode(EllipsisMode.CENTER)
-              }.width('100%').height('26vp')
-            }
-          }.alignItems(HorizontalAlign.Start).margin({ left: 8, top: 6 }).width('68%')
         }
         .width('100%')
-        .height(this.message?.getMessageHeight(this.getUIContext()))
         .alignItems(VerticalAlign.Top)
         .backgroundColor(this.message?.isPinMsg ? $r('app.color.color_chat_pin_bg') :
         $r('app.color.color_chat_page_bg'))
         .id('itemContainer')
       }
-    }.width('100%').padding({ top: 6, bottom: 6 })
+    }.width('100%').padding({ top: 3})
   }
 }

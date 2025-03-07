@@ -7,8 +7,6 @@
 import { audio } from '@kit.AudioKit';
 import { AsyncCallback, BusinessError } from '@kit.BasicServicesKit';
 import { fileIo } from '@kit.CoreFileKit';
-import File from '@system.file';
-import call from '@ohos.telephony.call';
 
 const TAG = 'Audio manager';
 

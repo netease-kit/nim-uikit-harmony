@@ -23,6 +23,8 @@ export { NEFriendUserCache } from './src/main/ets/NEFriendUserCache'
 
 export { ConversationRepo } from './src/main/ets/repo/ConversationRepo'
 
+export { LocalConversationRepo } from './src/main/ets/repo/LocalConversationRepo'
+
 export { IsDiscussion } from './src/main/ets/utils/Utils'
 
 export { ErrorUtils } from './src/main/ets/utils/ErrorUtils'
@@ -56,9 +58,7 @@ export { mergedMessageNickKey,
   typeExtensionAllowAll,
   typeExtensionAllowManager,
   collectionTypeOffset,
-  keyReplyMsgKey,
-  errCodeInBlock,
-  errCodeNoFriend
+  keyReplyMsgKey
 } from './src/main/ets/constant/Constant'
 
 export { TeamMemberCache } from './src/main/ets/cache/TeamMemberCache'
@@ -72,3 +72,5 @@ export { AitSegment } from './src/main/ets/model/ait/AitSegment'
 export { AitAllPermission } from './src/main/ets/model/ait/AitAllPermission'
 
 export { KitLogger as Logger } from './src/main/ets/logger/AppLogger'
+
+export {IMKitConfigCenter} from './src/main/ets/IMKitConfigCenter'

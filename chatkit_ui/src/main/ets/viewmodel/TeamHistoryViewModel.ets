@@ -67,7 +67,7 @@ export class TeamHistoryViewModel {
    */
   async getTeamMemberByIds(accountList: string[]) {
     const loadedAccountList = this.teamMemberList.map(member => member.teamMember.accountId)
-    const fetchAccountIds = accountList.filter(account =>!loadedAccountList.includes(account))
+    const fetchAccountIds = accountList.filter(account => !loadedAccountList.includes(account))
     try {
       let teamMemberList = await TeamRepo.getTeamMembersByIds(this.teamId, this.teamType, fetchAccountIds)
       this.teamMemberList.push(...teamMemberList)

@@ -5,9 +5,18 @@
  *
  */
 
-import { ChatKitClient, ChatRepo, ContactRepo, ConversationRepo, SettingRepo } from '@nimkit/chatkit';
+import {
+  ChatKitClient,
+  ChatRepo,
+  ContactRepo,
+  ConversationRepo,
+  IMKitConfigCenter,
+  LocalConversationRepo,
+  SettingRepo
+} from '@nimkit/chatkit';
 import {
   V2NIMFriend,
+  V2NIMFriendDeletionType,
   V2NIMMessage,
   V2NIMP2PMessageMuteMode,
   V2NIMP2PMessageReadReceipt,
@@ -34,6 +43,10 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
     ChatRepo.onP2PMessageReadReceipts(this.onReceiveP2PMessageReadReceiptFun)
     ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onUserProfileChangedFun)
     ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChangedFun)
+    ChatKitClient.nim.friendService?.on('onFriendDeleted',
+      async (accountId: string, deletionType: V2NIMFriendDeletionType) => {
+        this.onFriendInfoDeleteFun(accountId)
+      })
   }
 
   onReceiveP2PMessageReadReceiptFun = (readReceipts: V2NIMP2PMessageReadReceipt[]) => {
@@ -59,6 +72,12 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
     if (friendInfo.accountId == this.chatUserInfo?.targetId) {
       this.chatUserInfo?.updateConversationName()
       this.chatUserInfo?.setChatFriend(friendInfo)
+    }
+  }
+  onFriendInfoDeleteFun = (accountId: String) => {
+    if (accountId == this.chatUserInfo?.targetId) {
+      this.chatUserInfo?.updateConversationName()
+      this.chatUserInfo?.setChatFriend(undefined)
     }
   }
 
@@ -128,10 +147,18 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
    * 获取是否置顶和通知
    */
   getConversationInfo() {
-    ConversationRepo.getConversation(this.conversationId).then((conversation) => {
-      this.isStickTop = conversation?.stickTop ?? false
-      this.isMessageNotify = !(conversation?.mute ?? false)
-    })
+    if (IMKitConfigCenter.enableLocalConversation) {
+      LocalConversationRepo.getConversation(this.conversationId).then((conversation) => {
+        this.isStickTop = conversation?.stickTop ?? false
+        this.isMessageNotify = !(conversation?.mute ?? false)
+      })
+    } else {
+      ConversationRepo.getConversation(this.conversationId).then((conversation) => {
+        this.isStickTop = conversation?.stickTop ?? false
+        this.isMessageNotify = !(conversation?.mute ?? false)
+      })
+    }
+
   }
 
   /**
@@ -140,7 +167,11 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
    */
   async stickTopConversation(stickTop: boolean) {
     try {
-      await ConversationRepo.stickTopConversation(this.conversationId, stickTop)
+      if (IMKitConfigCenter.enableLocalConversation) {
+        await LocalConversationRepo.stickTopConversation(this.conversationId, stickTop)
+      } else {
+        await ConversationRepo.stickTopConversation(this.conversationId, stickTop)
+      }
       this.isStickTop = stickTop
     } catch (error) {
       this.isStickTop = !stickTop
@@ -191,5 +222,6 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
     ChatRepo.offP2PMessageReadReceipts(this.onReceiveP2PMessageReadReceiptFun)
     ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onUserProfileChangedFun)
     ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChangedFun)
+    ChatKitClient.nim.friendService?.off('onFriendDeleted', this.onFriendInfoDeleteFun)
   }
 }

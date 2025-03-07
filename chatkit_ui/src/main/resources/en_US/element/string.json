@@ -66,23 +66,11 @@
     },
     {
       "name": "chat_operation_copy",
-      "value": "Copy"
-    },
-    {
-      "name": "chat_operation_reply",
-      "value": "Reply "
-    },
-    {
-      "name": "chat_input_reply_text",
-      "value": "Reply | "
+      "value": "copy"
     },
     {
       "name": "chat_operation_forward",
-      "value": "Forward"
-    },
-    {
-      "name": "chat_operation_multi_select",
-      "value": "Select"
+      "value": "forward"
     },
     {
       "name": "chat_operation_multi_forward",
@@ -191,14 +179,6 @@
     {
       "name": "chat_team_error_tip_content",
       "value": "You have been removed from the group chat or the group chat has been dissolved."
-    },
-    {
-      "name": "chat_team_error_tip_title",
-      "value": "Tips"
-    },
-    {
-      "name": "chat_msg_download_tips",
-      "value": "The message is being downloaded..."
     },
     {
       "name": "chat_setting",
@@ -383,22 +363,6 @@
     {
       "name": "chat_team_at_permission_all_tips",
       "value": "Update Everyone can @all"
-    },
-    {
-      "name": "mine_remove_collection_tip",
-      "value": "Are you sure you want to delete this bookmark?"
-    },
-    {
-      "name": "mine_collection_empty",
-      "value": "No bookmark messages at the moment"
-    },
-    {
-      "name": "mine_collection_from_team",
-      "value": "From %s"
-    },
-    {
-      "name": "mine_collection_from_p2p",
-      "value": "From %s"
     }
   ]
 }

@@ -11,11 +11,11 @@ import { DateUtil } from '@nimkit/common/src/main/ets/utils/DateUtil';
 import { V2NIMConversation, V2NIMMessageCallAttachment, V2NIMMessageType } from '@nimsdk/base';
 import { ConversationOperationDialog } from './ConversationOperationDialog';
 
-@Component
+@ComponentV2
 export struct ConversationViewItem {
-  @State conversationInfo: V2NIMConversation | null = null
-  @State haveBeanAit: boolean = false
-  public onItemClick?: () => void
+  @Param conversationInfo: V2NIMConversation | null = null
+  @Param haveBeanAit: boolean = false
+  @Param @Require onItemClick?: () => void
   dialogController: CustomDialogController = new CustomDialogController({
     builder: ConversationOperationDialog({
       conversationInfo: this.conversationInfo

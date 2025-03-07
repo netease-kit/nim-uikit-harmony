@@ -120,6 +120,15 @@ export struct textBuilder {
   @BuilderParam
   chatInfo: ChatInfo | undefined
 
+  private onItemClick(event: ClickEvent) {
+    this.onMessageClick?.onReplyClick?.(event, this.message.replyMsg)
+  }
+
+  private onRevokeEditClick(event: ClickEvent) {
+    this.onMessageClick?.onRevokeEditClick?.(event, this.message)
+
+  }
+
   build() {
     Column() {
       if (!this.message.isRevokeMsg && this.message.isReplyMsg) {
@@ -153,9 +162,7 @@ export struct textBuilder {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .ellipsisMode(EllipsisMode.END)
           .margin({ bottom: 4 })
-          .onClick((event: ClickEvent) => {
-            this.onMessageClick?.onReplyClick?.(event, this.message.replyMsg)
-          })
+          .onClick((event) => this.onItemClick(event))
         } else {
           Text(getContext().resourceManager.getStringSync($r('app.string.chat_reply_not_exist').id))
             .fontColor($r('app.color.color_chat_desc'))
@@ -173,8 +180,8 @@ export struct textBuilder {
           if (this.message.revokeEditMsg) {
             Span($r('app.string.chat_msg_undo_edit_tips'))
               .fontColor($r('app.color.color_chat_send'))
-              .onClick((event: ClickEvent) => {
-                this.onMessageClick?.onRevokeEditClick?.(event, this.message)
+              .onClick((event) => {
+                this.onRevokeEditClick(event)
               })
           }
         } else {
@@ -263,12 +270,15 @@ export struct imageBuilder {
 
   build() {
     Column() {
-      Image(this.message?.getImageUrl()).objectFit(ImageFit.Cover)
-        .width(getImageWidth(this.message)).height(getImageHeight(this.message))
+      Image(this.message?.getImageUrl())
+        .objectFit(ImageFit.Cover)
+        .width(getImageWidth(this.message))
+        .height(getImageHeight(this.message))
         .borderRadius(8)
-    }.gesture(LongPressGesture().onAction((event: GestureEvent) => {
-      this.onMessageClick?.onItemLongClick?.(event, this.message)
-    }), GestureMask.IgnoreInternal)
+        .gesture(LongPressGesture().onAction((event: GestureEvent) => {
+          this.onMessageClick?.onItemLongClick?.(event, this.message)
+        }), GestureMask.IgnoreInternal)
+    }
   }
 }
 

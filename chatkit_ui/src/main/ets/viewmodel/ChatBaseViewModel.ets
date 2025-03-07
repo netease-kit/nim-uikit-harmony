@@ -12,6 +12,8 @@ import {
   collectionTypeOffset,
   ConversationRepo,
   ErrorUtils,
+  IMKitConfigCenter,
+  LocalConversationRepo,
   StorageRepo,
   YxAitMsg
 } from '@nimkit/chatkit';
@@ -113,8 +115,7 @@ export class ChatBaseViewModel {
     ChatRepo.onRevokeMessage(this.onRevokeFun)
     // 注册消息置顶监听
     ChatRepo.onMessagePinNotification(this.onPinFun)
-    // 清理未读数
-    ConversationRepo.clearUnreadCountByIds([this.conversationId])
+
     // 监听数据同步完成监听
     ChatKitClient.nim.loginService.on('onDataSync', this.onSyncFinishedFun)
     // 长连接状态变更
@@ -123,6 +124,8 @@ export class ChatBaseViewModel {
     ChatKitClient.nim.loginService?.on('onLoginStatus', this.onLoginStatusChange)
 
     ChatBaseViewModel.currentViewModel = this
+    // 清理未读数
+    this.clearUnreadCount()
   }
 
   onConnectStatusChange = (status: V2NIMConnectStatus) => {
@@ -229,11 +232,12 @@ export class ChatBaseViewModel {
   // 拉取历史消息
   async getMessageList(): Promise<NIMMessageInfo[]> {
     let hasError = false
+    console.debug(`ChatBaseViewModel getMessageList`)
     const messageList: V2NIMMessage[] = await ChatRepo.getMessageList({
       'conversationId': this.conversationId,
       'limit': ChatConst.chatMessagePageSize,
       'direction': this.msgDirection,
-      'onlyQueryLocal': true
+      'onlyQueryLocal': false,
     }).catch((err: BusinessError) => {
       hasError = true
       return []
@@ -260,6 +264,7 @@ export class ChatBaseViewModel {
     this.chatInfo?.setReceiveMsg(true)
     this.toHandleQueryMessage(result, messageList)
     this.hasLoadData = true
+    console.debug(`ChatBaseViewModel getMessageList end`)
     return result;
   }
 
@@ -546,7 +551,11 @@ export class ChatBaseViewModel {
 
   // 清理未读数
   clearUnreadCount() {
-    ConversationRepo.clearUnreadCountByIds([this.conversationId])
+    if (IMKitConfigCenter.enableLocalConversation) {
+      LocalConversationRepo.clearUnreadCountByIds([this.conversationId])
+    } else {
+      ConversationRepo.clearUnreadCountByIds([this.conversationId])
+    }
   }
 
   // 消息发送之前调用，用于配置消息通用参数
@@ -889,6 +898,25 @@ export class ChatBaseViewModel {
     return undefined
   }
 
+  resendMessage(msgInfo: NIMMessageInfo) {
+    //设置推送
+    let params: V2NIMSendMessageParams | undefined = undefined
+    let pushList = msgInfo.message.pushConfig?.forcePushAccountIds
+    if (pushList) {
+      params = {
+        pushConfig: {
+          forcePush: true,
+          forcePushAccountIds: pushList.length >= 0 ? pushList : undefined
+        }
+      }
+    }
+    if (msgInfo.isReplyMsg && msgInfo.replyMsg && msgInfo.replyMsg.message) {
+      this.replyMessage(msgInfo.message,msgInfo.replyMsg?.message,params)
+    }else {
+      this.sendMessage(msgInfo.message,params)
+    }
+  }
+
   // 多选数据，添加新的选中消息
   addSelectMessage(msg: NIMMessageInfo) {
     this.selectMsgMap.set(msg.getMessageClientId(), msg)
@@ -944,7 +972,7 @@ export class ChatBaseViewModel {
     // 登录状态变更
     ChatKitClient.nim.loginService?.off('onLoginStatus', this.onLoginStatusChange)
     // 清理未读数
-    ConversationRepo.clearUnreadCountByIds([this.conversationId])
+    this.clearUnreadCount()
     ChatKitClient.clearCurrentConversationId()
   }
 }

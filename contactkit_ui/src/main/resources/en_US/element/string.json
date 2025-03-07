@@ -187,6 +187,10 @@
     {
       "name": "conversation_selected",
       "value": "已选"
+    },
+    {
+      "name": "validate_processed",
+      "value": "该验证消息已在其他端处理"
     }
   ]
 }

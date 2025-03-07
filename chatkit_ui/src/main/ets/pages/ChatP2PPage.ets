@@ -219,7 +219,7 @@ export struct ChatP2PPage {
   }
 
   @Monitor("chatUserInfo.isReceiveMsg")
-  onReceiveMsg(monitor: IMonitor) {
+  onReceiveMsg() {
     if (this.firstLoadData || this.chatUserInfo.isReceiveMsg) {
       this.listScroller.scrollEdge(Edge.Bottom)
       this.chatUserInfo.setReceiveMsg(false)
@@ -228,7 +228,7 @@ export struct ChatP2PPage {
   }
 
   @Monitor("chatUserInfo.scrollIndex")
-  onScrollIndex(monitor: IMonitor) {
+  onScrollIndex() {
     if (this.chatUserInfo.scrollIndex > -1) {
       let height = DeviceUtils.windowPXHeight / 2
       this.toScroll = true
@@ -241,7 +241,7 @@ export struct ChatP2PPage {
   }
 
   @Monitor("chatViewModel.needScrollToBottom")
-  onNeedScrollToBottom(monitor: IMonitor) {
+  onNeedScrollToBottom() {
     if (this.chatViewModel.needScrollToBottom &&
       this.listScrollEndPosition >= this.chatUserInfo.msgList.totalCount() - 2) {
       this.listScroller.scrollEdge(Edge.Bottom)
@@ -250,7 +250,7 @@ export struct ChatP2PPage {
   }
 
   @Monitor("chatViewModel.anchorMsg")
-  onAnchorMsg(monitor: IMonitor) {
+  onAnchorMsg() {
     if (this.chatViewModel.anchorMsg) {
       if (this.chatUserInfo.msgMap.has(this.chatViewModel.anchorMsg.getMessageClientId())) {
         let position = this.chatUserInfo.searchPosition(this.chatViewModel.anchorMsg.getMessageClientId())
@@ -265,12 +265,12 @@ export struct ChatP2PPage {
   }
 
   @Monitor("chatViewModel.selectMsgCount")
-  onSelectMsg(monitor: IMonitor) {
+  onSelectMsg() {
     this.multiSelectCount = this.chatViewModel.getSelectMessageSize()
   }
 
   @Monitor("expandHeight")
-  onExpandInputView(monitor: IMonitor) {
+  onExpandInputView() {
     if (this.expandHeight > 10) {
       // 如果是定位消息状态，收到键盘展开重新切换最新消息
       if (this.chatViewModel.hasNew) {
@@ -493,7 +493,7 @@ export struct ChatP2PPage {
                     }
                     this.showOperationView = true
                   }),
-                  onItemClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                  onItemClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
                     if (this.showMultiSelect) {
                       if (msg) {
                         if (!msg?.isSelectedMsg && !msg.isRevokeMsg) {
@@ -507,7 +507,7 @@ export struct ChatP2PPage {
                     this.showMessageDetail(msg)
 
                   },
-                  onRevokeEditClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                  onRevokeEditClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
                     if (this.showMultiSelect) {
                       return
                     }
@@ -540,7 +540,7 @@ export struct ChatP2PPage {
                       this.operationMsg = undefined
                     }
                   },
-                  onReplyClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                  onReplyClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
                     if (msg) {
                       if (this.chatUserInfo.msgMap.has(msg.getMessageClientId())) {
                         let index = this.chatUserInfo.searchPosition(msg.getMessageClientId())
@@ -549,11 +549,25 @@ export struct ChatP2PPage {
                         this.showMessageDetail(msg, true)
                       }
                     }
+                  },
+                  onSendFailClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                    if (this.showMultiSelect) {
+                      return
+                    }
+                    if (msg) {
+                      this.chatViewModel.resendMessage(msg)
+                    }
+                  },
+                  onAvatarLongPress: () => {
+
+                  },
+                  onReadReceiptClick: (_event: ClickEvent) => {
+
                   }
                 },
               })
             }
-          }, (item: NIMMessageInfo, index?: number) => item.message.messageClientId)
+          }, (item: NIMMessageInfo) => item.message.messageClientId)
         }
         .id("chatPageListView")
         .cachedCount(20)
@@ -699,21 +713,21 @@ export struct ChatP2PPage {
         } else if (this.showMultiSelect) {
           ChatMultiSelectView({
             isEnable: this.multiSelectCount > 0,
-            onMultiForward: (clickEvent) => {
+            onMultiForward: () =>{
               if (ChatKitClient.connectBroken()) {
                 NECommonUtils.showToast($r('app.string.chat_network_error_tips'))
               } else {
                 this.multiForwardMessage()
               }
             },
-            onSingleForward: (clickEvent) => {
+            onSingleForward: () => {
               if (ChatKitClient.connectBroken()) {
                 NECommonUtils.showToast($r('app.string.chat_network_error_tips'))
               } else {
                 this.singleForwardMessage()
               }
             },
-            onMultiDelete: (clickEvent) => {
+            onMultiDelete: () => {
               let selectMsg = this.chatViewModel.getSelectMessageList()
               if (selectMsg.length > ChatConst.messageDeleteLimit) {
                 NECommonUtils.showToast($r('app.string.chat_multi_delete_limit_tips', ChatConst.messageDeleteLimit))

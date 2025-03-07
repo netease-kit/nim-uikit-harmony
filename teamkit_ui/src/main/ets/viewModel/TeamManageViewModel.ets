@@ -78,7 +78,7 @@ export class TeamManageViewModel {
       V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL
         && this.managerList.find((a) => a.accountId === e.accountId))
 
-      this.managerList = this.managerList.filter((m) =>!normalMembers.find((e) => e.accountId === m.accountId))
+      this.managerList = this.managerList.filter((m) => !normalMembers.find((e) => e.accountId === m.accountId))
 
       this.managerCount = this.managerList.length - 1;
     }

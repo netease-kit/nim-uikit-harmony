@@ -14,8 +14,10 @@ import { V2NIMUserServiceImpl } from '@nimsdk/user'
 import { V2NIMFriendServiceImpl } from '@nimsdk/friend'
 import { V2NIMClientAntispamUtil, V2NIMMessageServiceImpl } from '@nimsdk/message'
 import { AppConfig } from '../constants/AppConfig'
-import { ChatKitClient } from '@nimkit/chatkit'
+import { ChatKitClient, IMKitConfigCenter } from '@nimkit/chatkit'
 import { router } from '@kit.ArkUI'
+import { IMSDKConfigManager } from '../manager/IMSDKConfigManager'
+import { V2NIMLocalConversationServiceImpl } from '@nimsdk/localconversation'
 
 export class NimRepository {
   private static instance?: NimRepository
@@ -29,7 +31,7 @@ export class NimRepository {
 
   public get nim(): NIMInterface {
     if (!this._nim) {
-      this.init(this._context)
+      this.createDefaultNim(this._context)
     }
 
     return this._nim!
@@ -38,24 +40,30 @@ export class NimRepository {
   public static getInstance(context: common.Context): NimRepository {
     if (!NimRepository.instance) {
       NimRepository.instance = new NimRepository(context)
+      NimRepository.instance.nim
     }
     return NimRepository.instance
   }
 
   async login(accountId: string, token: string, appKey: string) {
     try {
+      console.debug(`Performance Test im start loginSuccess`)
       await this.nim.loginService.login(accountId, token);
       console.error('----------- 登录成功 -----------')
+      console.debug(`Performance Test im loginSuccess`)
+
+      ChatKitClient.init(this.nim, appKey)
 
       router.replaceUrl({
         url: 'pages/TabIndex'
       });
     } catch (error) {
       console.error('----------- 登录失败 -----------', error)
+      throw error as Error
     }
   }
 
-  init(context: common.Context) {
+  createDefaultNim(context: common.Context) {
     console.warn('------------- 创建NIM实例 --------------')
 
     let initializeOptions: NIMInitializeOptions = {
@@ -66,6 +74,7 @@ export class NimRepository {
       loginServiceConfig: {},
     }
 
+
     // 正式服
     initializeOptions = {
       appkey: AppConfig.appKey,
@@ -73,22 +82,32 @@ export class NimRepository {
       // ...其他属性
     };
 
-    serviceOptions = {
-      loginServiceConfig: {
-        lbsUrls: ['https://lbs.netease.im/lbs/webconf.jsp'],
-        linkUrl: 'weblink.netease.im:443'
-      },
-      pushServiceConfig: {
-        harmonyCertificateName: "DEMO_HMOS_PUSH"
-      },
-      databaseServiceConfig: {
-        encrypt: false,
-        appKey: AppConfig.appKey,
+    const customConfig = IMSDKConfigManager.getConfig()
+    if (customConfig?.enableCustomConfig) {
+      if (customConfig.configOptions) {
+        serviceOptions = customConfig.configOptions
+        let appKey = serviceOptions.databaseServiceConfig?.appKey
+        if (appKey) {
+          initializeOptions.appkey = appKey
+        }
+      }
+    } else {
+      serviceOptions = {
+        loginServiceConfig: {
+          lbsUrls: ['https://lbs.netease.im/lbs/webconf.jsp'],
+          linkUrl: 'weblink.netease.im:443'
+        },
+        pushServiceConfig: {
+          harmonyCertificateName: "DEMO_HMOS_PUSH"
+        },
+        databaseServiceConfig: {
+          encrypt: false,
+          appKey: AppConfig.appKey,
+        }
       }
     }
 
     this.initNim(initializeOptions, serviceOptions)
-    ChatKitClient.init(this.nim, AppConfig.appKey)
     console.log("net ease nim from createDefaultNim: " + this._nim)
   }
 
@@ -97,14 +116,20 @@ export class NimRepository {
       (core, serviceName, serviceConfig) => new V2NIMTeamServiceImpl(core, serviceName, serviceConfig))
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_CLIENT_ANTISPAM_UTIL,
       (core, serviceName, serviceConfig) => new V2NIMClientAntispamUtil(core, serviceName, serviceConfig));
-    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_CONVERSATION,
-      (core, serviceName, serviceConfig) => new V2NIMConversationServiceImpl(core, serviceName, serviceConfig));
+    if (IMKitConfigCenter.enableLocalConversation) {
+      NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_LOCAL_CONVERSATION,
+        (core, serviceName, serviceConfig) => new V2NIMLocalConversationServiceImpl(core, serviceName, serviceConfig));
+    } else {
+      NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_CONVERSATION,
+        (core, serviceName, serviceConfig) => new V2NIMConversationServiceImpl(core, serviceName, serviceConfig));
+    }
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_MESSAGE,
       (core, serviceName, serviceConfig) => new V2NIMMessageServiceImpl(core, serviceName, serviceConfig));
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_USER,
       (core, serviceName, serviceConfig) => new V2NIMUserServiceImpl(core, serviceName, serviceConfig));
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_FRIEND,
       (core, serviceName, serviceConfig) => new V2NIMFriendServiceImpl(core, serviceName, serviceConfig));
+
     this._nim = NIMSdk.newInstance(this._context, initializeOptions, serviceOptions)
     console.log("nim from initNim: " + this._nim)
   }

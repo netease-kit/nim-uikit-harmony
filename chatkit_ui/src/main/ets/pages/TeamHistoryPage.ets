@@ -34,7 +34,7 @@ export struct TeamHistoryPage {
   @Local viewModel?: TeamHistoryViewModel
   @Local isEmpty: boolean = false
   @Local searchText: string = ""
-  onSubmit = async (enterKey: EnterKeyType, event: SubmitEvent) => {
+  onSubmit = async (_enterKey: EnterKeyType, event: SubmitEvent) => {
     this.searchText = event.text
     if (ErrorUtils.checkNetworkAndToast()) {
       if (this.searchText.length > 0) {
@@ -48,7 +48,7 @@ export struct TeamHistoryPage {
       }
     }
   }
-  onTextChange = (value: string, previewText?: PreviewText) => {
+  onTextChange = (value: string) => {
     if (value.length === 0) {
       this.viewModel?.clearHistoryMessages()
       this.isEmpty = false

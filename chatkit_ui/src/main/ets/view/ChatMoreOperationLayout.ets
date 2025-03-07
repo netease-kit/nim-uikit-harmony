@@ -8,12 +8,11 @@
 import { OperationItem } from './OperationItemLayout';
 import { NEChatMoreOperationData } from '../model/NEChatMoreOperationData';
 
-@Entry
-@Component
+@ComponentV2
 export struct NEChatMoreOperation {
   // 面板回调
-  @Prop dataList: Array<NEChatMoreOperationData>;
-  onDidClick?: (data: NEChatMoreOperationData) => void;
+  @Param @Require dataList: Array<NEChatMoreOperationData>;
+  @Param @Require onDidClick?: (data: NEChatMoreOperationData) => void;
 
   build() {
     GridRow({
@@ -21,7 +20,7 @@ export struct NEChatMoreOperation {
         reference: BreakpointsReference.WindowSize
       }
     }) {
-      ForEach(this.dataList, (data: NEChatMoreOperationData, index?: number | undefined) => {
+      ForEach(this.dataList, (data: NEChatMoreOperationData) => {
         GridCol({ span: 3 }) {
           Row() {
             OperationItem({

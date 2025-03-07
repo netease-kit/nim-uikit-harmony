@@ -1,5 +1,11 @@
-import { ChatKitClient, ConversationRepo, SettingRepo } from '@nimkit/chatkit'
-import { V2NIMP2PMessageMuteMode } from '@nimsdk/base'
+import {
+  ChatKitClient,
+  ConversationRepo,
+  IMKitConfigCenter,
+  LocalConversationRepo,
+  SettingRepo
+} from '@nimkit/chatkit';
+import { V2NIMP2PMessageMuteMode } from '@nimsdk/base';
 
 @ObservedV2
 export class UserSettingViewModel {
@@ -23,9 +29,16 @@ export class UserSettingViewModel {
    */
   async getConversationInfo() {
     try {
-      const conversation = await ConversationRepo.getConversation(this.conversationId)
-      this.isStickTop = conversation?.stickTop ?? false
-      this.isMessageNotify = !(conversation?.mute ?? false)
+      if (IMKitConfigCenter.enableLocalConversation) {
+        const conversation = await LocalConversationRepo.getConversation(this.conversationId)
+        this.isStickTop = conversation?.stickTop ?? false
+        this.isMessageNotify = !(conversation?.mute ?? false)
+      } else {
+        const conversation = await ConversationRepo.getConversation(this.conversationId)
+        this.isStickTop = conversation?.stickTop ?? false
+        this.isMessageNotify = !(conversation?.mute ?? false)
+      }
+
     } catch (err) {
       console.error(err)
     }
@@ -37,7 +50,11 @@ export class UserSettingViewModel {
    */
   async stickTopConversation(stickTop: boolean) {
     try {
-      await ConversationRepo.stickTopConversation(this.conversationId, stickTop)
+      if (IMKitConfigCenter.enableLocalConversation) {
+        await LocalConversationRepo.stickTopConversation(this.conversationId, stickTop)
+      } else {
+        await ConversationRepo.stickTopConversation(this.conversationId, stickTop)
+      }
       this.isStickTop = stickTop
     } catch (error) {
       this.isStickTop = !stickTop
