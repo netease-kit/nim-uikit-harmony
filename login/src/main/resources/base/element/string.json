@@ -1,0 +1,92 @@
+{
+  "string": [
+    {
+      "name": "smsCodeLogin",
+      "value": "验证码登录"
+    },
+    {
+      "name": "smsCodeLoginComment",
+      "value": "未注册的手机号码验证通过后将自动注册"
+    },
+    {
+      "name": "pleaseInputPhoneMember",
+      "value": "请输入正确的手机号码"
+    },
+    {
+      "name": "pleaseInputSmsCode",
+      "value": "请输入验证码"
+    },
+    {
+      "name": "getSmsCode",
+      "value": "获取验证码"
+    },
+    {
+      "name": "inputInnerIMSDKAccount",
+      "value": "输入 IM 内部账号"
+    },
+    {
+      "name": "retryAfterCount",
+      "value": "%d秒后重新获取"
+    },
+    {
+      "name": "registerOrLogin",
+      "value": "注册/登录"
+    },
+    {
+      "name": "loginIMSDK",
+      "value": "登录 IM SDK"
+    },
+    {
+      "name": "getSmsCodeError",
+      "value": "获取验证码失败%d"
+    },
+    {
+      "name": "loginFailed",
+      "value": "登录失败%d"
+    },
+    {
+      "name": "inputSmsCode",
+      "value": "请输入正确的验证码"
+    },
+    {
+      "name": "inputPhoneNumber",
+      "value": "请输入正确的电话号码"
+    },
+    {
+      "name": "login_warning_tips_pre",
+      "value": "在您注册云信产品账号过程中，您需要完成注册流程并确认同意在线签署"
+    },
+    {
+      "name": "privacy_title_tips",
+      "value": "《隐私政策》"
+    },
+    {
+      "name": "user_protocol_title_tips",
+      "value": "《用户服务协议》"
+    },
+    {
+      "name": "user_protocol_add",
+      "value": " 和 "
+    },
+    {
+      "name": "login_warning_tips_after",
+      "value": "(以下简称“法律文件”)。\n请你在确认同意之前务必仔细阅读。"
+    },
+    {
+      "name": "login_warning",
+      "value": "温馨提示"
+    },
+    {
+      "name": "login_disagree",
+      "value": "不同意"
+    },
+    {
+      "name": "login_have_read_and_agree",
+      "value": "已阅读并同意"
+    },
+    {
+      "name": "network_not_working",
+      "value": "网络不通畅"
+    }
+  ]
+}

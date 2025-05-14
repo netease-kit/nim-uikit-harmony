@@ -94,14 +94,14 @@ export class NEFriendUserCache {
   }
 
   /// 使用好友列表初始化缓存
-  public initFriendCacheWithList(friends: V2NIMFriend[]) {
+  public loadFriendList(friends: V2NIMFriend[]) {
     friends.forEach((friend: V2NIMFriend) => {
       this.updateFriendInfo({
         friend: friend
       })
     })
 
-    ContactRepo.listener.emit('initFriendCache')
+    ContactRepo.listener.emit('loadFriendCache')
   }
 
   /// 获取缓存的好友信息

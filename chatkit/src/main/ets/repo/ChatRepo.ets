@@ -32,7 +32,7 @@ export class ChatRepo {
    * @param sendFn 消息接受处理方法
    */
   static onSendMessage(sendFn: (message: V2NIMMessage) => void) {
-    ChatKitClient.nim.messageService?.on("onSendMessage", sendFn);
+    ChatKitClient.nim.messageService?.on('onSendMessage', sendFn);
   }
 
   /**
@@ -40,7 +40,7 @@ export class ChatRepo {
    * @param receiveFn 消息接受处理方法
    */
   static offSendMessage(receiveFn: (message: V2NIMMessage) => void) {
-    ChatKitClient.nim.messageService?.off("onSendMessage", receiveFn);
+    ChatKitClient.nim.messageService?.off('onSendMessage', receiveFn);
   }
 
   /**
@@ -48,7 +48,7 @@ export class ChatRepo {
    * @param receiveFn 消息接受处理方法
    */
   static onReceiverMessage(receiveFn: (messageList: V2NIMMessage[]) => void) {
-    ChatKitClient.nim.messageService?.on("onReceiveMessages", receiveFn);
+    ChatKitClient.nim.messageService?.on('onReceiveMessages', receiveFn);
   }
 
   /**
@@ -56,7 +56,7 @@ export class ChatRepo {
    * @param receiveFn 消息接受处理方法
    */
   static offReceiverMessage(receiveFn: (messageList: V2NIMMessage[]) => void) {
-    ChatKitClient.nim.messageService?.off("onReceiveMessages", receiveFn);
+    ChatKitClient.nim.messageService?.off('onReceiveMessages', receiveFn);
   }
 
   /**
@@ -64,7 +64,7 @@ export class ChatRepo {
    * @param receiveFn 消息接受处理方法
    */
   static onDeleteMessage(deleteFn: (messageList: V2NIMMessageDeletedNotification[]) => void) {
-    ChatKitClient.nim.messageService?.on("onMessageDeletedNotifications", deleteFn);
+    ChatKitClient.nim.messageService?.on('onMessageDeletedNotifications', deleteFn);
   }
 
   /**
@@ -72,7 +72,7 @@ export class ChatRepo {
    * @param receiveFn 消息接受处理方法
    */
   static offDeleteMessage(deleteFn: (messageList: V2NIMMessageDeletedNotification[]) => void) {
-    ChatKitClient.nim.messageService?.off("onMessageDeletedNotifications", deleteFn);
+    ChatKitClient.nim.messageService?.off('onMessageDeletedNotifications', deleteFn);
   }
 
   /**
@@ -80,7 +80,7 @@ export class ChatRepo {
    * @param receiveFn 消息接受处理方法
    */
   static onRevokeMessage(revokeFn: (messageList: V2NIMMessageRevokeNotification[]) => void) {
-    ChatKitClient.nim.messageService?.on("onMessageRevokeNotifications", revokeFn);
+    ChatKitClient.nim.messageService?.on('onMessageRevokeNotifications', revokeFn);
   }
 
   /**
@@ -88,7 +88,7 @@ export class ChatRepo {
    * @param receiveFn 消息接受处理方法
    */
   static offRevokeMessage(revokeFn: (messageList: V2NIMMessageRevokeNotification[]) => void) {
-    ChatKitClient.nim.messageService?.off("onMessageRevokeNotifications", revokeFn);
+    ChatKitClient.nim.messageService?.off('onMessageRevokeNotifications', revokeFn);
   }
 
   /**
@@ -96,7 +96,7 @@ export class ChatRepo {
    * @param receiptsFn 单聊消息已读回执处理方法
    */
   static onP2PMessageReadReceipts(receiptsFn: (messageList: V2NIMP2PMessageReadReceipt[]) => void) {
-    ChatKitClient.nim.messageService?.on("onReceiveP2PMessageReadReceipts", receiptsFn);
+    ChatKitClient.nim.messageService?.on('onReceiveP2PMessageReadReceipts', receiptsFn);
   }
 
   /**
@@ -104,7 +104,7 @@ export class ChatRepo {
    * @param receiptsFn 单聊消息已读回执处理方法
    */
   static offP2PMessageReadReceipts(receiptsFn: (messageList: V2NIMP2PMessageReadReceipt[]) => void) {
-    ChatKitClient.nim.messageService?.off("onReceiveP2PMessageReadReceipts", receiptsFn);
+    ChatKitClient.nim.messageService?.off('onReceiveP2PMessageReadReceipts', receiptsFn);
   }
 
   /**
@@ -112,7 +112,7 @@ export class ChatRepo {
    * @param receiptsFn 群消息已读回执处理方法
    */
   static onReceiveTeamMessageReadReceipts(receiptsFn: (messageList: V2NIMTeamMessageReadReceipt[]) => void) {
-    ChatKitClient.nim.messageService?.on("onReceiveTeamMessageReadReceipts", receiptsFn);
+    ChatKitClient.nim.messageService?.on('onReceiveTeamMessageReadReceipts', receiptsFn);
   }
 
   /**
@@ -120,7 +120,7 @@ export class ChatRepo {
    * @param receiptsFn 群消息已读回执处理方法
    */
   static offReceiveTeamMessageReadReceipts(receiptsFn: (messageList: V2NIMTeamMessageReadReceipt[]) => void) {
-    ChatKitClient.nim.messageService?.off("onReceiveTeamMessageReadReceipts", receiptsFn);
+    ChatKitClient.nim.messageService?.off('onReceiveTeamMessageReadReceipts', receiptsFn);
   }
 
   /**
@@ -128,7 +128,7 @@ export class ChatRepo {
    * @param pinFn PIN消息监听处理方法
    */
   static onMessagePinNotification(pinFn: (notification: V2NIMMessagePinNotification) => void) {
-    ChatKitClient.nim.messageService?.on("onMessagePinNotification", pinFn);
+    ChatKitClient.nim.messageService?.on('onMessagePinNotification', pinFn);
   }
 
   /**
@@ -136,7 +136,23 @@ export class ChatRepo {
    * @param pinFn PIN消息监听处理方法
    */
   static offMessagePinNotification(pinFn: (notification: V2NIMMessagePinNotification) => void) {
-    ChatKitClient.nim.messageService?.off("onMessagePinNotification", pinFn);
+    ChatKitClient.nim.messageService?.off('onMessagePinNotification', pinFn);
+  }
+
+  /**
+   * 注册更新消息监听
+   * @param modifyFn PIN消息监听处理方法
+   */
+  static onReceiveMessagesModified(modifyFn: (messageList: V2NIMMessage[]) => void) {
+    ChatKitClient.nim.messageService?.on('onReceiveMessagesModified', modifyFn);
+  }
+
+  /**
+   * 取消更新消息监听
+   * @param modifyFn PIN消息监听处理方法
+   */
+  static offReceiveMessagesModified(modifyFn: (messageList: V2NIMMessage[]) => void) {
+    ChatKitClient.nim.messageService?.off('onReceiveMessagesModified', modifyFn);
   }
 
   /**
@@ -144,7 +160,7 @@ export class ChatRepo {
    * @param receiveFn 消息接受处理方法
    */
   static removeAllListeners(revokeFn: (messageList: V2NIMMessageRevokeNotification[]) => void) {
-    ChatKitClient.nim.messageService?.removeAllListeners("onMessageRevokeNotifications");
+    ChatKitClient.nim.messageService?.removeAllListeners('onMessageRevokeNotifications');
   }
 
   /**

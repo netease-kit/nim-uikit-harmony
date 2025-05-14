@@ -73,3 +73,6 @@ export { CommonConfirmDialog } from './src/main/ets/view/CommonConfirmDialog'
 
 export { MatchSearchText } from './src/main/ets/view/MatchSearchText'
 
+export {CommonLongLoadingProgress } from './src/main/ets/builder/CommonLongLoadingProgress'
+
+export { BreakpointConstants} from './src/main/ets/constants/BreakpointConstants'

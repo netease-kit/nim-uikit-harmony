@@ -93,6 +93,41 @@ export struct DeleteFriendDialog {
 }
 
 @Builder
+export function PersonInfoItemBuilderByParams(title?: ResourceStr, subTitle?: ResourceStr, itemHeight?: number) {
+  Column() {
+    Row() {
+      Text(title)
+        .height(18)
+        .margin({ left: 20 })
+        .layoutWeight(1)
+
+      if (subTitle !== undefined) {
+        Text(subTitle)
+          .fontSize(14)
+          .fontColor('#A6ADB6')
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .margin({ right: 20 })
+          .textAlign(TextAlign.End)
+          .layoutWeight(2)
+          .height(38)
+          .copyOption(CopyOptions.LocalDevice)
+      }
+    }
+    .height((itemHeight ?? 1) - 1)
+    .alignSelf(ItemAlign.Center)
+
+    Row()
+      .height(1)
+      .width('100%')
+      .backgroundColor('#F5F8FC')
+      .margin({ left: 32 })
+  }
+  .width('100%')
+  .height(itemHeight)
+}
+
+@Builder
 export function PersonInfoItemBuilder(item: PersonInfoItem | PersonInfoArrowItem | PersonInfoSwitchItem) {
   Column() {
     Row() {
@@ -160,7 +195,6 @@ export struct PersonInfoPage {
   @Local personInfoItems1: PersonInfoArrowItem[] = [
     new PersonInfoArrowItem($r("app.string.person_info_alias"))
   ]
-  @Local personInfoItems2: PersonInfoItem[] = []
   @Local personInfoItems3: PersonInfoSwitchItem[] = []
   deleteFriendDialog: CustomDialogController = new CustomDialogController({
     builder: DeleteFriendDialog({
@@ -194,14 +228,6 @@ export struct PersonInfoPage {
       this.alias = StringIsEmpty(this.viewModel.userWithFriend?.friend?.alias) ? undefined :
         this.viewModel.userWithFriend?.friend?.alias
       this.isBlock = NEFriendUserCache.getInstance().isBlockAccount(this.viewModel.accountId)
-
-      this.personInfoItems2 = [
-        new PersonInfoItem($r("app.string.person_info_gender"), this.getGenderString()),
-        new PersonInfoItem($r('app.string.person_info_birthday'), this.viewModel.userWithFriend?.user?.birthday),
-        new PersonInfoItem($r('app.string.person_info_mobile'), this.viewModel.userWithFriend?.user?.mobile),
-        new PersonInfoItem($r('app.string.person_info_email'), this.viewModel.userWithFriend?.user?.email),
-        new PersonInfoItem($r('app.string.person_info_sign'), this.viewModel.userWithFriend?.user?.sign, 66),
-      ]
 
       this.personInfoItems3 = [
       // new PersonInfoSwitchItem($r("app.string.person_setting_remind"), true),
@@ -296,13 +322,190 @@ export struct PersonInfoPage {
             .backgroundColor(Color.White)
 
             List() {
-              ForEach(this.personInfoItems2, (item: PersonInfoItem) => {
-                ListItem() {
-                  PersonInfoItemBuilder(item)
+              // gender
+              ListItem() {
+                Column() {
+                  Row() {
+                    Text($r("app.string.person_info_gender"))
+                      .height(18)
+                      .margin({ left: 20 })
+                      .layoutWeight(1)
+
+                    if (this.getGenderString() !== undefined) {
+                      Text(this.getGenderString())
+                        .fontSize(14)
+                        .fontColor('#A6ADB6')
+                        .maxLines(2)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        .margin({ right: 20 })
+                        .textAlign(TextAlign.End)
+                        .layoutWeight(2)
+                        .height(38)
+                        .copyOption(CopyOptions.LocalDevice)
+                    }
+                  }
+                  .height((46 ?? 1) - 1)
+                  .alignSelf(ItemAlign.Center)
+
+                  Row()
+                    .height(1)
+                    .width('100%')
+                    .backgroundColor('#F5F8FC')
+                    .margin({ left: 32 })
                 }
                 .width('100%')
-                .height(item.itemHeight)
-              })
+                .height(46)
+              }
+              .width('100%')
+              .height(46)
+
+              // birthday
+              ListItem() {
+                Column() {
+                  Row() {
+                    Text($r("app.string.person_info_birthday"))
+                      .height(18)
+                      .margin({ left: 20 })
+                      .layoutWeight(1)
+
+                    if (this.viewModel.userWithFriend?.user?.birthday !== undefined) {
+                      Text(this.viewModel.userWithFriend?.user?.birthday)
+                        .fontSize(14)
+                        .fontColor('#A6ADB6')
+                        .maxLines(2)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        .margin({ right: 20 })
+                        .textAlign(TextAlign.End)
+                        .layoutWeight(2)
+                        .height(38)
+                        .copyOption(CopyOptions.LocalDevice)
+                    }
+                  }
+                  .height((46 ?? 1) - 1)
+                  .alignSelf(ItemAlign.Center)
+
+                  Row()
+                    .height(1)
+                    .width('100%')
+                    .backgroundColor('#F5F8FC')
+                    .margin({ left: 32 })
+                }
+                .width('100%')
+                .height(46)
+              }
+              .width('100%')
+              .height(46)
+
+              // mobile
+              ListItem() {
+                Column() {
+                  Row() {
+                    Text($r("app.string.person_info_mobile"))
+                      .height(18)
+                      .margin({ left: 20 })
+                      .layoutWeight(1)
+
+                    if (this.viewModel.userWithFriend?.user?.mobile !== undefined) {
+                      Text(this.viewModel.userWithFriend?.user?.mobile)
+                        .fontSize(14)
+                        .fontColor('#A6ADB6')
+                        .maxLines(2)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        .margin({ right: 20 })
+                        .textAlign(TextAlign.End)
+                        .layoutWeight(2)
+                        .height(38)
+                        .copyOption(CopyOptions.LocalDevice)
+                    }
+                  }
+                  .height((46 ?? 1) - 1)
+                  .alignSelf(ItemAlign.Center)
+
+                  Row()
+                    .height(1)
+                    .width('100%')
+                    .backgroundColor('#F5F8FC')
+                    .margin({ left: 32 })
+                }
+                .width('100%')
+                .height(46)
+              }
+              .width('100%')
+              .height(46)
+
+              // email
+              ListItem() {
+                Column() {
+                  Row() {
+                    Text($r("app.string.person_info_email"))
+                      .height(18)
+                      .margin({ left: 20 })
+                      .layoutWeight(1)
+
+                    if (this.viewModel.userWithFriend?.user?.email !== undefined) {
+                      Text(this.viewModel.userWithFriend?.user?.email)
+                        .fontSize(14)
+                        .fontColor('#A6ADB6')
+                        .maxLines(2)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        .margin({ right: 20 })
+                        .textAlign(TextAlign.End)
+                        .layoutWeight(2)
+                        .height(38)
+                        .copyOption(CopyOptions.LocalDevice)
+                    }
+                  }
+                  .height((46 ?? 1) - 1)
+                  .alignSelf(ItemAlign.Center)
+
+                  Row()
+                    .height(1)
+                    .width('100%')
+                    .backgroundColor('#F5F8FC')
+                    .margin({ left: 32 })
+                }
+                .width('100%')
+                .height(46)
+              }
+              .width('100%')
+              .height(46)
+
+              // sign
+              ListItem() {
+                Column() {
+                  Row() {
+                    Text($r("app.string.person_info_sign"))
+                      .height(18)
+                      .margin({ left: 20 })
+                      .layoutWeight(1)
+
+                    if (this.viewModel.userWithFriend?.user?.sign !== undefined) {
+                      Text(this.viewModel.userWithFriend?.user?.sign)
+                        .fontSize(14)
+                        .fontColor('#A6ADB6')
+                        .maxLines(2)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        .margin({ right: 20 })
+                        .textAlign(TextAlign.End)
+                        .layoutWeight(2)
+                        .height(38)
+                        .copyOption(CopyOptions.LocalDevice)
+                    }
+                  }
+                  .height((66 ?? 1) - 1)
+                  .alignSelf(ItemAlign.Center)
+
+                  Row()
+                    .height(1)
+                    .width('100%')
+                    .backgroundColor('#F5F8FC')
+                    .margin({ left: 32 })
+                }
+                .width('100%')
+                .height(66)
+              }
+              .width('100%')
+              .height(66)
             }
             .backgroundColor(Color.White)
 

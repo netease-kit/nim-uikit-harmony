@@ -39,8 +39,11 @@ export class ContactViewModel {
     if (oldUser && oldUser.friend?.alias !== friend.alias) {
       this.removeFromContact(friend.accountId)
     }
+
     const user = NEFriendUserCache.getInstance().getFriendById(friend.accountId)
-    if (user) {
+    const isFriend = NEFriendUserCache.getInstance().isFriend(friend.accountId)
+
+    if (user && isFriend) {
       this.addToContact(user)
     }
   }
@@ -87,33 +90,33 @@ export class ContactViewModel {
   }
 
   // 格式化好友列表（按分组排序）
-  async formatFriends(friendList: NEUserWithFriend[], filterList: string[]): Promise<NEContactSection[]> {
+  formatFriends(friendList: NEUserWithFriend[], filterList: string[]): NEContactSection[] {
     let contactList: NEContactSection[] = []
     let initalDict: Map<string, SelectUserWithFriend[]> = new Map<string, SelectUserWithFriend[]>()
     let digitList: SelectUserWithFriend[] = []
     let specialCharList: SelectUserWithFriend[] = []
 
-    await Promise.all(
-      friendList.map(async (friend) => {
-        if (friend.user?.accountId && !filterList.includes(friend.user?.accountId)) {
-          let name = friend.showName()
-          if (name) {
-            const inital = await initalLetter(name)
-            if (digitRegular.test(inital)) {
-              digitList.push(new SelectUserWithFriend(friend))
-            } else if (!azRegular.test(inital)) {
-              specialCharList.push(new SelectUserWithFriend(friend))
+    //await Promise.all(
+    friendList.map((friend) => {
+      if (friend.user?.accountId && !filterList.includes(friend.user?.accountId)) {
+        let name = friend.showName()
+        if (name) {
+          const inital = initalLetter(name)
+          if (digitRegular.test(inital)) {
+            digitList.push(new SelectUserWithFriend(friend))
+          } else if (!azRegular.test(inital)) {
+            specialCharList.push(new SelectUserWithFriend(friend))
+          } else {
+            if (initalDict.get(inital)) {
+              initalDict.get(inital)?.push(new SelectUserWithFriend(friend))
             } else {
-              if (initalDict.get(inital)) {
-                initalDict.get(inital)?.push(new SelectUserWithFriend(friend))
-              } else {
-                initalDict.set(inital, [new SelectUserWithFriend(friend)])
-              }
+              initalDict.set(inital, [new SelectUserWithFriend(friend)])
             }
           }
         }
-      })
-    )
+      }
+    })
+    //)
 
     const nameSortFunc = (s1: NEUserWithFriend, s2: NEUserWithFriend) => {
       if ((s1.showName()) < (s2.showName())) {

@@ -40,8 +40,7 @@ export class TeamSettingViewModel {
   //是否置顶
   @Trace isStickTop: boolean = false
   limit: number = 100
-  nextToken?: string
-  isFinished: boolean = false
+  isSyncing: boolean = false
 
   constructor(teamId: string) {
     this.teamId = teamId
@@ -51,13 +50,21 @@ export class TeamSettingViewModel {
    * 获取群成员，附带用户信息
    * @returns
    */
-  async getTeamMember() {
+  async getTeamMember(nextToken?: string) {
+    const firstPage: boolean = !nextToken
+    if (firstPage) {
+      if (this.isSyncing) {
+        return // first page, and is syncing, ignore
+      }
+      this.isSyncing = true
+    }
+
     let teamMemberResult = await TeamRepo.getTeamMembers(
       this.teamId,
       this.teamType,
       {
         limit: this.limit,
-        nextToken: this.nextToken,
+        nextToken,
         direction: V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_ASC
       }
     )
@@ -72,8 +79,17 @@ export class TeamSettingViewModel {
     }
 
     if (teamMemberResult) {
-      this.teamMemberList.splice(0, this.teamMemberList.length)
+      if (firstPage) {
+        this.teamMemberList.splice(0, this.teamMemberList.length)
+      }
       this.teamMemberList.push(...teamMemberResult.memberList)
+      // 检查是否有 nextToken，如果有则继续请求下一页
+      if (!teamMemberResult.finished) {
+        await this.getTeamMember(teamMemberResult.nextToken)
+      }
+    }
+    if (firstPage) {
+      this.isSyncing = false // 标记所有成员已加载完成
     }
   }
 
@@ -156,7 +172,7 @@ export class TeamSettingViewModel {
     ChatKitClient.nim.teamService?.on('onTeamMemberKicked', this.onTeamMemberKicked.bind(this))
     ChatKitClient.nim.teamService?.on('onTeamMemberLeft', this.onTeamMemberLeft.bind(this))
 
-    ChatKitClient.nim.conversationService?.on("onConversationChanged", this.onConversationChanged.bind(this))
+    ChatKitClient.nim.conversationService?.on('onConversationChanged', this.onConversationChanged.bind(this))
   }
 
   /**
@@ -266,6 +282,6 @@ export class TeamSettingViewModel {
     ChatKitClient.nim.teamService?.off('onTeamMemberKicked', this.onTeamMemberKicked)
     ChatKitClient.nim.teamService?.off('onTeamMemberLeft', this.onTeamMemberLeft)
 
-    ChatKitClient.nim.conversationService?.off("onConversationChanged", this.onConversationChanged)
+    ChatKitClient.nim.conversationService?.off('onConversationChanged', this.onConversationChanged)
   }
 }

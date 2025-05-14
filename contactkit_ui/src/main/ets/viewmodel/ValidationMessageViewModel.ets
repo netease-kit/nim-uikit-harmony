@@ -72,8 +72,8 @@ export class ValidationMessageViewModel {
   private context = getContext(this) as common.UIAbilityContext
 
   constructor() {
-    ChatKitClient.nim.friendService?.on("onFriendAddApplication", this.onFriendAddApplicationFun)
-    ChatKitClient.nim.friendService?.on("onFriendAddRejected", this.onFriendAddRejectedFun)
+    ChatKitClient.nim.friendService?.on('onFriendAddApplication', this.onFriendAddApplicationFun)
+    ChatKitClient.nim.friendService?.on('onFriendAddRejected', this.onFriendAddRejectedFun)
   }
 
   async convertToNEFriendAddApplication(item: V2NIMFriendAddApplication, move: boolean = false) {
@@ -178,13 +178,13 @@ export class ValidationMessageViewModel {
       await this.changeApplicationStatus(application,
         V2NIMFriendAddApplicationStatus.V2NIM_FRIEND_ADD_APPLICATION_STATUS_AGREED)
 
-      const text = this.context.resourceManager.getStringSync($r("app.string.let_us_chat"))
+      const text = this.context.resourceManager.getStringSync($r('app.string.let_us_chat'))
       const message = ChatRepo.createTextMessage(text)
       const conversationId = ChatKitClient.nim.conversationIdUtil.p2pConversationId(application.applicantAccountId)
       const result = await ChatRepo.sendMessage(message, conversationId)
-      console.log("net ease send hello message success ", result);
+      console.log('net ease send hello message success ', result);
     } catch (err) {
-      console.log("net ease send hello message error", err);
+      console.log('net ease send hello message error', err);
     }
   }
 
@@ -224,6 +224,9 @@ export class ValidationMessageViewModel {
             this.setApplicationStatus(application,
               V2NIMFriendAddApplicationStatus.V2NIM_FRIEND_ADD_APPLICATION_STATUS_AGREED)
             NECommonUtils.showToast($r('app.string.validate_processed'))
+            break
+          case V2NIMErrorCode.V2NIM_ERROR_CODE_FRIEND_LIMIT:
+            NECommonUtils.showToast($r('app.string.friend_limit'))
             break
           default:
             break
@@ -282,7 +285,7 @@ export class ValidationMessageViewModel {
   }
 
   onDestroy() {
-    ChatKitClient.nim.friendService?.off("onFriendAddApplication", this.onFriendAddApplicationFun)
-    ChatKitClient.nim.friendService?.off("onFriendAddRejected", this.onFriendAddRejectedFun)
+    ChatKitClient.nim.friendService?.off('onFriendAddApplication', this.onFriendAddApplicationFun)
+    ChatKitClient.nim.friendService?.off('onFriendAddRejected', this.onFriendAddRejectedFun)
   }
 }

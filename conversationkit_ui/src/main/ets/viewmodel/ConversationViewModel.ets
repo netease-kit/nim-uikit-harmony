@@ -86,24 +86,24 @@ export class ConversationViewModel {
 
 
     //群解散
-    ChatKitClient.nim.teamService?.on("onTeamDismissed", (team: V2NIMTeam) => {
+    ChatKitClient.nim.teamService?.on('onTeamDismissed', (team: V2NIMTeam) => {
       this.deleteConversation(ChatKitClient.nim.conversationIdUtil.teamConversationId(team.teamId))
     })
 
     //退出群
-    ChatKitClient.nim.teamService?.on("onTeamLeft", (team: V2NIMTeam) => {
+    ChatKitClient.nim.teamService?.on('onTeamLeft', (team: V2NIMTeam) => {
       this.deleteConversation(ChatKitClient.nim.conversationIdUtil.teamConversationId(team.teamId))
     })
 
     //会话未读数变化
-    ChatKitClient.nim.conversationService?.on("onTotalUnreadCountChanged", (unreadCount: number) => {
+    ChatKitClient.nim.conversationService?.on('onTotalUnreadCountChanged', (unreadCount: number) => {
       if (this.onUreadMessageChange) {
         this.onUreadMessageChange(unreadCount)
       }
     })
 
     //会话创建
-    ChatKitClient.nim.conversationService?.on("onConversationCreated", (conversation: V2NIMConversation) => {
+    ChatKitClient.nim.conversationService?.on('onConversationCreated', (conversation: V2NIMConversation) => {
       ChatKitClient.logger?.debug(`${ConversationViewModel.logTag} onConversationCreated type is ${conversation.type}`)
       if (conversation.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
         this.addTeamConversation(conversation)
@@ -120,25 +120,25 @@ export class ConversationViewModel {
     })
 
     //会话删除
-    ChatKitClient.nim.conversationService?.on("onConversationDeleted", (conversationIds: string[]) => {
+    ChatKitClient.nim.conversationService?.on('onConversationDeleted', (conversationIds: string[]) => {
       this.conversationList =
         this.conversationList?.filter(conversation => !conversationIds.includes(conversation.conversationId))
     })
     //会话更新
-    ChatKitClient.nim.conversationService?.on("onConversationChanged", (updateList: V2NIMConversation[]) => {
+    ChatKitClient.nim.conversationService?.on('onConversationChanged', (updateList: V2NIMConversation[]) => {
       updateList.forEach(
         changedItem => {
           const index =
             this.conversationList?.findIndex(conversation => conversation.conversationId === changedItem.conversationId)
-          if (index !== undefined && index > -1) {
-            this.conversationList?.splice(index, 1)
+          if (index !== undefined && index > -1 && this.conversationList) {
+            this.conversationList[index] = changedItem
           }
           if (changedItem.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
             setTimeout(() => {
               this.addTeamConversation(changedItem)
             }, 100)
           } else {
-            this.conversationList?.push(...[changedItem])
+            //this.conversationList?.push(...[changedItem])
           }
         }
       );
@@ -243,5 +243,3 @@ export class ConversationViewModel {
 
   }
 }
-
-

@@ -5,7 +5,8 @@
  *
  */
 
-import { ChatKitClient, ContactRepo, ConversationRepo, IMKitConfigCenter } from '@nimkit/chatkit';
+import { ChatKitClient, ContactRepo, ConversationRepo, IMKitConfigCenter,
+  LocalConversationRepo } from '@nimkit/chatkit';
 import { ChatKitConfig } from '@nimkit/chatkit_ui/src/main/ets/ChatKitConfig';
 import { CommonConstants } from '@nimkit/common';
 import { ContactPage } from '@nimkit/contactkit_ui';
@@ -16,7 +17,7 @@ import { MinePage } from '../mine/pages/MinePage';
 
 @ObservedV2
 class TabBarItem {
-  title: ResourceStr = "";
+  title: ResourceStr = '';
   targetIndex: number = 0;
   @Trace showRedPoint: boolean = false;
   normalIcon: Resource;
@@ -61,7 +62,13 @@ struct TabIndex {
   }
   //获取会话列表未读数
   loadUnreadMessageCount = () => {
-    const unreadCount = ConversationRepo.getTotalUnreadCount()
+     let unreadCount = 0
+    if (this.useLocalConversation) {
+       unreadCount = LocalConversationRepo.getTotalUnreadCount() ?? 0
+    }else {
+       unreadCount = ConversationRepo.getTotalUnreadCount() ?? 0
+    }
+
     if (unreadCount) {
       this.tabs[0].showRedPoint = unreadCount > 0
     }
@@ -73,7 +80,7 @@ struct TabIndex {
   }
 
   async aboutToAppear(): Promise<void> {
-    ChatKitClient.nim.friendService?.on("onFriendAddApplication", async (application: V2NIMFriendAddApplication) => {
+    ChatKitClient.nim.friendService?.on('onFriendAddApplication', async (application: V2NIMFriendAddApplication) => {
       await this.loadUnreadApplication()
     })
     try {
@@ -146,7 +153,7 @@ struct TabIndex {
         })
       }
       .barHeight(60)
-      .backgroundColor("#F6F8FA")
+      .backgroundColor('#F6F8FA')
       .barPosition(BarPosition.End)
       .onChange((index: number) => {
         this.currentIndex = index

@@ -6,7 +6,10 @@
  */
 
 import {
+  V2NIMGetMediaResourceInfoResult,
+  V2NIMMessageAttachment,
   V2NIMProgressCallback,
+  V2NIMSize,
   V2NIMStorageScene,
   V2NIMUploadFileParams,
   V2NIMUploadFileTask
@@ -90,5 +93,12 @@ export class StorageRepo {
    */
   static async shortUrlToLong(url: string): Promise<string | undefined> {
     return await ChatKitClient.nim.storageService?.shortUrlToLong(url)
+  }
+
+  /**
+   * 生成图片缩略链接
+   */
+  static async getImageThumbUrl(attachment: V2NIMMessageAttachment, thumbSize: V2NIMSize): Promise<V2NIMGetMediaResourceInfoResult | undefined> {
+    return await ChatKitClient.nim.storageService?.getImageThumbUrl(attachment, thumbSize)
   }
 }

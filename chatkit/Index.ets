@@ -73,4 +73,6 @@ export { AitAllPermission } from './src/main/ets/model/ait/AitAllPermission'
 
 export { KitLogger as Logger } from './src/main/ets/logger/AppLogger'
 
-export {IMKitConfigCenter} from './src/main/ets/IMKitConfigCenter'
+export { IMKitConfigCenter } from './src/main/ets/IMKitConfigCenter'
+
+export { TeamSettingParam } from './src/main/ets/model/TeamSettingParam'

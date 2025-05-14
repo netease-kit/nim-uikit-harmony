@@ -103,6 +103,18 @@
           ]
         }
       ]
+    },
+    {
+      "name": "login",
+      "srcPath": "./login",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
     }
   ]
 }

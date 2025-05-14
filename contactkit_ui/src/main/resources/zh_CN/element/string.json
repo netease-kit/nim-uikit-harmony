@@ -191,6 +191,10 @@
     {
       "name": "validate_processed",
       "value": "该验证消息已在其他端处理"
+    },
+    {
+      "name": "friend_limit",
+      "value": "好友人数已达上限"
     }
   ]
 }
