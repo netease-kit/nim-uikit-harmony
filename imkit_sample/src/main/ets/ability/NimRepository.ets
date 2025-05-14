@@ -6,7 +6,9 @@
  */
 
 import common from '@ohos.app.ability.common'
-import { LogLevel, NIMInitializeOptions, NIMInterface, NIMServiceOptions, V2NIMProvidedServiceType } from '@nimsdk/base'
+import { LogLevel, NIMInitializeOptions, NIMInterface, NIMServiceOptions,
+  V2NIMEnableServiceType,
+  V2NIMProvidedServiceType } from '@nimsdk/base'
 import { NIMSdk } from '@nimsdk/nim'
 import { V2NIMTeamServiceImpl } from '@nimsdk/team'
 import { V2NIMConversationServiceImpl } from '@nimsdk/conversation'
@@ -94,8 +96,10 @@ export class NimRepository {
     } else {
       serviceOptions = {
         loginServiceConfig: {
-          lbsUrls: ['https://lbs.netease.im/lbs/webconf.jsp'],
-          linkUrl: 'weblink.netease.im:443'
+           lbsUrls: ['https://lbs.netease.im/lbs/webconf.jsp'],
+           linkUrl: 'weblink.netease.im:443'
+          //lbsUrls: ['https://imtest.netease.im/lbs/webconf'],
+          //linkUrl: 'imtest-jd.netease.im:8091'
         },
         pushServiceConfig: {
           harmonyCertificateName: "DEMO_HMOS_PUSH"
@@ -129,8 +133,16 @@ export class NimRepository {
       (core, serviceName, serviceConfig) => new V2NIMUserServiceImpl(core, serviceName, serviceConfig));
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_FRIEND,
       (core, serviceName, serviceConfig) => new V2NIMFriendServiceImpl(core, serviceName, serviceConfig));
-
+    initializeOptions.isOpenConsoleLog = true
     this._nim = NIMSdk.newInstance(this._context, initializeOptions, serviceOptions)
     console.log("nim from initNim: " + this._nim)
+  }
+
+  isLocalConversation(): boolean {
+    if (this._nim?.isServiceEnable(V2NIMEnableServiceType.LOCAL_CONVERSATION)) {
+      return true
+    }
+
+    return false
   }
 }

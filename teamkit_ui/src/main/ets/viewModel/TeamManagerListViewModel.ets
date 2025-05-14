@@ -94,7 +94,7 @@ export class TeamMangerListViewModel {
    * 初始化成员信息变化回调
    */
   initMemberChangeListener() {
-    ChatKitClient.nim.friendService?.on("onFriendInfoChanged", this.onFriendInfoChanged.bind(this))
+    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChanged.bind(this))
     //群成员信息变更
     ChatKitClient.nim.teamService?.on('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated.bind(this))
     ChatKitClient.nim.teamService?.on('onTeamMemberLeft', this.onTeamMemberLeft.bind(this))
@@ -183,7 +183,7 @@ export class TeamMangerListViewModel {
   }
 
   onDestroy() {
-    ChatKitClient.nim.friendService?.off("onFriendInfoChanged", this.onFriendInfoChanged)
+    ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChanged)
     //群成员信息变更
     ChatKitClient.nim.teamService?.off('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated)
     ChatKitClient.nim.teamService?.off('onTeamMemberLeft', this.onTeamMemberLeft)

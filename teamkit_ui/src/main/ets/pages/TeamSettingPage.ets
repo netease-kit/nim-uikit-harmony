@@ -23,7 +23,7 @@ import {
 } from '@nimsdk/base'
 import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
 import { TeamSettingViewModel } from '../viewModel/TeamViewModel'
-import { ChatKitClient, NEUserWithFriend, PersonSelectParam, TeamRepo } from '@nimkit/chatkit'
+import { ChatKitClient, NEUserWithFriend, PersonSelectParam, TeamRepo, TeamSettingParam } from '@nimkit/chatkit'
 import { MemberListParams } from './TeamMemberListPage'
 
 @ComponentV2
@@ -91,6 +91,7 @@ export struct TeamSettingPage {
               Text(this.teamViewModel.team.name)
                 .fontColor('ff333333')
                 .fontSize(16)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
                 .width('80%')
                 .maxLines(1)
                 .ellipsisMode(EllipsisMode.END)

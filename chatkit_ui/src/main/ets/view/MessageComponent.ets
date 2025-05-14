@@ -142,11 +142,14 @@ export struct SenderMessageComponent {
                   if (this.message.message.conversationType == V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
                     if (this.message.readCount >= 0) {
                       Image(this.message.readCount == 0 ? $r('app.media.ic_chat_read_status_unread') :
-                      $r('app.media.ic_chat_read_status_read')).width(16).height(16)
+                      $r('app.media.ic_chat_read_status_read'))
+                        .width(16)
+                        .height(16)
                         .alignRules({
                           bottom: { anchor: "msgContainer", align: VerticalAlign.Bottom },
                           right: { anchor: "msgContainer", align: HorizontalAlign.Start }
-                        }).margin({ right: 6 })
+                        })
+                        .margin({ right: 6 })
                     }
 
                   } else {
@@ -211,7 +214,7 @@ export struct SenderMessageComponent {
             .alignItems(VerticalAlign.Bottom)
             .margin({ right: 8 })
             .width('100%')
-            .height(this.message.getMessageHeight(this.getUIContext()))
+            //.height(this.message.getMessageHeight(this.getUIContext()))
             .gesture(LongPressGesture()
               .onAction((event: GestureEvent) => {
                 this.onMessageClick?.onItemLongClick?.(event, this.message)
@@ -310,9 +313,10 @@ export struct ReceiveMessageComponent {
           }
           CommonAvatar({
             item: new AvatarItem(this.chatUserInfo != null ?
-            this.chatUserInfo?.getChatUserAvatarUrl(this.message?.message) : '',
+              this.chatUserInfo?.getChatUserAvatarUrl(this.message?.message) : '',
               this.chatUserInfo?.getChatUserAvatarName(this.message?.message) ?? '',
-              AvatarColorUntil.getBackgroundColorById(this.message?.message.senderId ?? '')),
+              AvatarColorUntil.getBackgroundColorById(this.message?.message.senderId ?? '')
+            ),
             longPressGesture: () => {
               this.onMessageClick?.onAvatarLongPress?.( this.message)
             }
@@ -356,7 +360,7 @@ export struct ReceiveMessageComponent {
                 })
             }
             .width('100%')
-            .height(this.message?.getMessageHeight(this.getUIContext()))
+            //.height(this.message?.getMessageHeight(this.getUIContext()))
             .alignItems(HorizontalAlign.Start)
             .justifyContent(FlexAlign.Center)
             .gesture(LongPressGesture().onAction((event: GestureEvent) => {
@@ -408,7 +412,7 @@ export struct NotificationMessageComponent {
             .height(20)
         }
         Row() {
-          Text(this.messageContent)
+          Text(this.messageContent ?? $r('app.string.chat_message_empty_notification_text'))
             .fontColor($r('app.color.color_chat_sub_title'))
             .fontSize($r('app.float.chat_desc_text_font_size'))
             .padding({
@@ -421,6 +425,7 @@ export struct NotificationMessageComponent {
             .ellipsisMode(EllipsisMode.END)
         }
         .width('100%')
+        // .height(this.message?.getMessageHeight(this.getUIContext()))
         .padding({ top: 6, bottom: 6 })
         .justifyContent(FlexAlign.Center)
         .borderRadius(6)
@@ -447,7 +452,7 @@ export struct TipsMessageComponent {
           }.justifyContent(FlexAlign.Center).width('100%').height(20)
         }
         Row() {
-          Text(this.message?.message.text)
+          Text(this.message?.message.text ?? $r('app.string.chat_message_empty_tip_text'))
             .lineHeight(20)
             .padding({
               left: 6,
@@ -459,7 +464,7 @@ export struct TipsMessageComponent {
             .fontSize($r('app.float.chat_desc_text_font_size'))
         }
         .width('100%')
-        .height(this.message?.getMessageHeight(this.getUIContext()))
+        // .height(this.message?.getMessageHeight(this.getUIContext()))
         .padding({ top: 6, bottom: 6 })
         .margin({ left: 60, right: 60, top: 6 })
         .justifyContent(FlexAlign.Center)

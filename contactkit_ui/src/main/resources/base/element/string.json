@@ -191,6 +191,10 @@
     {
       "name": "validate_processed",
       "value": "Already done on other devices"
+    },
+    {
+      "name": "friend_limit",
+      "value": "Friend limit has been reached"
     }
   ]
 }

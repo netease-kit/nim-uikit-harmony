@@ -9,9 +9,10 @@
     "@nimkit/common": "file:../common",
     "@nimkit/chatkit": "file:../chatkit",
     "@nimkit/corekit": "file:../corekit",
-    "@nimsdk/base": "10.8.5",
+    "@nimsdk/base": "10.8.30",
     "class-transformer": "^0.5.1",
-    "reflect-metadata": "^0.1.13"
+    "reflect-metadata": "^0.1.13",
+    '@nimkit/markdown': "1.1.0"
     // 用于嵌套对象@Type反射
   }
 }

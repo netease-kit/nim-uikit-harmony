@@ -27,7 +27,7 @@ export function BlockListItemBuilder(params: BlockListItemBuilderParams) {
         Row() {
           CommonAvatar({
             item: new AvatarItem(item.user?.avatar, item.shortName(),
-              AvatarColorUntil.getBackgroundColorById(item.user?.accountId ?? ""))
+              AvatarColorUntil.getBackgroundColorById(item.user?.accountId ?? ''))
           })
             .width(params.titleIconSize ?? 36)
             .height(params.titleIconSize ?? 36)
@@ -36,7 +36,7 @@ export function BlockListItemBuilder(params: BlockListItemBuilderParams) {
 
           Text(item.showName())
             .fontSize(params.titleFontSize ?? 14)
-            .fontColor("#333333")
+            .fontColor('#333333')
             .height(18)
             .margin({ left: 12, right: 12 })
             .layoutWeight(2)
@@ -76,9 +76,6 @@ export function BlockListItemBuilder(params: BlockListItemBuilderParams) {
       .width('100%')
       .height(params.itemHeight)
       .backgroundColor(params.backgroundColor ?? Color.White)
-      .onClick(() => {
-
-      })
     }
   })
 }

@@ -19,6 +19,8 @@ import {
 } from '@nimkit/chatkit';
 import fs from '@ohos.file.fs';
 import {
+  V2NIMAIModelRoleType,
+  V2NIMAIUser,
   V2NIMConnectStatus,
   V2NIMDataSyncState,
   V2NIMDataSyncType,
@@ -26,6 +28,9 @@ import {
   V2NIMErrorCode,
   V2NIMLoginStatus,
   V2NIMMessage,
+  V2NIMMessageAIConfigParams,
+  V2NIMMessageAIStatus,
+  V2NIMMessageAIStreamStatus,
   V2NIMMessageConfig,
   V2NIMMessageDeletedNotification,
   V2NIMMessageFileAttachment,
@@ -53,7 +58,8 @@ import { sceneMap } from '@kit.MapKit';
 import { clearForwardAtMark, createForwardMessageListFileDetail, sendMessageFailedTips } from '../common/MessageHelper';
 import { instanceToPlain } from 'class-transformer';
 import { NECommonUtils } from '@nimkit/common';
-import { JSON } from '@kit.ArkTS';
+import { HashMap, JSON } from '@kit.ArkTS';
+import { assign } from '@nimsdk/vendor';
 
 @ObservedV2
 export class ChatBaseViewModel {
@@ -75,6 +81,8 @@ export class ChatBaseViewModel {
   hasLoadData = false
   // 网络连接状态
   @Trace networkBroken: boolean = ChatKitClient.connectBroken()
+  // 流式 ing 缓存数据
+  private streamingMessageMap: HashMap<string, StreamMessage> = new HashMap();
   // 发送消息
   onSendFun = async (message: V2NIMMessage): Promise<void> => {
     if (message.conversationId === this.conversationId) {
@@ -107,6 +115,8 @@ export class ChatBaseViewModel {
     ChatKitClient.setCurrentConversationId(this.conversationId)
     // 注册消息接受监听
     ChatRepo.onReceiverMessage(this.onReceiveFun)
+    // 注册消息更新监听
+    ChatRepo.onReceiveMessagesModified(this.onModifyFun)
     // 注册消息发送监听
     ChatRepo.onSendMessage(this.onSendFun)
     // 注册消息删除监听
@@ -169,6 +179,85 @@ export class ChatBaseViewModel {
       this.chatInfo?.setReceiveMsg(true);
     }
   }
+  // 更新消息
+  onModifyFun = (messages: V2NIMMessage[]) => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      let message = messages[i];
+      // 流式并且机器人回复消息，走流式展示逻辑
+      if (message.aiConfig?.aiStream && message.aiConfig?.aiStatus === V2NIMMessageAIStatus.V2NIM_MESSAGE_AI_STATUS_RESPONSE) {
+        this.onModifyFunStream(message)
+      } else {
+        this.onModifyFunNormal(message)
+      }
+    }
+  }
+
+  private onModifyFunNormal = (message: V2NIMMessage) => {
+    if (this.hasNew) {
+      return
+    }
+    let hasNew = false
+    let receiveMsg: NIMMessageInfo[] = [];
+    if (message.conversationId == this.conversationId) {
+      let msgInfo = this.chatInfo?.pushModifyMessage(message);
+      if (msgInfo !== undefined) {
+        receiveMsg.push(msgInfo)
+      }
+      hasNew = true;
+    }
+    if (hasNew) {
+      this.toHandleReceiveMessage(receiveMsg)
+      // this.clearUnreadCount() // 更新消息不做 clear 动作
+      this.chatInfo?.setReceiveMsg(true);
+    }
+  }
+
+  private onModifyFunStream = async (message: V2NIMMessage) => {
+    if (message.aiConfig?.aiStreamStatus === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_STREAMING) {
+      // 检查新老情况
+      const messageClientId: string = message.messageClientId
+      const oldStreamMessage: StreamMessage | undefined = this.streamingMessageMap.get(messageClientId) // 老的
+      const newStreamMessage: StreamMessage = new StreamMessage(message) // 新的
+      this.streamingMessageMap.set(messageClientId, newStreamMessage) // 替换成新的
+
+      // 准备裁切 message.text
+      const oldLen = oldStreamMessage?.message?.text?.length ?? 0
+      const newLen = newStreamMessage.message?.text?.length ?? 0
+      const newStr: string = newStreamMessage.message?.text ?? ''
+      const currentIndex: number = newStreamMessage.index
+
+      // 开始裁切
+      for (let i = oldLen; i < newLen; i++) {
+        const latestStreaming: StreamMessage | undefined = this.streamingMessageMap.get(messageClientId)
+        if (latestStreaming.finish || currentIndex !== latestStreaming.index) {
+          break; // finish or index 已经发生了变化，不再更新
+        }
+        const tmpMessage: V2NIMMessage = assign({}, message)
+        const tmpStr: string = newStr.substring(0, i + 1);
+        tmpMessage.text = tmpStr
+        this.onModifyFunNormal(tmpMessage) // 循环 modify
+        // 阻塞 20ms，避免循环过快而回调过快
+        await new Promise<void>(resolve => {
+          setTimeout(resolve, 20); // 例如，这里设置一个 20 毫秒的延迟。还有优化空间
+        });
+      }
+    } else {
+      if (message.aiConfig?.aiStreamStatus === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_STOPPED ||
+        message.aiConfig?.aiStreamStatus === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_UPDATED ||
+        message.aiConfig?.aiStreamStatus === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_GENERATED ||
+        message.aiConfig?.aiStreamStatus === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_ABORTED) {
+        // finish
+        const oldStreaming = this.streamingMessageMap.get(message.messageClientId)
+        if (oldStreaming) {
+          oldStreaming.finish = true
+        } else {
+          this.streamingMessageMap.set(message.messageClientId, new StreamMessage(message)) // finished message
+        }
+      }
+      this.onModifyFunNormal(message) // 直接 modify
+    }
+  }
+
   // 删除消息
   onDeleteFun = (messages: V2NIMMessageDeletedNotification[]) => {
     messages.forEach((msg, index, messages) => {
@@ -181,6 +270,12 @@ export class ChatBaseViewModel {
         }
       }
     })
+    // 等待 1 秒，然后重新拉取一次消息
+    if ((this.chatInfo?.msgList.totalCount() ?? 0) <= 0) {
+      setTimeout(() => {
+        this.getMessageList() // 被删完了消息之后，防止消息空了，重新拉取
+      },  1000)
+    }
   }
   // 撤回消息
   onRevokeFun = (messages: V2NIMMessageRevokeNotification[]) => {
@@ -232,12 +327,12 @@ export class ChatBaseViewModel {
   // 拉取历史消息
   async getMessageList(): Promise<NIMMessageInfo[]> {
     let hasError = false
-    console.debug(`ChatBaseViewModel getMessageList`)
     const messageList: V2NIMMessage[] = await ChatRepo.getMessageList({
       'conversationId': this.conversationId,
       'limit': ChatConst.chatMessagePageSize,
       'direction': this.msgDirection,
       'onlyQueryLocal': false,
+      'strictMode': true
     }).catch((err: BusinessError) => {
       hasError = true
       return []
@@ -264,7 +359,6 @@ export class ChatBaseViewModel {
     this.chatInfo?.setReceiveMsg(true)
     this.toHandleQueryMessage(result, messageList)
     this.hasLoadData = true
-    console.debug(`ChatBaseViewModel getMessageList end`)
     return result;
   }
 
@@ -612,6 +706,42 @@ export class ChatBaseViewModel {
       return
     }
 
+    // 设置 AI 配置
+    const enableAIStream: boolean = false
+    if (enableAIStream) {
+      const text: string = message.text ?? '你是谁'
+      const aiUsers: V2NIMAIUser[] = await ChatKitClient.nim.aiService!.getAIUserList()
+      const ollamaaitest20AIUser: V2NIMAIUser | undefined =
+        aiUsers.find((aiUser) => aiUser.accountId === 'ollamaaitest9')
+
+      const aiParams: V2NIMMessageAIConfigParams = {
+        accountId: ollamaaitest20AIUser ? ollamaaitest20AIUser.accountId : (aiUsers.length > 0 ? aiUsers[0].accountId : ''),
+        content: {
+          msg: text,
+          type: 0
+        },
+        messages: [
+          {
+            role: V2NIMAIModelRoleType.V2NIM_AI_MODEL_ROLE_TYPE_ASSISTANT,
+            msg: text,
+            type: 0
+          }
+        ],
+        promptVariables: undefined,
+        modelConfigParams: {
+          prompt: undefined,
+          maxTokens: undefined,
+          topP: undefined,
+          temperature: undefined
+        },
+        aiStream: true // open aiStream
+      }
+
+      if (typeof params === 'undefined') {
+        params = {}
+      }
+      params.aiConfig = aiParams
+    }
     this.sendMessage(message, params)
   }
 
@@ -962,6 +1092,7 @@ export class ChatBaseViewModel {
    */
   onDestroy(): void {
     ChatRepo.offReceiverMessage(this.onReceiveFun)
+    ChatRepo.offReceiveMessagesModified(this.onModifyFun)
     ChatRepo.offSendMessage(this.onSendFun)
     ChatRepo.offDeleteMessage(this.onDeleteFun)
     ChatRepo.offRevokeMessage(this.onRevokeFun)
@@ -977,3 +1108,22 @@ export class ChatBaseViewModel {
   }
 }
 
+
+class StreamMessage {
+  public message: V2NIMMessage
+  public streamingArr: string[]
+  public index: number
+  public finish: boolean
+
+  constructor(message: V2NIMMessage) {
+    this.message = message
+    this.streamingArr = []
+    this.index = message.aiConfig?.aiStreamLastChunk?.index ?? 0
+    if (message.aiConfig?.aiStreamStatus === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_STREAMING ||
+      message.aiConfig?.aiStreamStatus === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_PLACEHOLDER) {
+      this.finish = false // streaming / placeholder 认为还没结束
+    } else {
+      this.finish = true
+    }
+  }
+}

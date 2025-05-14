@@ -48,6 +48,14 @@
           }
         ]
       }
+    ],
+    "metadata": [
+      {
+        "name": "client_id",
+        // 配置为获取的Client ID,
+//        "value": "112133551", // UIKit
+        "value": "110423569" // IM SDK
+      }
     ]
   }
 }

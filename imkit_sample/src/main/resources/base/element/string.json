@@ -6,7 +6,7 @@
     },
     {
       "name": "ability_desc",
-      "value": "云信IM"
+      "value": "description"
     },
     {
       "name": "ability_label",
@@ -47,10 +47,6 @@
     {
       "name": "tab_mine",
       "value": "我的"
-    },
-    {
-      "name": "mine_collection",
-      "value": "收藏"
     },
     {
       "name": "mine_remove_collection_tip",

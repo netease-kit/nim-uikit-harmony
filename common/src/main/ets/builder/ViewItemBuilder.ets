@@ -50,6 +50,7 @@ export function ViewItemBuilder(params: ViewItem | ViewItemArrow | ViewItemSwitc
           .height(28)
           .margin({ right: 16 })
           .onChange((params as ViewItemSwitch).switchChange)
+          .enabled((params as ViewItemSwitch).enableChange)
       }
     }
     .alignSelf(ItemAlign.Center)

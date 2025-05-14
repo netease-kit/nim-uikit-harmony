@@ -63,6 +63,19 @@ export struct MinePage {
     return avatarName
   }
 
+  aboutToAppear(): void {
+    ChatKitClient.nim.userService?.on('onUserProfileChanged', (users: V2NIMUser[])=>{
+      const user = users.pop()
+      if (user?.accountId === NEFriendUserCache.mineUserCache?.user?.accountId && NEFriendUserCache.mineUserCache?.user) {
+        NEFriendUserCache.mineUserCache.user = user
+      }
+    })
+  }
+
+  onPageShow(): void {
+    this.build()
+  }
+
   build() {
     NavDestination() {
       Column({ space: 6 }) {

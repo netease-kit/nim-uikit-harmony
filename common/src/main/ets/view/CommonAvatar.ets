@@ -23,8 +23,7 @@ export struct CommonAvatar {
    * 文字颜色
    */
   @Param textColor: ResourceColor = '#ffFFFFFF'
-
-  @Param longPressGesture:((event: GestureEvent) => void) | undefined = undefined
+  @Param longPressGesture: ((event: GestureEvent) => void) | undefined = undefined
 
   build() {
     if (this.item != null) {
@@ -47,11 +46,16 @@ export struct CommonAvatar {
             .maxLines(1)
         }.gesture(LongPressGesture().onAction(this.longPressGesture))
       } else {
-        Image(this.item.avatarUrl).borderRadius(this.roundRadius).gesture(LongPressGesture().onAction(event => {
-          this.longPressGesture?.(event)
-        }))
+        Image(this.item.avatarUrl)
+          .syncLoad(true)
+          .borderRadius(this.roundRadius)
+         .onGestureJudgeBegin(() => {
+          return GestureJudgeResult.CONTINUE;
+        }).parallelGesture(LongPressGesture().onAction(event => {
+            this.longPressGesture?.(event)
+          }
+        ))
       }
-
     }
   }
 }
@@ -133,7 +137,8 @@ export class AvatarColorUntil {
     }
     for (let i = 0; i < str.length; i++) {
       let char = str.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
+      hash =
+        (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32bit integer
     }
     return hash;

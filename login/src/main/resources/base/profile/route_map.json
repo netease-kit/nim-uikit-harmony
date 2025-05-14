@@ -1,0 +1,36 @@
+{
+  "routerMap": [
+    {
+      "name": "LoginIndexPage",
+      "pageSourceFile": "src/main/ets/components/LoginIndexPage.ets",
+      "buildFunction": "LoginIndexPageBuilder",
+      "data": {
+        "description": "login enter"
+      }
+    },
+    {
+      "name": "LoginPage",
+      "pageSourceFile": "src/main/ets/components/LoginPage.ets",
+      "buildFunction": "LoginPageBuilder",
+      "data": {
+        "description": "login page"
+      }
+    },
+    {
+      "name": "DeprecatedLoginPage",
+      "pageSourceFile": "src/main/ets/utils/deprecated/DeprecatedLoginPage.ets",
+      "buildFunction": "DeprecatedLoginPageBuilder",
+      "data": {
+        "description": "deprecated login page"
+      }
+    },
+    {
+      "name": "WebPage",
+      "pageSourceFile": "src/main/ets/components/WebPage.ets",
+      "buildFunction": "WebPageBuilder",
+      "data": {
+        "description": "web page"
+      }
+    }
+  ]
+}

@@ -340,18 +340,6 @@ export struct NEChatInputView {
 
             }
           })
-          .onCut((event: CutEvent) => {
-            console.debug(`ChatInputView onCut`)
-            event.preventDefault!()
-          })
-          .onCopy((event: CopyEvent) => {
-            console.debug(`ChatInputView onCopy`)
-
-            event.preventDefault!()
-          })
-          .onPaste(() => {
-            console.debug(`ChatInputView onPaste`)
-          })
           .borderRadius(8)
           .id('chat_edit_input')
           .onSubmit((enterKey: EnterKeyType, event: SubmitEvent) => {

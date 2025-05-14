@@ -46,11 +46,11 @@ export class MyTeamsViewModel {
   }
 
   constructor() {
-    ChatKitClient.nim.teamService?.on("onTeamCreated", this.onTeamCreatedFun)
-    ChatKitClient.nim.teamService?.on("onTeamDismissed", this.onTeamDismissedFun)
-    ChatKitClient.nim.teamService?.on("onTeamJoined", this.onTeamJoinedFun)
-    ChatKitClient.nim.teamService?.on("onTeamLeft", this.onTeamLeftFun)
-    ChatKitClient.nim.teamService?.on("onTeamInfoUpdated", this.onTeamInfoUpdatedFun)
+    ChatKitClient.nim.teamService?.on('onTeamCreated', this.onTeamCreatedFun)
+    ChatKitClient.nim.teamService?.on('onTeamDismissed', this.onTeamDismissedFun)
+    ChatKitClient.nim.teamService?.on('onTeamJoined', this.onTeamJoinedFun)
+    ChatKitClient.nim.teamService?.on('onTeamLeft', this.onTeamLeftFun)
+    ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', this.onTeamInfoUpdatedFun)
   }
 
   async getJoinedTeamList() {
@@ -73,10 +73,10 @@ export class MyTeamsViewModel {
   }
 
   onDestroy() {
-    ChatKitClient.nim.teamService?.off("onTeamCreated", this.onTeamCreatedFun)
-    ChatKitClient.nim.teamService?.off("onTeamDismissed", this.onTeamDismissedFun)
-    ChatKitClient.nim.teamService?.off("onTeamJoined", this.onTeamJoinedFun)
-    ChatKitClient.nim.teamService?.off("onTeamLeft", this.onTeamLeftFun)
-    ChatKitClient.nim.teamService?.off("onTeamInfoUpdated", this.onTeamInfoUpdatedFun)
+    ChatKitClient.nim.teamService?.off('onTeamCreated', this.onTeamCreatedFun)
+    ChatKitClient.nim.teamService?.off('onTeamDismissed', this.onTeamDismissedFun)
+    ChatKitClient.nim.teamService?.off('onTeamJoined', this.onTeamJoinedFun)
+    ChatKitClient.nim.teamService?.off('onTeamLeft', this.onTeamLeftFun)
+    ChatKitClient.nim.teamService?.off('onTeamInfoUpdated', this.onTeamInfoUpdatedFun)
   }
 }

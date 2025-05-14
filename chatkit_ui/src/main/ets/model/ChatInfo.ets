@@ -82,6 +82,8 @@ export class ChatInfo {
       this.msgList.getMessageList().find(msg => msg.message.messageClientId === message.messageClientId);
     if (targetMessage !== undefined) {
       targetMessage.updateMessageStatus(message)
+      // 如果是消息 message crateTime 》 lastMessage crateTime 需要调整消息位置
+      this.moveMessage(message)
       return true
     } else {
       this.insertMessage(message)
@@ -118,6 +120,20 @@ export class ChatInfo {
 
   }
 
+  moveMessage(message: V2NIMMessage){
+    // 如果是消息 message crateTime 》 lastMessage crateTime 需要调整消息位置
+    const copiedArray = [...this.msgList.messageData];
+    const oldIndex = this.msgList.searchPosition(message.messageClientId)
+    const updatedElement = copiedArray[oldIndex];
+    // 按新的createTime降序排序
+    const sortedArray = [...copiedArray].sort((a, b) => a.message.createTime - b.message.createTime);
+    const newIndex = sortedArray.findIndex(element => element === updatedElement)
+    // 位置发生变换，进行reload
+    if (oldIndex != newIndex) {
+      this.msgList.reloadData()
+    }
+  }
+
   insertMessage(message: V2NIMMessage): NIMMessageInfo {
     let addIndex = this.msgList.searchInsertPosition(message.createTime)
     if (addIndex > this.msgList.totalCount()) {
@@ -137,6 +153,16 @@ export class ChatInfo {
         msgInfo.setPinMessage(this.msgPinMap.get(message.messageClientId))
       }
       this.msgList.addData(addIndex, msgInfo)
+
+      // 非尾部插入。
+      // 该情况下可能展示时间，但是可能与新的一条消息时间间隔太小，会重复展示相同时间。因此该条展示后，需要检查与下条的展示时间是否相同。若相同，则隐藏下条消息时间。
+      const changeIndex = addIndex + 1
+      if (changeIndex < this.msgList.totalCount()) {
+        const nextMsg: NIMMessageInfo = this.msgList.getData(changeIndex)
+        nextMsg.setLastMessageTime(message.createTime)
+        this.msgList.replaceData(changeIndex, nextMsg)
+      }
+
       return msgInfo;
     }
   }
@@ -159,6 +185,22 @@ export class ChatInfo {
       msgInfo.setPinMessage(this.msgPinMap.get(message.messageClientId))
     }
     return msgInfo;
+  }
+
+  pushModifyMessage(message: V2NIMMessage): NIMMessageInfo | undefined {
+    const current: NIMMessageInfo | undefined = this.getMessage(message.messageClientId)
+    if (current !== undefined) {
+      const idx: number = this.msgList.searchPosition(message.messageClientId) // TODO 目前以遍历方式更新，modify 频繁情况下（如流式消息）存在性能优化项。临时方案
+      if (idx >= 0) {
+        current.message = message
+        this.msgList.getData(idx).message = message
+        this.msgList.getData(idx).messageHeight = -1 // 重置高度，重新计算高度
+        this.msgList.notifyDataChange(idx)
+      }
+      return current;
+    } else {
+      return undefined
+    }
   }
 
   pushMessageInfo(msgInfo: NIMMessageInfo) {
@@ -236,6 +278,11 @@ export class MessageDataSource implements IDataSource {
     this.notifyDataAdd(index);
   }
 
+  public replaceData(index: number, data: NIMMessageInfo): void {
+    this.messageData.splice(index, 1, data);
+    this.notifyDataChange(index);
+  }
+
   public push(data: NIMMessageInfo): void {
     this.messageData.push(data);
     this.notifyDataAdd(this.messageData.length - 1);
@@ -280,6 +327,13 @@ export class MessageDataSource implements IDataSource {
       this.messageData.splice(index, 1)
       this.notifyDataDelete(index)
     }
+  }
+
+  public reloadData(): void {
+    // 1. 元素重新排序
+    this.messageData.sort((a, b) => a.message.createTime - b.message.createTime)
+    // 2. 通知视图更新
+    this.notifyDataReload()
   }
 
   public searchInsertPosition(creatTime: number): number {
@@ -362,6 +416,12 @@ export class MessageDataSource implements IDataSource {
 
   // 通知LazyForEach组件将from索引和to索引处的子组件进行交换
   notifyDatasetChange(operation: DataAddOperation[]): void {
+    this.listeners.forEach(listener => {
+      listener.onDatasetChange(operation);
+    })
+  }
+  // 通知LazyForEach组件将from索引和to索引处的子组件进行交换
+  notifyDatasetReload(operation: DataReloadOperation[]): void {
     this.listeners.forEach(listener => {
       listener.onDatasetChange(operation);
     })

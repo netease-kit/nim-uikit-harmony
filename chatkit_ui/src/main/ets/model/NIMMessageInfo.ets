@@ -11,13 +11,20 @@ import {
   V2NIMMessageImageAttachment,
   V2NIMMessageType
 } from '@nimsdk/base/src/main/ets/nim/sdk/V2NIMMessageService'
-import { ChatKitClient, ChatRepo, CustomMessageUtils, keyReplyMsgKey, mergedMessageCustomType } from '@nimkit/chatkit'
+import {
+  ChatKitClient,
+  ChatRepo,
+  CustomMessageUtils,
+  keyReplyMsgKey,
+  mergedMessageCustomType,
+  StorageRepo
+} from '@nimkit/chatkit'
 import { DateUtils } from '../common/DateUtils'
 import { fileUri } from '@kit.CoreFileKit'
 import { ChatConst } from '../constants/ChatConst'
 import { JSONUtil } from '@nimkit/common'
 import { BusinessError, systemDateTime } from '@kit.BasicServicesKit'
-import { V2NIMMessagePin } from '@nimsdk/base'
+import { V2NIMGetMediaResourceInfoResult, V2NIMMessageAIStreamStatus, V2NIMMessagePin } from '@nimsdk/base'
 import { ChatKitConfig } from '../ChatKitConfig'
 import { getMergedMessageContent, measureMessageHeight } from '../common/MessageHelper'
 import fs from '@ohos.file.fs'
@@ -38,7 +45,7 @@ export class NIMMessageInfo {
   // 自定义消息附件
   customAttachment: object | null = null
   // 上一条消息的发送时间，用于判断该消息展示时候是否需要展示发送时间
-  lastMessageTime: number = 0
+  @Trace lastMessageTime: number = 0
   // 是否是接收消息，UI渲染时使用
   isReceiveMsg: boolean = false
   // 是否为撤回消息
@@ -253,6 +260,16 @@ export class NIMMessageInfo {
     return this.message.messageType
   }
 
+  isAiStreamMessage(): boolean {
+    return this.message.aiConfig?.aiStream ?? false
+  }
+
+  isFinishedAiStream(): boolean {
+    return (this.message.aiConfig?.aiStreamStatus ??
+    V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_GENERATED) >
+    V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_PLACEHOLDER
+  }
+
   isReceiveMessage(): boolean {
     return this.isReceiveMsg
   }
@@ -280,6 +297,30 @@ export class NIMMessageInfo {
           }
         }
         return iamgeAttachment.url ?? ''
+      }
+    }
+    return ''
+  }
+
+  async getImageThumbUrl(): Promise<string> {
+    if (this.message.messageType == V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
+      let iamgeAttachment = this.message.attachment as V2NIMMessageImageAttachment
+      if (iamgeAttachment) {
+        if (iamgeAttachment.path) {
+          if (fs.accessSync(iamgeAttachment.path)) {
+            const uri = fileUri.getUriFromPath(iamgeAttachment.path)
+            return uri
+          }
+        }
+        const thumbResult: V2NIMGetMediaResourceInfoResult | undefined =
+          await StorageRepo.getImageThumbUrl(iamgeAttachment, {
+            width: ChatConst.imageMessageWidth
+          })
+        if (!thumbResult) {
+          return iamgeAttachment.url ?? ''
+        } else {
+          return thumbResult.url ?? ''
+        }
       }
     }
     return ''

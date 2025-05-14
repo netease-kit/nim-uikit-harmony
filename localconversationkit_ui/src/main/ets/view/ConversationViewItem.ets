@@ -134,9 +134,6 @@ export struct ConversationViewItem {
               this.dialogController.open()
             }
           })
-          .onActionEnd(() => {
-            //do nothing
-          })
       )
       .padding({
         left: 20,
@@ -181,6 +178,10 @@ export struct ConversationViewItem {
    * @returns
    */
   getConversationContent(item: V2NIMLocalConversation): string | Resource {
+    if (!item.lastMessage) {
+      return ''
+    }
+
     switch (item.lastMessage?.messageType) {
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT:
         return item.lastMessage.text ?? ''

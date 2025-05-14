@@ -6,7 +6,7 @@
  */
 
 import { ChatKitClient, ChatRepo, NEUserWithFriend, PersonSelectParam, TeamRepo } from '@nimkit/chatkit';
-import { CommonEmptyResult, NetworkBrokenBuilder } from '@nimkit/common';
+import { CommonEmptyResult, CommonLongLoadingProgress, NetworkBrokenBuilder } from '@nimkit/common';
 import { V2NIMConversation, V2NIMConversationType } from '@nimsdk/base';
 import { AitServer } from '../service/ait/AitService';
 import { ConversationViewItem } from '../view/ConversationViewItem';
@@ -67,6 +67,9 @@ export struct ConversationPage {
           .backgroundColor('#ffFFFFFF')
         }
 
+      }
+      else {
+        CommonLongLoadingProgress()
       }
 
     }
@@ -324,7 +327,7 @@ struct ConversationNavigationTitleBar {
     TeamRepo.createAdvanceTeam(invitees).then((result) => {
       if (result) {
         //1，本地保存一条消息
-        let message = ChatKitClient.nim.messageCreator.createTipsMessage(
+        const message = ChatKitClient.nim.messageCreator.createTipsMessage(
           getContext(this).resourceManager.getStringSync($r('app.string.createAdvancedTeamSuccess'))
         )
         ChatRepo.saveLocalMessage(message,
@@ -348,4 +351,3 @@ struct ConversationNavigationTitleBar {
 export function ConversationPageBuilder() {
   ConversationPage()
 }
-

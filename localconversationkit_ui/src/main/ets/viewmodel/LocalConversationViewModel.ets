@@ -26,6 +26,7 @@ export class LocalConversationViewModel {
   public isFinished: boolean = false
   //会话列表数据
   @Trace conversationList?: V2NIMLocalConversation[]
+  @Trace isFinishedSyncLoad?: boolean = false
   onUreadMessageChange?: (unreadCount?: number) => void = undefined
   // 网络连接状态
   @Trace networkBroken: boolean = ChatKitClient.connectBroken()
@@ -48,10 +49,11 @@ export class LocalConversationViewModel {
     }
     //添加监听
     ChatKitClient.nim.localConversationService?.on('onSyncFinished',
-      () => {
+      async () => {
         //同步完成拉一次
         ChatKitClient.logger?.debug(`${LocalConversationViewModel.logTag} onSyncFinished`)
-        this.loadConversation(0)
+        await this.loadConversation(0)
+        this.isFinishedSyncLoad = true
       }
     )
 
@@ -85,24 +87,24 @@ export class LocalConversationViewModel {
       })
 
     //群解散
-    ChatKitClient.nim.teamService?.on("onTeamDismissed", (team: V2NIMTeam) => {
+    ChatKitClient.nim.teamService?.on('onTeamDismissed', (team: V2NIMTeam) => {
       this.deleteConversation(ChatKitClient.nim.conversationIdUtil.teamConversationId(team.teamId))
     })
 
     //退出群
-    ChatKitClient.nim.teamService?.on("onTeamLeft", (team: V2NIMTeam) => {
+    ChatKitClient.nim.teamService?.on('onTeamLeft', (team: V2NIMTeam) => {
       this.deleteConversation(ChatKitClient.nim.conversationIdUtil.teamConversationId(team.teamId))
     })
 
     //会话未读数变化
-    ChatKitClient.nim.localConversationService?.on("onTotalUnreadCountChanged", (unreadCount: number) => {
+    ChatKitClient.nim.localConversationService?.on('onTotalUnreadCountChanged', (unreadCount: number) => {
       if (this.onUreadMessageChange) {
         this.onUreadMessageChange(unreadCount)
       }
     })
 
     //会话创建
-    ChatKitClient.nim.localConversationService?.on("onConversationCreated", (conversation: V2NIMLocalConversation) => {
+    ChatKitClient.nim.localConversationService?.on('onConversationCreated', (conversation: V2NIMLocalConversation) => {
       ChatKitClient.logger?.debug(`${LocalConversationViewModel.logTag} onConversationCreated type is ${conversation.type}`)
       if (conversation.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
         this.addTeamConversation(conversation)
@@ -119,25 +121,25 @@ export class LocalConversationViewModel {
     })
 
     //会话删除
-    ChatKitClient.nim.localConversationService?.on("onConversationDeleted", (conversationIds: string[]) => {
+    ChatKitClient.nim.localConversationService?.on('onConversationDeleted', (conversationIds: string[]) => {
       this.conversationList =
         this.conversationList?.filter(conversation => !conversationIds.includes(conversation.conversationId))
     })
     //会话更新
-    ChatKitClient.nim.localConversationService?.on("onConversationChanged", (updateList: V2NIMLocalConversation[]) => {
+    ChatKitClient.nim.localConversationService?.on('onConversationChanged', (updateList: V2NIMLocalConversation[]) => {
       updateList.forEach(
         changedItem => {
           const index =
             this.conversationList?.findIndex(conversation => conversation.conversationId === changedItem.conversationId)
-          if (index !== undefined && index > -1) {
-            this.conversationList?.splice(index, 1)
+          if (index !== undefined && index > -1 && this.conversationList) {
+            this.conversationList[index] = changedItem
           }
           if (changedItem.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
             setTimeout(() => {
               this.addTeamConversation(changedItem)
             }, 100)
           } else {
-            this.conversationList?.push(...[changedItem])
+            //this.conversationList?.push(...[changedItem])
           }
         }
       );
@@ -234,6 +236,7 @@ export class LocalConversationViewModel {
         }
         this.conversationList?.push(...newConversation)
         this.conversationList?.sort((a, b) => this.sortConversation(a, b))
+        this.isFinishedSyncLoad = true
         console.debug(`Performance Test finish  loadLocalConversation`)
       }
     } catch (e) {
@@ -242,5 +245,3 @@ export class LocalConversationViewModel {
 
   }
 }
-
-

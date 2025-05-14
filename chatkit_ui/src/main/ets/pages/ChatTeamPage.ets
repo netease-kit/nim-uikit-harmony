@@ -55,7 +55,8 @@ import {
   mergedMessageLimitCount,
   mergedMessageMaxDepth,
   singleMessageLimitCount,
-  TeamMemberCache
+  TeamMemberCache,
+  TeamSettingParam
 } from '@nimkit/chatkit';
 import { TeamExitDialogParam, TeamExitWarningDialog } from '../view/TeamExitWarningDialog';
 import { AudioPlayerManager } from '../manager/AudioPlayerManager';
@@ -206,10 +207,21 @@ export struct ChatTeamPage {
     width: 276,
   })
   invalidForwardDialogSureAction?: () => void
-  invalidForwardDialog?: CustomDialogController = new CustomDialogController({
+  invalidForwardFailureDialog?: CustomDialogController = new CustomDialogController({
     builder: DoubleAlertDialog({
       title: $r('app.string.exception_description'),
-      message: $r('app.string.multiForward_exist_invalid'),
+      message: $r("app.string.multiForward_exist_invalid_fail"),
+      sureAction: this.invalidForwardDialogSureAction
+    }),
+    cornerRadius: 14,
+    backgroundColor: Color.White,
+    height: 140,
+    width: 270,
+  })
+  invalidForwardDepthDialog?: CustomDialogController = new CustomDialogController({
+    builder: DoubleAlertDialog({
+      title: $r('app.string.exception_description'),
+      message: $r('app.string.multiForward_exist_invalid_depth'),
       sureAction: this.invalidForwardDialogSureAction
     }),
     cornerRadius: 14,
@@ -676,11 +688,25 @@ export struct ChatTeamPage {
                         this.showMessageDetail(msg, true)
                       }
                     }
-                  }
+                  },
+                  onSendFailClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                    if (this.showMultiSelect) {
+                      return
+                    }
+                    if (msg) {
+                      this.chatViewModel.resendMessage(msg)
+                    }
+                  },
                 }
               })
             }
-          }, (item: NIMMessageInfo) => item.message.messageClientId)
+          }, (item: NIMMessageInfo, index: number) => {
+            try {
+              return item.message.messageClientId
+            }catch (e) {
+              return index.toString()
+            }
+          })
         }
         .id("chatPageListView")
         .cachedCount(20)
@@ -929,6 +955,7 @@ export struct ChatTeamPage {
                         .catch((err: BusinessError) => {
                           console.error("ChooseLocation",
                             `Failed to choose location, code: ${err.code}, message: ${err.message}`);
+                          // NECommonUtils.showToast(`code: ${err.code}, message: ${err.message}`)
                         });
                     } else {
                       NECommonUtils.showToast($r('app.string.chat_permission_deny_tips'))
@@ -1144,7 +1171,7 @@ export struct ChatTeamPage {
 
       // 存在不可转发的消息：提示 + 取消勾选
       if (invalidMessages.length > 0) {
-        this.invalidForwardDialog?.open()
+        this.invalidForwardFailureDialog?.open()
         this.invalidForwardDialogSureAction = () => {
           for (const invalidMessage of invalidMessages) {
             this.chatViewModel.removeSelectMessage(invalidMessage)
@@ -1185,12 +1212,15 @@ export struct ChatTeamPage {
 
       // 计算层数（深度） depth
       let depth = 0
-      // 不可合并转发的消息列表
-      let invalidMessages: NIMMessageInfo[] = []
+      // 不可合并转发的消息列表(1.发送失败的消息；2.转发层数超过 mergedMessageMaxDepth 的消息)
+      const invalidMessages: NIMMessageInfo[] = []
+      let invalidFail: boolean = false
+      let invalidDepth: boolean = false
       for (const message of this.chatViewModel.selectMsgMap.values()) {
         // 发送失败的消息不可转发
         if (message.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED) {
           invalidMessages.push(message)
+          invalidFail = true
           continue
         }
 
@@ -1201,6 +1231,7 @@ export struct ChatTeamPage {
             let dep = data["depth"] as number
             if (dep >= mergedMessageMaxDepth) {
               invalidMessages.push(message)
+              invalidDepth = true
             } else if (dep >= depth) {
               depth = dep
             }
@@ -1224,7 +1255,11 @@ export struct ChatTeamPage {
 
       // 存在不可转发的消息：提示 + 取消勾选
       if (invalidMessages.length > 0) {
-        this.invalidForwardDialog?.open()
+        if (invalidFail) {
+          this.invalidForwardFailureDialog?.open()
+        } else if (invalidDepth) {
+          this.invalidForwardDepthDialog?.open()
+        }
         this.invalidForwardDialogSureAction = () => {
           for (const invalidMessage of invalidMessages) {
             this.chatViewModel.removeSelectMessage(invalidMessage)

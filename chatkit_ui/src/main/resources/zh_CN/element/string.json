@@ -333,8 +333,12 @@
       "value": "%s限制%d条消息"
     },
     {
-      "name": "multiForward_exist_invalid",
+      "name": "multiForward_exist_invalid_fail",
       "value": "存在不可转发的消息体，是否去除后发送？"
+    },
+    {
+      "name": "multiForward_exist_invalid_depth",
+      "value": "存在超出合并限制的消息，无法合并转发，是否去除后发送？"
     },
     {
       "name": "file_md5_check_failed",
@@ -363,6 +367,14 @@
     {
       "name": "chat_team_at_permission_all_tips",
       "value": "更新@所有人权限更新为所有人"
+    },
+    {
+      "name": "chat_message_empty_notification_text",
+      "value": "一条空的通知消息"
+    },
+    {
+      "name": "chat_message_empty_tip_text",
+      "value": "一条空的 tip 消息"
     }
   ]
 }

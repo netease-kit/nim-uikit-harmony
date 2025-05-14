@@ -6,7 +6,7 @@
  */
 
 import { ChatKitClient, ChatRepo, NEUserWithFriend, PersonSelectParam, TeamRepo } from '@nimkit/chatkit';
-import { CommonEmptyResult, NetworkBrokenBuilder } from '@nimkit/common';
+import { CommonEmptyResult, CommonLongLoadingProgress, NetworkBrokenBuilder } from '@nimkit/common';
 import { V2NIMConversationType, V2NIMLocalConversation } from '@nimsdk/base';
 import { AitServer } from '../service/ait/AitService';
 import { ConversationViewItem } from '../view/ConversationViewItem';
@@ -28,7 +28,7 @@ export struct LocalConversationPage {
   build() {
     NavDestination() {
       if (this.viewModel.conversationList) {
-        if (this.viewModel.conversationList.length <= 0) {
+        if (this.viewModel.conversationList.length <= 0 && this.viewModel.isFinishedSyncLoad) {
           CommonEmptyResult({
             tips: $r('app.string.conversation_empty')
           }).margin({
@@ -67,6 +67,8 @@ export struct LocalConversationPage {
           .backgroundColor('#ffFFFFFF')
         }
 
+      } else {
+        CommonLongLoadingProgress({ contentText: $r('app.string.conversation_loading') })
       }
 
     }
@@ -348,4 +350,3 @@ struct ConversationNavigationTitleBar {
 export function LocalConversationPageBuilder() {
   LocalConversationPage()
 }
-

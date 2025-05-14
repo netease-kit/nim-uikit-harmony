@@ -8,6 +8,7 @@ import { AitMessage } from './AitMessage'
 import { plainToClass, Transform, Type } from 'class-transformer'
 import 'reflect-metadata'
 import { AitSegment } from './AitSegment'
+import { JSON } from '@kit.ArkTS'
 
 //@所有人的Account
 export const accountAll: string = "ait_all"
@@ -244,18 +245,22 @@ export class AitModel {
  */
 export function getAitModelFromJson(extension?: string): AitModel | undefined {
   if (extension) {
-    let obj: Record<string, Object> = JSON.parse(extension)
-    for (let key of Object.entries(obj)) {
-      if (key[0] === aitKey) {
-        let trans: AitModelTrans = {
-          aitBlocks: key[1]
+    try {
+      const obj: Record<string, Object> = JSON.parse(extension) as Record<string, Object>
+      for (let key of Object.entries(obj)) {
+        if (key[0] === aitKey) {
+          let trans: AitModelTrans = {
+            aitBlocks: key[1]
+          }
+          let aitModel: AitModel = plainToClass(AitModel, trans, { enableImplicitConversion: true })
+          if (aitModel.aitBlocks.size > 0) {
+            return aitModel
+          }
         }
-        let aitModel: AitModel = plainToClass(AitModel, trans, { enableImplicitConversion: true })
-        if (aitModel.aitBlocks.size > 0) {
-          return aitModel
-        }
-
       }
+    }catch (e) {
+      console.error('parse json error', JSON.stringify(e), JSON.stringify(extension))
+      return undefined
     }
   }
   return undefined

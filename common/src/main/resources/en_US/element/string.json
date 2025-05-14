@@ -147,6 +147,10 @@
     {
       "name": "delete_success",
       "value": "删除成功"
+    },
+    {
+      "name": "conversation_loading",
+      "value": "会话加载中..."
     }
   ]
 }

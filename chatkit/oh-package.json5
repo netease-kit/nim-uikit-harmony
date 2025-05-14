@@ -6,17 +6,16 @@
   "author": "",
   "license": "Apache-2.0",
   "dependencies": {
+    "@nimsdk/conversation": "10.8.30",
+    "@nimsdk/message": "10.8.30",
+    "@nimsdk/team": "10.8.30",
+    "@nimsdk/user": "10.8.30",
+    "@nimsdk/friend": "10.8.30",
+    "@nimsdk/nim": "10.8.30",
+    "@nimsdk/base": "10.8.30",
     "@nimkit/coreKit": "file:../corekit",
-    "@nimsdk/conversation": "10.8.5",
-    "@nimsdk/localconversation": "10.8.5",
-    "@nimsdk/message": "10.8.5",
-    "@nimsdk/team": "10.8.5",
-    "@nimsdk/user": "10.8.5",
-    "@nimsdk/friend": "10.8.5",
-    "@nimsdk/nim": "10.8.5",
-    "@nimsdk/base": "10.8.5",
     "class-transformer": "^0.5.1",
-    "reflect-metadata": "^0.1.13"
+    "reflect-metadata": "^0.1.13",
     // 用于嵌套对象@Type反射
   }
 }
