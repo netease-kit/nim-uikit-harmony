@@ -14,7 +14,7 @@ import {
   ViewItemArrow,
   ViewItemBuilder
 } from '@nimkit/common';
-import { AuthService } from '@nimkit/login';
+
 import { router } from '@kit.ArkUI';
 import { ChatKitClient } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
 import { ConversationRepo, IMKitConfigCenter } from '@nimkit/chatkit';
@@ -111,13 +111,11 @@ export struct SettingPage {
   async logout() {
     try {
       await ChatKitClient.nim.loginService.logout()
-      AuthService.instance.logout(getContext(this)).then(() => {
-        router.replaceUrl({
-          url: 'pages/Index'
-        })
-      })
       ConversationRepo.removeAllConversationListener()
       ChatKitClient.onDestroy()
+      router.replaceUrl({
+        url: 'pages/Index'
+      })
     } catch (err) {
       console.error(err)
       NECommonUtils.showToast(err)

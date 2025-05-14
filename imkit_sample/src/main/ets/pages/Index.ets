@@ -6,8 +6,6 @@
  */
 import { IMKitConfigCenter } from '@nimkit/chatkit';
 import { CommonConstants, NECommonUtils } from '@nimkit/common';
-
-import { AuthService, BuildProfile, LoginConfig, LoginIndexComponent, LoginInfo } from '@nimkit/login';
 import { NimRepository } from '../ability/NimRepository';
 import { AppConfig } from '../constants/AppConfig';
 import { preferences } from '@kit.ArkData';
@@ -37,63 +35,49 @@ struct Index {
   }
 
   async onPageShow(): Promise<void> {
-    LoginConfig.getInstance().initConfig(
-      AppConfig.appKey, 2, 7, BuildProfile.DEBUG, null
-    );
     let dataPreferences: preferences.Preferences | null = null;
-    const options: preferences.Options = { name: 'imkit_data' };
+    let options: preferences.Options = { name: 'imkit_data' };
     dataPreferences = preferences.getPreferencesSync(getContext(this), options);
-    IMKitConfigCenter.enableLocalConversation = dataPreferences.getSync(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, true) as boolean
-    const loginUser = AuthService.instance.getLoginInfo(getContext(this))
-    if (loginUser) {
-      this.login(loginUser.imAccid, loginUser.imToken)
+    IMKitConfigCenter.enableLocalConversation =
+      dataPreferences.getSync(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, true) as boolean
+    if (AppConfig.userId) {
+      this.login(AppConfig.userId, AppConfig.userToken)
     } else {
       this.showLoginPage = true
     }
-
-    AuthService.instance.setOnLoginSuccess({
-      onSuccess: (user: LoginInfo): void => {
-        console.debug(`Performance Test app loginSuccess`)
-        this.login(user.imAccid, user.imToken)
-      }
-    })
   }
 
   build() {
     Navigation(this.pathStack) {
       if (this.showLoginPage) {
-        LoginIndexComponent({
-          pathStack: this.pathStack
-        })
-          .height('80%')
+        Column() {
+          Row().height(80)
+          Image($r('app.media.im_uikit_icon'))
+            .width(120).height(120)
+          Text('云信IM').fontSize(24)
+            .fontColor('#333333')
 
-        Row().layoutWeight(1)
+          Row().height(127)
 
-        Row() {
-          Text($r('app.string.login_privatized_configuration'))
-            .fontColor("#999999")
-            .fontSize(12)
+          Button($r('app.string.login'), { type: ButtonType.Normal, stateEffect: true })
+            .alignSelf(ItemAlign.Center)
             .onClick(() => {
-              this.pathStack?.pushPath({ name: "IMSDKConfigPage" })
+              NimRepository.getInstance(getContext(this)).login(AppConfig.userId, AppConfig.userToken, AppConfig.appKey)
             })
+            .borderRadius(10)
+            .height(50)
+            .width('90%')
+            .backgroundColor(0x337EFF)
 
-          Text($r('app.string.login_by_account'))
-            .fontColor("#999999")
-            .fontSize(12)
-            .margin({
-              left: 20
-            })
-            .onClick(() => {
-              this.pathStack?.pushPath({ name: "LoginByAccountPage" })
-            })
+          Row().height(200)
+
+          Image($r('app.media.yunxin_icon'))
+            .width(82).height(20)
         }
-        .margin({
-          top: 10,
-          bottom: 40
-        })
-
-        // InnerSDK
-        // DeprecatedIndexButton({ pathStack: this.pathStack })
+        .alignItems(HorizontalAlign.Center)
+        .height('100%')
+        .width('100%')
+        .margin({ top: 10 })
       } else {
         Column() {
           Row().height(80)

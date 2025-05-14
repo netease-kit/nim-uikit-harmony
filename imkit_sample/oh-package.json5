@@ -6,7 +6,6 @@
   "author": "",
   "license": "",
   "dependencies": {
-    "@nimkit/login": "file:../login",
     "@nimkit/conversationkit_ui": "file:../conversationkit_ui",
     "@nimkit/localconversationkit_ui": "file:../localconversationkit_ui",
     "@nimkit/contactkit_ui": "file:../contactkit_ui",
