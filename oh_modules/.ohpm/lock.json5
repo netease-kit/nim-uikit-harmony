@@ -57,7 +57,7 @@
         },
         "@nimsdk/base": {
           "specifier": "10.8.30",
-          "version": "file:oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har"
+          "version": "file:oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har"
         },
         "@nimkit/coreKit": {
           "specifier": "file:corekit",
@@ -93,7 +93,7 @@
         },
         "@nimsdk/base": {
           "specifier": "10.8.30",
-          "version": "file:oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har"
+          "version": "file:oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har"
         },
         "class-transformer": {
           "specifier": "^0.5.1",
@@ -137,7 +137,7 @@
         },
         "@nimsdk/base": {
           "specifier": "10.8.30",
-          "version": "file:oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har"
+          "version": "file:oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har"
         }
       },
       "devDependencies": {},
@@ -157,7 +157,7 @@
         },
         "@nimsdk/base": {
           "specifier": "10.8.30",
-          "version": "file:oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har"
+          "version": "file:oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har"
         }
       },
       "devDependencies": {},
@@ -174,10 +174,6 @@
     "imkit_sample": {
       "name": "imkit_sample",
       "dependencies": {
-        "@nimkit/login": {
-          "specifier": "file:login",
-          "version": "file:login"
-        },
         "@nimkit/conversationkit_ui": {
           "specifier": "file:conversationkit_ui",
           "version": "file:conversationkit_ui"
@@ -240,7 +236,7 @@
         },
         "@nimsdk/base": {
           "specifier": "10.8.30",
-          "version": "file:oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har"
+          "version": "file:oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har"
         }
       },
       "devDependencies": {},
@@ -260,16 +256,9 @@
         },
         "@nimsdk/base": {
           "specifier": "10.8.30",
-          "version": "file:oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har"
+          "version": "file:oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har"
         }
       },
-      "devDependencies": {},
-      "dynamicDependencies": {},
-      "maskedByOverrideDependencyMap": false
-    },
-    "login": {
-      "name": "login",
-      "dependencies": {},
       "devDependencies": {},
       "dynamicDependencies": {},
       "maskedByOverrideDependencyMap": false
@@ -287,7 +276,7 @@
         },
         "@nimsdk/base": {
           "specifier": "10.8.30",
-          "version": "file:oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har"
+          "version": "file:oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har"
         }
       },
       "devDependencies": {},
@@ -296,6 +285,15 @@
     }
   },
   "packages": {
+    "@ohos/pinyin4js@2.0.1": {
+      "integrity": "sha512-qmYDelku5gcgKVmJyMqa7kWf0a+e8nnGS9ts5FRLA0LdRf+Iz36X/4Vub6hhh/RusuDmmWG9h153KZe+kraIVg==",
+      "storePath": "oh_modules/.ohpm/@ohos+pinyin4js@2.0.1",
+      "dependencies": {},
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
     "@ohos/hypium@1.0.19": {
       "integrity": "sha512-cEjDgLFCm3cWZDeRXk7agBUkPqjWxUo6AQeiu0gEkb3J8ESqlduQLSIXeo3cCsm8U/asL7iKjF85ZyOuufAGSQ==",
       "storePath": "oh_modules/.ohpm/@ohos+hypium@1.0.19",
@@ -323,20 +321,11 @@
       "dynamic": false,
       "maskedByOverrideDependencyMap": false
     },
-    "@ohos/pinyin4js@2.0.1": {
-      "integrity": "sha512-qmYDelku5gcgKVmJyMqa7kWf0a+e8nnGS9ts5FRLA0LdRf+Iz36X/4Vub6hhh/RusuDmmWG9h153KZe+kraIVg==",
-      "storePath": "oh_modules/.ohpm/@ohos+pinyin4js@2.0.1",
-      "dependencies": {},
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
     "@nimsdk/conversation@10.8.30": {
       "integrity": "sha512-maYOF556eNloRoctdukmAVX6g6hwGDBuIh6zDHEBv0XesrjGYBLFvU3s94dkkFDsR/EoVlcZ2P9Wm/lmEaMhSQ==",
       "storePath": "oh_modules/.ohpm/@nimsdk+conversation@10.8.30",
       "dependencies": {
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har",
         "@nimsdk/vendor": "1.0.0"
       },
       "dynamicDependencies": {},
@@ -344,7 +333,7 @@
       "dynamic": false,
       "maskedByOverrideDependencyMap": false
     },
-    "@nimsdk/base@file:oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har": {
+    "@nimsdk/base@file:oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har": {
       "storePath": "oh_modules/.ohpm/@nimsdk+base@imcpm9qhwqdwjkwfjial+imehbma5sgdrmbme+c04nq=",
       "dependencies": {
         "@nimsdk/vendor": "1.0.0"
@@ -358,7 +347,7 @@
       "integrity": "sha512-3XcfJjMuaadH+fm2xWHT9hq2MIMeXhKv2hifZOslyqVmqJL19Y/JizctM+EcoZWPoGNRucN4i9i2Pm229bgfRA==",
       "storePath": "oh_modules/.ohpm/@nimsdk+message@10.8.30",
       "dependencies": {
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har",
         "@nimsdk/vendor": "1.0.0"
       },
       "dynamicDependencies": {},
@@ -370,7 +359,7 @@
       "integrity": "sha512-Nh7v5md+Q8q6jt2QZeC8qcMxoTttFnL04wwUUirRfj2YcDzXHp4jt/Pvum76RUlL1UzEt8i9/PBmOzY6Mlo/tg==",
       "storePath": "oh_modules/.ohpm/@nimsdk+team@10.8.30",
       "dependencies": {
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har",
         "@nimsdk/vendor": "1.0.0"
       },
       "dynamicDependencies": {},
@@ -382,7 +371,7 @@
       "integrity": "sha512-j1sEcmcrMbB+F5wtmnhfVKcgU6LlgbKkbQ8afybZfCvIMvd6qZm+/z3fmicA4v5rLEcy2muiQnDto8mgxt6iXQ==",
       "storePath": "oh_modules/.ohpm/@nimsdk+user@10.8.30",
       "dependencies": {
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har",
         "@nimsdk/vendor": "1.0.0"
       },
       "dynamicDependencies": {},
@@ -394,7 +383,7 @@
       "integrity": "sha512-JYCS7+6exG3f5Ox1xFlp4oolIYhxuBd8XrI8laT07dzhD0VsJHceZd5g2fCQLy3M/jxz9aNrCIXgYfiEch5JdQ==",
       "storePath": "oh_modules/.ohpm/@nimsdk+friend@10.8.30",
       "dependencies": {
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har",
         "@nimsdk/vendor": "1.0.0"
       },
       "dynamicDependencies": {},
@@ -406,7 +395,7 @@
       "integrity": "sha512-y+T7SKqyaXfn0eshke8R3cVRTMsZtzlIyMzwx5+AG5ZBQy2pBSribXhi5IwzdX5jtJ5yMrdhpK+ktvptWYFqmA==",
       "storePath": "oh_modules/.ohpm/@nimsdk+nim@10.8.30",
       "dependencies": {
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har",
         "@nimsdk/vendor": "1.0.0"
       },
       "dynamicDependencies": {},
@@ -440,26 +429,6 @@
       "dynamic": false,
       "maskedByOverrideDependencyMap": false
     },
-    "@nimkit/login@file:login": {
-      "storePath": "login",
-      "dependencies": {},
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
-    "@nimkit/conversationkit_ui@file:conversationkit_ui": {
-      "storePath": "conversationkit_ui",
-      "dependencies": {
-        "@nimkit/common": "common",
-        "@nimkit/chatkit": "chatkit",
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har"
-      },
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
     "@nimkit/common@file:common": {
       "storePath": "common",
       "dependencies": {
@@ -479,62 +448,10 @@
         "@nimsdk/user": "10.8.30",
         "@nimsdk/friend": "10.8.30",
         "@nimsdk/nim": "10.8.30",
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har",
         "@nimkit/coreKit": "corekit",
         "class-transformer": "0.5.1",
         "reflect-metadata": "0.1.13"
-      },
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
-    "@nimkit/localconversationkit_ui@file:localconversationkit_ui": {
-      "storePath": "localconversationkit_ui",
-      "dependencies": {
-        "@nimkit/common": "common",
-        "@nimkit/chatkit": "chatkit",
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har"
-      },
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
-    "@nimkit/contactkit_ui@file:contactkit_ui": {
-      "storePath": "contactkit_ui",
-      "dependencies": {
-        "@nimkit/common": "common",
-        "@nimkit/chatkit": "chatkit",
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har"
-      },
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
-    "@nimkit/teamkit_ui@file:teamkit_ui": {
-      "storePath": "teamkit_ui",
-      "dependencies": {
-        "@nimkit/common": "common",
-        "@nimkit/chatkit": "chatkit",
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har"
-      },
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
-    "@nimkit/chatkit_ui@file:chatkit_ui": {
-      "storePath": "chatkit_ui",
-      "dependencies": {
-        "@nimkit/common": "common",
-        "@nimkit/chatkit": "chatkit",
-        "@nimkit/corekit": "corekit",
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har",
-        "class-transformer": "0.5.1",
-        "reflect-metadata": "0.1.13",
-        "@nimkit/markdown": "1.1.0"
       },
       "dynamicDependencies": {},
       "dev": false,
@@ -558,11 +475,75 @@
       "dynamic": false,
       "maskedByOverrideDependencyMap": false
     },
+    "@nimkit/conversationkit_ui@file:conversationkit_ui": {
+      "storePath": "conversationkit_ui",
+      "dependencies": {
+        "@nimkit/common": "common",
+        "@nimkit/chatkit": "chatkit",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har"
+      },
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "@nimkit/localconversationkit_ui@file:localconversationkit_ui": {
+      "storePath": "localconversationkit_ui",
+      "dependencies": {
+        "@nimkit/common": "common",
+        "@nimkit/chatkit": "chatkit",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har"
+      },
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "@nimkit/contactkit_ui@file:contactkit_ui": {
+      "storePath": "contactkit_ui",
+      "dependencies": {
+        "@nimkit/common": "common",
+        "@nimkit/chatkit": "chatkit",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har"
+      },
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "@nimkit/teamkit_ui@file:teamkit_ui": {
+      "storePath": "teamkit_ui",
+      "dependencies": {
+        "@nimkit/common": "common",
+        "@nimkit/chatkit": "chatkit",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har"
+      },
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "@nimkit/chatkit_ui@file:chatkit_ui": {
+      "storePath": "chatkit_ui",
+      "dependencies": {
+        "@nimkit/common": "common",
+        "@nimkit/chatkit": "chatkit",
+        "@nimkit/corekit": "corekit",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har",
+        "class-transformer": "0.5.1",
+        "reflect-metadata": "0.1.13",
+        "@nimkit/markdown": "1.1.0"
+      },
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
     "@nimsdk/localconversation@10.8.30": {
       "integrity": "sha512-Iw0uKOsZJhRZ9g/7kTiEkhfCkQ+keC++5fM8eB6vD01Eu0kjlCLGO828fh6AyzOmP4QCHxs5WGbfTGyBgtnQ/w==",
       "storePath": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30",
       "dependencies": {
-        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+localconversation@10.8.30/oh_modules/@nimsdk/localconversation/libs/base.har",
+        "@nimsdk/base": "oh_modules/.ohpm/@nimsdk+user@10.8.30/oh_modules/@nimsdk/user/libs/base.har",
         "@nimsdk/vendor": "1.0.0"
       },
       "dynamicDependencies": {},
