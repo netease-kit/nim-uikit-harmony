@@ -340,13 +340,16 @@ export struct ConversationSelectPage {
 
                               ViewItemBuilder({
                                 avatarItem: new AvatarItem(item.user?.avatar, item.shortName(),
-                                  AvatarColorUntil.getBackgroundColorById(ChatKitClient.nim.conversationIdUtil.p2pConversationId(item.user?.accountId))),
+                                  AvatarColorUntil.getBackgroundColorById(
+                                    ChatKitClient.nim.conversationIdUtil.p2pConversationId(item.user?.accountId)
+                                  )
+                                ),
                                 title: item.showName(),
                                 itemHeight: 60,
                                 titleIconSize: 36,
                                 titleFontSize: 14,
                                 rightIcon: $r('app.string.validation_empty'), // 仅做占位
-                                showDivideLine: false,
+                                showDivideLine: false
                               })
                             }
                           }

@@ -14,6 +14,7 @@ import {
   ViewItemArrow,
   ViewItemBuilder
 } from '@nimkit/common';
+import { AuthService } from '@nimkit/login';
 import { router } from '@kit.ArkUI';
 import { ChatKitClient } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
 import { ConversationRepo, IMKitConfigCenter } from '@nimkit/chatkit';
@@ -21,7 +22,6 @@ import { ChatKitConfig } from '@nimkit/chatkit_ui/src/main/ets/ChatKitConfig';
 import { preferences } from '@kit.ArkData';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { common, Want } from '@kit.AbilityKit';
-import { AppConstants } from '../../constants/AppConstants';
 
 // 跳转页面入口函数
 @Builder
@@ -64,7 +64,7 @@ export struct SettingPage {
     let options: preferences.Options = { name: 'imkit_data' };
     this.dataPreferences = preferences.getPreferencesSync(getContext(this), options);
     this.localConversationOrOpen =
-      this.dataPreferences?.getSync(AppConstants.KEY_SETTING_LOCAL_CONVERSATION, true) as boolean
+      this.dataPreferences?.getSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, true) as boolean
     this.secondItems = [
       {
         title: $r('app.string.mine_setting_earpiece'),
@@ -83,7 +83,7 @@ export struct SettingPage {
         itemHeight: 48,
         isOpen: this.localConversationOrOpen,
         switchChange: ((isOpen: boolean) => {
-          this.dataPreferences?.putSync(AppConstants.KEY_SETTING_LOCAL_CONVERSATION, isOpen)
+          this.dataPreferences?.putSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, isOpen)
           this.dataPreferences?.flush((err: BusinessError) => {
             if (err) {
               console.error("Failed to flush. code =" + err.code + ", message =" + err.message);
@@ -96,7 +96,6 @@ export struct SettingPage {
           // restart app
           let applicationContext = this.context.getApplicationContext();
           let want: Want = {
-            bundleName: 'com.netease.yunxin.app.hm.im',
             abilityName: 'IMAbility'
           };
           try {
@@ -112,11 +111,13 @@ export struct SettingPage {
   async logout() {
     try {
       await ChatKitClient.nim.loginService.logout()
+      AuthService.instance.logout(getContext(this)).then(() => {
+        router.replaceUrl({
+          url: 'pages/Index'
+        })
+      })
       ConversationRepo.removeAllConversationListener()
       ChatKitClient.onDestroy()
-      router.replaceUrl({
-        url: 'pages/Index'
-      })
     } catch (err) {
       console.error(err)
       NECommonUtils.showToast(err)

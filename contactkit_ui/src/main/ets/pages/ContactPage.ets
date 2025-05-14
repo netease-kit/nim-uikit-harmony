@@ -16,9 +16,10 @@ import {
 } from '@nimkit/common';
 import { ContactViewModel } from '../viewmodel/ContactViewModel';
 import { NEContactSection } from '../model/NEContactSection';
-import { ChatKitClient, ContactRepo, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit';
+import { ChatKitClient, ContactRepo, NEUserWithFriend } from '@nimkit/chatkit';
 import { NEContactItem } from '../model/NEContactItem';
 import { V2NIMFriendAddApplication } from '@nimsdk/base';
+import { displaySync } from '@kit.ArkGraphics2D';
 
 export class ContactViewHolderSection {
   inital: string
@@ -45,7 +46,7 @@ export function ContactItemBuilder(params: NEContactItem) {
 
       Text(params.title)
         .fontSize(14)
-        .fontColor("#333333")
+        .fontColor('#333333')
         .height(18)
         .margin({ left: params.avatarIcon ? 16 : 12, right: 12 })
         .layoutWeight(1)
@@ -88,6 +89,8 @@ export struct ContactPage {
   @Param pathStack: NavPathStack = new NavPathStack()
   @Param onUnreadApplicationChange?: (countString?: string) => void = undefined
   @Local viewModel: ContactViewModel = new ContactViewModel()
+  @Local isFinishedInit: boolean = false
+  private displaySync: displaySync.DisplaySync | undefined = undefined;
   loadUnreadApplication = async () => {
     try {
       const unreadCount = await this.viewModel.getUnreadApplication()
@@ -101,9 +104,9 @@ export struct ContactPage {
   }
   @Local headerItems: NEContactItem[] = [
     new NEContactItem($r('app.media.contact_validation_message'), $r('app.string.contact_validation_message'),
-      "ValidationMessagePage", undefined, this.loadUnreadApplication),
-    new NEContactItem($r('app.media.contact_blocklist'), $r('app.string.contact_blocklist'), "BlockListPage"),
-    new NEContactItem($r('app.media.contact_my_teams'), $r('app.string.contact_my_teams'), "MyTeamsPage")
+      'ValidationMessagePage', undefined, this.loadUnreadApplication),
+    new NEContactItem($r('app.media.contact_blocklist'), $r('app.string.contact_blocklist'), 'BlockListPage'),
+    new NEContactItem($r('app.media.contact_my_teams'), $r('app.string.contact_my_teams'), 'MyTeamsPage')
   ]
   @Local selectedIndex: number = 0; // 用于指定字母导航的选择项
   // List组件的scroller控制器：listScroller，用于控制联系人列表的滑动位置
@@ -118,15 +121,30 @@ export struct ContactPage {
   }
 
   async aboutToAppear(): Promise<void> {
-    ChatKitClient.nim.friendService?.on("onFriendAddApplication", async (application: V2NIMFriendAddApplication) => {
+    ChatKitClient.nim.friendService?.on('onFriendAddApplication', async (application: V2NIMFriendAddApplication) => {
       await this.loadUnreadApplication()
     })
 
-    if (NEFriendUserCache.getInstance().isEmpty()) {
-      ContactRepo.listener.on('initFriendCache', this.loadData)
-    } else {
-      this.loadData()
-    }
+    ContactRepo.listener.on('loadFriendCache', ()=> {
+      this.isFinishedInit = true;
+    })
+
+    // 高负载场景下分帧渲染进行优化
+    // Creating a DisplaySync Object
+    this.displaySync = displaySync.create();
+    // Set the expected frame rate
+    let range: ExpectedFrameRateRange = {
+      expected: 120,
+      min: 60,
+      max: 120
+    };
+    this.displaySync.setExpectedFrameRateRange(range);
+    // Add Frame Callback
+    this.displaySync.on('frame', () => {
+        this.loadData()
+        this.displaySync?.stop()
+    });
+    this.displaySync.start();
   }
 
   build() {
@@ -138,11 +156,11 @@ export struct ContactPage {
             firstButtonIcon: $r('app.media.nav_search'),
             secondButtonIcon: $r('app.media.nav_add'),
             firstButtonAction: () => {
-              this.pathStack.pushPath({ name: "SearchPage" })
+              this.pathStack.pushPath({ name: 'SearchPage' })
             },
             secondButtonAction: () => {
               this.pathStack.pushPath({
-                name: "AddFriendPage"
+                name: 'AddFriendPage'
               })
             }
           })
@@ -183,7 +201,7 @@ export struct ContactPage {
                   ListItem() {
                     ViewItemBuilder({
                       avatarItem: new AvatarItem(item.user?.avatar, item.shortName(),
-                        AvatarColorUntil.getBackgroundColorById(item.user?.accountId ?? "")),
+                        AvatarColorUntil.getBackgroundColorById(item.user?.accountId ?? '')),
                       title: item.showName(),
                       itemHeight: 60,
                       titleIconSize: 36,
@@ -214,7 +232,7 @@ export struct ContactPage {
             this.selectedIndex = start
           })
 
-          if (this.viewModel.friendSection.totalCount() <= 0) {
+          if (this.viewModel.friendSection.totalCount() <= 0 && this.isFinishedInit) {
             CommonEmptyResult({
               tips: $r('app.string.no_friend')
             })
@@ -250,6 +268,7 @@ export struct ContactPage {
 
   aboutToDisappear(): void {
     this.viewModel.onDestroy()
-    ContactRepo.listener.off('initFriendCache', this.loadData)
+    ContactRepo.listener.off('loadFriendCache', this.loadData)
+    this.displaySync?.stop();
   }
 }

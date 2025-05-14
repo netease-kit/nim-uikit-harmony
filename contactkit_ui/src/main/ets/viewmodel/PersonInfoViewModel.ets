@@ -1,10 +1,10 @@
 import { ChatKitClient, ContactRepo, ErrorUtils, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit'
 import { NECommonUtils } from '@nimkit/common'
-import { V2NIMFriend, V2NIMFriendAddMode, V2NIMFriendDeletionType } from '@nimsdk/base'
+import { V2NIMError, V2NIMFriend, V2NIMFriendAddMode, V2NIMFriendDeletionType, V2NIMUser } from '@nimsdk/base'
 
 @ObservedV2
 export class PersonInfoViewModel {
-  @Trace accountId: string = ""
+  @Trace accountId: string = ''
   @Trace userWithFriend: NEUserWithFriend | undefined = undefined
   // 【加入黑名单】开关切换事件
   onAddBlockClick = async (isOpen: boolean) => {
@@ -36,6 +36,8 @@ export class PersonInfoViewModel {
         await ContactRepo.removeUserFromBlockList(this.accountId)
         NECommonUtils.showToast($r('app.string.person_info_add_tip'))
       } catch (err) {
+        const error  = err as V2NIMError
+        NECommonUtils.showToast(error.message)
         console.error(err)
       }
     }
@@ -47,26 +49,54 @@ export class PersonInfoViewModel {
     await this.getFriend()
   }
 
+  onUpdateUserInfoFun = (users: V2NIMUser[]) => {
+    // this.getFriend()
+    if (typeof users === 'undefined' || typeof this.userWithFriend === 'undefined') {
+      return // ignore
+    }
+
+    for (const user of users) {
+      if (user.accountId === this.accountId) {
+        this.userWithFriend = new NEUserWithFriend({
+          friend: this.userWithFriend.friend,
+          user: user
+        })
+        break;
+      }
+    }
+  }
   onFriendAddedFun = (friend: V2NIMFriend) => {
+    if (friend.accountId !== this.accountId) {
+      return
+    }
     this.userWithFriend = new NEUserWithFriend({
       friend: friend
     })
+    // 更新 user 信息至最新
+    ContactRepo.getUserListFromCloud([friend.accountId])
   }
   onFriendDeletedFun = (accountId: string, deletionType: V2NIMFriendDeletionType) => {
+    if (accountId !== this.accountId) {
+      return
+    }
     if (this.userWithFriend?.friend) {
       this.userWithFriend.friend = undefined
     }
   }
   onFriendInfoChangedFun = (friend: V2NIMFriend) => {
+    if (friend.accountId !== this.accountId) {
+      return
+    }
     if (this.userWithFriend?.friend) {
       this.userWithFriend.friend = friend
     }
   }
 
   addListener() {
-    ChatKitClient.nim.friendService?.on("onFriendAdded", this.onFriendAddedFun)
-    ChatKitClient.nim.friendService?.on("onFriendDeleted", this.onFriendDeletedFun)
-    ChatKitClient.nim.friendService?.on("onFriendInfoChanged", this.onFriendInfoChangedFun)
+    ContactRepo.listener.on('updateUserInfo', this.onUpdateUserInfoFun)
+    ChatKitClient.nim.friendService?.on('onFriendAdded', this.onFriendAddedFun)
+    ChatKitClient.nim.friendService?.on('onFriendDeleted', this.onFriendDeletedFun)
+    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChangedFun)
   }
 
   async getFriend() {
@@ -84,8 +114,9 @@ export class PersonInfoViewModel {
   }
 
   onDestroy() {
-    ChatKitClient.nim.friendService?.off("onFriendAdded", this.onFriendAddedFun)
-    ChatKitClient.nim.friendService?.off("onFriendDeleted", this.onFriendDeletedFun)
-    ChatKitClient.nim.friendService?.off("onFriendInfoChanged", this.onFriendInfoChangedFun)
+    ContactRepo.listener.off('updateUserInfo', this.onUpdateUserInfoFun)
+    ChatKitClient.nim.friendService?.off('onFriendAdded', this.onFriendAddedFun)
+    ChatKitClient.nim.friendService?.off('onFriendDeleted', this.onFriendDeletedFun)
+    ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChangedFun)
   }
 }

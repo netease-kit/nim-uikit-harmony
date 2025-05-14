@@ -10,4 +10,5 @@ import { ViewItem } from './ViewItem';
 export interface ViewItemSwitch extends ViewItem {
   isOpen?: boolean;
   switchChange?: (isOpen: boolean) => void;
+  enableChange?: boolean;
 }

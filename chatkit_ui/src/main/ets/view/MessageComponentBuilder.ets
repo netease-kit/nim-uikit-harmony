@@ -33,7 +33,7 @@ import { BusinessError } from '@kit.BasicServicesKit'
 import { ChatAitNode } from '../model/ChatAitNode'
 import { MergedMessageAttachment } from '@nimkit/chatkit'
 import { ChatInfo } from '../model/ChatInfo'
-
+import { Markdown } from '@nimkit/markdown'
 
 @ComponentV2
 export struct messageContent {
@@ -46,11 +46,19 @@ export struct messageContent {
 
   build() {
     if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
-      textBuilder({
-        message: this.message,
-        onMessageClick: this.onMessageClick,
-        chatInfo: this.chatInfo
-      });
+      if (this.message.isAiStreamMessage() == false) {
+        textBuilder({
+          message: this.message,
+          onMessageClick: this.onMessageClick,
+          chatInfo: this.chatInfo
+        });
+      } else {
+        richTextBuilder({
+          message: this.message,
+          onMessageClick: this.onMessageClick,
+          chatInfo: this.chatInfo
+        });
+      }
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
       locationBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
@@ -107,6 +115,123 @@ export struct pinMessageContent {
     } else {
       unknownBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     }
+  }
+}
+
+
+@ComponentV2
+export struct richTextBuilder {
+  @BuilderParam
+  message: NIMMessageInfo
+  @BuilderParam
+  onMessageClick: MessageItemClick | undefined
+  @BuilderParam
+  chatInfo: ChatInfo | undefined
+
+  private onItemClick(event: ClickEvent) {
+    this.onMessageClick?.onReplyClick?.(event, this.message.replyMsg)
+  }
+
+  private onRevokeEditClick(event: ClickEvent) {
+    this.onMessageClick?.onRevokeEditClick?.(event, this.message)
+
+  }
+
+  build() {
+    Column() {
+      if (!this.message.isRevokeMsg && this.message.isReplyMsg) {
+        if (this.message.replyMsg) {
+          Text() {
+            if (this.chatInfo) {
+              Span(' | ' + parseReplyMessageUserInfo(this.message.replyMsg, this.chatInfo))
+                .fontSize($r('app.float.chat_desc_text_font_size'))
+                .textCase(TextCase.Normal)
+                .fontColor($r('app.color.color_chat_desc'))
+            }
+            ForEach(sliceMessageText(parseMessageText(getReplyMessageText(this.message.replyMsg)), 30),
+              (item: NEEmojiParseResult) => {
+                if (item.text) {
+                  Span(item.text)
+                    .fontSize($r('app.float.chat_desc_text_font_size'))
+                    .textCase(TextCase.Normal)
+                    .fontColor($r('app.color.color_chat_desc'))
+                } else if (item.emoji) {
+                  ImageSpan($rawfile(`emoji/${item.emoji.file}`)).width('16')
+                    .height('16')
+                    .objectFit(ImageFit.Fill)
+                    .verticalAlign(ImageSpanAlignment.CENTER)
+                }
+              })
+          }
+          .fontColor($r('app.color.color_chat_desc'))
+          .fontSize($r('app.float.chat_desc_text_font_size'))
+          .height(20)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .ellipsisMode(EllipsisMode.END)
+          .margin({ bottom: 4 })
+          .onClick((event) => this.onItemClick(event))
+        } else {
+          Text(getContext().resourceManager.getStringSync($r('app.string.chat_reply_not_exist').id))
+            .fontColor($r('app.color.color_chat_desc'))
+            .fontSize($r('app.float.chat_desc_text_font_size'))
+            .height(20)
+            .maxLines(1)
+            .ellipsisMode(EllipsisMode.END)
+            .margin({ bottom: 4 })
+        }
+
+      }
+      Column() {
+        if (this.message.isRevokeMsg) {
+          Span(this.message.message.text)
+          if (this.message.revokeEditMsg) {
+            Text($r('app.string.chat_msg_undo_edit_tips'))
+              .fontColor($r('app.color.color_chat_send'))
+              .onClick((event) => {
+                this.onRevokeEditClick(event)
+              })
+          }
+        } else {
+          ForEach(parseMessageText(this.message.message.text?.trimStart()?.trimEnd()), (item: NEEmojiParseResult) => {
+            if (item.text) {
+              ForEach(getAitNodes(item.startIndex, item.text, this.message.message.serverExtension),
+                (node: ChatAitNode) => {
+                  if (node.segment) {
+                    Span(node.text)
+                      .fontSize($r('app.float.chat_message_text_font_size'))
+                      .textCase(TextCase.Normal)
+                      .fontColor('#337EFF')
+                  } else {
+                    Markdown({
+                      content: node.text,
+                      lineSpace: 0,
+                      textLineSpace: 6,
+                      fontStyle: {
+                        fontColor: $r('app.color.color_chat_title'),
+                        fontSize: $r('app.float.chat_message_text_font_size')
+                      },
+                    })
+                  }
+                })
+
+            } else if (item.emoji) {
+              ImageSpan($rawfile(`emoji/${item.emoji.file}`))
+                .width(18)
+                .height(18)
+                .objectFit(ImageFit.Fill)
+                .verticalAlign(ImageSpanAlignment.CENTER)
+            }
+          })
+        }
+      }
+    }.alignItems(HorizontalAlign.Start)
+    .padding({
+      left: 12,
+      top: 12,
+      bottom: 12,
+      right: 12
+    })
   }
 }
 
@@ -267,10 +392,12 @@ export struct imageBuilder {
   message: NIMMessageInfo
   @BuilderParam
   onMessageClick: MessageItemClick | undefined
+  @Local thumbUrl?: string
+  @Local url?: string
 
   build() {
     Column() {
-      Image(this.message?.getImageUrl())
+      Image(this.thumbUrl ?? this.url)
         .objectFit(ImageFit.Cover)
         .width(getImageWidth(this.message))
         .height(getImageHeight(this.message))
@@ -279,6 +406,13 @@ export struct imageBuilder {
           this.onMessageClick?.onItemLongClick?.(event, this.message)
         }), GestureMask.IgnoreInternal)
     }
+  }
+
+  aboutToAppear(): void {
+    this.url = this.message.getImageUrl()
+    this.message.getImageThumbUrl().then((thumbUrl) => {
+      this.thumbUrl = thumbUrl
+    })
   }
 }
 

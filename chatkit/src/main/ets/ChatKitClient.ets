@@ -5,6 +5,7 @@
  *
  */
 
+import { CoreKitClient } from '@nimkit/coreKit';
 import {
   IM_SDK_VERSION,
   NIM,
@@ -12,16 +13,16 @@ import {
   V2NIMConnectStatus,
   V2NIMDataSyncState,
   V2NIMDataSyncType,
+  V2NIMEnableServiceType,
   V2NIMError,
   V2NIMLoginStatus,
   V2NIMMessageRevokeNotification
 } from '@nimsdk/base';
+import { ContactRepo } from '../../../Index';
+import { KitLogger } from './logger/AppLogger';
+import { LoggerKitImpl } from './logger/LoggerKitImpl';
 import { ChatRepo } from './repo/ChatRepo';
 import { saveLocalRevokeMessageFormOther } from './utils/MessageUtils';
-import { NEFriendUserCache } from './NEFriendUserCache';
-import { CoreKitClient } from '@nimkit/coreKit';
-import { LoggerKitImpl } from './logger/LoggerKitImpl';
-import { KitLogger } from './logger/AppLogger';
 
 export const currentConversationChanged: string = 'CurrentConversationChanged'
 
@@ -113,6 +114,10 @@ export class ChatKitClient {
     return false
   }
 
+  static isLocalConversation(): boolean {
+    return ChatKitClient.nim.isServiceEnable(V2NIMEnableServiceType.LOCAL_CONVERSATION)
+  }
+
   /**
    * 等待登录后执行
    */
@@ -167,7 +172,7 @@ export class ChatKitClient {
   }
   private static dataSyncFun = (type: V2NIMDataSyncType, state: V2NIMDataSyncState, error?: V2NIMError) => {
     if (state === V2NIMDataSyncState.V2NIM_DATA_SYNC_STATE_COMPLETED) {
-      NEFriendUserCache.getInstance()
+      ContactRepo.getFriendList()
     }
   }
   private static onRevokeFun = (messages: V2NIMMessageRevokeNotification[]) => {

@@ -136,7 +136,6 @@ export struct MineInfoPage {
         // 将文件 拷贝到 临时目录
         const file = fs.openSync(filePath, fs.OpenMode.READ_ONLY)
         fs.copyFileSync(file.fd, dir)
-
         const task = StorageRepo.createUploadFileTask({
           filePath: dir,
           sceneName: 'nim_default_profile_icon'

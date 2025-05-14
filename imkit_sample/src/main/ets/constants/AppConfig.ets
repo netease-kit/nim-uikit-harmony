@@ -5,12 +5,8 @@
  *
  */
 
+const IM_UIKIT_APP_KEY: string = '3e215d27b6a6a9e27dad7ef36dd5b65c'
+// const IM_UIKIT_APP_KEY: string = '45c6af3c98409b18a84451215d0bdd6e' // InnerSDK
 export class AppConfig {
-  // appKey 和 userName 在网易云信控制台获取
-  // appKey 网易云信应用appkey
-  public static appKey: string = ''
-  // userName 网易云信应用下账号ID
-  public static userId: string = ''
-  // userName 网易云信应用下账号Token
-  public static userToken: string = ''
+  public static appKey: string = IM_UIKIT_APP_KEY
 }

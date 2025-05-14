@@ -8,6 +8,6 @@
   "dependencies": {
     "@nimkit/common": "file:../common",
     "@nimkit/chatkit": "../chatkit",
-    "@nimsdk/base": "10.8.5"
+    "@nimsdk/base": "10.8.30",
   }
 }

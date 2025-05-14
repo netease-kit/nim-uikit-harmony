@@ -222,9 +222,9 @@ export class TeamMemberCache {
    */
   initMemberChangeListener() {
     //用户信息变更
-    ChatKitClient.nim.userService?.on("onUserProfileChanged", this.onUserProfileChanged.bind(this))
+    ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onUserProfileChanged.bind(this))
     //好友信息变更
-    ChatKitClient.nim.friendService?.on("onFriendInfoChanged", this.onFriendInfoChanged.bind(this))
+    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChanged.bind(this))
     //群成员信息变更
     ChatKitClient.nim.teamService?.on('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated.bind(this))
     ChatKitClient.nim.teamService?.on('onTeamMemberLeft', this.onTeamMemberLeft.bind(this))
@@ -353,10 +353,11 @@ export class TeamMemberCache {
     this.teamId = ''
     this.team = undefined
     this.isFinish = false
+    this.nextToken = ''
     //用户信息变更
-    ChatKitClient.nim.userService?.off("onUserProfileChanged", this.onUserProfileChanged.bind(this))
+    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onUserProfileChanged.bind(this))
     //好友信息变更
-    ChatKitClient.nim.friendService?.off("onFriendInfoChanged", this.onFriendInfoChanged.bind(this))
+    ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChanged.bind(this))
     //群成员信息变更
     ChatKitClient.nim.teamService?.off('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated.bind(this))
     ChatKitClient.nim.teamService?.off('onTeamMemberLeft', this.onTeamMemberLeft.bind(this))
@@ -376,4 +377,3 @@ export class TeamMemberCache {
     return this.isFinish
   }
 }
-

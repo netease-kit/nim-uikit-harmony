@@ -57,7 +57,7 @@ export class AitServer {
     ChatRepo.onRevokeMessage(this.onRevokeFun.bind(this))
 
     //会话已读未读数的变化
-    ChatKitClient.nim.conversationService?.on("onConversationChanged", (updateList: V2NIMConversation[]) => {
+    ChatKitClient.nim.conversationService?.on('onConversationChanged', (updateList: V2NIMConversation[]) => {
       updateList.forEach((conversation) => {
         if (conversation.unreadCount === 0 &&
         this.aitConversationSet.has(conversation.conversationId)) {
@@ -130,7 +130,7 @@ export class AitServer {
       await AitDatabase.instance.deleteMessage(msg.messageRefer.conversationId, msg.messageRefer.messageClientId,
         myAccId)
       let haveAit = await this.isAitSession(msg.messageRefer.conversationId, myAccId)
-      if (haveAit === false) {
+      //if (haveAit === false) {
         // 回调
         this.sendAitChange({
           sessionId: msg.messageRefer.conversationId,
@@ -138,7 +138,7 @@ export class AitServer {
           isAit: false
         })
         this.aitConversationSet.delete(msg.messageRefer.conversationId)
-      }
+      //}
     }
 
   }
