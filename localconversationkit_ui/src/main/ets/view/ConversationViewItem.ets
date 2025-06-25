@@ -5,26 +5,22 @@
  *
  */
 
-import { ChatKitClient } from '@nimkit/chatkit';
+import { ChatKitClient, IMKitConfigCenter } from '@nimkit/chatkit';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
 import { DateUtil } from '@nimkit/common/src/main/ets/utils/DateUtil';
-import { V2NIMLocalConversation, V2NIMMessageCallAttachment, V2NIMMessageType } from '@nimsdk/base';
-import { LocalConversationOperationDialog } from './LocalConversationOperationDialog';
+import {
+  V2NIMConversationType,
+  V2NIMLocalConversation,
+  V2NIMMessageCallAttachment,
+  V2NIMMessageType
+} from '@nimsdk/base';
 
 @ComponentV2
 export struct ConversationViewItem {
   @Param conversationInfo: V2NIMLocalConversation | null = null
   @Param haveBeanAit: boolean = false
   @Param onItemClick?: () => void | undefined = undefined
-  dialogController: CustomDialogController = new CustomDialogController({
-    builder: LocalConversationOperationDialog({
-      conversationInfo: this.conversationInfo
-    }),
-    cornerRadius: 15,
-    borderWidth: 0.5,
-    width: '60%',
-    borderColor: '#ffDCDFE5'
-  })
+  @Param onlineState: boolean = false
 
   build() {
     if (this.conversationInfo !== null) {
@@ -41,16 +37,38 @@ export struct ConversationViewItem {
                   .parseConversationTargetId(this.conversationInfo.conversationId)
               ))
           })
-          //未读数显示
-          if (this.conversationInfo.mute !== true && this.conversationInfo.unreadCount > 0) {
-            Text(this.getUnreadCountStr(this.conversationInfo.unreadCount))
-              .fontSize(12)
-              .fontColor('#ffFFFFFF')
-              .textAlign(TextAlign.Center)
-              .backgroundColor('#ffF24957')
-              .borderRadius(20)
-              .height(18)
-              .width(18 + (this.getUnreadCountStr(this.conversationInfo.unreadCount).length - 1) * 4)
+          RelativeContainer() {
+            //未读数显示
+            if (this.conversationInfo.mute !== true && this.conversationInfo.unreadCount > 0) {
+              Text(this.getUnreadCountStr(this.conversationInfo.unreadCount))
+                .fontSize(12)
+                .fontColor('#ffFFFFFF')
+                .textAlign(TextAlign.Center)
+                .backgroundColor('#ffF24957')
+                .alignRules({
+                  'top': { 'anchor': '__container__', 'align': VerticalAlign.Top },
+                  'right': { 'anchor': '__container__', 'align': HorizontalAlign.End }
+                })
+                .borderRadius(20)
+                .height(18)
+                .width(18 +
+                  (this.getUnreadCountStr(this.conversationInfo.unreadCount).length - 1) * 4)
+                .offset({ x: 1, y: 1 })
+            }
+            //在线状态
+            if (this.conversationInfo.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P &&
+            IMKitConfigCenter.enableShownOnlineState) {
+              Column()
+                .width(8)
+                .height(8)
+                .borderRadius(4)
+                .backgroundColor(this.onlineState ? '#84ED85' : '#D4D9DA')
+                .alignRules({
+                  'bottom': { 'anchor': '__container__', 'align': VerticalAlign.Bottom },
+                  'right': { 'anchor': '__container__', 'align': HorizontalAlign.End }
+                })
+                .offset({ x: -1, y: -1 })
+            }
           }
 
         }
@@ -104,7 +122,6 @@ export struct ConversationViewItem {
 
           //mute 状态显示
           if (this.conversationInfo.mute) {
-
             Image($r('app.media.conversation_mute'))
               .width(14)
               .height(14)
@@ -114,12 +131,10 @@ export struct ConversationViewItem {
         .margin({
           right: 12
         }).alignItems(HorizontalAlign.End)
-
       }
       .width('100%')
       .height(62)
       .onClick(() => {
-        // this.goToChatPage()
         if (this.onItemClick !== undefined) {
           this.onItemClick()
         }
@@ -131,7 +146,6 @@ export struct ConversationViewItem {
           .onAction((event: GestureEvent) => {
             if (!event.repeat) {
               //show 操作弹框
-              this.dialogController.open()
             }
           })
       )

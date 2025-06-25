@@ -16,7 +16,8 @@
           "consumerFiles": [
             "./consumer-rules.txt"
           ]
-        }
+        },
+        "byteCodeHar": true
       },
     },
   ],

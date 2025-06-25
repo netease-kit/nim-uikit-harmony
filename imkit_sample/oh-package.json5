@@ -6,7 +6,6 @@
   "author": "",
   "license": "",
   "dependencies": {
-    "@nimkit/login": "file:../login",
     "@nimkit/conversationkit_ui": "file:../conversationkit_ui",
     "@nimkit/localconversationkit_ui": "file:../localconversationkit_ui",
     "@nimkit/contactkit_ui": "file:../contactkit_ui",
@@ -15,14 +14,14 @@
     "@nimkit/chatkit_ui": "file:../chatkit_ui",
     "@nimkit/common": "file:../common",
     "@nimkit/corekit": "file:../corekit",
-    "@nimsdk/conversation": "10.8.30",
-    "@nimsdk/localconversation": "10.8.30",
-    "@nimsdk/message": "10.8.30",
-    "@nimsdk/team": "10.8.30",
-    "@nimsdk/user": "10.8.30",
-    "@nimsdk/friend": "10.8.30",
-    "@nimsdk/nim": "10.8.30",
-    "@nimsdk/base": "10.8.30"
+    "@nimsdk/conversation": "10.9.10",
+    "@nimsdk/localconversation": "10.9.10",
+    "@nimsdk/message": "10.9.10",
+    "@nimsdk/team": "10.9.10",
+    "@nimsdk/user": "10.9.10",
+    "@nimsdk/friend": "10.9.10",
+    "@nimsdk/nim": "10.9.10",
+    "@nimsdk/base": "10.9.10"
   },
   "devDependencies": {},
   "dynamicDependencies": {}

@@ -9,6 +9,7 @@ import { ContactRepo, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatki
 import { GetUnreadCountStr, initalLetter } from '@nimkit/common'
 import { V2NIMFriend, V2NIMUser } from '@nimsdk/base'
 import { NEContactSection, NEContactSectionDataSource, SelectUserWithFriend } from '../model/NEContactSection'
+import { systemDateTime } from '@kit.BasicServicesKit'
 
 const digitRegular = /[0-9]/
 const azRegular = /[A-Z]/
@@ -18,12 +19,14 @@ export class ContactViewModel {
   @Trace friendList: NEUserWithFriend[] = []
   @Trace friendSection: NEContactSectionDataSource = new NEContactSectionDataSource()
   @Trace initalList: string[] = []
+
   updateUserInfoFun = async (users: V2NIMUser[]) => {
     await Promise.all(
       users.map(async (user) => {
         if (NEFriendUserCache.getInstance().isFriend(user.accountId)) {
           const oldUser = this.findContactModel(user.accountId)
-          if (oldUser && (oldUser?.user?.name !== user.name || oldUser?.user?.avatar !== user.avatar)) {
+          if (oldUser &&
+            (oldUser?.user?.name !== user.name || oldUser?.user?.avatar !== user.avatar)) {
             this.removeFromContact(user.accountId)
           }
           const userWithFriend = NEFriendUserCache.getInstance().getFriendById(user.accountId)
@@ -34,6 +37,7 @@ export class ContactViewModel {
       })
     )
   }
+
   updateFriendInfoFun = async (friend: V2NIMFriend) => {
     const oldUser = this.findContactModel(friend.accountId)
     if (oldUser && oldUser.friend?.alias !== friend.alias) {
@@ -47,12 +51,15 @@ export class ContactViewModel {
       this.addToContact(user)
     }
   }
+
   removeFriendInfoFun = async (accountId: string) => {
     this.removeFromContact(accountId)
   }
+
   addBlockAccountFun = async (accountId: string) => {
     this.removeFromContact(accountId)
   }
+
   removeBlockAccountFun = async (accountId: string) => {
     const user = NEFriendUserCache.getInstance().getFriendById(accountId)
     if (user) {
@@ -79,7 +86,7 @@ export class ContactViewModel {
       friendList = NEFriendUserCache.getInstance().getFriendListNotInBlocklist()
       if (friendList) {
         this.friendList = friendList
-        const contactList = await this.formatFriends(friendList, filterList)
+        const contactList = this.formatFriends(friendList, filterList)
         this.friendSection.pushList(contactList)
         return contactList
       }
@@ -101,7 +108,11 @@ export class ContactViewModel {
       if (friend.user?.accountId && !filterList.includes(friend.user?.accountId)) {
         let name = friend.showName()
         if (name) {
-          const inital = initalLetter(name)
+          let inital = ContactRepo.pinyinHasMap.get(name)
+          if (!inital) {
+            inital = initalLetter(name)
+            ContactRepo.pinyinHasMap.set(name, inital)
+          }
           if (digitRegular.test(inital)) {
             digitList.push(new SelectUserWithFriend(friend))
           } else if (!azRegular.test(inital)) {
@@ -119,10 +130,14 @@ export class ContactViewModel {
     //)
 
     const nameSortFunc = (s1: NEUserWithFriend, s2: NEUserWithFriend) => {
-      if ((s1.showName()) < (s2.showName())) {
+      if (
+        (s1.showName()) <
+          (s2.showName())) {
         return -1
       }
-      if ((s1.showName()) > (s2.showName())) {
+      if (
+        (s1.showName()) >
+          (s2.showName())) {
         return 1
       }
       return 0
@@ -167,7 +182,7 @@ export class ContactViewModel {
     let name = userWithFriend.showName()
     let user = new SelectUserWithFriend(userWithFriend)
     if (name) {
-      let inital = await initalLetter(name)
+      let inital = initalLetter(name)
       if (digitRegular.test(inital)) {
         inital = '#'
       } else if (!azRegular.test(inital)) {

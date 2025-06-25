@@ -15,13 +15,21 @@ export { TeamRepo } from './src/main/ets/repo/TeamRepo'
 
 export { SettingRepo } from './src/main/ets/repo/SettingRepo'
 
+export {SubscriptionRepo} from './src/main/ets/repo/SubscriptionRepo'
+
 export { StorageRepo } from './src/main/ets/repo/StorageRepo'
 
 export { NEUserWithFriend } from './src/main/ets/model/NEUserWithFriend'
 
 export { NEFriendUserCache } from './src/main/ets/NEFriendUserCache'
 
+export { NEAIUserCache } from './src/main/ets/NEAIUserCache'
+
 export { ConversationRepo } from './src/main/ets/repo/ConversationRepo'
+
+export { ConversationIdUtilRepo } from './src/main/ets/repo/ConversationIdUtilRepo'
+
+export { AIRepo } from './src/main/ets/repo/AIRepo'
 
 export { LocalConversationRepo } from './src/main/ets/repo/LocalConversationRepo'
 

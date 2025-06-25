@@ -5,9 +5,9 @@
 		"versionCode": 1000000,
 		"versionName": "1.0.0",
 		"minAPIVersion": 50000012,
-		"targetAPIVersion": 50004016,
+		"targetAPIVersion": 50100018,
 		"apiReleaseType": "Release",
-		"compileSdkVersion": "5.0.4.150",
+		"compileSdkVersion": "5.1.0.110",
 		"compileSdkType": "HarmonyOS",
 		"appEnvironments": [],
 		"bundleType": "app",
@@ -22,7 +22,7 @@
 			"tablet",
 			"2in1"
 		],
-		"packageName": "@ohos/common",
+		"packageName": "@nimkit/common",
 		"installationFree": false
 	}
 }

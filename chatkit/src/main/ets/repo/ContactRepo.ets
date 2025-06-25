@@ -5,6 +5,8 @@
  *
  */
 
+import { HashMap } from '@kit.ArkTS';
+import { initalLetter } from '@nimkit/common';
 import {
   V2NIMCheckFriendResult,
   V2NIMFriend,
@@ -27,9 +29,22 @@ import { NEFriendUserCache } from '../NEFriendUserCache';
 
 export class ContactRepo {
   public static listener = getContext(this).eventHub
+  public static pinyinHasMap: HashMap<string, string> = new HashMap()
+
   static onBlockListAddedFun = async (user: V2NIMUser) => {
     NEFriendUserCache.getInstance().addBlockAccount(user.accountId)
   }
+
+  static onFriendAddedFun = async (friend: V2NIMFriend) => {
+    NEFriendUserCache.getInstance().updateFriendInfo({
+      friend: friend
+    })
+    ContactRepo.removeUserFromBlockList(friend.accountId)
+    ContactRepo.listener.emit('updateFriendInfo', friend)
+    // 更新 user 信息至最新
+    ContactRepo.getUserListFromCloud([friend.accountId])
+  }
+
   static onLoginStatusFun = (status: V2NIMLoginStatus) => {
     switch (status) {
       case V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGOUT:
@@ -40,6 +55,7 @@ export class ContactRepo {
         break;
     }
   }
+
   static onUserProfileChangedFun = async (users: V2NIMUser[]) => {
     users.forEach((user) => {
       if (NEFriendUserCache.getInstance().isFriend(user.accountId)) {
@@ -54,21 +70,15 @@ export class ContactRepo {
 
     ContactRepo.listener.emit('updateUserInfo', users)
   }
+
   static onBlockListRemovedFun = (accountId: string) => {
     NEFriendUserCache.getInstance().removeBlockAccount(accountId)
   }
-  static onFriendAddedFun = async (friend: V2NIMFriend) => {
-    NEFriendUserCache.getInstance().updateFriendInfo({
-      friend: friend
-    })
-    ContactRepo.removeUserFromBlockList(friend.accountId)
-    ContactRepo.listener.emit('updateFriendInfo', friend)
-    // 更新 user 信息至最新
-    ContactRepo.getUserListFromCloud([friend.accountId])
-  }
+
   static onFriendDeletedFun = (accountId: string, deletionType: V2NIMFriendDeletionType) => {
     NEFriendUserCache.getInstance().removeFriendInfo(accountId)
   }
+
   static onFriendInfoChangedFun = (friend: V2NIMFriend) => {
     NEFriendUserCache.getInstance().updateFriendInfo({
       friend: friend
@@ -250,6 +260,7 @@ export class ContactRepo {
       NEFriendUserCache.getInstance().loadFriendList(friendList)
     }
 
+    ContactRepo.initalFriendLetter(friendList)
     return friendList
   }
 
@@ -334,5 +345,19 @@ export class ContactRepo {
    */
   static async searchFriendByOption(option: V2NIMFriendSearchOption): Promise<V2NIMFriend[]> {
     return await ChatKitClient.nim.friendService?.searchFriendByOption(option) ?? []
+  }
+
+  private static async initalFriendLetter(friendList: V2NIMFriend[]): Promise<void> {
+    friendList.map((friend) => {
+      if (friend.userProfile?.accountId) {
+        let name = friend.userProfile.name
+        if (name) {
+          const inital = initalLetter(name)
+          if (inital) {
+            ContactRepo.pinyinHasMap.set(name, inital)
+          }
+        }
+      }
+    })
   }
 }

@@ -6,7 +6,7 @@
     },
     {
       "name": "stick_top_conversation",
-      "value": "置顶该聊天"
+      "value": "置顶"
     },
     {
       "name": "unstick_top_conversation",
@@ -14,7 +14,7 @@
     },
     {
       "name": "delete_conversation",
-      "value": "删除该聊天"
+      "value": "删除"
     },
     {
       "name": "add_friend",

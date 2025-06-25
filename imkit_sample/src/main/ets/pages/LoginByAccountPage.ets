@@ -47,7 +47,7 @@ struct LoginByAccountPage {
       this.isLogin = true
       try {
         const nimRepository = NimRepository.getInstance(getContext(this))
-        const appkey = IMSDKConfigManager.configModel?.configOptions?.databaseServiceConfig?.appKey ?? AppConfig.appKey
+        const appkey = AppConfig.appKey
         const token = await this.md5(this.accountIdToken)
         await nimRepository.login(this.accountId, token, appkey)
         this.isLogin = false

@@ -17,8 +17,8 @@ function cardStyle() {
 @Extend(Text)
 function centerTitleStyle() {
   .fontColor('#182431')
-  .fontSize(14)
-  .height(22)
+  .fontSize(10)
+  .height(12)
   .alignSelf(ItemAlign.Center)
   .margin({ left: 12, top: 6 })
 }
@@ -26,18 +26,19 @@ function centerTitleStyle() {
 @ComponentV2
 export struct CommonLongLoadingProgress {
   @Param contentText?: Resource | undefined = undefined
+
   build() {
     Column() {
       Column() {
         LoadingProgress()
-          .width(50)
-          .height(50)
+          .width(40)
+          .height(40)
           .color('#51AFF8')
       }
       .cardStyle()
       .width('100%')
       Text(this.contentText)
-          .centerTitleStyle()
+        .centerTitleStyle()
     }
     .height('100%')
     .width('100%')

@@ -57,6 +57,10 @@
       "value": "请输入你要搜索的关键字"
     },
     {
+      "name": "common_search_ai_users",
+      "value": "搜索"
+    },
+    {
       "name": "all_space_not_support",
       "value": "不支持全空格"
     },
@@ -67,6 +71,10 @@
     {
       "name": "no_team",
       "value": "暂无群聊"
+    },
+    {
+      "name": "no_ai_user",
+      "value": "暂无数字人"
     },
     {
       "name": "cancel",

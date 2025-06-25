@@ -50,11 +50,13 @@ import {
   ConversationSelectParam,
   CustomMessageUtils,
   ErrorUtils,
+  IMKitConfigCenter,
   MergedMessageAttachment,
   mergedMessageCustomType,
   mergedMessageLimitCount,
   mergedMessageMaxDepth,
-  singleMessageLimitCount
+  singleMessageLimitCount,
+  SubscriptionRepo
 } from '@nimkit/chatkit';
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog';
@@ -263,16 +265,8 @@ export struct ChatP2PPage {
   @Monitor("chatViewModel.anchorMsg")
   onAnchorMsg() {
     if (this.chatViewModel.anchorMsg) {
-      if (this.chatUserInfo.msgMap.has(this.chatViewModel.anchorMsg.getMessageClientId())) {
-        let position = this.chatUserInfo.searchPosition(this.chatViewModel.anchorMsg.getMessageClientId())
-        this.toScroll = true
-        this.listScroller.scrollToIndex(position)
-        this.chatViewModel.setAnchorMessage(undefined)
-      } else {
         this.chatViewModel.loadAnchorMsg(this.chatViewModel.anchorMsg)
-      }
     }
-
   }
 
   @Monitor("chatViewModel.selectMsgCount")
@@ -436,7 +430,7 @@ export struct ChatP2PPage {
   build() {
     NavDestination() {
       NavigationBackBuilder({
-        title: this.chatUserInfo.conversationName,
+        title: `${this.chatUserInfo.conversationName}${IMKitConfigCenter.enableShownOnlineState ? SubscriptionRepo.onlineStateMap.get(this.chatUserInfo.targetId) ? '(在线)' : '(离线)':''}`,
         rightButtonIcon: this.showMultiSelect ? undefined : $r('app.media.ic_public_more_dot'),
         rightButtonTitle: this.showMultiSelect ? $r('app.string.chat_msg_dialog_cancel') : undefined,
         rightButtonAction: () => {
@@ -581,9 +575,9 @@ export struct ChatP2PPage {
           }, (item: NIMMessageInfo) => item.message.messageClientId)
         }
         .id("chatPageListView")
-        .cachedCount(20)
+        .cachedCount(3)
         .maintainVisibleContentPosition(true)
-        .padding({ bottom: 20 })
+        .padding({ bottom: 0 })
         .onScrollIndex((start: number, end: number) => {
           // Listen to the first index of the current list.
           if (!this.toScroll) {
@@ -598,7 +592,6 @@ export struct ChatP2PPage {
           this.listScrollStartPosition = start;
         })
         .onScrollStop(() => {
-          console.debug('netease to scroll stop:', this.toScroll)
           if (this.toScroll) {
             this.toScroll = false
           }

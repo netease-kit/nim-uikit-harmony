@@ -69,7 +69,7 @@ struct TeamMemberListPage {
               Text(member.getNickname())
                 .fontColor('#ff333333')
                 .fontSize(16)
-                .width(member.isManager() && this.haveKickPermission(member) ? '50%' : '70%')
+                .width(member.isManager() && this.haveKickPermission(member) ? '45%' : '65%')
 
               if (this.caseRole && member.isManager()) {
                 Blank().layoutWeight(1)
@@ -88,6 +88,7 @@ struct TeamMemberListPage {
                     right: 12
                   })
               }
+
               if (this.caseRole && member.isOwner()) {
                 Blank().layoutWeight(1)
 

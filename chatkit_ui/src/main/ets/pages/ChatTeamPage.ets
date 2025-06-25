@@ -287,14 +287,7 @@ export struct ChatTeamPage {
   @Monitor("chatViewModel.anchorMsg")
   onAnchorMsg() {
     if (this.chatViewModel.anchorMsg) {
-      if (this.chatTeamInfo.msgMap.has(this.chatViewModel.anchorMsg.getMessageClientId())) {
-        let position = this.chatTeamInfo.searchPosition(this.chatViewModel.anchorMsg.getMessageClientId())
-        this.toScroll = true
-        this.listScroller.scrollToIndex(position)
-        this.chatViewModel.setAnchorMessage(undefined)
-      } else {
         this.chatViewModel.loadAnchorMsg(this.chatViewModel.anchorMsg)
-      }
     }
   }
 
@@ -705,12 +698,12 @@ export struct ChatTeamPage {
               return item.message.messageClientId
             }catch (e) {
               return index.toString()
-            }
+                }
           })
         }
         .id("chatPageListView")
-        .cachedCount(20)
-        .padding({ bottom: 10 })
+        .cachedCount(4)
+        .padding({ bottom: 5 })
         .maintainVisibleContentPosition(true)
         .onScrollIndex((start: number, end: number) => {
           if (!this.toScroll) {

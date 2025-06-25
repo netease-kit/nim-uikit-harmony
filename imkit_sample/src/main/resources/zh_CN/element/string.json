@@ -93,6 +93,10 @@
       "value": "本地会话功能"
     },
     {
+      "name": "mine_setting_online_state",
+      "value": "单聊在线状态"
+    },
+    {
       "name": "mine_setting_logout",
       "value": "退出登录"
     },

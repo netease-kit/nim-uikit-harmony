@@ -45,3 +45,5 @@ export let collectionTypeOffset = 1000
 
 /// 回复消息key, 用于不使用 thread 的消息回复方案
 export let keyReplyMsgKey = "yxReplyMsg"
+
+export const subscriptionOnlineStateDuration = 60 * 60 * 24

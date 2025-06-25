@@ -19,6 +19,7 @@ interface NavigationBackBuilderParams {
   rightButtonAction?: (() => void);
   backgroundColor?: ResourceColor;
   buttonTextWidth?: number;
+  onlineState?: boolean;
 }
 
 @Builder

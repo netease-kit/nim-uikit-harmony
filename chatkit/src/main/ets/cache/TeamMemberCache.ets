@@ -16,6 +16,7 @@ import {
 } from '@nimsdk/base';
 import { ChatKitClient } from '../ChatKitClient';
 import { TeamMemberWithUser } from '../model/TeamMemberWithUser';
+import { NEFriendUserCache } from '../NEFriendUserCache';
 import { TeamRepo } from '../repo/TeamRepo';
 
 @ObservedV2

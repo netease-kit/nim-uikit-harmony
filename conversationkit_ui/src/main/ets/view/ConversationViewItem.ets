@@ -5,10 +5,10 @@
  *
  */
 
-import { ChatKitClient } from '@nimkit/chatkit';
+import { ChatKitClient, IMKitConfigCenter } from '@nimkit/chatkit';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
 import { DateUtil } from '@nimkit/common/src/main/ets/utils/DateUtil';
-import { V2NIMConversation, V2NIMMessageCallAttachment, V2NIMMessageType } from '@nimsdk/base';
+import { V2NIMConversation, V2NIMConversationType, V2NIMMessageCallAttachment, V2NIMMessageType } from '@nimsdk/base';
 import { ConversationOperationDialog } from './ConversationOperationDialog';
 
 @ComponentV2
@@ -16,15 +16,7 @@ export struct ConversationViewItem {
   @Param conversationInfo: V2NIMConversation | null = null
   @Param haveBeanAit: boolean = false
   @Param @Require onItemClick?: () => void
-  dialogController: CustomDialogController = new CustomDialogController({
-    builder: ConversationOperationDialog({
-      conversationInfo: this.conversationInfo
-    }),
-    cornerRadius: 15,
-    borderWidth: 0.5,
-    width: '60%',
-    borderColor: '#ffDCDFE5'
-  })
+  @Param onlineState: boolean = false
 
   build() {
     if (this.conversationInfo !== null) {
@@ -41,18 +33,41 @@ export struct ConversationViewItem {
                   .parseConversationTargetId(this.conversationInfo.conversationId)
               ))
           })
-          //未读数显示
-          if (this.conversationInfo.mute !== true && this.conversationInfo.unreadCount > 0) {
-            Text(this.getUnreadCountStr(this.conversationInfo.unreadCount))
-              .fontSize(12)
-              .fontColor('#ffFFFFFF')
-              .textAlign(TextAlign.Center)
-              .backgroundColor('#ffF24957')
-              .borderRadius(20)
-              .height(18)
-              .width(18 + (this.getUnreadCountStr(this.conversationInfo.unreadCount).length - 1) * 4)
-          }
 
+          //未读数显示
+          RelativeContainer() {
+            //未读数显示
+            if (this.conversationInfo.mute !== true && this.conversationInfo.unreadCount > 0) {
+              Text(this.getUnreadCountStr(this.conversationInfo.unreadCount))
+                .fontSize(12)
+                .fontColor('#ffFFFFFF')
+                .textAlign(TextAlign.Center)
+                .backgroundColor('#ffF24957')
+                .alignRules({
+                  'top': { 'anchor': '__container__', 'align': VerticalAlign.Top },
+                  'right': { 'anchor': '__container__', 'align': HorizontalAlign.End }
+                })
+                .borderRadius(20)
+                .height(18)
+                .width(18 +
+                  (this.getUnreadCountStr(this.conversationInfo.unreadCount).length - 1) * 4)
+                .offset({ x: 1, y: 1 })
+            }
+            //在线状态
+            if (this.conversationInfo.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P &&
+            IMKitConfigCenter.enableShownOnlineState) {
+              Column()
+                .width(8)
+                .height(8)
+                .borderRadius(4)
+                .backgroundColor(this.onlineState ? '#84ED85' : '#D4D9DA')
+                .alignRules({
+                  'bottom': { 'anchor': '__container__', 'align': VerticalAlign.Bottom },
+                  'right': { 'anchor': '__container__', 'align': HorizontalAlign.End }
+                })
+                .offset({ x: -1, y: -1 })
+            }
+          }
         }
         .width(42)
         .height(42)
@@ -131,7 +146,6 @@ export struct ConversationViewItem {
           .onAction((event: GestureEvent) => {
             if (!event.repeat) {
               //show 操作弹框
-              this.dialogController.open()
             }
           })
       )
@@ -211,6 +225,5 @@ export struct ConversationViewItem {
 
     }
     return item.lastMessage?.text ?? $r('app.string.chatMessageNonsupportType')
-
   }
 }

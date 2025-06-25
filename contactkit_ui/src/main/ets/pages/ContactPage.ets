@@ -5,6 +5,8 @@
  *
  */
 
+import { ChatKitClient, ContactRepo, IMKitConfigCenter, NEAIUserCache, NEUserWithFriend,
+  SubscriptionRepo } from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -14,12 +16,11 @@ import {
   ViewItem,
   ViewItemBuilder
 } from '@nimkit/common';
-import { ContactViewModel } from '../viewmodel/ContactViewModel';
-import { NEContactSection } from '../model/NEContactSection';
-import { ChatKitClient, ContactRepo, NEUserWithFriend } from '@nimkit/chatkit';
-import { NEContactItem } from '../model/NEContactItem';
 import { V2NIMFriendAddApplication } from '@nimsdk/base';
-import { displaySync } from '@kit.ArkGraphics2D';
+import { NEContactItem } from '../model/NEContactItem';
+import { NEContactSection } from '../model/NEContactSection';
+import { ContactViewModel } from '../viewmodel/ContactViewModel';
+import { SubscriptionViewModel } from '../viewmodel/SubscriptionViewModel';
 
 export class ContactViewHolderSection {
   inital: string
@@ -61,7 +62,8 @@ export function ContactItemBuilder(params: NEContactItem) {
           .backgroundColor('#ffF24957')
           .borderRadius(20)
           .height(18)
-          .width(18 + (params.unreadCount.toString().length - 1) * 4)
+          .width(18 +
+            (params.unreadCount.toString().length - 1) * 4)
           .margin({ right: 10 })
       }
 
@@ -89,28 +91,10 @@ export struct ContactPage {
   @Param pathStack: NavPathStack = new NavPathStack()
   @Param onUnreadApplicationChange?: (countString?: string) => void = undefined
   @Local viewModel: ContactViewModel = new ContactViewModel()
+  @Local subscriptViewModel: SubscriptionViewModel = new SubscriptionViewModel()
   @Local isFinishedInit: boolean = false
-  private displaySync: displaySync.DisplaySync | undefined = undefined;
-  loadUnreadApplication = async () => {
-    try {
-      const unreadCount = await this.viewModel.getUnreadApplication()
-      this.headerItems[0].unreadCount = unreadCount
-      if (this.onUnreadApplicationChange) {
-        this.onUnreadApplicationChange(unreadCount)
-      }
-    } catch (err) {
-      console.error(err)
-    }
-  }
-  @Local headerItems: NEContactItem[] = [
-    new NEContactItem($r('app.media.contact_validation_message'), $r('app.string.contact_validation_message'),
-      'ValidationMessagePage', undefined, this.loadUnreadApplication),
-    new NEContactItem($r('app.media.contact_blocklist'), $r('app.string.contact_blocklist'), 'BlockListPage'),
-    new NEContactItem($r('app.media.contact_my_teams'), $r('app.string.contact_my_teams'), 'MyTeamsPage')
-  ]
+  @Local headerItems: NEContactItem[] = this.getContactHeaderItems()
   @Local selectedIndex: number = 0; // 用于指定字母导航的选择项
-  // List组件的scroller控制器：listScroller，用于控制联系人列表的滑动位置
-  private listScroller: Scroller = new Scroller()
   loadData = async () => {
     try {
       await this.viewModel.getFriendList()
@@ -119,32 +103,23 @@ export struct ContactPage {
       console.error(err)
     }
   }
+  // List组件的scroller控制器：listScroller，用于控制联系人列表的滑动位置
+  private listScroller: Scroller = new Scroller()
 
   async aboutToAppear(): Promise<void> {
     ChatKitClient.nim.friendService?.on('onFriendAddApplication', async (application: V2NIMFriendAddApplication) => {
       await this.loadUnreadApplication()
     })
 
-    ContactRepo.listener.on('loadFriendCache', ()=> {
+    ContactRepo.listener.on('loadFriendCache', () => {
       this.isFinishedInit = true;
     })
 
-    // 高负载场景下分帧渲染进行优化
-    // Creating a DisplaySync Object
-    this.displaySync = displaySync.create();
-    // Set the expected frame rate
-    let range: ExpectedFrameRateRange = {
-      expected: 120,
-      min: 60,
-      max: 120
-    };
-    this.displaySync.setExpectedFrameRateRange(range);
-    // Add Frame Callback
-    this.displaySync.on('frame', () => {
-        this.loadData()
-        this.displaySync?.stop()
-    });
-    this.displaySync.start();
+    if (IMKitConfigCenter.enableLocalConversation) {
+      NEAIUserCache.load()
+    }
+
+    this.loadData()
   }
 
   build() {
@@ -166,16 +141,16 @@ export struct ContactPage {
           })
 
           List() {
-            ForEach(this.headerItems, (item: NEContactItem) => {
+            Repeat<NEContactItem>(this.headerItems).each((obj) => {
               ListItem() {
-                ContactItemBuilder(item)
+                ContactItemBuilder(obj.item)
               }
               .width('100%')
               .height(60)
               .backgroundColor(Color.White)
               .onClick(() => {
                 this.pathStack.pushPath({
-                  name: item.routerUrl,
+                  name: obj.item.routerUrl,
                   onPop: (popInfo: PopInfo) => {
                     this.loadUnreadApplication()
                   }
@@ -206,8 +181,22 @@ export struct ContactPage {
                       itemHeight: 60,
                       titleIconSize: 36,
                       titleFontSize: 14,
+                      onlineState:
+                      (IMKitConfigCenter.enableShownOnlineState ?
+                        (this.subscriptViewModel.onlineStateMap.get(item.user!.accountId) ? true : false) : undefined)
                     })
                   }
+                  .onAppear(() => {
+                    if (IMKitConfigCenter.enableShownOnlineState) {
+                      this.subscriptViewModel.subscribeUserStatus(item.user?.accountId ?? '')
+                    }
+                  })
+                  .onDisAppear(() => {
+                    if (IMKitConfigCenter.enableShownOnlineState &&
+                      SubscriptionRepo.subscriptionArray.length >= 3000) {
+                      this.subscriptViewModel.unsubscribeUserStatus([item.user?.accountId ?? ''])
+                    }
+                  })
                   .width('100%')
                   .height(60)
                   .backgroundColor(Color.White)
@@ -249,7 +238,11 @@ export struct ContactPage {
           .selectedColor(Color.White)
           .selectedBackgroundColor('#337EFF')
           .usingPopup(true)
-          .popupPosition({ x: 30, y: (this.viewModel.initalList.length * 16 - 48) / 2 })
+          .popupPosition({
+            x: 30,
+            y:
+            (this.viewModel.initalList.length * 16 - 48) / 2
+          })
           .margin({ right: 10 })
           .itemSize(16)
           .font({ size: 10 })// 指定字母导航的选择项为selectedIndex，完成跟联系人列表的同步
@@ -269,6 +262,32 @@ export struct ContactPage {
   aboutToDisappear(): void {
     this.viewModel.onDestroy()
     ContactRepo.listener.off('loadFriendCache', this.loadData)
-    this.displaySync?.stop();
+  }
+
+  private getContactHeaderItems(): NEContactItem[] {
+    const items: NEContactItem[] = [
+      new NEContactItem($r('app.media.contact_validation_message'), $r('app.string.contact_validation_message'),
+        'ValidationMessagePage', undefined, this.loadUnreadApplication),
+      new NEContactItem($r('app.media.contact_blocklist'), $r('app.string.contact_blocklist'), 'BlockListPage'),
+      new NEContactItem($r('app.media.contact_my_teams'), $r('app.string.contact_my_teams'), 'MyTeamsPage')
+    ]
+    if (IMKitConfigCenter.enableAI) {
+      items.push(
+        new NEContactItem($r('app.media.contact_ai_users'), $r('app.string.contact_ai_users'), 'AIUsersPage')
+      )
+    }
+    return items
+  }
+
+  private async loadUnreadApplication() {
+    try {
+      const unreadCount = await this.viewModel.getUnreadApplication()
+      this.headerItems[0].unreadCount = unreadCount
+      if (this.onUnreadApplicationChange) {
+        this.onUnreadApplicationChange(unreadCount)
+      }
+    } catch (err) {
+      console.error(err)
+    }
   }
 }
