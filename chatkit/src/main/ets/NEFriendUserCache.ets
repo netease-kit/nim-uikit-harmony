@@ -35,7 +35,7 @@ export class NEFriendUserCache {
   public static getInstance() {
     if (!AppStorage.get<NEFriendUserCache>(NEFriendUserCache.name)) {
       let instance = new NEFriendUserCache()
-      AppStorage.setOrCreate(NEFriendUserCache.name, instance);
+      AppStorage.setOrCreate<NEFriendUserCache>(NEFriendUserCache.name, instance);
     }
     return AppStorage.get<NEFriendUserCache>(NEFriendUserCache.name) as NEFriendUserCache;
   }
@@ -132,14 +132,16 @@ export class NEFriendUserCache {
 
   /// 获取缓存的好友信息列表，不包含黑名单中的好友
   public getFriendListNotInBlocklist() {
-    let friends: Map<string, NEUserWithFriend> = new Map<string, NEUserWithFriend>()
-    this.friendCache.forEach((value, key) => {
-      if (!this.blockAccountList.includes(key)) {
-        friends.set(key, value)
+    const friends: NEUserWithFriend[] = []
+    const blockSet = new Set(this.blockAccountList)
+
+    this.friendCache.forEach((friend, key) => {
+      if (!blockSet.has(key)) {
+        friends.push(friend)
       }
     })
 
-    return Array.from(friends.values())
+    return friends
   }
 
   /// 获取缓存的黑名单列表

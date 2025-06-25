@@ -17,6 +17,10 @@
       "value": "我的群聊"
     },
     {
+      "name": "contact_ai_users",
+      "value": "我的数字人"
+    },
+    {
       "name": "contact_clean",
       "value": "清空"
     },

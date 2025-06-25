@@ -63,4 +63,8 @@ export class CommonConstants {
    * if false , use remote conversation kit
    */
   static readonly KEY_SETTING_LOCAL_CONVERSATION: string = 'KEY_SETTING_MESSAGE_READ_OR';
+  /**
+   * 在线状态是否显示
+   */
+  static readonly KEY_SETTING_SHOWN_ONLINE_STATE: string = 'KEY_SETTING_SHOWN_ONLINE_STATE';
 }

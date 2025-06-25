@@ -5,7 +5,7 @@
  *
  */
 
-import { CoreKitClient } from '@nimkit/coreKit';
+import { CoreKitClient } from '@nimkit/corekit';
 import {
   IM_SDK_VERSION,
   NIM,
@@ -18,7 +18,7 @@ import {
   V2NIMLoginStatus,
   V2NIMMessageRevokeNotification
 } from '@nimsdk/base';
-import { ContactRepo } from '../../../Index';
+import { ContactRepo, IMKitConfigCenter, SubscriptionRepo } from '../../../Index';
 import { KitLogger } from './logger/AppLogger';
 import { LoggerKitImpl } from './logger/LoggerKitImpl';
 import { ChatRepo } from './repo/ChatRepo';
@@ -162,6 +162,10 @@ export class ChatKitClient {
     ChatKitClient.nim.loginService.on('onDataSync', ChatKitClient.dataSyncFun)
     // 消息撤回监听，消息撤回后，会收到通知
     ChatRepo.onRevokeMessage(ChatKitClient.onRevokeFun)
+    // 显示在线状态
+    if(IMKitConfigCenter.enableShownOnlineState){
+      SubscriptionRepo.addListener()
+    }
     ChatKitClient.hasInitListener = true
 
   }
@@ -170,11 +174,13 @@ export class ChatKitClient {
     console.debug(`Performance Test onSyncFinishedFun`)
     ChatKitClient.haveSyncedConversation = true
   }
+
   private static dataSyncFun = (type: V2NIMDataSyncType, state: V2NIMDataSyncState, error?: V2NIMError) => {
     if (state === V2NIMDataSyncState.V2NIM_DATA_SYNC_STATE_COMPLETED) {
       ContactRepo.getFriendList()
     }
   }
+
   private static onRevokeFun = (messages: V2NIMMessageRevokeNotification[]) => {
     messages.forEach((msg, index, messages) => {
       if (msg.messageRefer.conversationId !== ChatKitClient.currentConversationId) {

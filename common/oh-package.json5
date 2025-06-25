@@ -1,5 +1,5 @@
 {
-  "name": "@ohos/common",
+  "name": "@nimkit/common",
   "version": "1.1.0",
   "description": "Please describe the basic information.",
   "main": "Index.ets",

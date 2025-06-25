@@ -16,6 +16,10 @@ export function saveLocalRevokeMessage(conversationId: string, msg: V2NIMMessage
   let revokeText = getContext().resourceManager.getStringByNameSync('chat_msg_undo_tips');
   let revokeMsg = ChatKitClient.nim.messageCreator.createTextMessage(revokeText)
   revokeMsg.serverExtension = msg.serverExtension
+  revokeMsg.messageConfig = {
+    unreadEnabled: false
+  }
+
   revokeMsg.threadReply = msg.threadReply
   let localExtension = {
     revoke_message_local: true,
@@ -38,6 +42,9 @@ export function saveLocalRevokeMessageFormOther(conversationId: string, msgNotif
   let currentTime = systemDateTime.getTime()
   let revokeText = getContext().resourceManager.getStringByNameSync('chat_msg_undo_tips');
   let revokeMsg = ChatKitClient.nim.messageCreator.createTextMessage(revokeText)
+  revokeMsg.messageConfig = {
+    unreadEnabled: false
+  }
   let localExtension = {
     revoke_message_local: false,
     revoke_message_local_time: currentTime,

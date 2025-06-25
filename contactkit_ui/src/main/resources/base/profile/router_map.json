@@ -57,11 +57,27 @@
       }
     },
     {
+      "name": "AIUsersPage",
+      "pageSourceFile": "src/main/ets/pages/AIUsersPage.ets",
+      "buildFunction": "AIUsersPageBuilder",
+      "data": {
+        "description": "this is my ai user list page"
+      }
+    },
+    {
       "name": "PersonInfoPage",
       "pageSourceFile": "src/main/ets/pages/PersonInfoPage.ets",
       "buildFunction": "PersonInfoPageBuilder",
       "data": {
         "description": "this is person info page"
+      }
+    },
+    {
+      "name": "AIPersonInfoPage",
+      "pageSourceFile": "src/main/ets/pages/AIPersonInfoPage.ets",
+      "buildFunction": "AIPersonInfoPageBuilder",
+      "data": {
+        "description": "this is ai person info page"
       }
     },
     {

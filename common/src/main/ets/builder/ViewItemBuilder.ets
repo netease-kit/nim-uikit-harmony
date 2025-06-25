@@ -18,12 +18,26 @@ interface ViewHolderItemBuilderParams {
 export function ViewItemBuilder(params: ViewItem | ViewItemArrow | ViewItemSwitch) {
   Column() {
     Row() {
-      if (params.avatarItem) {
-        CommonAvatar({ item: params.avatarItem })
-          .width(params.titleIconSize ?? 36)
-          .height(params.titleIconSize ?? 36)
-          .borderRadius((params.titleIconRadius ?? (params.titleIconSize ?? 36 / 2)))
-          .margin({ left: 20 })
+      Stack({
+        alignContent: Alignment.BottomEnd
+      }) {
+        if (params.avatarItem) {
+          CommonAvatar({ item: params.avatarItem })
+            .width(params.titleIconSize ?? 36)
+            .height(params.titleIconSize ?? 36)
+            .borderRadius(
+              (params.titleIconRadius ??
+                (params.titleIconSize ?? 36 / 2)))
+            .margin({ left: 20 })
+        }
+
+        if (params.onlineState !== undefined) {
+          Column()
+            .width(8)
+            .height(8)
+            .borderRadius(4)
+            .backgroundColor(params.onlineState ? '#84ED85': '#D4D9DA')
+        }
       }
 
       Text(params.title)

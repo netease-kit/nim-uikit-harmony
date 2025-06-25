@@ -35,6 +35,7 @@ export struct SettingPage {
   @Local earpieceOpen: boolean = AppStorage.get(CommonConstants.KEY_SETTING_EARPIECE_MODE) ?? true
   @Local readOrOpen: boolean = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_MESSAGE_READ_OR) ?? true
   @Local localConversationOrOpen: boolean = true
+  @Local shownOnlineState: boolean = true
   dataPreferences: preferences.Preferences | undefined
   @Local firstItem: ViewItemArrow[] = [
     {
@@ -93,6 +94,33 @@ export struct SettingPage {
           })
           IMKitConfigCenter.enableLocalConversation = isOpen
 
+          // restart app
+          let applicationContext = this.context.getApplicationContext();
+          let want: Want = {
+            abilityName: 'IMAbility'
+          };
+          try {
+            applicationContext.restartApp(want);
+          } catch (error) {
+            console.error(`restartApp fail, error: ${JSON.stringify(error)}`);
+          }
+        })
+      },
+      {
+        title: $r('app.string.mine_setting_online_state'),
+        itemHeight: 48,
+        isOpen: this.shownOnlineState,
+        switchChange: ((isOpen: boolean) => {
+          this.dataPreferences?.putSync(CommonConstants.KEY_SETTING_SHOWN_ONLINE_STATE, isOpen)
+          this.dataPreferences?.flush((err: BusinessError) => {
+            if (err) {
+              console.error("Failed to flush. code =" + err.code + ", message =" + err.message);
+              return;
+            }
+            console.info("Succeeded in flushing.");
+          })
+          IMKitConfigCenter.enableShownOnlineState = isOpen
+          this.shownOnlineState = isOpen
           // restart app
           let applicationContext = this.context.getApplicationContext();
           let want: Want = {

@@ -20,4 +20,5 @@ export interface ViewItem {
   routerUrl?: string;
   routerParams?: Object;
   itemHeight?: number;
+  onlineState?: boolean;
 }

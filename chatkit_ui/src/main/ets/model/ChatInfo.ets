@@ -13,6 +13,7 @@ import { NIMMessageInfo } from '../model/NIMMessageInfo';
 @ObservedV2
 export class ChatInfo {
   @Trace conversationName: string | undefined = undefined;
+  @Trace onlineState: boolean = false
   @Trace msgList: MessageDataSource = new MessageDataSource();
   @Trace downloadProgressMap: Map<string, number> = new Map();
   @Trace isReceiveMsg: boolean = false;
