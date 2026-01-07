@@ -1,6 +1,6 @@
 {
   "name": "imkit_sample",
-  "version": "10.3.1",
+  "version": "10.4.0",
   "description": "Please describe the basic information.",
   "main": "",
   "author": "",
@@ -14,14 +14,19 @@
     "@nimkit/chatkit_ui": "file:../chatkit_ui",
     "@nimkit/common": "file:../common",
     "@nimkit/corekit": "file:../corekit",
-    "@nimsdk/conversation": "10.9.10",
-    "@nimsdk/localconversation": "10.9.10",
-    "@nimsdk/message": "10.9.10",
-    "@nimsdk/team": "10.9.10",
-    "@nimsdk/user": "10.9.10",
-    "@nimsdk/friend": "10.9.10",
-    "@nimsdk/nim": "10.9.10",
-    "@nimsdk/base": "10.9.10"
+    "@nimsdk/conversation": "10.9.72",
+    "@nimsdk/localconversation": "10.9.72",
+    "@nimsdk/message": "10.9.72",
+    "@nimsdk/team": "10.9.72",
+    "@nimsdk/user": "10.9.72",
+    "@nimsdk/friend": "10.9.72",
+    "@nimsdk/signalling": "10.9.72",
+    "@nimsdk/nim": "10.9.72",
+    "@nimsdk/base": "10.9.72",
+    // rtc 呼叫组件
+    "@yunxin/callkit": "4.0.2",
+    "@yunxin/callkit_ui": "4.0.3",
+    "@nertc/nertc_sdk": "5.9.11"
   },
   "devDependencies": {},
   "dynamicDependencies": {}

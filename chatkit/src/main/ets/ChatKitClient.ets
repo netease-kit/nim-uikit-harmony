@@ -18,7 +18,7 @@ import {
   V2NIMLoginStatus,
   V2NIMMessageRevokeNotification
 } from '@nimsdk/base';
-import { ContactRepo, IMKitConfigCenter, SubscriptionRepo } from '../../../Index';
+import { ContactRepo, IMKitConfigCenter, LocalConversationRepo, SubscriptionRepo } from '../../../Index';
 import { KitLogger } from './logger/AppLogger';
 import { LoggerKitImpl } from './logger/LoggerKitImpl';
 import { ChatRepo } from './repo/ChatRepo';
@@ -67,6 +67,8 @@ export class ChatKitClient {
   static setCurrentConversationId(conversationId: string) {
     ChatKitClient.currentConversationId = conversationId
     getContext().eventHub.emit(currentConversationChanged, conversationId)
+    // 设置 SDK 当前聊天账号
+    ChatKitClient.switchCurrentConversation(true)
   }
 
   /**
@@ -75,6 +77,8 @@ export class ChatKitClient {
   static clearCurrentConversationId() {
     ChatKitClient.currentConversationId = ''
     getContext().eventHub.emit(currentConversationChanged, '')
+    // 消除 SDK 当前聊天账号
+    ChatKitClient.switchCurrentConversation(false)
   }
 
   /**
@@ -187,5 +191,18 @@ export class ChatKitClient {
         saveLocalRevokeMessageFormOther(msg.messageRefer.conversationId, msg, false)
       }
     })
+  }
+
+  // 设置当前聊天会话
+  private static switchCurrentConversation(on: boolean): void {
+    if (IMKitConfigCenter.enableLocalConversation) {
+      if (on) {
+        // on
+        LocalConversationRepo.setCurrentConversation(ChatKitClient.currentConversationId)
+      } else {
+        // off
+        LocalConversationRepo.setCurrentConversation(undefined)
+      }
+    }
   }
 }

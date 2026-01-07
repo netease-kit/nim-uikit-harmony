@@ -55,7 +55,7 @@ export function showLocationDetail(msg: NIMMessageInfo, context: common.UIAbilit
   });
 }
 
-export function setupMoreOperationData() {
+export function setupMoreOperationData(isP2P: boolean) {
   let operationMoreDataList: Array<NEChatMoreOperationData> = Array()
 
   // 拍摄功能
@@ -78,6 +78,15 @@ export function setupMoreOperationData() {
   fileOperationData.type = NEChatMoreOperationType.File;
   fileOperationData.imageSource = "app.media.ic_public_chat_file";
   operationMoreDataList.push(fileOperationData);
+
+  if (isP2P) {
+    // 呼叫组件功能
+    const callOperationData = new NEChatMoreOperationData();
+    callOperationData.operationTitle = $r("app.string.chat_send_call");
+    callOperationData.type = NEChatMoreOperationType.Call;
+    callOperationData.imageSource = "app.media.ic_public_chat_call";
+    operationMoreDataList.push(callOperationData);
+  }
 
   return operationMoreDataList
 }

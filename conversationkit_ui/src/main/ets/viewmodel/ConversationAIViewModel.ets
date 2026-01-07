@@ -40,6 +40,7 @@ export class ConversationAIViewModel {
    * @param offset
    */
   async loadAIUsers() {
+
     try {
       if (!this.aiUsers) {
         this.aiUsers = []

@@ -14,3 +14,7 @@ export { ForwardMessageDialog } from './src/main/ets/view/ForwardMessageDialog'
 export { TextMessageDetailDialog } from './src/main/ets/view/TextMessageDetailDialog'
 
 export { MessageItemClick } from './src/main/ets/view/MessageItemClick'
+
+export { ChatKitUIClient } from './src/main/ets/ChatKitUIClient'
+
+export { AbsCallKitClient } from './src/main/ets/AbsCallKitClient'

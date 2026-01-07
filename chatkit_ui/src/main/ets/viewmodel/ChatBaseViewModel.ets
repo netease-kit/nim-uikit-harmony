@@ -59,7 +59,6 @@ import { clearForwardAtMark, createForwardMessageListFileDetail, sendMessageFail
 import { instanceToPlain } from 'class-transformer';
 import { NECommonUtils } from '@nimkit/common';
 import { HashMap, JSON } from '@kit.ArkTS';
-import { assign } from '@nimsdk/vendor';
 
 @ObservedV2
 export class ChatBaseViewModel {
@@ -232,7 +231,7 @@ export class ChatBaseViewModel {
         if (latestStreaming.finish || currentIndex !== latestStreaming.index) {
           break; // finish or index 已经发生了变化，不再更新
         }
-        const tmpMessage: V2NIMMessage = assign({}, message)
+        const tmpMessage: V2NIMMessage = message
         const tmpStr: string = newStr.substring(0, i + 1);
         tmpMessage.text = tmpStr
         this.onModifyFunNormal(tmpMessage) // 循环 modify
@@ -646,6 +645,7 @@ export class ChatBaseViewModel {
   // 清理未读数
   clearUnreadCount() {
     if (IMKitConfigCenter.enableLocalConversation) {
+      // 已经通过 set current conversation了，可以不需要自己 clear
       LocalConversationRepo.clearUnreadCountByIds([this.conversationId])
     } else {
       ConversationRepo.clearUnreadCountByIds([this.conversationId])
@@ -1104,6 +1104,7 @@ export class ChatBaseViewModel {
     ChatKitClient.nim.loginService?.off('onLoginStatus', this.onLoginStatusChange)
     // 清理未读数
     this.clearUnreadCount()
+    // 设置当前聊天账号
     ChatKitClient.clearCurrentConversationId()
   }
 }

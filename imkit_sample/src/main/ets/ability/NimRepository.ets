@@ -20,6 +20,9 @@ import { ChatKitClient, IMKitConfigCenter } from '@nimkit/chatkit'
 import { router } from '@kit.ArkUI'
 import { IMSDKConfigManager } from '../manager/IMSDKConfigManager'
 import { V2NIMLocalConversationServiceImpl } from '@nimsdk/localconversation'
+import { ChatKitUIClient } from '@nimkit/chatkit_ui/Index'
+import { V2NIMSignallingServiceImpl } from '@nimsdk/signalling'
+import { CallKitClient } from '../callkit/ChatKitUIClient'
 
 export class NimRepository {
   private static instance?: NimRepository
@@ -55,6 +58,9 @@ export class NimRepository {
       console.debug(`Performance Test im loginSuccess`)
 
       ChatKitClient.init(this.nim, appKey)
+      // chat ui init & login CallKit
+      ChatKitUIClient.setInstance(new CallKitClient())
+      ChatKitUIClient.getInstance().init(this._context, this.nim, appKey, accountId, token)
 
       router.replaceUrl({
         url: 'pages/TabIndex'
@@ -96,13 +102,14 @@ export class NimRepository {
     } else {
       serviceOptions = {
         loginServiceConfig: {
-           lbsUrls: ['https://lbs.netease.im/lbs/webconf.jsp'],
-           linkUrl: 'weblink.netease.im:443'
-          //lbsUrls: ['https://imtest.netease.im/lbs/webconf'],
-          //linkUrl: 'imtest-jd.netease.im:8091'
+          lbsUrls: ['https://lbs.netease.im/lbs/webconf.jsp'],
+          linkUrl: 'weblink.netease.im:443'
+          // lbsUrls: ['https://imtest.netease.im/lbs/webconf'],
+          // linkUrl: 'imtest-jd.netease.im:8091'
         },
         pushServiceConfig: {
-          harmonyCertificateName: "DEMO_HMOS_PUSH"
+          harmonyCertificateName: "DEMO_HMOS_PUSH",
+          customPushContentType: "CONTENT_TYPE_TEST"
         },
         databaseServiceConfig: {
           encrypt: false,
@@ -116,23 +123,17 @@ export class NimRepository {
   }
 
   initNim(initializeOptions: NIMInitializeOptions, serviceOptions?: NIMServiceOptions) {
-    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_TEAM,
-      (core, serviceName, serviceConfig) => new V2NIMTeamServiceImpl(core, serviceName, serviceConfig))
-    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_CLIENT_ANTISPAM_UTIL,
-      (core, serviceName, serviceConfig) => new V2NIMClientAntispamUtil(core, serviceName, serviceConfig));
+    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_TEAM, (core, serviceName, serviceConfig) => new V2NIMTeamServiceImpl(core, serviceName, serviceConfig))
+    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_CLIENT_ANTISPAM_UTIL, (core, serviceName, serviceConfig) => new V2NIMClientAntispamUtil(core, serviceName, serviceConfig));
     if (IMKitConfigCenter.enableLocalConversation) {
-      NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_LOCAL_CONVERSATION,
-        (core, serviceName, serviceConfig) => new V2NIMLocalConversationServiceImpl(core, serviceName, serviceConfig));
+      NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_LOCAL_CONVERSATION, (core, serviceName, serviceConfig) => new V2NIMLocalConversationServiceImpl(core, serviceName, serviceConfig));
     } else {
-      NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_CONVERSATION,
-        (core, serviceName, serviceConfig) => new V2NIMConversationServiceImpl(core, serviceName, serviceConfig));
+      NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_CONVERSATION, (core, serviceName, serviceConfig) => new V2NIMConversationServiceImpl(core, serviceName, serviceConfig));
     }
-    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_MESSAGE,
-      (core, serviceName, serviceConfig) => new V2NIMMessageServiceImpl(core, serviceName, serviceConfig));
-    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_USER,
-      (core, serviceName, serviceConfig) => new V2NIMUserServiceImpl(core, serviceName, serviceConfig));
-    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_FRIEND,
-      (core, serviceName, serviceConfig) => new V2NIMFriendServiceImpl(core, serviceName, serviceConfig));
+    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_MESSAGE, (core, serviceName, serviceConfig) => new V2NIMMessageServiceImpl(core, serviceName, serviceConfig));
+    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_USER, (core, serviceName, serviceConfig) => new V2NIMUserServiceImpl(core, serviceName, serviceConfig));
+    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_FRIEND, (core, serviceName, serviceConfig) => new V2NIMFriendServiceImpl(core, serviceName, serviceConfig));
+    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_SIGNALLING, (core, serviceName, serviceConfig) => new V2NIMSignallingServiceImpl(core, serviceName, serviceConfig));
     initializeOptions.isOpenConsoleLog = true
     this._nim = NIMSdk.newInstance(this._context, initializeOptions, serviceOptions)
     console.log("nim from initNim: " + this._nim)

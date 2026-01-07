@@ -19,7 +19,6 @@ import { LocalConversationNavigationView } from '../view/LocalConversationNaviga
 import { LocalConversationAIViewModel } from '../viewmodel/LocalConversationAIViewModel'
 import { LocalConversationViewModel } from '../viewmodel/LocalConversationViewModel'
 import { SubscriptionViewModel } from '../viewmodel/SubscriptionViewModel'
-import { systemDateTime } from '@kit.BasicServicesKit'
 
 @ComponentV2
 export struct LocalConversationPage {
@@ -29,10 +28,8 @@ export struct LocalConversationPage {
   private subscriptViewModel: SubscriptionViewModel = new SubscriptionViewModel()
   private viewModelAI: LocalConversationAIViewModel = new LocalConversationAIViewModel()
   private scroller: ListScroller = new ListScroller();
-  private shownTime?: number
 
   aboutToAppear(): void {
-      this.shownTime = systemDateTime.getTime()
     this.viewModel.onUreadMessageChange = this.onUreadMessageChange
     //初始化@ 服务
     AitServer.instance.init()

@@ -265,6 +265,20 @@ export class LocalConversationRepo {
   }
 
   /**
+   * 查询当前全量置顶的会话列表
+   */
+  static async getStickTopConversationList(): Promise<V2NIMLocalConversation[] | undefined> {
+    return await ChatKitClient.nim.localConversationService?.getStickTopConversationList()
+  }
+
+  /**
+   * 设置当前聊天账号
+   */
+  static setCurrentConversation(conversationId: string | undefined): void {
+    return ChatKitClient.nim.localConversationService?.setCurrentConversation(conversationId)
+  }
+
+  /**
    * 移除会话的所有监听
    */
   static removeAllConversationListener() {

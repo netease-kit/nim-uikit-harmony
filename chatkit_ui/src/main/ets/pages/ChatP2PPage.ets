@@ -15,33 +15,18 @@ import { NEChatMoreOperation } from '../view/ChatMoreOperationLayout';
 import { NEChatMoreOperationData, NEChatMoreOperationType } from '../model/NEChatMoreOperationData';
 import { NEAudioRecordView } from '../view/NEAudioRecordView';
 import { InputStyleType, NEChatInputView } from '../view/ChatInputView';
-import {
-  DoubleAlertDialog,
-  ImagesIndexModel,
-  MediaUtils,
-  NavigationBackBuilder,
-  NECommonUtils,
-  NetworkBrokenBuilder,
-  PermissionsUtils,
-  VideoViewerDialog
-} from '@nimkit/common';
+import { DoubleAlertDialog, ImagesIndexModel, MediaUtils, NavigationBackBuilder, NECommonUtils, NetworkBrokenBuilder, PermissionsUtils, VideoViewerDialog } from '@nimkit/common';
 import { NECameraSelectView } from '../view/NECameraSelectView';
 import { common } from '@kit.AbilityKit';
 import { cameraPicker } from '@kit.CameraKit';
-import { LengthMetrics, window } from '@kit.ArkUI';
+import { LengthMetrics, promptAction, window } from '@kit.ArkUI';
 import { NERectData } from '../model/NERectData';
 import { MessageOperationView } from '../view/MessageOperationView';
 import { MessageOperationItem, MessageOperationType } from '../model/MessageOperationItem';
 import { BusinessError, pasteboard } from '@kit.BasicServicesKit';
 import { DeviceUtils } from '../common/DeviceUtils';
 import { ImageViewDialog } from '@nimkit/common/src/main/ets/ImageViewDialog/ImageViewDialog';
-import {
-  V2NIMMessage,
-  V2NIMMessageAudioAttachment,
-  V2NIMMessageLocationAttachment,
-  V2NIMMessageSendingState,
-  V2NIMMessageType
-} from '@nimsdk/base';
+import { V2NIMMessage, V2NIMMessageAudioAttachment, V2NIMMessageLocationAttachment, V2NIMMessageSendingState, V2NIMMessageType } from '@nimsdk/base';
 import { ChatConst } from '../constants/ChatConst';
 import { ChatKitClient } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
 import { AudioPlayerManager } from '../manager/AudioPlayerManager';
@@ -61,18 +46,12 @@ import {
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
-import {
-  downLoadAndOpenFile,
-  getMessageImageUrl,
-  getMessageImageUrls,
-  getMessageVideoRatio,
-  getMessageVideoUrl,
-  parseMessageText
-} from '../common/MessageHelper';
+import { downLoadAndOpenFile, getMessageImageUrl, getMessageImageUrls, getMessageVideoRatio, getMessageVideoUrl, parseMessageText } from '../common/MessageHelper';
 import { sceneMap } from '@kit.MapKit';
 import { computeOperateViewHeight, computeOperateViewWidth, setupMoreOperationData } from '../common/ChatUtils';
 import { ChatMultiSelectView } from '../view/ChatMultiSelectView';
 import { TextMessageDetailDialog } from '../view/TextMessageDetailDialog';
+import { ChatKitUIClient } from '../ChatKitUIClient';
 
 @ComponentV2
 export struct ChatP2PPage {
@@ -265,7 +244,7 @@ export struct ChatP2PPage {
   @Monitor("chatViewModel.anchorMsg")
   onAnchorMsg() {
     if (this.chatViewModel.anchorMsg) {
-        this.chatViewModel.loadAnchorMsg(this.chatViewModel.anchorMsg)
+      this.chatViewModel.loadAnchorMsg(this.chatViewModel.anchorMsg)
     }
   }
 
@@ -289,7 +268,7 @@ export struct ChatP2PPage {
   aboutToAppear(): void {
     NEEmojiManager.instance.setup();
     DeviceUtils.rootDirPath = getContext(this).filesDir
-    this.operationMoreDataList = setupMoreOperationData()
+    this.operationMoreDataList = setupMoreOperationData(true)
     window.getLastWindow(getContext(this)).then(currentWindow => {
       let property = currentWindow.getWindowProperties();
       // 初始化窗口高度
@@ -430,7 +409,7 @@ export struct ChatP2PPage {
   build() {
     NavDestination() {
       NavigationBackBuilder({
-        title: `${this.chatUserInfo.conversationName}${IMKitConfigCenter.enableShownOnlineState ? SubscriptionRepo.onlineStateMap.get(this.chatUserInfo.targetId) ? '(在线)' : '(离线)':''}`,
+        title: `${this.chatUserInfo.conversationName}${IMKitConfigCenter.enableShownOnlineState ? SubscriptionRepo.onlineStateMap.get(this.chatUserInfo.targetId) ? '(在线)' : '(离线)' : ''}`,
         rightButtonIcon: this.showMultiSelect ? undefined : $r('app.media.ic_public_more_dot'),
         rightButtonTitle: this.showMultiSelect ? $r('app.string.chat_msg_dialog_cancel') : undefined,
         rightButtonAction: () => {
@@ -717,7 +696,7 @@ export struct ChatP2PPage {
         } else if (this.showMultiSelect) {
           ChatMultiSelectView({
             isEnable: this.multiSelectCount > 0,
-            onMultiForward: () =>{
+            onMultiForward: () => {
               if (ChatKitClient.connectBroken()) {
                 NECommonUtils.showToast($r('app.string.chat_network_error_tips'))
               } else {
@@ -813,6 +792,41 @@ export struct ChatP2PPage {
                     }
                   })
 
+                } else if (data.type == NEChatMoreOperationType.Call) {
+                  promptAction.showActionMenu({
+                    title: $r('app.string.chat_kit_select_call_type'),
+                    buttons: [
+                      {
+                        text: $r('app.string.chat_kit_audio_call_type'),
+                        color: '#000000'
+                      },
+                      {
+                        text: $r('app.string.chat_kit_video_call_type'),
+                        color: '#000000'
+                      },
+                    ]
+                  })
+                    .then((data: promptAction.ActionMenuSuccessResponse) => {
+                      console.info('showActionMenu success, click button: ' + data.index);
+                      let callType: number = 1; // 默认音频通话
+                      // 根据选中索引，切换通话类型
+                      switch (data.index) {
+                        case 0: // 选中【音频通话】
+                          callType = 1;
+                          break;
+                        case 1: // 选中【视频通话】
+                          callType = 2;
+                          break;
+                        default: // 选中取消/空白处，直接返回不执行后续逻辑
+                          return;
+                      }
+
+                      const targetId: string = this.chatUserInfo.targetId;
+                      ChatKitUIClient.getInstance().call(targetId, callType)
+                    })
+                    .catch((err: Error) => {
+                      console.error('showActionMenu error: ' + err);
+                    })
                 }
               }
             }).padding({ top: 10 })

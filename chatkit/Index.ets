@@ -15,7 +15,7 @@ export { TeamRepo } from './src/main/ets/repo/TeamRepo'
 
 export { SettingRepo } from './src/main/ets/repo/SettingRepo'
 
-export {SubscriptionRepo} from './src/main/ets/repo/SubscriptionRepo'
+export { SubscriptionRepo } from './src/main/ets/repo/SubscriptionRepo'
 
 export { StorageRepo } from './src/main/ets/repo/StorageRepo'
 

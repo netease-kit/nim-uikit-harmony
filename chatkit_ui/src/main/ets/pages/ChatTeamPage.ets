@@ -319,7 +319,7 @@ export struct ChatTeamPage {
   aboutToAppear(): void {
     NEEmojiManager.instance.setup()
     DeviceUtils.rootDirPath = getContext(this).filesDir
-    this.operationMoreDataList = setupMoreOperationData()
+    this.operationMoreDataList = setupMoreOperationData(false)
     window.getLastWindow(getContext(this)).then(currentWindow => {
       let property = currentWindow.getWindowProperties();
       // 初始化窗口高度

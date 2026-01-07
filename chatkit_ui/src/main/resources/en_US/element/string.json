@@ -65,6 +65,10 @@
       "value": "File"
     },
     {
+      "name": "chat_send_call",
+      "value": "Call"
+    },
+    {
       "name": "chat_operation_copy",
       "value": "copy"
     },
@@ -331,6 +335,18 @@
     {
       "name": "chat_forward_limit",
       "value": "%s limits %d messages"
+    },
+    {
+      "name": "chat_kit_select_call_type",
+      "value": "Choose call type"
+    },
+    {
+      "name": "chat_kit_audio_call_type",
+      "value": "Audio"
+    },
+    {
+      "name": "chat_kit_video_call_type",
+      "value": "Video"
     },
     {
       "name": "multiForward_exist_invalid_fail",

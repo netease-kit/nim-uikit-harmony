@@ -65,6 +65,10 @@
       "value": "文件"
     },
     {
+      "name": "chat_send_call",
+      "value": "音视频通话"
+    },
+    {
       "name": "chat_operation_copy",
       "value": "复制"
     },
@@ -327,6 +331,18 @@
     {
       "name": "chat_team_ait_all",
       "value": "所有人"
+    },
+    {
+      "name": "chat_kit_select_call_type",
+      "value": "选择通话方式"
+    },
+    {
+      "name": "chat_kit_audio_call_type",
+      "value": "音频通话"
+    },
+    {
+      "name": "chat_kit_video_call_type",
+      "value": "视频通话"
     },
     {
       "name": "chat_forward_limit",

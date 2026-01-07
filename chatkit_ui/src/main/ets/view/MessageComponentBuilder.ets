@@ -6,7 +6,7 @@
  */
 
 import { NEEmojiParseResult } from '../manager/NEEmojiManager'
-import { V2NIMMessageFileAttachment, V2NIMMessageLocationAttachment, V2NIMMessageType } from '@nimsdk/base'
+import { V2NIMConversationType, V2NIMErrorMap, V2NIMMessageFileAttachment, V2NIMMessageLocationAttachment, V2NIMMessageType } from '@nimsdk/base'
 import {
   getAitNodes,
   getCallMessageIcon,
@@ -31,9 +31,11 @@ import { image } from '@kit.ImageKit'
 import { staticMap } from '@kit.MapKit'
 import { BusinessError } from '@kit.BasicServicesKit'
 import { ChatAitNode } from '../model/ChatAitNode'
-import { MergedMessageAttachment } from '@nimkit/chatkit'
+import { ChatKitClient, MergedMessageAttachment } from '@nimkit/chatkit'
 import { ChatInfo } from '../model/ChatInfo'
 import { Markdown } from '@nimkit/markdown'
+import { get } from '@nimsdk/vendor'
+import { ChatKitUIClient } from '../ChatKitUIClient'
 
 @ComponentV2
 export struct messageContent {
@@ -503,6 +505,25 @@ export struct callBuilder {
       top: 12,
       bottom: 12,
       right: 12
+    })
+    .onClick(() => {
+      if (this.message.getConversationType() !== V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
+        // only p2p, ignore
+        return
+      }
+      if (this.message.getMessageType() !== V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
+        // only call message, ignore
+        return
+      }
+
+      // call
+      let callType: number = 1; // 默认音频通话
+      if (get(this.message.message.attachment ?? {}, 'type') === 2) { // is video?
+        callType = 2;
+      }
+      // 创建呼叫参数（核心：动态传入选中的callType）
+      const targetId: string = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(this.message.getConversationId())
+      ChatKitUIClient.getInstance().call(targetId, callType)
     })
   }
 }

@@ -7,5 +7,19 @@
     "@ohos/hypium": "1.0.19",
     "@ohos/hamock": "1.0.0",
     "@nimsdk/vendor": "1.0.0"
+  },
+  "overrides": {
+    // 项目存在Foo模块，即build-profile.json5文件或dependencyMap.json5文件中modules节点下存在名称为Foo的模块；该模块Foo的oh-package.json5中name为：foo_test
+    // "foo_test": "@module:Foo"
+    // 本地存在"foo"的源码目录，如项目根目录下的foo目录
+    // "foo": "file:./foo"
+    // 本地存在"foo"的HAR文件，如项目根目录下的libs目录中的foo.har
+    "@nimsdk/base": "10.9.72",
+    "@nimsdk/nim": "10.9.72",
+    "@nimsdk/user": "10.9.72",
+    "@nimsdk/signalling": "10.9.72",
+    //    "@yunxin/callkit": "4.0.2",
+    //    "@yunxin/callkit_ui": "4.0.3",
+    //    "@nertc/nertc_sdk": "5.9.11"
   }
 }

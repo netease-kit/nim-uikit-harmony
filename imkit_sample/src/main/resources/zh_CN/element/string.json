@@ -139,6 +139,21 @@
     {
       "name": "login_by_account",
       "value": "账号登录"
+    },    {
+      "name": "chat_kit_call_blocked",
+      "value": "您已被对方拉黑"
+    },
+    {
+      "name": "chat_kit_call_illegal_state",
+      "value": "当前网络不可用，请检查你的网络设置"
+    },
+    {
+      "name": "chat_kit_call_microphone_permission_denied",
+      "value": "麦克风被禁用"
+    },
+    {
+      "name": "chat_kit_call_camera_permission_denied",
+      "value": "相机被禁用"
     }
   ]
 }

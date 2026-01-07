@@ -139,6 +139,21 @@
     {
       "name": "login_by_account",
       "value": "login"
+    },    {
+      "name": "chat_kit_call_blocked",
+      "value": "You are in block list"
+    },
+    {
+      "name": "chat_kit_call_illegal_state",
+      "value": "Illegal state"
+    },
+    {
+      "name": "chat_kit_call_microphone_permission_denied",
+      "value": "Microphone media permission denied"
+    },
+    {
+      "name": "chat_kit_call_camera_permission_denied",
+      "value": "Camera media permission denied"
     }
   ]
 }

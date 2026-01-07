@@ -1,6 +1,6 @@
 {
   "name": "@nimkit/chatkit_ui",
-  "version": "10.3.2",
+  "version": "10.4.0",
   "description": "Please describe the basic information.",
   "main": "Index.ets",
   "author": "",
@@ -9,9 +9,13 @@
     "@nimkit/common": "file:../common",
     "@nimkit/chatkit": "file:../chatkit",
     "@nimkit/corekit": "file:../corekit",
-    "@nimsdk/base": "10.9.10",
+    "@nimsdk/base": "10.9.72",
+    "@nimsdk/nim": "10.9.72",
+    "@nimsdk/user": "10.9.72",
+    "@nimsdk/signalling": "10.9.72",
     "class-transformer": "^0.5.1",
     "reflect-metadata": "^0.1.13",
     '@nimkit/markdown': "1.1.0",
+    // 用于嵌套对象@Type反射
   }
 }

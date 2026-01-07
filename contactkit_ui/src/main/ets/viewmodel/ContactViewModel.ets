@@ -40,7 +40,8 @@ export class ContactViewModel {
 
   updateFriendInfoFun = async (friend: V2NIMFriend) => {
     const oldUser = this.findContactModel(friend.accountId)
-    if (oldUser && oldUser.friend?.alias !== friend.alias) {
+    // if (oldUser && oldUser.friend?.alias !== friend.alias) {
+    if (oldUser) { // 回调来之前，old 数据已经是最新了。没办法判断变更，导致少了一次 remove
       this.removeFromContact(friend.accountId)
     }
 

@@ -24,7 +24,6 @@ import { EndItemView } from '../view/EndItemView';
 import { ConversationAIViewModel } from '../viewmodel/ConversationAIViewModel';
 import { ConversationViewModel } from '../viewmodel/ConversationViewModel';
 import { SubscriptionViewModel } from '../viewmodel/SubscriptionViewModel';
-import { systemDateTime } from '@kit.BasicServicesKit';
 
 @ComponentV2
 export struct ConversationPage {
@@ -34,11 +33,10 @@ export struct ConversationPage {
   private subscriptViewModel: SubscriptionViewModel = new SubscriptionViewModel()
   private viewModelAI: ConversationAIViewModel = new ConversationAIViewModel()
   private scroller: ListScroller = new ListScroller();
-  private shownTime?: number
+
   aboutToAppear(): void {
     this.viewModel.onUreadMessageChange = this.onUreadMessageChange
     //初始化@ 服务
-    this.shownTime = systemDateTime.getTime()
     AitServer.instance.init()
     this.viewModel.initConversation()
     this.viewModelAI.initAIUsers()
@@ -94,6 +92,7 @@ export struct ConversationPage {
           if (this.viewModel.networkBroken) {
             NetworkBrokenBuilder()
           }
+
           LazyForEach(this.viewModel.data, (item: V2NIMConversation, index: number) => {
             ListItem() {
               ConversationViewItem({

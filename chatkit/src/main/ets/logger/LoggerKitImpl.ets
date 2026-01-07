@@ -6,7 +6,7 @@
  */
 
 import { taskpool } from '@kit.ArkTS';
-import { LogLevel, NetWorkingInStance, NIMEStrAnyObj, V2NIMErrorImpl } from '@nimsdk/base';
+import { LogLevel, NIMEStrAnyObj, V2NIMErrorImpl } from '@nimsdk/base';
 
 import fs from '@ohos.file.fs';
 
@@ -14,15 +14,13 @@ import fs from '@ohos.file.fs';
 async function writeLogger(filePath: string, level: string, label: string, message: string,
   ...args: NIMEStrAnyObj[]) {
   //  CELLULAR = 0, WIFI = 1, ETHERNET = 3, VPN = 4
-  const netInfo = NetWorkingInStance.getInstance().getNetInfoSync()
-  const customInfo = `${netInfo.netType}_${netInfo.isConnected}`
   // date formatter
   const date = new Date()
   const milliseconds: number = date.getMilliseconds()
   const formattedMilliseconds: string = ("00" + milliseconds).slice(-3);
   const dateStr = `${date.getMonth() +
     1}-${date.getDate()} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${formattedMilliseconds}`
-  const prefix = `[${dateStr}]: ${level}: ${customInfo}: ${label}: ${message} `
+  const prefix = `[${dateStr}]: ${level}: ${label}: ${message} `
   // args formatter
   let tempStr = args.map((item) => {
     if (item instanceof V2NIMErrorImpl) {
