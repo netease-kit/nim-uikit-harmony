@@ -55,6 +55,14 @@
       "data": {
         "description": "this is merge message detail page"
       }
+    },
+    {
+      "name": "ReportWebPage",
+      "pageSourceFile": "src/main/ets/pages/ReportWebPage.ets",
+      "buildFunction": "ReportWebPageBuilder",
+      "data": {
+        "description": "report web page"
+      }
     }
   ]
 }

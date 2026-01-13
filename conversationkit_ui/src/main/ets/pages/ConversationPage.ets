@@ -21,6 +21,7 @@ import { AitServer } from '../service/ait/AitService';
 import { ConversationAIUserViewItem } from '../view/ConversationAIUserViewItem';
 import { ConversationViewItem } from '../view/ConversationViewItem';
 import { EndItemView } from '../view/EndItemView';
+import { FraudTipView } from '../view/FraudTipView';
 import { ConversationAIViewModel } from '../viewmodel/ConversationAIViewModel';
 import { ConversationViewModel } from '../viewmodel/ConversationViewModel';
 import { SubscriptionViewModel } from '../viewmodel/SubscriptionViewModel';
@@ -44,6 +45,16 @@ export struct ConversationPage {
 
   build() {
     NavDestination() {
+      // 防诈条
+      // 用Stack包裹，实现FraudTipView浮动在RelativeContainer上方
+      // 防诈条
+      FraudTipView({
+        pathStack: this.pathStack,
+        canReport: false,
+        canCancel: false
+      })
+        .zIndex(10)
+
       // AI 数字人列表
       if (IMKitConfigCenter.enableAI && this.viewModelAI.isFinishedSyncLoad) {
         // 置顶数字人列表，可横向滑动

@@ -97,6 +97,10 @@
       "value": "单聊在线状态"
     },
     {
+      "name": "mine_setting_antispam_tip_message",
+      "value": "文本安全提示"
+    },
+    {
       "name": "mine_setting_logout",
       "value": "退出登录"
     },
@@ -118,10 +122,6 @@
     },
     {
       "name": "mine_about_uikit_version",
-      "value": "版本号"
-    },
-    {
-      "name": "mine_about_uikit_version2",
       "value": "版本号"
     },
     {

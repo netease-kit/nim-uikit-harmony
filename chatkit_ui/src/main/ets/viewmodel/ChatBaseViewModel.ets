@@ -19,6 +19,7 @@ import {
 } from '@nimkit/chatkit';
 import fs from '@ohos.file.fs';
 import {
+  NIMEStrAnyObj,
   V2NIMAIModelRoleType,
   V2NIMAIUser,
   V2NIMConnectStatus,
@@ -40,7 +41,8 @@ import {
   V2NIMMessageSendingState,
   V2NIMMessageType,
   V2NIMQueryDirection,
-  V2NIMSendMessageParams
+  V2NIMSendMessageParams,
+  V2NIMSendMessageResult
 } from '@nimsdk/base';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { ChatInfo } from '../model/ChatInfo';
@@ -64,9 +66,9 @@ import { HashMap, JSON } from '@kit.ArkTS';
 export class ChatBaseViewModel {
   @Trace static currentViewModel: ChatBaseViewModel | undefined = undefined
   @Trace anchorMsg: NIMMessageInfo | undefined = undefined
-  @Trace conversationId: string = ""
+  @Trace conversationId: string = ''
   // p2p 会话是对方账号ID，群聊是为群ID teamId
-  targetId: string = ""
+  targetId: string = ''
   @Trace chatInfo: ChatInfo | undefined = undefined
   @Trace selectMsgMap: Map<string, NIMMessageInfo> = new Map()
   @Trace selectMsgCount = 0
@@ -453,10 +455,10 @@ export class ChatBaseViewModel {
     this.isLoading = true;
     let result: NIMMessageInfo[] = [];
     await ChatRepo.getMessageList({
-      "anchorMessage": anchorMsg.message,
-      "conversationId": this.conversationId,
-      "limit": ChatConst.chatMessagePageSize,
-      "direction": this.msgDirection,
+      'anchorMessage': anchorMsg.message,
+      'conversationId': this.conversationId,
+      'limit': ChatConst.chatMessagePageSize,
+      'direction': this.msgDirection,
     }).then((messageList: V2NIMMessage[]) => {
       // SDK 返回消息不太稳定，所以按照更小的值判断是否有下一页
       if (messageList.length >= ChatConst.chatMessagePageSize - 5 || this.networkBroken) {
@@ -490,10 +492,10 @@ export class ChatBaseViewModel {
     this.isLoading = true;
     let result: NIMMessageInfo[] = [];
     await ChatRepo.getMessageList({
-      "anchorMessage": anchorMsg.message,
-      "conversationId": this.conversationId,
-      "limit": ChatConst.chatMessagePageSize,
-      "direction": V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_ASC,
+      'anchorMessage': anchorMsg.message,
+      'conversationId': this.conversationId,
+      'limit': ChatConst.chatMessagePageSize,
+      'direction': V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_ASC,
     }).then((messageList: V2NIMMessage[]) => {
       // SDK 返回消息不太稳定，所以按照更小的值判断是否有下一页
       if (messageList.length >= ChatConst.chatMessagePageSize - 10 || this.networkBroken) {
@@ -594,7 +596,7 @@ export class ChatBaseViewModel {
       clearForwardAtMark(message)
       const messageString = ChatKitClient.nim.messageConverter.messageSerialization(message)
       if (messageString) {
-        collectionDic["message"] = messageString
+        collectionDic['message'] = messageString
       }
 
       collectionDic['conversationName'] = this.chatInfo?.conversationName ?? ''
@@ -759,8 +761,8 @@ export class ChatBaseViewModel {
   async sendImageMessage(uri: string) {
     try {
       if (uri.length > 0) {
-        let fileType = ""
-        const subStrings = uri.split(".");
+        let fileType = ''
+        const subStrings = uri.split('.');
         if (subStrings.length > 0) {
           fileType = subStrings[subStrings.length - 1];
         }
@@ -787,7 +789,7 @@ export class ChatBaseViewModel {
         await fs.close(file)
       }
     } catch (err) {
-      console.log("net ease send image error", err);
+      console.log('net ease send image error', err);
     }
   }
 
@@ -800,8 +802,8 @@ export class ChatBaseViewModel {
    */
   async sendVideoMessage(uri: string, duration?: number, width?: number, height?: number, thumbnail?: PixelMap) {
     try {
-      let fileType = ""
-      const subStrings = uri.split(".");
+      let fileType = ''
+      const subStrings = uri.split('.');
       if (subStrings.length > 0) {
         fileType = subStrings[subStrings.length - 1];
       }
@@ -824,7 +826,7 @@ export class ChatBaseViewModel {
 
       await fs.close(file)
     } catch (err) {
-      console.log("net ease send video error", err);
+      console.log('net ease send video error', err);
     }
   }
 
@@ -834,8 +836,8 @@ export class ChatBaseViewModel {
    */
   async sendFileMessage(uri: string) {
     try {
-      let fileType = ""
-      const subStrings = uri.split(".");
+      let fileType = ''
+      const subStrings = uri.split('.');
       if (subStrings.length > 0) {
         fileType = subStrings[subStrings.length - 1];
       }
@@ -864,7 +866,7 @@ export class ChatBaseViewModel {
 
       await fs.close(file)
     } catch (err) {
-      console.log("net ease send file error", err);
+      console.log('net ease send file error', err);
     }
   }
 
@@ -878,7 +880,7 @@ export class ChatBaseViewModel {
       const message = await ChatRepo.createAudioMessage(uri, undefined, undefined, duration * 1000);
       this.sendMessage(message)
     } catch (err) {
-      console.error("net ease send audio message error", err.code, err.message)
+      console.error('net ease send audio message error', err.code, err.message)
     }
   }
 
@@ -888,12 +890,19 @@ export class ChatBaseViewModel {
    * @param params 消息配置参数
    * @param progress 消息发送进度
    */
-  async sendMessage(msg: V2NIMMessage, params?: V2NIMSendMessageParams, progress?: (percentage: number) => void) {
-    ChatRepo.sendMessage(this.beforeSendMessage(msg), this.conversationId!, params, progress)
-      .catch((err: BusinessError) => {
-        console.error("net ease send message error", err.code, err.message);
-        sendMessageFailedTips(msg, err, this.conversationId!)
-      })
+  async sendMessage(msg: V2NIMMessage, params?: V2NIMSendMessageParams, progress?: (percentage: number) => void): Promise<void> {
+    try {
+      const result: V2NIMSendMessageResult | undefined = await ChatRepo.sendMessage(this.beforeSendMessage(msg), this.conversationId!, params, progress)
+
+      // 命中反垃圾的需要进行更新消息 & 添加反垃圾 TIP
+      if (result && result.antispamResult) {
+        this.modifyAndSendTip(result)
+      }
+
+    } catch (err) {
+      console.error('netease send message error', err.code, err.message);
+      sendMessageFailedTips(msg, err, this.conversationId!)
+    }
   }
 
   /**
@@ -907,7 +916,7 @@ export class ChatBaseViewModel {
     progress?: (percentage: number) => void) {
     ChatRepo.replyMessage(this.beforeSendMessage(msg), replyMsg, params, progress)
       .catch((err: BusinessError) => {
-        console.error("net ease reply message error", err.code, err.message);
+        console.error('net ease reply message error', err.code, err.message);
         sendMessageFailedTips(msg, err, this.conversationId!)
       })
   }
@@ -923,7 +932,7 @@ export class ChatBaseViewModel {
     progress?: (percentage: number) => void) {
     ChatRepo.sendMessage(this.beforeSendMessage(msg), conversationId, params, progress)
       .catch((err: BusinessError) => {
-        console.error("net ease send message error", err.code, err.message);
+        console.error('net ease send message error', err.code, err.message);
         sendMessageFailedTips(msg, err, conversationId)
       })
   }
@@ -986,7 +995,7 @@ export class ChatBaseViewModel {
             setTimeout(() => {
               ChatRepo.sendMessage(this.beforeSendMessage(leaveMsg), conversation.conversationId!)
                 .catch((err: BusinessError) => {
-                  console.error("net ease send message error", err.code, err.message);
+                  console.error('net ease send message error', err.code, err.message);
                   sendMessageFailedTips(leaveMsg, err, conversation.conversationId!)
                 })
             }, 200)
@@ -1085,6 +1094,134 @@ export class ChatBaseViewModel {
     let msg = this.chatInfo?.getMessage(msgClientId)
     console.debug('netease isSelect', msgClientId, result, ',content:', msg?.message.text)
     return result
+  }
+
+  private async modifyAndSendTip(result: V2NIMSendMessageResult): Promise<void> {
+    if (!result) {
+      return; // ignore
+    }
+    // 是否命中反垃圾，并且开启反垃圾 TIP 提示
+    if (result.antispamResult) {
+      const getMsg: NIMMessageInfo | undefined = this.chatInfo?.msgMap.get(result.message.messageClientId)
+      if (getMsg) {
+        getMsg.isServerAntiSpam = true
+        await this.modifyMessageLocalExtensionAntispam(getMsg.message)
+      }
+
+      if (IMKitConfigCenter.enableAntiSpamTipMessage) {
+        this.sendAntispamTipMessage(result)
+      }
+    }
+  }
+
+  private sendAntispamTipMessage(result: V2NIMSendMessageResult): void {
+    let label: number = 900; // unknown
+    try {
+      const antispamResultJSON: NIMEStrAnyObj | null = JSON.parse(result.antispamResult)
+      if (!antispamResultJSON) {
+        return; // skip
+      }
+      const extJSON: NIMEStrAnyObj | null = JSON.parse(antispamResultJSON.ext) as NIMEStrAnyObj
+      if (!extJSON) {
+        return; // skip
+      }
+      if (Array.isArray(extJSON) && extJSON.length > 0) {
+        label = extJSON[0].antispam.label
+      } else {
+        label = extJSON.antispam.label
+      }
+    } catch (e) {
+      // 如果还出错的话，就使用正则的方式找
+      try {
+        if (result.antispamResult) {
+          // 去除字符串中的转义符 \
+          const jsonResultReplace = result.antispamResult.replace(/\\/g, '');
+          // 全局匹配所有label数字，取第一个
+          const pattern = /"label":(\d+)/g;
+          const matches = jsonResultReplace.matchAll(pattern);
+          const matchList = Array.from(matches);
+          if (matchList.length > 0) {
+            const lastMatch = matchList[0];
+            const matchedLabel = Number(lastMatch[1]);
+            if (!isNaN(matchedLabel)) {
+              label = matchedLabel;
+            }
+          }
+        }
+      } catch (e) {
+        // 放弃，使用默认值
+      }
+    }
+
+    console.error('netease send message antispam label', label)
+
+    // 分类信息，100：色情，200：广告，260：广告法，300：暴恐，400：违禁，500：涉政，600：谩骂，700：灌水，900：其他，1100：涉价值观
+    let labelResource: Resource = $r('app.string.chat_message_other_tip_label')
+    switch (label) {
+      case 100:
+        labelResource = $r('app.string.chat_message_pornography_tip_label')
+        break
+      case 200:
+        labelResource = $r('app.string.chat_message_ads_tip_label')
+        break
+      case 260:
+        labelResource = $r('app.string.chat_message_ad_law_tip_label')
+        break
+      case 300:
+        labelResource = $r('app.string.chat_message_terror_and_violence_law_tip_label')
+        break
+      case 400:
+        labelResource = $r('app.string.chat_message_prohibited_tip_label')
+        break
+      case 500:
+        labelResource = $r('app.string.chat_message_politics_tip_label')
+        break
+      case 600:
+        labelResource = $r('app.string.chat_message_abusive_tip_label')
+        break
+      case 700:
+        labelResource = $r('app.string.chat_message_spam_tip_label')
+        break
+      case 900:
+        labelResource = $r('app.string.chat_message_other_tip_label')
+        break
+      case 1100:
+        labelResource = $r('app.string.chat_message_values_issue_tip_label')
+        break
+      default:
+        labelResource = $r('app.string.chat_message_other_tip_label')
+        break
+    }
+    const tipLabel: string = getContext(this).resourceManager.getStringSync(labelResource.id)
+    const tipFormat: string = getContext(this).resourceManager.getStringSync($r('app.string.chat_message_antispam_tip_format').id)
+    // 把 %s 替换成 labelName
+    const tipText: string = tipFormat.replace('%s', tipLabel)
+    const antispamTipMessage: V2NIMMessage = ChatRepo.createTipsMessage(tipText)
+    antispamTipMessage.createTime += 1 // 延迟 1ms
+    ChatRepo.insertMessageToLocal(antispamTipMessage, result.message.conversationId)
+  }
+
+  private async modifyMessageLocalExtensionAntispam(message: V2NIMMessage): Promise<void> {
+    // 修改本地扩展字段，加入 isServerAntispam 的描述
+    const oldLocalExtension: string | undefined = message.localExtension
+    // try catch 是不是 json，如果是 json 就加一个 isServerAntispam = true，如果不是的话，就放一个 { isServerAntispam: true } 进去覆盖
+    let newLocalExtension: string = JSON.stringify({ isServerAntispam: true })
+    try {
+      const localExtensionJSON: NIMEStrAnyObj | null = JSON.parse(oldLocalExtension)
+      if (localExtensionJSON) {
+        localExtensionJSON.isServerAntispam = true
+      }
+      newLocalExtension = JSON.stringify(localExtensionJSON)
+    } catch (e) {
+      // use { isServerAntispam: true }
+    }
+    const updatedMessage: V2NIMMessage | undefined = await ChatRepo.updateMessageLocalExtension(message, newLocalExtension)
+
+    if (!updatedMessage) {
+      // 更新失败，不管
+      return
+    }
+    this.chatInfo?.pushModifyMessage(updatedMessage)
   }
 
   /**

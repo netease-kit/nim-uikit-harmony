@@ -411,6 +411,50 @@
     {
       "name": "chat_message_empty_tip_text",
       "value": "一条空的 tip 消息"
+    },
+    {
+      "name": "chat_message_pornography_tip_label",
+      "value": "色情"
+    },
+    {
+      "name": "chat_message_ads_tip_label",
+      "value": "广告"
+    },
+    {
+      "name": "chat_message_ad_law_tip_label",
+      "value": "广告法"
+    },
+    {
+      "name": "chat_message_terror_and_violence_law_tip_label",
+      "value": "暴恐"
+    },
+    {
+      "name": "chat_message_prohibited_tip_label",
+      "value": "违禁"
+    },
+    {
+      "name": "chat_message_politics_tip_label",
+      "value": "涉政"
+    },
+    {
+      "name": "chat_message_abusive_tip_label",
+      "value": "谩骂"
+    },
+    {
+      "name": "chat_message_spam_tip_label",
+      "value": "灌水"
+    },
+    {
+      "name": "chat_message_other_tip_label",
+      "value": "其他"
+    },
+    {
+      "name": "chat_message_values_issue_tip_label",
+      "value": "涉价值观"
+    },
+    {
+      "name": "chat_message_antispam_tip_format",
+      "value": "内容可能涉及%s, 请调整后发送"
     }
   ]
 }

@@ -78,6 +78,7 @@ import { ChatMultiSelectView } from '../view/ChatMultiSelectView';
 import { AitManager } from '../manager/ait/AitManager';
 import { ChatAitNode } from '../model/ChatAitNode';
 import { TextMessageDetailDialog } from '../view/TextMessageDetailDialog';
+import { FraudTipView } from '../view/FraudTipView';
 
 @ComponentV2
 export struct ChatTeamPage {
@@ -533,463 +534,316 @@ export struct ChatTeamPage {
           this.goToTeamSettingPage(this.pathStack)
         }
       })
+      // 用Stack包裹，实现FraudTipView浮动在RelativeContainer上方
+      Stack({
+        alignContent: Alignment.TopStart // 防诈条靠顶部靠左显示（可根据需求调整）
+      }) {
+        // 防诈条
+        FraudTipView({
+          pathStack: this.pathStack,
+          canReport: true,
+          canCancel: true
+        })
+          .zIndex(10)
 
-      RelativeContainer() {
-        List({ scroller: this.listScroller }) {
-          LazyForEach(this.chatTeamInfo.msgList, (msg: NIMMessageInfo) => {
-            ListItem() {
-              MessageComponent({
-                message: msg,
-                chatInfo: this.chatTeamInfo,
-                showSelect: this.showMultiSelect,
-                onMessageClick: {
-                  onAvatarClick: (msg: NIMMessageInfo | undefined) => {
-                    if (this.showMultiSelect) {
-                      return
-                    }
-                    if (msg != null) {
-                      if (msg?.message.senderId == ChatKitClient.getLoginUserId()) {
-                        this.pathStack.pushPath({
-                          name: 'MineInfoPage'
+
+        RelativeContainer() {
+          List({ scroller: this.listScroller }) {
+            LazyForEach(this.chatTeamInfo.msgList, (msg: NIMMessageInfo) => {
+              ListItem() {
+                MessageComponent({
+                  message: msg,
+                  chatInfo: this.chatTeamInfo,
+                  showSelect: this.showMultiSelect,
+                  onMessageClick: {
+                    onAvatarClick: (msg: NIMMessageInfo | undefined) => {
+                      if (this.showMultiSelect) {
+                        return
+                      }
+                      if (msg != null) {
+                        if (msg?.message.senderId == ChatKitClient.getLoginUserId()) {
+                          this.pathStack.pushPath({
+                            name: 'MineInfoPage'
+                          })
+                        } else {
+                          this.pathStack.pushPath({ name: 'PersonInfoPage', param: msg?.message.senderId })
+                        }
+                      }
+                    },
+                    onAvatarLongPress: (msg: NIMMessageInfo | undefined) => {
+                      if (this.showMultiSelect) {
+                        return
+                      }
+                      if (msg != null) {
+                        if (msg?.message.senderId && msg?.message.senderId !== ChatKitClient.getLoginUserId()) {
+                          this.addAitUserById(msg.message.senderId)
+                        }
+                      }
+                    },
+                    onItemLongClick: (event: GestureEvent, msg: NIMMessageInfo | undefined) => {
+                      if (this.showMultiSelect) {
+                        return
+                      }
+                      this.operationMsg = msg
+                      let opMenuWidth = computeOperateViewWidth(msg)
+                      let opMenuHeight = computeOperateViewHeight(msg)
+                      let marginSize = this.operationViewMargin
+                      if (event.target.area.position.x !== undefined) {
+                        let xPoint = Number(event.target.area.globalPosition.x) +
+                          (Number(event.target.area.width) - opMenuWidth) / 2
+                        if (xPoint < marginSize) {
+                          xPoint = marginSize
+                        }
+                        if (xPoint + opMenuWidth + marginSize > this.screenWidth) {
+                          xPoint = this.screenWidth - opMenuWidth - marginSize
+                        }
+                        this.operationRect.x = xPoint;
+                      }
+                      if (event.target.area.position.y !== undefined) {
+                        let yPoint =
+                          Number(event.target.area.globalPosition.y) - this.navBarHeight +
+                          Number(event.target.area.height)
+                        if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
+                          yPoint =
+                            yPoint - opMenuHeight - marginSize * 2 - Number(event.target.area.height);
+                        }
+                        if (yPoint < 0) {
+                          yPoint = this.scrollHeight / 2;
+
+                        }
+                        this.operationRect.y = yPoint
+                      }
+                      this.showOperationView = true
+                    },
+                    onItemClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                      if (this.showMultiSelect) {
+                        if (msg && !msg.isRevokeMsg) {
+                          if (!msg?.isSelectedMsg) {
+                            this.chatViewModel.addSelectMessage(msg)
+                          } else {
+                            this.chatViewModel.removeSelectMessage(msg)
+                          }
+                        }
+                        return
+                      }
+                      this.showMessageDetail(msg)
+                    },
+                    onRevokeEditClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                      if (msg?.checkRevokeEdit()) {
+                        const controller = this.controller
+                        if (msg.isReplyMsg && msg.replyMsg) {
+                          this.controller.deleteSpans()
+                          this.loadReplyInfo(msg.replyMsg, false)
+                        } else {
+                          this.clearInput(true)
+                        }
+                        this.builderSpans.splice(0, this.builderSpans.length)
+                        parseMessageText(msg.revokeInfo?.revokeMsgText)?.forEach((item: NEEmojiParseResult) => {
+                          let spanIndex = 0
+                          if (item.text) {
+                            getAitNodes(item.startIndex, item.text, msg.message.serverExtension)
+                              .forEach((node: ChatAitNode) => {
+                                if (node.segment) {
+                                  controller.addBuilderSpan(() => this.AtSpan(node.text));
+                                  let aitSpan: AitEditorSpan = {
+                                    spanIndex: spanIndex,
+                                    accountId: node.account ?? '',
+                                    value: node.text,
+                                  }
+                                  this.builderSpans.push(...[aitSpan])
+                                  spanIndex++
+                                } else {
+                                  controller.addTextSpan(node.text)
+                                  spanIndex = spanIndex + node.text.length
+                                }
+                              })
+                          } else if (item.emoji) {
+                            controller.addImageSpan($rawfile(`emoji/${item.emoji.file}`),
+                              {
+                                imageStyle: { size: [16, 16] }
+                              })
+                            spanIndex++
+                          }
                         })
-                      } else {
-                        this.pathStack.pushPath({ name: 'PersonInfoPage', param: msg?.message.senderId })
-                      }
-                    }
-                  },
-                  onAvatarLongPress: (msg: NIMMessageInfo | undefined) => {
-                    if (this.showMultiSelect) {
-                      return
-                    }
-                    if (msg != null) {
-                      if (msg?.message.senderId && msg?.message.senderId !== ChatKitClient.getLoginUserId()) {
-                        this.addAitUserById(msg.message.senderId)
-                      }
-                    }
-                  },
-                  onItemLongClick: (event: GestureEvent, msg: NIMMessageInfo | undefined) => {
-                    if (this.showMultiSelect) {
-                      return
-                    }
-                    this.operationMsg = msg
-                    let opMenuWidth = computeOperateViewWidth(msg)
-                    let opMenuHeight = computeOperateViewHeight(msg)
-                    let marginSize = this.operationViewMargin
-                    if (event.target.area.position.x !== undefined) {
-                      let xPoint = Number(event.target.area.globalPosition.x) +
-                        (Number(event.target.area.width) - opMenuWidth) / 2
-                      if (xPoint < marginSize) {
-                        xPoint = marginSize
-                      }
-                      if (xPoint + opMenuWidth + marginSize > this.screenWidth) {
-                        xPoint = this.screenWidth - opMenuWidth - marginSize
-                      }
-                      this.operationRect.x = xPoint;
-                    }
-                    if (event.target.area.position.y !== undefined) {
-                      let yPoint =
-                        Number(event.target.area.globalPosition.y) - this.navBarHeight +
-                        Number(event.target.area.height)
-                      if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
-                        yPoint =
-                          yPoint - opMenuHeight - marginSize * 2 - Number(event.target.area.height);
-                      }
-                      if (yPoint < 0) {
-                        yPoint = this.scrollHeight / 2;
 
+                      } else if (msg?.revokeInfo !== undefined) {
+                        NECommonUtils.showToast($r('app.string.chat_revoke_edit_error_tips'))
                       }
-                      this.operationRect.y = yPoint
-                    }
-                    this.showOperationView = true
-                  },
-                  onItemClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
-                    if (this.showMultiSelect) {
-                      if (msg && !msg.isRevokeMsg) {
-                        if (!msg?.isSelectedMsg) {
+                    },
+                    onReadReceiptClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                      if (ErrorUtils.checkNetworkAndToast()) {
+                        this.pathStack.pushPath({ name: 'ChatReadReceiptPage', param: msg?.message })
+                      }
+                    },
+                    onMultiSelect: (select: boolean, msg: NIMMessageInfo | undefined) => {
+                      if (msg) {
+                        if (select) {
                           this.chatViewModel.addSelectMessage(msg)
                         } else {
                           this.chatViewModel.removeSelectMessage(msg)
                         }
+                        this.operationMsg = undefined
                       }
-                      return
-                    }
-                    this.showMessageDetail(msg)
-                  },
-                  onRevokeEditClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
-                    if (msg?.checkRevokeEdit()) {
-                      const controller = this.controller
-                      if (msg.isReplyMsg && msg.replyMsg) {
-                        this.controller.deleteSpans()
-                        this.loadReplyInfo(msg.replyMsg, false)
-                      } else {
-                        this.clearInput(true)
-                      }
-                      this.builderSpans.splice(0, this.builderSpans.length)
-                      parseMessageText(msg.revokeInfo?.revokeMsgText)?.forEach((item: NEEmojiParseResult) => {
-                        let spanIndex = 0
-                        if (item.text) {
-                          getAitNodes(item.startIndex, item.text, msg.message.serverExtension)
-                            .forEach((node: ChatAitNode) => {
-                              if (node.segment) {
-                                controller.addBuilderSpan(() => this.AtSpan(node.text));
-                                let aitSpan: AitEditorSpan = {
-                                  spanIndex: spanIndex,
-                                  accountId: node.account ?? '',
-                                  value: node.text,
-                                }
-                                this.builderSpans.push(...[aitSpan])
-                                spanIndex++
-                              } else {
-                                controller.addTextSpan(node.text)
-                                spanIndex = spanIndex + node.text.length
-                              }
-                            })
-                        } else if (item.emoji) {
-                          controller.addImageSpan($rawfile(`emoji/${item.emoji.file}`),
-                            {
-                              imageStyle: { size: [16, 16] }
-                            })
-                          spanIndex++
+                    },
+                    onReplyClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                      if (msg) {
+                        if (this.chatTeamInfo.msgMap.has(msg.getMessageClientId())) {
+                          let index = this.chatTeamInfo.searchPosition(msg.getMessageClientId())
+                          this.listScroller.scrollToIndex(index)
+                        } else {
+                          this.showMessageDetail(msg, true)
                         }
-                      })
-
-                    } else if (msg?.revokeInfo !== undefined) {
-                      NECommonUtils.showToast($r('app.string.chat_revoke_edit_error_tips'))
-                    }
-                  },
-                  onReadReceiptClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
-                    if (ErrorUtils.checkNetworkAndToast()) {
-                      this.pathStack.pushPath({ name: 'ChatReadReceiptPage', param: msg?.message })
-                    }
-                  },
-                  onMultiSelect: (select: boolean, msg: NIMMessageInfo | undefined) => {
-                    if (msg) {
-                      if (select) {
-                        this.chatViewModel.addSelectMessage(msg)
-                      } else {
-                        this.chatViewModel.removeSelectMessage(msg)
                       }
-                      this.operationMsg = undefined
-                    }
-                  },
-                  onReplyClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
-                    if (msg) {
-                      if (this.chatTeamInfo.msgMap.has(msg.getMessageClientId())) {
-                        let index = this.chatTeamInfo.searchPosition(msg.getMessageClientId())
-                        this.listScroller.scrollToIndex(index)
-                      } else {
-                        this.showMessageDetail(msg, true)
+                    },
+                    onSendFailClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                      if (this.showMultiSelect) {
+                        return
                       }
-                    }
-                  },
-                  onSendFailClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
-                    if (this.showMultiSelect) {
-                      return
-                    }
-                    if (msg) {
-                      this.chatViewModel.resendMessage(msg)
-                    }
-                  },
-                }
-              })
+                      if (msg) {
+                        this.chatViewModel.resendMessage(msg)
+                      }
+                    },
+                  }
+                })
+              }
+            }, (item: NIMMessageInfo, index: number) => {
+              try {
+                return item.message.messageClientId
+              } catch (e) {
+                return index.toString()
+              }
+            })
+          }
+          .id("chatPageListView")
+          .cachedCount(4)
+          .padding({ bottom: 5 })
+          .maintainVisibleContentPosition(true)
+          .onScrollIndex((start: number, end: number) => {
+            if (!this.toScroll) {
+              if (start >= 0 && start < 3
+                && this.listScrollStartPosition > start && this.chatViewModel.canLoadMore()) {
+                this.chatViewModel.getMoreMessageList()
+              } else if (this.listScrollEndPosition < end && this.chatViewModel.canLoadNext(end)) {
+                this.chatViewModel.getNewMessageList()
+              }
             }
-          }, (item: NIMMessageInfo, index: number) => {
-            try {
-              return item.message.messageClientId
-            }catch (e) {
-              return index.toString()
-                }
+            this.listScrollEndPosition = end;
+            this.listScrollStartPosition = start;
           })
-        }
-        .id("chatPageListView")
-        .cachedCount(4)
-        .padding({ bottom: 5 })
-        .maintainVisibleContentPosition(true)
-        .onScrollIndex((start: number, end: number) => {
-          if (!this.toScroll) {
-            if (start >= 0 && start < 3
-              && this.listScrollStartPosition > start && this.chatViewModel.canLoadMore()) {
-              this.chatViewModel.getMoreMessageList()
-            } else if (this.listScrollEndPosition < end && this.chatViewModel.canLoadNext(end)) {
-              this.chatViewModel.getNewMessageList()
+          .onScrollStop(() => {
+            console.debug('netease to scroll stop:', this.toScroll)
+            if (this.toScroll) {
+              this.toScroll = false
             }
-          }
-          this.listScrollEndPosition = end;
-          this.listScrollStartPosition = start;
-        })
-        .onScrollStop(() => {
-          console.debug('netease to scroll stop:', this.toScroll)
-          if (this.toScroll) {
-            this.toScroll = false
-          }
-        })
-        .alignRules({
-          left: { anchor: "__container__", align: HorizontalAlign.Start },
-          right: { anchor: "__container__", align: HorizontalAlign.End },
-          top: { anchor: "__container__", align: VerticalAlign.Top },
-        })
-        .height(this.scrollHeight - this.bottomMargin)
-        .onScrollStart(() => {
-          this.showOperationView = false
-        })
-        .onTouch((event) => {
-          if (event.type == TouchType.Down) {
-            this.showOperationView = false
-            this.getUIContext().getFocusController().clearFocus();
-            this.scrollHeight = this.defaultInputViewHeight;
-            this.expandHeight = 0;
-            this.inputStyle = InputStyleType.None
-          }
-        })
-
-        if (this.chatViewModel.networkBroken) {
-          NetworkBrokenBuilder()
-        }
-
-        Column()
-          .height(this.bottomHeight)
-          .backgroundColor(Color.Transparent)
-          .backgroundColor($r('app.color.chat_input_background'))
-          .id("chat_input")
+          })
           .alignRules({
             left: { anchor: "__container__", align: HorizontalAlign.Start },
             right: { anchor: "__container__", align: HorizontalAlign.End },
-            top: { anchor: "chatPageListView", align: VerticalAlign.Bottom },
+            top: { anchor: "__container__", align: VerticalAlign.Top },
+          })
+          .height(this.scrollHeight - this.bottomMargin)
+          .onScrollStart(() => {
+            this.showOperationView = false
+          })
+          .onTouch((event) => {
+            if (event.type == TouchType.Down) {
+              this.showOperationView = false
+              this.getUIContext().getFocusController().clearFocus();
+              this.scrollHeight = this.defaultInputViewHeight;
+              this.expandHeight = 0;
+              this.inputStyle = InputStyleType.None
+            }
           })
 
-        if (this.hideInput === false && !this.showMultiSelect) {
-          NEChatInputView({
-            aitManager: this.aitManager,
-            controller: this.controller,
-            builderSpans: this.builderSpans,
-            placeHolder: (this.chatTeamInfo.conversationName ?? '').length > 15 ?
-              this.chatTeamInfo.conversationName?.substring(0, 15) + '...' : this.chatTeamInfo.conversationName,
-            replyMsg: this.replyMsg,
-            chatInfo: this.chatTeamInfo,
-            onDidClickCloseReply: () => {
-              this.clearInput(false)
-            },
-            onDidClickImage: () => {
-              this.showOperationView = false
-              MediaUtils.showImageVideoPicker().then((result) => {
-                if (result.errorMsg == null && result.uri) {
-                  if (result.type === photoAccessHelper.PhotoType.IMAGE) {
-                    this.chatViewModel.sendImageMessage(result.uri);
-                  } else if (result.type === photoAccessHelper.PhotoType.VIDEO) {
-                    this.chatViewModel.sendVideoMessage(result.uri, result.duration, result.width, result.height);
-                  }
-                }
-              })
-            },
-            onDidClickAudio: () => {
-              let context = getContext(this) as common.UIAbilityContext
-              this.showOperationView = false
-              this.getUIContext().getFocusController().clearFocus()
-              PermissionsUtils.reqPermissionsFromUser(['ohos.permission.MICROPHONE'], context).then((result) => {
-                if (result.grantStatus == true) {
-                  if (this.inputStyle == InputStyleType.Record) {
-                    this.expandHeight = 0
-                    this.inputStyle = InputStyleType.None;
-                    this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
-                  } else {
-                    this.inputStyle = InputStyleType.Record
-                    this.expandHeight = ChatConst.messageInputAreaHeight
-                    this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
-                  }
+          if (this.chatViewModel.networkBroken) {
+            NetworkBrokenBuilder()
+          }
 
-                } else {
-                  NECommonUtils.showToast($r('app.string.chat_permission_deny_tips'))
-                }
-              })
-
-            },
-            onDidClickEmoji: () => {
-              this.showOperationView = false
-              if (this.inputStyle == InputStyleType.Emoji) {
-                this.expandHeight = 0
-                this.inputStyle = InputStyleType.None;
-                this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
-              } else {
-                this.inputStyle = InputStyleType.Emoji
-                this.expandHeight = ChatConst.messageInputAreaHeight
-                this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
-              }
-            },
-            onDidClickMore: () => {
-              this.showOperationView = false
-              if (this.inputStyle == InputStyleType.More) {
-                this.expandHeight = 0
-                this.inputStyle = InputStyleType.None;
-                this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
-              } else {
-                this.inputStyle = InputStyleType.More
-                this.expandHeight = ChatConst.messageInputAreaHeight
-                this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
-              }
-            },
-            onSendTextMessage: () => {
-              const text = this.getMessageText()
-              let textSend = text.trimEnd()
-              this.showOperationView = false
-              if (textSend.length <= 0) {
-                NECommonUtils.showToast($r('app.string.null_message_not_support'))
-                return
-              }
-              if (text.length - textSend.length <= 1) {
-                textSend = text
-              }
-              this.chatViewModel.sendTextMessage(textSend, this.replyMsg, this.aitManager.aitModel,
-                this.aitManager.getPushList())
-              this.clearInput(true)
-              this.aitManager.cleanAit()
-              this.builderSpans.splice(0, this.builderSpans.length)
-            },
-            inputStyle: this.inputStyle,
-            mute: this.chatViewModel.isMuteModel,
-            teamId: this.chatTeamInfo.team?.teamId,
-            team: this.chatTeamInfo.team
-          }).alignRules({
-            left: { anchor: "chat_input", align: HorizontalAlign.Start },
-            right: { anchor: "chat_input", align: HorizontalAlign.End },
-            bottom: { anchor: "chat_input", align: VerticalAlign.Bottom },
-            top: { anchor: "chat_input", align: VerticalAlign.Top },
-          }).backgroundColor(this.chatViewModel.isMuteModel ? '#ffE9EFF5' : $r('app.color.chat_input_background'))
-        } else if (this.showMultiSelect) {
-          ChatMultiSelectView({
-            isEnable: this.multiSelectCount > 0,
-            onMultiForward: () => {
-              if (ChatKitClient.connectBroken()) {
-                NECommonUtils.showToast($r('app.string.chat_network_error_tips'))
-              } else {
-                this.multiForwardMessage()
-              }
-            },
-            onSingleForward: () => {
-              if (ChatKitClient.connectBroken()) {
-                NECommonUtils.showToast($r('app.string.chat_network_error_tips'))
-              } else {
-                this.singleForwardMessage()
-              }
-            },
-            onMultiDelete: () => {
-              let selectMsg = this.chatViewModel.getSelectMessageList()
-              if (selectMsg.length > ChatConst.messageDeleteLimit) {
-                NECommonUtils.showToast($r('app.string.chat_multi_delete_limit_tips', ChatConst.messageDeleteLimit))
-              } else {
-                this.showDialogToDelete(selectMsg)
-              }
-            },
-          }).width('100%').height(this.bottomHeight)
+          Column()
+            .height(this.bottomHeight)
+            .backgroundColor(Color.Transparent)
+            .backgroundColor($r('app.color.chat_input_background'))
+            .id("chat_input")
             .alignRules({
-              left: { anchor: "chat_input", align: HorizontalAlign.Start },
-              right: { anchor: "chat_input", align: HorizontalAlign.End },
-              bottom: { anchor: "chat_input", align: VerticalAlign.Bottom },
-              top: { anchor: "chat_input", align: VerticalAlign.Top },
-            }).backgroundColor($r('app.color.chat_input_background'))
-        }
-
-        Column() {
-          if (this.inputStyle === InputStyleType.Record) {
-            NEAudioRecordView({
-              onRecordAudio: (filepath, duration) => {
-                console.log("net ease record audio " + filepath);
-                this.chatViewModel.sendAudioMessage(filepath, duration)
-
-              },
-              onRecordStart: () => {
-                this.hideInput = true
-              },
-              onRecordEnd: () => {
-                this.hideInput = false
-              }
+              left: { anchor: "__container__", align: HorizontalAlign.Start },
+              right: { anchor: "__container__", align: HorizontalAlign.End },
+              top: { anchor: "chatPageListView", align: VerticalAlign.Bottom },
             })
-              .width('100%')
-              .height(150)
-              .alignRules({
-                left: { anchor: "__container__", align: HorizontalAlign.Start },
-                right: { anchor: "__container__", align: HorizontalAlign.End },
-                top: { anchor: "__container__", align: VerticalAlign.Top },
-              })
-          } else if (this.inputStyle === InputStyleType.More) {
-            NEChatMoreOperation({
-              dataList: this.operationMoreDataList, onDidClick: (data) => {
-                let context = getContext(this) as common.UIAbilityContext;
-                if (data.type == NEChatMoreOperationType.Video) {
-                  PermissionsUtils.reqPermissionsFromUser(['ohos.permission.CAMERA'], context).then((result) => {
-                    if (result.grantStatus == true) {
-                      this.selectVideoView.open()
-                    } else {
-                      NECommonUtils.showToast($r('app.string.chat_permission_deny_tips'))
-                    }
-                  })
-                } else if (data.type == NEChatMoreOperationType.File) {
-                  console.log("net ease click file")
-                  MediaUtils.showFilePicker().then((result) => {
-                    if (result.errorMsg == null && result.uri) {
-                      this.chatViewModel.sendFileMessage(result.uri);
-                    }
-                  })
-                } else if (data.type == NEChatMoreOperationType.Location) {
-                  PermissionsUtils.reqPermissionsFromUser(['ohos.permission.LOCATION',
-                    'ohos.permission.APPROXIMATELY_LOCATION'], context).then((result) => {
-                    if (result.grantStatus == true) {
-                      let locationChoosingOptions: sceneMap.LocationChoosingOptions = {
-                        // 展示搜索控件
-                        searchEnabled: true,
-                        // 展示附近Poi
-                        showNearbyPoi: true
-                      };
-                      // 拉起地点选取页
-                      sceneMap.chooseLocation(getContext(this) as common.UIAbilityContext, locationChoosingOptions)
-                        .then((data) => {
-                          this.chatViewModel.sendLocationMessage(data)
-                          console.info("ChooseLocation", "Succeeded in choosing location.");
-                        })
-                        .catch((err: BusinessError) => {
-                          console.error("ChooseLocation",
-                            `Failed to choose location, code: ${err.code}, message: ${err.message}`);
-                          // NECommonUtils.showToast(`code: ${err.code}, message: ${err.message}`)
-                        });
-                    } else {
-                      NECommonUtils.showToast($r('app.string.chat_permission_deny_tips'))
-                    }
-                  })
-                }
 
-              }
-            }).padding({ top: 10 })
-              .width('100%')
-              .height(150)
-              .alignRules({
-                left: { anchor: "__container__", align: HorizontalAlign.Start },
-                right: { anchor: "__container__", align: HorizontalAlign.End },
-                top: { anchor: "__container__", align: VerticalAlign.Top },
-              })
-          } else if (this.inputStyle === InputStyleType.Emoji) {
-            NEChatEmojiView({
-              onDidClick: (emoji) => {
-                console.log("net ease click emoji", emoji);
-                if (emoji.type === NIMEmoticonType.file) {
-                  this.controller.addImageSpan($rawfile(`emoji/${emoji.file}`),
-                    {
-                      offset: this.controller.getCaretOffset(),
-                      imageStyle: { size: [16, 16] }
-                    })
-                } else if (emoji.type === NIMEmoticonType.delete) {
-                  if (this.controller) {
-                    let index = this.controller.getCaretOffset()
-                    if (index > 0) {
-                      this.controller.deleteSpans({
-                        start: index - 1,
-                        end: index
-                      })
+          if (this.hideInput === false && !this.showMultiSelect) {
+            NEChatInputView({
+              aitManager: this.aitManager,
+              controller: this.controller,
+              builderSpans: this.builderSpans,
+              placeHolder: (this.chatTeamInfo.conversationName ?? '').length > 15 ?
+                this.chatTeamInfo.conversationName?.substring(0, 15) + '...' : this.chatTeamInfo.conversationName,
+              replyMsg: this.replyMsg,
+              chatInfo: this.chatTeamInfo,
+              onDidClickCloseReply: () => {
+                this.clearInput(false)
+              },
+              onDidClickImage: () => {
+                this.showOperationView = false
+                MediaUtils.showImageVideoPicker().then((result) => {
+                  if (result.errorMsg == null && result.uri) {
+                    if (result.type === photoAccessHelper.PhotoType.IMAGE) {
+                      this.chatViewModel.sendImageMessage(result.uri);
+                    } else if (result.type === photoAccessHelper.PhotoType.VIDEO) {
+                      this.chatViewModel.sendVideoMessage(result.uri, result.duration, result.width, result.height);
                     }
                   }
+                })
+              },
+              onDidClickAudio: () => {
+                let context = getContext(this) as common.UIAbilityContext
+                this.showOperationView = false
+                this.getUIContext().getFocusController().clearFocus()
+                PermissionsUtils.reqPermissionsFromUser(['ohos.permission.MICROPHONE'], context).then((result) => {
+                  if (result.grantStatus == true) {
+                    if (this.inputStyle == InputStyleType.Record) {
+                      this.expandHeight = 0
+                      this.inputStyle = InputStyleType.None;
+                      this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                    } else {
+                      this.inputStyle = InputStyleType.Record
+                      this.expandHeight = ChatConst.messageInputAreaHeight
+                      this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                    }
+
+                  } else {
+                    NECommonUtils.showToast($r('app.string.chat_permission_deny_tips'))
+                  }
+                })
+
+              },
+              onDidClickEmoji: () => {
+                this.showOperationView = false
+                if (this.inputStyle == InputStyleType.Emoji) {
+                  this.expandHeight = 0
+                  this.inputStyle = InputStyleType.None;
+                  this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                } else {
+                  this.inputStyle = InputStyleType.Emoji
+                  this.expandHeight = ChatConst.messageInputAreaHeight
+                  this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
                 }
               },
-              onEmojiSendMessage: () => {
+              onDidClickMore: () => {
+                this.showOperationView = false
+                if (this.inputStyle == InputStyleType.More) {
+                  this.expandHeight = 0
+                  this.inputStyle = InputStyleType.None;
+                  this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                } else {
+                  this.inputStyle = InputStyleType.More
+                  this.expandHeight = ChatConst.messageInputAreaHeight
+                  this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                }
+              },
+              onSendTextMessage: () => {
                 const text = this.getMessageText()
                 let textSend = text.trimEnd()
+                this.showOperationView = false
                 if (textSend.length <= 0) {
                   NECommonUtils.showToast($r('app.string.null_message_not_support'))
                   return
@@ -1002,85 +856,248 @@ export struct ChatTeamPage {
                 this.clearInput(true)
                 this.aitManager.cleanAit()
                 this.builderSpans.splice(0, this.builderSpans.length)
-              }
-            }).padding({ top: 0 })
-              .width('100%')
-              .height(170)
+              },
+              inputStyle: this.inputStyle,
+              mute: this.chatViewModel.isMuteModel,
+              teamId: this.chatTeamInfo.team?.teamId,
+              team: this.chatTeamInfo.team
+            }).alignRules({
+              left: { anchor: "chat_input", align: HorizontalAlign.Start },
+              right: { anchor: "chat_input", align: HorizontalAlign.End },
+              bottom: { anchor: "chat_input", align: VerticalAlign.Bottom },
+              top: { anchor: "chat_input", align: VerticalAlign.Top },
+            }).backgroundColor(this.chatViewModel.isMuteModel ? '#ffE9EFF5' : $r('app.color.chat_input_background'))
+          } else if (this.showMultiSelect) {
+            ChatMultiSelectView({
+              isEnable: this.multiSelectCount > 0,
+              onMultiForward: () => {
+                if (ChatKitClient.connectBroken()) {
+                  NECommonUtils.showToast($r('app.string.chat_network_error_tips'))
+                } else {
+                  this.multiForwardMessage()
+                }
+              },
+              onSingleForward: () => {
+                if (ChatKitClient.connectBroken()) {
+                  NECommonUtils.showToast($r('app.string.chat_network_error_tips'))
+                } else {
+                  this.singleForwardMessage()
+                }
+              },
+              onMultiDelete: () => {
+                let selectMsg = this.chatViewModel.getSelectMessageList()
+                if (selectMsg.length > ChatConst.messageDeleteLimit) {
+                  NECommonUtils.showToast($r('app.string.chat_multi_delete_limit_tips', ChatConst.messageDeleteLimit))
+                } else {
+                  this.showDialogToDelete(selectMsg)
+                }
+              },
+            }).width('100%').height(this.bottomHeight)
               .alignRules({
-                left: { anchor: "__container__", align: HorizontalAlign.Start },
-                right: { anchor: "__container__", align: HorizontalAlign.End },
-                top: { anchor: "__container__", align: VerticalAlign.Top }
+                left: { anchor: "chat_input", align: HorizontalAlign.Start },
+                right: { anchor: "chat_input", align: HorizontalAlign.End },
+                bottom: { anchor: "chat_input", align: VerticalAlign.Bottom },
+                top: { anchor: "chat_input", align: VerticalAlign.Top },
+              }).backgroundColor($r('app.color.chat_input_background'))
+          }
+
+          Column() {
+            if (this.inputStyle === InputStyleType.Record) {
+              NEAudioRecordView({
+                onRecordAudio: (filepath, duration) => {
+                  console.log("net ease record audio " + filepath);
+                  this.chatViewModel.sendAudioMessage(filepath, duration)
+
+                },
+                onRecordStart: () => {
+                  this.hideInput = true
+                },
+                onRecordEnd: () => {
+                  this.hideInput = false
+                }
               })
+                .width('100%')
+                .height(150)
+                .alignRules({
+                  left: { anchor: "__container__", align: HorizontalAlign.Start },
+                  right: { anchor: "__container__", align: HorizontalAlign.End },
+                  top: { anchor: "__container__", align: VerticalAlign.Top },
+                })
+            } else if (this.inputStyle === InputStyleType.More) {
+              NEChatMoreOperation({
+                dataList: this.operationMoreDataList, onDidClick: (data) => {
+                  let context = getContext(this) as common.UIAbilityContext;
+                  if (data.type == NEChatMoreOperationType.Video) {
+                    PermissionsUtils.reqPermissionsFromUser(['ohos.permission.CAMERA'], context).then((result) => {
+                      if (result.grantStatus == true) {
+                        this.selectVideoView.open()
+                      } else {
+                        NECommonUtils.showToast($r('app.string.chat_permission_deny_tips'))
+                      }
+                    })
+                  } else if (data.type == NEChatMoreOperationType.File) {
+                    console.log("net ease click file")
+                    MediaUtils.showFilePicker().then((result) => {
+                      if (result.errorMsg == null && result.uri) {
+                        this.chatViewModel.sendFileMessage(result.uri);
+                      }
+                    })
+                  } else if (data.type == NEChatMoreOperationType.Location) {
+                    PermissionsUtils.reqPermissionsFromUser(['ohos.permission.LOCATION',
+                      'ohos.permission.APPROXIMATELY_LOCATION'], context).then((result) => {
+                      if (result.grantStatus == true) {
+                        let locationChoosingOptions: sceneMap.LocationChoosingOptions = {
+                          // 展示搜索控件
+                          searchEnabled: true,
+                          // 展示附近Poi
+                          showNearbyPoi: true
+                        };
+                        // 拉起地点选取页
+                        sceneMap.chooseLocation(getContext(this) as common.UIAbilityContext, locationChoosingOptions)
+                          .then((data) => {
+                            this.chatViewModel.sendLocationMessage(data)
+                            console.info("ChooseLocation", "Succeeded in choosing location.");
+                          })
+                          .catch((err: BusinessError) => {
+                            console.error("ChooseLocation",
+                              `Failed to choose location, code: ${err.code}, message: ${err.message}`);
+                            // NECommonUtils.showToast(`code: ${err.code}, message: ${err.message}`)
+                          });
+                      } else {
+                        NECommonUtils.showToast($r('app.string.chat_permission_deny_tips'))
+                      }
+                    })
+                  }
+
+                }
+              }).padding({ top: 10 })
+                .width('100%')
+                .height(150)
+                .alignRules({
+                  left: { anchor: "__container__", align: HorizontalAlign.Start },
+                  right: { anchor: "__container__", align: HorizontalAlign.End },
+                  top: { anchor: "__container__", align: VerticalAlign.Top },
+                })
+            } else if (this.inputStyle === InputStyleType.Emoji) {
+              NEChatEmojiView({
+                onDidClick: (emoji) => {
+                  console.log("net ease click emoji", emoji);
+                  if (emoji.type === NIMEmoticonType.file) {
+                    this.controller.addImageSpan($rawfile(`emoji/${emoji.file}`),
+                      {
+                        offset: this.controller.getCaretOffset(),
+                        imageStyle: { size: [16, 16] }
+                      })
+                  } else if (emoji.type === NIMEmoticonType.delete) {
+                    if (this.controller) {
+                      let index = this.controller.getCaretOffset()
+                      if (index > 0) {
+                        this.controller.deleteSpans({
+                          start: index - 1,
+                          end: index
+                        })
+                      }
+                    }
+                  }
+                },
+                onEmojiSendMessage: () => {
+                  const text = this.getMessageText()
+                  let textSend = text.trimEnd()
+                  if (textSend.length <= 0) {
+                    NECommonUtils.showToast($r('app.string.null_message_not_support'))
+                    return
+                  }
+                  if (text.length - textSend.length <= 1) {
+                    textSend = text
+                  }
+                  this.chatViewModel.sendTextMessage(textSend, this.replyMsg, this.aitManager.aitModel,
+                    this.aitManager.getPushList())
+                  this.clearInput(true)
+                  this.aitManager.cleanAit()
+                  this.builderSpans.splice(0, this.builderSpans.length)
+                }
+              }).padding({ top: 0 })
+                .width('100%')
+                .height(170)
+                .alignRules({
+                  left: { anchor: "__container__", align: HorizontalAlign.Start },
+                  right: { anchor: "__container__", align: HorizontalAlign.End },
+                  top: { anchor: "__container__", align: VerticalAlign.Top }
+                })
+            }
+          }
+          .height(this.expandHeight)
+          .width('100%')
+          .alignRules({
+            left: { anchor: "__container__", align: HorizontalAlign.Start },
+            right: { anchor: "__container__", align: HorizontalAlign.End },
+            top: { anchor: "chat_input", align: VerticalAlign.Bottom },
+          })
+          .id("input_expand_back_container")
+          .backgroundColor($r('app.color.chat_input_background'))
+
+          if (this.showOperationView) {
+            MessageOperationView({
+              operateMsg: this.operationMsg,
+              didClickItem: (item: MessageOperationItem) => {
+                console.log('net ease click operation item event')
+                this.showOperationView = false
+                if (this.operationMsg == undefined) {
+                  return;
+                }
+
+                if (item.operationType == MessageOperationType.Copy) {
+                  const pasteboardData =
+                    pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.operationMsg.message.text)
+                  pasteboard.getSystemPasteboard().setDataSync(pasteboardData)
+                  NECommonUtils.showToast($r('app.string.chat_message_copy_success_tips'))
+                } else if (item.operationType == MessageOperationType.Delete) {
+                  this.showDialogToDelete([this.operationMsg])
+                } else if (item.operationType == MessageOperationType.Undo) {
+                  this.showDialogToRevoke(this.operationMsg)
+                } else if (item.operationType == MessageOperationType.Forward) {
+                  // 转发
+                  this.forwardMessageAction = (selectedList: ConversationSelectModel[]) => {
+                    if (this.operationMsg?.message) {
+                      this.forwardMessages = [this.operationMsg.message]
+                      this.forwardConversations = selectedList
+                      this.currentConversationName = this.chatTeamInfo.team?.name
+                      this.forwardMessageDialog.open()
+                    }
+                  }
+                  this.forwardType = $r('app.string.chat_operation_forward')
+                  this.pathStack.pushPath({
+                    name: 'ConversationSelectPage',
+                    param: new ConversationSelectParam([], conversationSelectLimitCount, this.forwardMessageAction)
+                  })
+                } else if (item.operationType == MessageOperationType.Collection) {
+                  // 收藏
+                  this.chatViewModel.collectionMessage(this.operationMsg)
+                } else if (item.operationType == MessageOperationType.Pin) {
+                  this.chatViewModel.pinMessage(this.operationMsg)
+                } else if (item.operationType == MessageOperationType.Unpin) {
+                  this.chatViewModel.unpinMessage(this.operationMsg)
+                } else if (item.operationType == MessageOperationType.Select) {
+                  this.chatViewModel.clearSelectMessage()
+                  this.chatViewModel.addSelectMessage(this.operationMsg)
+                  this.showMultiSelect = true
+                } else if (item.operationType == MessageOperationType.Reply) {
+                  this.loadReplyInfo(this.operationMsg, true)
+                }
+              }
+            })
+              .position({ x: this.operationRect.x, y: this.operationRect.y })
+              .borderRadius(8)
+              .shadow(ShadowStyle.OUTER_DEFAULT_MD)
+
           }
         }
-        .height(this.expandHeight)
-        .width('100%')
-        .alignRules({
-          left: { anchor: "__container__", align: HorizontalAlign.Start },
-          right: { anchor: "__container__", align: HorizontalAlign.End },
-          top: { anchor: "chat_input", align: VerticalAlign.Bottom },
-        })
-        .id("input_expand_back_container")
-        .backgroundColor($r('app.color.chat_input_background'))
-
-        if (this.showOperationView) {
-          MessageOperationView({
-            operateMsg: this.operationMsg,
-            didClickItem: (item: MessageOperationItem) => {
-              console.log('net ease click operation item event')
-              this.showOperationView = false
-              if (this.operationMsg == undefined) {
-                return;
-              }
-
-              if (item.operationType == MessageOperationType.Copy) {
-                const pasteboardData =
-                  pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.operationMsg.message.text)
-                pasteboard.getSystemPasteboard().setDataSync(pasteboardData)
-                NECommonUtils.showToast($r('app.string.chat_message_copy_success_tips'))
-              } else if (item.operationType == MessageOperationType.Delete) {
-                this.showDialogToDelete([this.operationMsg])
-              } else if (item.operationType == MessageOperationType.Undo) {
-                this.showDialogToRevoke(this.operationMsg)
-              } else if (item.operationType == MessageOperationType.Forward) {
-                // 转发
-                this.forwardMessageAction = (selectedList: ConversationSelectModel[]) => {
-                  if (this.operationMsg?.message) {
-                    this.forwardMessages = [this.operationMsg.message]
-                    this.forwardConversations = selectedList
-                    this.currentConversationName = this.chatTeamInfo.team?.name
-                    this.forwardMessageDialog.open()
-                  }
-                }
-                this.forwardType = $r('app.string.chat_operation_forward')
-                this.pathStack.pushPath({
-                  name: 'ConversationSelectPage',
-                  param: new ConversationSelectParam([], conversationSelectLimitCount, this.forwardMessageAction)
-                })
-              } else if (item.operationType == MessageOperationType.Collection) {
-                // 收藏
-                this.chatViewModel.collectionMessage(this.operationMsg)
-              } else if (item.operationType == MessageOperationType.Pin) {
-                this.chatViewModel.pinMessage(this.operationMsg)
-              } else if (item.operationType == MessageOperationType.Unpin) {
-                this.chatViewModel.unpinMessage(this.operationMsg)
-              } else if (item.operationType == MessageOperationType.Select) {
-                this.chatViewModel.clearSelectMessage()
-                this.chatViewModel.addSelectMessage(this.operationMsg)
-                this.showMultiSelect = true
-              } else if (item.operationType == MessageOperationType.Reply) {
-                this.loadReplyInfo(this.operationMsg, true)
-              }
-            }
-          })
-            .position({ x: this.operationRect.x, y: this.operationRect.y })
-            .borderRadius(8)
-            .shadow(ShadowStyle.OUTER_DEFAULT_MD)
-
-        }
-      }.margin({ bottom: this.bottomMargin })
+        // .margin({ bottom: this.bottomMargin })
+        // .expandSafeArea([SafeAreaType.KEYBOARD])
+        .zIndex(1)
+      }
+      .margin({ bottom: this.bottomMargin })
       .expandSafeArea([SafeAreaType.KEYBOARD])
-      .zIndex(1)
     }
     .hideTitleBar(true)
     .onReady((context: NavDestinationContext) => {
@@ -1137,9 +1154,12 @@ export struct ChatTeamPage {
         // 发送失败的消息不可转发
         // 语音消息不可转发
         // 话单消息不可转发
-        if (message.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED ||
-          message.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO ||
-          message.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
+        // 远端反垃圾消息不可转发
+        if (message.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED
+          || message.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO
+          || message.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL
+          || message.isServerAntiSpam
+        ) {
           invalidMessages.push(message)
           continue
         }
@@ -1211,7 +1231,10 @@ export struct ChatTeamPage {
       let invalidDepth: boolean = false
       for (const message of this.chatViewModel.selectMsgMap.values()) {
         // 发送失败的消息不可转发
-        if (message.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED) {
+        // 远端反垃圾消息不可转发
+        if (message.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED
+          || message.isServerAntiSpam
+        ) {
           invalidMessages.push(message)
           invalidFail = true
           continue

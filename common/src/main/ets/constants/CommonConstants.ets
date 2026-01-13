@@ -67,4 +67,8 @@ export class CommonConstants {
    * 在线状态是否显示
    */
   static readonly KEY_SETTING_SHOWN_ONLINE_STATE: string = 'KEY_SETTING_SHOWN_ONLINE_STATE';
+  /**
+   * 反垃圾是否发送 TIP 消息
+   */
+  static readonly KEY_SETTING_ANTISPAM_TIP_MESSAGE: string = 'KEY_SETTING_ANTISPAM_TIP_MESSAGE';
 }

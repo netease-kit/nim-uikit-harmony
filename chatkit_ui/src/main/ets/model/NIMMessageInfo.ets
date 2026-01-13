@@ -24,7 +24,7 @@ import { fileUri } from '@kit.CoreFileKit'
 import { ChatConst } from '../constants/ChatConst'
 import { JSONUtil } from '@nimkit/common'
 import { BusinessError, systemDateTime } from '@kit.BasicServicesKit'
-import { V2NIMGetMediaResourceInfoResult, V2NIMMessageAIStreamStatus, V2NIMMessagePin } from '@nimsdk/base'
+import { NIMEStrAnyObj, V2NIMGetMediaResourceInfoResult, V2NIMMessageAIStreamStatus, V2NIMMessagePin } from '@nimsdk/base'
 import { ChatKitConfig } from '../ChatKitConfig'
 import { getMergedMessageContent, measureMessageHeight } from '../common/MessageHelper'
 import fs from '@ohos.file.fs'
@@ -70,6 +70,9 @@ export class NIMMessageInfo {
   revokeInfo: RevokeInfo | undefined = undefined
   //pin信息
   pinInfo: V2NIMMessagePin | undefined = undefined
+  // 是否被反垃圾
+  @Trace
+  isServerAntiSpam: boolean = false
 
   constructor(msg: V2NIMMessage) {
     this.message = msg
@@ -99,6 +102,9 @@ export class NIMMessageInfo {
 
     // 解析回复
     this.parseReply(message)
+
+    // 是否被反垃圾
+    this.isServerAntiSpam = this.getServerAntispam()
 
     this.messageHeight = -1
   }
@@ -324,6 +330,25 @@ export class NIMMessageInfo {
       }
     }
     return ''
+  }
+
+  private getServerAntispam(): boolean {
+    // 是否被反垃圾
+    if (!this.message.localExtension) {
+      return false
+    }
+
+    // is json && json.isServerAntispam = true, return true
+    try {
+      const json: NIMEStrAnyObj = JSON.parse(this.message.localExtension)
+      if (json.isServerAntispam) {
+        return true
+      } else {
+        return false
+      }
+    } catch (error) {
+      return false
+    }
   }
 }
 

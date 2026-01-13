@@ -6,7 +6,7 @@
  */
 
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
-import { V2NIMConversationType, V2NIMMessageSendingState, V2NIMMessageType } from '@nimsdk/base';
+import { V2NIMConversationType, V2NIMErrorCode, V2NIMMessageSendingState, V2NIMMessageType } from '@nimsdk/base';
 import { ChatInfo } from '../model/ChatInfo';
 import { getNotificationMessageContent, getPinMessagesTips } from '../common/MessageHelper';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
@@ -112,17 +112,33 @@ export struct SenderMessageComponent {
           }
           Column() {
             Row() {
-              if (this.message.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED) {
-                Image($r("app.media.ic_chat_message_status_fail")).width(16).height(16)
-                  .alignRules({
-                    bottom: { anchor: "msgContainer", align: VerticalAlign.Bottom },
-                    right: { anchor: "msgContainer", align: HorizontalAlign.Start }
-                  }).margin({ right: 6 })
-                  .onClick((event: ClickEvent) => {
-                    if (this.onMessageClick) {
-                      this.onMessageClick?.onSendFailClick?.(event, this.message)
-                    }
-                  })
+              if (this.message.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED
+                || this.message.message.messageStatus?.errorCode !== 200
+                || this.message.isServerAntiSpam) {
+                if (this.message.isServerAntiSpam || this.message.message.messageStatus?.errorCode === V2NIMErrorCode.V2NIM_ERROR_CODE_SERVER_ANTISPAM) {
+                  Image($r("app.media.ic_chat_message_status_fail_gray"))
+                    .width(16)
+                    .height(16)
+                    .alignRules({
+                      bottom: { anchor: "msgContainer", align: VerticalAlign.Bottom },
+                      right: { anchor: "msgContainer", align: HorizontalAlign.Start }
+                    })
+                    .margin({ right: 6 })
+                } else {
+                  Image($r("app.media.ic_chat_message_status_fail"))
+                    .width(16)
+                    .height(16)
+                    .alignRules({
+                      bottom: { anchor: "msgContainer", align: VerticalAlign.Bottom },
+                      right: { anchor: "msgContainer", align: HorizontalAlign.Start }
+                    })
+                    .margin({ right: 6 })
+                    .onClick((event: ClickEvent) => {
+                      if (this.onMessageClick) {
+                        this.onMessageClick?.onSendFailClick?.(event, this.message)
+                      }
+                    })
+                }
               } else if (this.message.message.sendingState ===
               V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SENDING) {
                 Progress({ value: 0, total: 100, type: ProgressType.Ring })

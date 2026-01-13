@@ -261,11 +261,13 @@ export function getOperateMenu(operateMsg: NIMMessageInfo | undefined): MessageO
       operationMoreDataList.push(undoItem)
     }
 
-    let selectItem = new MessageOperationItem()
-    selectItem.operationType = MessageOperationType.Select;
-    selectItem.operationText = $r('app.string.chat_operation_multi_select');
-    selectItem.operationImage = $r('app.media.ic_chat_menu_multi_select');
-    operationMoreDataList.push(selectItem);
+    if (operateMsg !== undefined && operateMsg.isServerAntiSpam === false) {
+      let selectItem = new MessageOperationItem()
+      selectItem.operationType = MessageOperationType.Select;
+      selectItem.operationText = $r('app.string.chat_operation_multi_select');
+      selectItem.operationImage = $r('app.media.ic_chat_menu_multi_select');
+      operationMoreDataList.push(selectItem);
+    }
 
     if (operateMsg !== undefined &&
       operateMsg.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SUCCEEDED
@@ -289,8 +291,12 @@ export function getOperateMenuSize(msgInfo: NIMMessageInfo | undefined) {
   }
   let localExtension = msgInfo?.message.localExtension;
   if (localExtension == undefined || !localExtension.includes(ChatConst.revokeLocalKey)) {
-    // 多选和删除
-    count = count + 2
+    // 删除
+    count++
+    if (msgInfo.isServerAntiSpam === false) {
+      // 多选
+      count++
+    }
     if (msgInfo !== undefined &&
       msgInfo.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
       // 复制

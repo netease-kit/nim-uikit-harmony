@@ -14,7 +14,6 @@ import {
   ViewItemArrow,
   ViewItemBuilder
 } from '@nimkit/common';
-
 import { router } from '@kit.ArkUI';
 import { ChatKitClient } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
 import { ConversationRepo, IMKitConfigCenter } from '@nimkit/chatkit';
@@ -36,6 +35,7 @@ export struct SettingPage {
   @Local readOrOpen: boolean = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_MESSAGE_READ_OR) ?? true
   @Local localConversationOrOpen: boolean = true
   @Local shownOnlineState: boolean = true
+  @Local antiSpamTipMessage: boolean = AppStorage.get(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE) ?? true
   dataPreferences: preferences.Preferences | undefined
   @Local firstItem: ViewItemArrow[] = [
     {
@@ -133,6 +133,12 @@ export struct SettingPage {
           }
         })
       },
+      {
+        title: $r('app.string.mine_setting_antispam_tip_message'),
+        itemHeight: 48,
+        isOpen: this.antiSpamTipMessage,
+        switchChange: this.antiSpamTipMessageChange
+      },
     ]
   }
 
@@ -152,6 +158,11 @@ export struct SettingPage {
 
   earpieceModeSwitchChange(isOpen: boolean) {
     AppStorage.set(CommonConstants.KEY_SETTING_EARPIECE_MODE, isOpen)
+  }
+
+  antiSpamTipMessageChange(isOpen: boolean) {
+    AppStorage.set(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE, isOpen)
+    IMKitConfigCenter.enableAntiSpamTipMessage = isOpen
   }
 
   readOrSwitchChange(isOpen: boolean) {

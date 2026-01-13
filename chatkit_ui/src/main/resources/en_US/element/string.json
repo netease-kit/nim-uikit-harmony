@@ -391,6 +391,50 @@
     {
       "name": "chat_message_empty_tip_text",
       "value": "One empty tip message"
+    },
+    {
+      "name": "chat_message_pornography_tip_label",
+      "value": "Pornography"
+    },
+    {
+      "name": "chat_message_ads_tip_label",
+      "value": "Ads"
+    },
+    {
+      "name": "chat_message_ad_law_tip_label",
+      "value": "Advertising Law"
+    },
+    {
+      "name": "chat_message_terror_and_violence_law_tip_label",
+      "value": "Terror and Violence"
+    },
+    {
+      "name": "chat_message_prohibited_tip_label",
+      "value": "Prohibited"
+    },
+    {
+      "name": "chat_message_politics_tip_label",
+      "value": "Politics"
+    },
+    {
+      "name": "chat_message_abusive_tip_label",
+      "value": "Abusive"
+    },
+    {
+      "name": "chat_message_spam_tip_label",
+      "value": "Spam"
+    },
+    {
+      "name": "chat_message_other_tip_label",
+      "value": "Other"
+    },
+    {
+      "name": "chat_message_values_issue_tip_label",
+      "value": "Values Issue"
+    },
+    {
+      "name": "chat_message_antispam_tip_format",
+      "value": "The content may involve %s. Please adjust and send."
     }
   ]
 }

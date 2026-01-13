@@ -18,6 +18,7 @@ function MinePageBuilder() {
 
 PersistentStorage.persistProp(CommonConstants.KEY_SETTING_EARPIECE_MODE, true)
 PersistentStorage.persistProp(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, true)
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE, true)
 
 @ComponentV2
 export struct MinePage {

@@ -1208,7 +1208,9 @@ export function sendMessageFailedTips(msg: V2NIMMessage, err: BusinessError, con
 
 export function isSupportMessage(msgInfo: NIMMessageInfo): boolean {
   let result = false
-  if (msgInfo.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+  if (msgInfo.isServerAntiSpam) { // 被反垃圾就不支持
+    result = false
+  } else if (msgInfo.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
     result = true
   } else if (msgInfo.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
     result = true

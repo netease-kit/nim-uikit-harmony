@@ -16,6 +16,7 @@ import { DeprecatedIndexButton } from '../other/DeprecatedIndexButton'
  * click the button to jump to different pages.
  */
 
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE, true)
 
 @Entry
 @ComponentV2
@@ -38,8 +39,8 @@ struct Index {
     let dataPreferences: preferences.Preferences | null = null;
     let options: preferences.Options = { name: 'imkit_data' };
     dataPreferences = preferences.getPreferencesSync(getContext(this), options);
-    IMKitConfigCenter.enableLocalConversation =
-      dataPreferences.getSync(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, true) as boolean
+    IMKitConfigCenter.enableLocalConversation = dataPreferences.getSync(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, true) as boolean
+    IMKitConfigCenter.enableAntiSpamTipMessage = AppStorage.get(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE) ?? true
     if (AppConfig.userId) {
       this.login(AppConfig.userId, AppConfig.userToken)
     } else {

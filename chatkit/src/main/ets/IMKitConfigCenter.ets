@@ -19,4 +19,8 @@ export class IMKitConfigCenter {
    * 是否启用 AI 数字人功能
    */
   @Trace static enableAI: boolean = false;
+  /**
+   * 是否反垃圾检测提示消息，控制消息发送后命中反垃圾，是否提示TIPS消息
+   */
+  @Trace static enableAntiSpamTipMessage: boolean = true;
 }

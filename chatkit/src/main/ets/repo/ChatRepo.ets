@@ -511,4 +511,14 @@ export class ChatRepo {
   static async sendTeamMessageReceipt(messages: V2NIMMessage[]): Promise<void> {
     return ChatKitClient.nim.messageService?.sendTeamMessageReceipts(messages)
   }
+
+  /**
+   * 更新消息本地扩展字段
+   * @param message 需要更新的消息体
+   * @param localExtension 本地扩展字段
+   * @return 更新成功的消息体
+   */
+  static async updateMessageLocalExtension(message: V2NIMMessage, localExtension: string): Promise<V2NIMMessage | undefined> {
+    return ChatKitClient.nim.messageService?.updateMessageLocalExtension(message, localExtension)
+  }
 }

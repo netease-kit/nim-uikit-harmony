@@ -14,6 +14,7 @@ import { V2NIMAIUser, V2NIMConversationType, V2NIMLocalConversation } from '@nim
 import { AitServer } from '../service/ait/AitService'
 import { ConversationViewItem } from '../view/ConversationViewItem'
 import { EndItemView } from '../view/EndItemView'
+import { FraudTipView } from '../view/FraudTipView'
 import { LocalConversationAIUserViewItem } from '../view/LocalConversationAIUserViewItem'
 import { LocalConversationNavigationView } from '../view/LocalConversationNavigationView'
 import { LocalConversationAIViewModel } from '../viewmodel/LocalConversationAIViewModel'
@@ -39,6 +40,17 @@ export struct LocalConversationPage {
 
   build() {
     NavDestination() {
+      // 防诈条
+      // 用Stack包裹，实现FraudTipView浮动在RelativeContainer上方
+      // 防诈条
+      FraudTipView({
+        pathStack: this.pathStack,
+        canReport: false,
+        canCancel: false
+      })
+        .zIndex(10)
+
+      // ai 数字人列表
       if (IMKitConfigCenter.enableAI && this.viewModelAI.isFinishedSyncLoad) {
         // 置顶数字人列表，可横向滑动
         List() {
