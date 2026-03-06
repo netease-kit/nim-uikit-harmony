@@ -36,6 +36,7 @@ export struct SettingPage {
   @Local localConversationOrOpen: boolean = true
   @Local shownOnlineState: boolean = true
   @Local antiSpamTipMessage: boolean = AppStorage.get(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE) ?? true
+  @Local cloudSearch: boolean = AppStorage.get(CommonConstants.KEY_SETTING_CLOUD_SEARCH) ?? false
   dataPreferences: preferences.Preferences | undefined
   @Local firstItem: ViewItemArrow[] = [
     {
@@ -66,6 +67,8 @@ export struct SettingPage {
     this.dataPreferences = preferences.getPreferencesSync(getContext(this), options);
     this.localConversationOrOpen =
       this.dataPreferences?.getSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, true) as boolean
+    this.shownOnlineState =
+      this.dataPreferences?.getSync(CommonConstants.KEY_SETTING_SHOWN_ONLINE_STATE, true) as boolean
     this.secondItems = [
       {
         title: $r('app.string.mine_setting_earpiece'),
@@ -139,6 +142,12 @@ export struct SettingPage {
         isOpen: this.antiSpamTipMessage,
         switchChange: this.antiSpamTipMessageChange
       },
+      {
+        title: $r('app.string.mine_setting_cloud_search'),
+        itemHeight: 48,
+        isOpen: this.cloudSearch,
+        switchChange: this.cloudSearchChange
+      },
     ]
   }
 
@@ -163,6 +172,11 @@ export struct SettingPage {
   antiSpamTipMessageChange(isOpen: boolean) {
     AppStorage.set(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE, isOpen)
     IMKitConfigCenter.enableAntiSpamTipMessage = isOpen
+  }
+
+  cloudSearchChange(isOpen: boolean) {
+    AppStorage.set(CommonConstants.KEY_SETTING_CLOUD_SEARCH, isOpen)
+    IMKitConfigCenter.enableCloudSearch = isOpen
   }
 
   readOrSwitchChange(isOpen: boolean) {

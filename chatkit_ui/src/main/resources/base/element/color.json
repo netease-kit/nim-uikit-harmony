@@ -41,6 +41,10 @@
       "value": "#FFFBEA"
     },
     {
+      "name": "color_chat_anchor_bg",
+      "value": "#DEF0FF"
+    },
+    {
       "name": "color_chat_page_bg",
       "value": "#FFFFFF"
     },

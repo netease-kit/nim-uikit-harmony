@@ -109,6 +109,13 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
   }
 
   toHandleReceiptMessage(messages: NIMMessageInfo[]) {
+    if (!messages || messages.length == 0) {
+      return
+    }
+    // 只有在页面可见时才处理已读回执
+    if (!this.isPageVisible) {
+      return
+    }
     // 发送已读回执
     let receiveMsg: NIMMessageInfo | undefined = undefined
     // 如果已读回执消息，大于当前列表中最后一条消息，则发送已读回执
@@ -209,7 +216,8 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
    * @param message
    */
   sendMessageReceipt(msg: NIMMessageInfo | undefined): void {
-    if (msg && ChatKitConfig.messageReadState) {
+    // 只有在页面可见时才发送已读回执
+    if (msg && ChatKitConfig.messageReadState && this.isPageVisible) {
       ChatRepo.sendP2PMessageReceipt(msg.message)
     }
   }

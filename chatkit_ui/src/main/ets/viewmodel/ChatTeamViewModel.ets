@@ -170,7 +170,18 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
   toHandleReceiveMessage(messages: NIMMessageInfo[]) {
     this.getTeamMemberInfoWithMessage(messages)
     this.getAndSendMessageReceipts(messages)
+  }
 
+  /**
+   * 消息发送成功后的处理，获取该消息的已读回执
+   * @param message 发送成功的消息
+   */
+  toHandleSendMessageSuccess(message: V2NIMMessage): void {
+    // 发送成功后，立即获取该消息的已读回执（解决单人群聊不显示已读状态的问题）
+    const msgInfo = this.chatTeamInfo?.getMessage(message.messageClientId)
+    if (msgInfo) {
+      this.getAndSendMessageReceipts([msgInfo])
+    }
   }
 
   toHandleQueryMessage(messages: NIMMessageInfo[], originMsg: V2NIMMessage[]) {
@@ -212,16 +223,26 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
           }
         }
       })
-      // 拉取消息已读回执
-      ChatRepo.getTeamMessageReceipts(receiptMessage).then((messageReadReceipt) => {
-        if (messageReadReceipt !== undefined) {
-          this.chatTeamInfo?.setTeamReadReadReceipt(messageReadReceipt)
+      // receiptMessage 拉取消息已读回执，一次执行最多 50 个
+      for (let i = 0; i < receiptMessage.length; i += 50) {
+        ChatRepo.getTeamMessageReceipts(receiptMessage.slice(i, i + 50))
+          .then((messageReadReceipt: V2NIMTeamMessageReadReceipt[] | undefined) => {
+            if (messageReadReceipt !== undefined) {
+              this.chatTeamInfo?.setTeamReadReadReceipt(messageReadReceipt)
+            }
+          })
+          .catch((error: Error) => {
+            console.error(error.name)
+          })
+      }
+
+      // sendReceiptMessage 发送消息已读回执，一次执行最多 50 个
+      // 只有在页面可见时才发送已读回执
+      if (this.isPageVisible) {
+        for (let i = 0; i < sendReceiptMessage.length; i += 50) {
+          ChatRepo.sendTeamMessageReceipt(sendReceiptMessage.slice(i, i + 50))
         }
-      }).catch((error: Error) => {
-        console.error(error.name)
-      })
-      // 发送消息已读回执
-      ChatRepo.sendTeamMessageReceipt(sendReceiptMessage)
+      }
     }
   }
 
@@ -310,10 +331,11 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
         });
     }
     if (requestUserAccountList.length > 0) {
-      ContactRepo.getUserList(requestUserAccountList).then((teamUserInfo: V2NIMUser[]) => {
+      // 使用 getUserListFromCloud 从云端获取用户信息，确保能获取到已退群用户的信息
+      ContactRepo.getUserListFromCloud(requestUserAccountList).then((teamUserInfo: V2NIMUser[]) => {
         this.chatTeamInfo?.addTeamUser(teamUserInfo)
       }).catch((error: Error) => {
-        console.error('netease getTeamMemberInfoWithMessage:getUserList ', error.name)
+        console.error('netease getTeamMemberInfoWithMessage:getUserListFromCloud ', error.name)
       })
     }
   }

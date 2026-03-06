@@ -8,11 +8,11 @@ import { promptAction } from '@kit.ArkUI';
 
 export class NECommonUtils {
   /// toast on bottom
-  public static showToast(msg: ResourceStr) {
+  public static showToast(msg: ResourceStr, alignment: Alignment = Alignment.Bottom) {
     try {
       promptAction.showToast({
         message: msg,
-        alignment: Alignment.Bottom
+        alignment: alignment
       });
     } catch (error) {
       console.error(`showToast args error code is ${error.code}, message is ${error.message}`);

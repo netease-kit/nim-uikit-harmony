@@ -33,15 +33,38 @@ export class ValidationMessageViewModel {
    */
   finished: boolean = false
   @Trace friendAddApplications: NEFriendAddApplication[] = []
+  /**
+   * 申请处理队列，用于防止并发时重复添加
+   */
+  private applicationQueue: V2NIMFriendAddApplication[] = []
+  private isProcessingApplication: boolean = false
+
   onFriendAddApplicationFun = async (application: V2NIMFriendAddApplication) => {
-    try {
-      const neApplication = await this.convertToNEFriendAddApplication(application, true)
-      if (neApplication) {
-        this.friendAddApplications.unshift(neApplication)
-      }
-    } catch (err) {
-      console.log(err)
+    this.applicationQueue.push(application)
+    await this.processApplicationQueue()
+  }
+
+  private async processApplicationQueue(): Promise<void> {
+    if (this.isProcessingApplication) {
+      return
     }
+    this.isProcessingApplication = true
+
+    while (this.applicationQueue.length > 0) {
+      const currentApplication = this.applicationQueue.shift()
+      if (currentApplication) {
+        try {
+          const neApplication = await this.convertToNEFriendAddApplication(currentApplication, true)
+          if (neApplication) {
+            this.friendAddApplications.unshift(neApplication)
+          }
+        } catch (err) {
+          console.log(err)
+        }
+      }
+    }
+
+    this.isProcessingApplication = false
   }
   onFriendAddRejectedFun = async (rejection: V2NIMFriendAddRejection) => {
     let currentApplication: V2NIMFriendAddApplication | undefined

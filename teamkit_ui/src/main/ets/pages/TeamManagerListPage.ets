@@ -17,8 +17,8 @@ import {
 } from '@nimkit/common'
 import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
 import { V2NIMTeamMemberRole, V2NIMTeamType } from '@nimsdk/base'
-import { ManagerSelectorParams } from './TeamMemberSelectorPage'
-import { TeamMangerListViewModel } from '../viewModel/TeamManagerListViewModel'
+import { managerLimit, TeamMangerListViewModel } from '../viewModel/TeamManagerListViewModel'
+import { ManagerSelectorParams, TeamMemberSelectorMode } from '@nimkit/chatkit/src/main/ets/model/TeamMemberSelector'
 
 /**
  * 群管理员列表
@@ -81,7 +81,8 @@ struct TeamManagerListPage {
       .onClick(() => {
         let params: ManagerSelectorParams = {
           teamId: this.teamId ?? '',
-          managerCount: this.viewModel.managerList.length
+          selectLimit: managerLimit - this.viewModel.managerList.length,
+          mode: TeamMemberSelectorMode.ADD_MANAGER
         }
         this.pathStack.pushPath({
           name: 'TeamMemberSelectorPage',

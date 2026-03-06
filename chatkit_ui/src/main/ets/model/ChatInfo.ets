@@ -9,6 +9,7 @@ import { ChatKitClient } from '@nimkit/chatkit';
 import { V2NIMMessagePin } from '@nimsdk/base';
 import { V2NIMMessage, V2NIMMessageSendingState } from '@nimsdk/base/src/main/ets/nim/sdk/V2NIMMessageService';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
+import { IsReceiveMsg, IsReceiveMsgOperation } from './IsReceiveMsg';
 
 @ObservedV2
 export class ChatInfo {
@@ -16,7 +17,7 @@ export class ChatInfo {
   @Trace onlineState: boolean = false
   @Trace msgList: MessageDataSource = new MessageDataSource();
   @Trace downloadProgressMap: Map<string, number> = new Map();
-  @Trace isReceiveMsg: boolean = false;
+  @Trace isReceiveMsg: IsReceiveMsg = new IsReceiveMsg(false);
   @Trace scrollIndex: number = -1; // 是否需要滚动到指定位置
   msgMap: Map<string, NIMMessageInfo> = new Map();
   @Trace msgPinMap: Map<string, V2NIMMessagePin> = new Map();
@@ -33,8 +34,14 @@ export class ChatInfo {
     this.targetId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversationId)
   }
 
-  setReceiveMsg(receiveMsg: boolean) {
-    this.isReceiveMsg = receiveMsg;
+  /**
+   * 中间态，正在处理中接收到的消息（包括 ADD/DELETE）
+   * @param receiveMsg False 为关闭
+   * @param messages 具体消息
+   * @param operation 默认 ADD
+   */
+  setReceiveMsg(receiveMsg: boolean, messages?: V2NIMMessage[], operation?: IsReceiveMsgOperation) {
+    this.isReceiveMsg = new IsReceiveMsg(receiveMsg, messages, operation)
   }
 
   setScrollIndex(index: number) {
@@ -138,8 +145,8 @@ export class ChatInfo {
   insertMessage(message: V2NIMMessage): NIMMessageInfo {
     let addIndex = this.msgList.searchInsertPosition(message.createTime)
     if (addIndex > this.msgList.totalCount()) {
-      let result = this.pushMessage(message)
-      this.setReceiveMsg(true)
+      let result: NIMMessageInfo = this.pushMessage(message)
+      this.setReceiveMsg(true, [message])
       return result
     } else {
       let lastMessageTime = 0
@@ -238,6 +245,10 @@ export class ChatInfo {
   }
 
   deleteMessage(msgClientId: string) {
+    const deletedMessage: NIMMessageInfo | undefined = this.getMessage(msgClientId)
+    if (deletedMessage !== undefined) {
+      this.setReceiveMsg(true, [deletedMessage.message], IsReceiveMsgOperation.DELETE)
+    }
     this.msgList.delete(msgClientId)
     this.msgMap.delete(msgClientId)
   }

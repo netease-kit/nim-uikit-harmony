@@ -5,13 +5,14 @@
  *
  */
 
-import { ChatKitClient, TeamRepo } from '@nimkit/chatkit'
+import { ChatKitClient, ContactRepo, TeamRepo } from '@nimkit/chatkit'
 import {
   V2NIMConversation,
   V2NIMConversationType,
   V2NIMFriendDeletionType,
   V2NIMTeam,
-  V2NIMTeamType
+  V2NIMTeamType,
+  V2NIMUser
 } from '@nimsdk/base'
 import { Constant } from '../loader/Constant'
 import { ConversationModel } from '../model/ConversationModel'
@@ -129,6 +130,12 @@ export class ConversationViewModel {
     this.model.onFriendInfoChangedHandler = async (accountId: string) => {
       await this.updateConversationById(this.model.p2pConversationId(accountId))
     }
+    //用户信息变更修改（昵称、头像等）
+    this.model.onUserProfileChangedHandler = async (users: V2NIMUser[]) => {
+      for (const user of users) {
+        await this.updateConversationById(this.model.p2pConversationId(user.accountId))
+      }
+    }
     //好友删除，别名不存在需要更新
     this.model.onFriendDeletedHandler = async (accountId: string, deletionType: V2NIMFriendDeletionType) => {
       await this.updateConversationById(this.model.p2pConversationId(accountId))
@@ -230,6 +237,36 @@ export class ConversationViewModel {
       this.data.conversationList = result.conversationList
       this.data.conversationList?.sort((a, b) => this.sortConversation(a, b))
       this.data.reloadData()
+      // 检查 P2P 会话是否有缺失用户信息的情况，如果有则从云端获取
+      this.ensureP2PUserInfo(result.conversationList)
+    }
+  }
+
+  /**
+   * 确保 P2P 会话的用户信息完整，缺失的从云端获取
+   * @param conversations 会话列表
+   */
+  private async ensureP2PUserInfo(conversations: V2NIMConversation[]) {
+    // 过滤出 P2P 会话中 name 为空或等于 accountId 的会话
+    const missingUserInfoAccountIds = conversations
+      .filter((conversation) => {
+        if (conversation.type !== V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
+          return false
+        }
+        const targetId = this.model.parseConversationTargetId(conversation.conversationId)
+        // name 为空或等于 accountId 表示缺失用户信息
+        return !conversation.name || conversation.name === targetId
+      })
+      .map((conversation) => this.model.parseConversationTargetId(conversation.conversationId))
+
+    if (missingUserInfoAccountIds.length > 0) {
+      try {
+        // 从云端获取缺失的用户信息
+        await ContactRepo.getUserListFromCloud(missingUserInfoAccountIds)
+        // 用户信息更新后会触发 onUserProfileChanged 回调，自动更新会话列表
+      } catch (e) {
+        console.error(`ensureP2PUserInfo failed: ${e}`)
+      }
     }
   }
 

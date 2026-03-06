@@ -12,12 +12,15 @@ import {
   V2NIMMessage,
   V2NIMMessageDeletedNotification,
   V2NIMMessageListOption,
+  V2NIMMessageListResult,
   V2NIMMessagePin,
   V2NIMMessagePinNotification,
   V2NIMMessageRefer,
   V2NIMMessageRevokeNotification,
   V2NIMMessageRevokeParams,
+  V2NIMMessageSearchExParams,
   V2NIMMessageSearchParams,
+  V2NIMMessageSearchResult,
   V2NIMP2PMessageReadReceipt,
   V2NIMSendMessageParams,
   V2NIMSendMessageResult,
@@ -191,6 +194,38 @@ export class ChatRepo {
   static async searchCloudMessages(params: V2NIMMessageSearchParams): Promise<V2NIMMessage[]> {
     let messageList = await ChatKitClient.nim.messageService!!.searchCloudMessages(params)
     return messageList ?? [];
+  }
+
+  /**
+   * 检索本地 FTS 消息
+   *
+   * @param params 检索参数
+   */
+  static async searchLocalMessages(params: V2NIMMessageSearchExParams): Promise<V2NIMMessageSearchResult> {
+    const searchResult: V2NIMMessageSearchResult = await ChatKitClient.nim.messageService!.searchLocalMessages(params)
+    return searchResult;
+  }
+
+  /**
+   * 检索云端 FTS 消息
+   *
+   * @param params 检索参数
+   */
+  static async searchCloudMessagesEx(params: V2NIMMessageSearchExParams): Promise<V2NIMMessageSearchResult> {
+    const searchResult: V2NIMMessageSearchResult = await ChatKitClient.nim.messageService!.searchCloudMessagesEx(params)
+    return searchResult;
+  }
+
+  /**
+   * 获取消息列表（扩展版）
+   * 支持分页和更多查询选项
+   *
+   * @param option 查询参数
+   * @returns 消息列表结果，包含消息数组和是否有更多
+   */
+  static async getMessageListEx(option: V2NIMMessageListOption): Promise<V2NIMMessageListResult> {
+    const result: V2NIMMessageListResult = await ChatKitClient.nim.messageService!.getMessageListEx(option)
+    return result;
   }
 
   /**
@@ -368,7 +403,9 @@ export class ChatRepo {
    */
   static async createImageMessage(imagePath: string, name?: string, sceneName?: string, width?: number,
     height?: number): Promise<V2NIMMessage> {
-    return ChatKitClient.nim.messageCreator.createImageMessage(imagePath, name, sceneName, width, height);
+    const imageMessage: V2NIMMessage = await ChatKitClient.nim.messageCreator.createImageMessage(imagePath, name, sceneName, width, height);
+    imageMessage.text = name
+    return imageMessage;
   }
 
   /**
@@ -396,7 +433,9 @@ export class ChatRepo {
    */
   static async createVideoMessage(videoPath: string, name?: string, sceneName?: string, duration?: number,
     width?: number, height?: number): Promise<V2NIMMessage> {
-    return ChatKitClient.nim.messageCreator.createVideoMessage(videoPath, name, sceneName, duration, width, height);
+    const videoMessage: V2NIMMessage = await ChatKitClient.nim.messageCreator.createVideoMessage(videoPath, name, sceneName, duration, width, height);
+    videoMessage.text = name
+    return videoMessage;
   }
 
   /**
@@ -407,7 +446,9 @@ export class ChatRepo {
    * @param sceneName 场景名
    */
   static async createFileMessage(filePath: string, name?: string, sceneName?: string): Promise<V2NIMMessage> {
-    return ChatKitClient.nim.messageCreator.createFileMessage(filePath, name, sceneName);
+    const fileMessage: V2NIMMessage = await ChatKitClient.nim.messageCreator.createFileMessage(filePath, name, sceneName);
+    fileMessage.text = name
+    return fileMessage;
   }
 
   /**

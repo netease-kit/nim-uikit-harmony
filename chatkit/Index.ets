@@ -84,3 +84,5 @@ export { KitLogger as Logger } from './src/main/ets/logger/AppLogger'
 export { IMKitConfigCenter } from './src/main/ets/IMKitConfigCenter'
 
 export { TeamSettingParam } from './src/main/ets/model/TeamSettingParam'
+
+export { ManagerSelectorParams, TeamMemberSelectorMode } from './src/main/ets/model/TeamMemberSelector'

@@ -2,12 +2,21 @@
 export struct MatchSearchText {
   @Param allText: string = ""
   @Param searchText: string = ""
-  @Param fontSize: number = 14
+  @Param fontSize: number | Resource = 14
   @Param normalFontColor: ResourceColor = "#333333"
   @Param highlightFontColor: ResourceColor = "#337EFF"
+  @Param showFullText: boolean = false
+
+  // 检查是否能在原文中找到搜索关键词
+  canFindKeyword(): boolean {
+    if (!this.allText || !this.searchText) {
+      return false
+    }
+    return this.allText.toLowerCase().indexOf(this.searchText.toLowerCase()) >= 0
+  }
 
   startOfSearchText() {
-    return this.allText?.indexOf(this.searchText)
+    return this.allText?.toLowerCase().indexOf(this.searchText.toLowerCase())
   }
 
   endOfSearchText() {
@@ -15,38 +24,83 @@ export struct MatchSearchText {
   }
 
   startText() {
+    // showFullText 为 true 时不做截断，直接返回关键词前的完整文本
+    if (this.showFullText) {
+      const index = this.allText.toLowerCase().indexOf(this.searchText.toLowerCase())
+      if (index >= 0) {
+        return this.allText.substring(0, index)
+      }
+      return this.allText
+    }
     const result = this.extractKeywordCenteredSubstring(this.allText, this.searchText, 16)
-    const index = result.indexOf(this.searchText)
+    const index = result.toLowerCase().indexOf(this.searchText.toLowerCase())
     const start = result.substring(0, index)
     return start
   }
 
   endText() {
+    // showFullText 为 true 时不做截断，直接返回关键词后的完整文本
+    if (this.showFullText) {
+      const index = this.allText.toLowerCase().indexOf(this.searchText.toLowerCase())
+      if (index >= 0) {
+        return this.allText.substring(index + this.searchText.length)
+      }
+      return ""
+    }
     const result = this.extractKeywordCenteredSubstring(this.allText, this.searchText, 16)
-    const index = result.indexOf(this.searchText)
+    const index = result.toLowerCase().indexOf(this.searchText.toLowerCase())
     const end = result.substring(index + this.searchText.length, result.length)
     return end
   }
 
-  build() {
-    Text() {
-      Span(this.startText())
-        .fontSize(this.fontSize)
-        .fontColor(this.normalFontColor)
-
-      Span(this.searchText)
-        .fontColor(this.highlightFontColor)
-        .fontSize(this.fontSize)
-
-      Span(this.endText())
-        .fontSize(this.fontSize)
-        .fontColor(this.normalFontColor)
-
+  // 获取实际匹配的文本（保持原始大小写）
+  getMatchedText() {
+    // showFullText 为 true 时直接从原始文本中获取匹配文本
+    if (this.showFullText) {
+      const index = this.allText.toLowerCase().indexOf(this.searchText.toLowerCase())
+      if (index >= 0) {
+        return this.allText.substring(index, index + this.searchText.length)
+      }
+      return this.searchText
     }
-    .maxLines(1)
-    .textOverflow({
-      overflow: TextOverflow.Ellipsis
-    })
+    const result = this.extractKeywordCenteredSubstring(this.allText, this.searchText, 16)
+    const index = result.toLowerCase().indexOf(this.searchText.toLowerCase())
+    if (index >= 0) {
+      return result.substring(index, index + this.searchText.length)
+    }
+    return this.searchText
+  }
+
+  build() {
+    // 如果找不到关键词匹配，直接展示原文本，不进行高亮拼接
+    if (!this.canFindKeyword()) {
+      Text(this.allText)
+        .fontSize(this.fontSize)
+        .fontColor(this.normalFontColor)
+        .maxLines(this.showFullText ? 100 : 1)
+        .textOverflow({
+          overflow: TextOverflow.Ellipsis
+        })
+    } else {
+      Text() {
+        Span(this.startText())
+          .fontSize(this.fontSize)
+          .fontColor(this.normalFontColor)
+
+        Span(this.getMatchedText())
+          .fontColor(this.highlightFontColor)
+          .fontSize(this.fontSize)
+
+        Span(this.endText())
+          .fontSize(this.fontSize)
+          .fontColor(this.normalFontColor)
+
+      }
+      .maxLines(this.showFullText ? 100 : 1)
+      .textOverflow({
+        overflow: TextOverflow.Ellipsis
+      })
+    }
   }
 
   extractKeywordCenteredSubstring(str: string, keyword: string, length: number): string {
@@ -61,7 +115,8 @@ export struct MatchSearchText {
       return keyword.substring(0, length);
     }
 
-    const keywordIndex = str.indexOf(keyword);
+    // 使用大小写不敏感的搜索
+    const keywordIndex = str.toLowerCase().indexOf(keyword.toLowerCase());
     if (keywordIndex === -1) {
       return ""; // 或 throw new Error("Keyword not found");
     }

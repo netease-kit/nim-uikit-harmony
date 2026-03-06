@@ -23,6 +23,7 @@ import { V2NIMLocalConversationServiceImpl } from '@nimsdk/localconversation'
 import { ChatKitUIClient } from '@nimkit/chatkit_ui/Index'
 import { V2NIMSignallingServiceImpl } from '@nimsdk/signalling'
 import { CallKitClient } from '../callkit/ChatKitUIClient'
+import { V2NIMSearchServiceImpl } from '@nimsdk/search'
 
 export class NimRepository {
   private static instance?: NimRepository
@@ -79,7 +80,7 @@ export class NimRepository {
     }
 
     let serviceOptions: NIMServiceOptions = {
-      loginServiceConfig: {},
+      loginServiceConfig: {}
     }
 
 
@@ -114,6 +115,12 @@ export class NimRepository {
         databaseServiceConfig: {
           encrypt: false,
           appKey: AppConfig.appKey,
+        },
+        searchServiceConfig: {
+          searchAccountIdEnabled: true
+        },
+        localConversationServiceConfig: {
+          clearUnreadAfterDeleteConversation: true
         }
       }
     }
@@ -134,6 +141,7 @@ export class NimRepository {
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_USER, (core, serviceName, serviceConfig) => new V2NIMUserServiceImpl(core, serviceName, serviceConfig));
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_FRIEND, (core, serviceName, serviceConfig) => new V2NIMFriendServiceImpl(core, serviceName, serviceConfig));
     NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_SIGNALLING, (core, serviceName, serviceConfig) => new V2NIMSignallingServiceImpl(core, serviceName, serviceConfig));
+    NIMSdk.registerCustomServices(V2NIMProvidedServiceType.V2NIM_PROVIDED_SERVICE_SEARCH, (core, serviceName, serviceConfig) => new V2NIMSearchServiceImpl(core, serviceName, serviceConfig));
     initializeOptions.isOpenConsoleLog = true
     this._nim = NIMSdk.newInstance(this._context, initializeOptions, serviceOptions)
     console.log("nim from initNim: " + this._nim)

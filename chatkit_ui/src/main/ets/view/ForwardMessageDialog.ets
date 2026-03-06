@@ -18,6 +18,8 @@ export struct ForwardMessageDialog {
   forwardType: ResourceStr = $r('app.string.chat_operation_forward') // 转发类型：转发、合并转发、逐条转发
   currentConversationName?: string
   sendForwardMsg?: (leaveText: string | undefined) => void
+  // 弹窗关闭回调，用于通知父组件弹窗已关闭
+  onDialogClose?: () => void
 
   build() {
     Column() {
@@ -130,6 +132,7 @@ export struct ForwardMessageDialog {
           .width(135)
           .height(52)
           .onClick(() => {
+            this.onDialogClose?.()
             this.controller?.close()
           })
 
@@ -146,6 +149,7 @@ export struct ForwardMessageDialog {
           .height(52)
           .onClick(() => {
             this.sendForwardMsg?.(this.leaveText)
+            this.onDialogClose?.()
             this.controller?.close()
           })
       }

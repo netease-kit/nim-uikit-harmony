@@ -1,13 +1,18 @@
 /*
- * Copyright (c) 2022 NetEase, Inc. All rights reserved.
- * Use of this source code is governed by a MIT license that can be
- * found in the LICENSE file.
- *
+ *  Copyright (c) 2022 NetEase, Inc. All rights reserved.
+ *  Use of this source code is governed by a MIT license that can be
+ *  found in the LICENSE file.
  */
 
 import { NEEmojiParseResult } from '../manager/NEEmojiManager'
-import { V2NIMConversationType, V2NIMErrorMap, V2NIMMessageFileAttachment, V2NIMMessageLocationAttachment, V2NIMMessageType } from '@nimsdk/base'
 import {
+  V2NIMConversationType,
+  V2NIMMessageFileAttachment,
+  V2NIMMessageLocationAttachment,
+  V2NIMMessageType
+} from '@nimsdk/base'
+import {
+  formatVideoDuration,
   getAitNodes,
   getCallMessageIcon,
   getCallMessageText,
@@ -17,6 +22,7 @@ import {
   getImageHeight,
   getImageWidth,
   getReplyMessageText,
+  getVideoDuration,
   getVideoMessageThumbnail,
   getVideoMessageUrl,
   parseMessageText,
@@ -36,6 +42,7 @@ import { ChatInfo } from '../model/ChatInfo'
 import { Markdown } from '@nimkit/markdown'
 import { get } from '@nimsdk/vendor'
 import { ChatKitUIClient } from '../ChatKitUIClient'
+import { http } from '@kit.NetworkKit'
 
 @ComponentV2
 export struct messageContent {
@@ -96,6 +103,40 @@ export struct pinMessageContent {
   build() {
     if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
       pinTextBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
+      pinLocationBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
+      imageBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
+      videoBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE) {
+      fileBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
+      MessageAudioItemView({ message: this.message, onMessageClick: this.onMessageClick, isReceiveStyle: true });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
+      callBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM) {
+      if (this.message.isMergeMsg) {
+        mergedMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick }).width('80%')
+      } else {
+        unknownBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+      }
+    } else {
+      unknownBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+    }
+  }
+}
+
+@ComponentV2
+export struct memberHistoryMessageContent {
+  @BuilderParam
+  message: NIMMessageInfo
+  @BuilderParam
+  onMessageClick?: MessageItemClick
+
+  build() {
+    if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+      historyTextBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
       pinLocationBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
@@ -388,6 +429,47 @@ export struct pinTextBuilder {
   }
 }
 
+
+@ComponentV2
+export struct historyTextBuilder {
+  @BuilderParam
+  message: NIMMessageInfo
+  @BuilderParam
+  onMessageClick: MessageItemClick | undefined
+
+  build() {
+    Column() {
+      Text() {
+        ForEach(parseMessageText(this.message.message.text?.trimStart()?.trimEnd()), (item: NEEmojiParseResult) => {
+          if (item.text) {
+            Span(item.text)
+              .fontSize($r('app.float.chat_message_text_font_size'))
+              .textCase(TextCase.Normal)
+              .fontColor($r('app.color.color_chat_title'))
+          } else if (item.emoji) {
+            ImageSpan($rawfile(`emoji/${item.emoji.file}`)).width('18')
+              .height('18')
+              .objectFit(ImageFit.Fill)
+              .verticalAlign(ImageSpanAlignment.CENTER)
+          }
+        })
+      }
+      .fontColor($r('app.color.color_chat_title'))
+      .lineHeight(20)
+      .fontSize($r('app.float.chat_subtitle_text_font_size'))
+      .textOverflow({ overflow: TextOverflow.Ellipsis })
+      .ellipsisMode(EllipsisMode.END)
+      .padding({
+        left: 14,
+        right: 14,
+        top: 10,
+        bottom: 10
+      })
+      // .margin({ top: 6 })
+    }
+  }
+}
+
 @ComponentV2
 export struct imageBuilder {
   @BuilderParam
@@ -407,6 +489,10 @@ export struct imageBuilder {
         .gesture(LongPressGesture().onAction((event: GestureEvent) => {
           this.onMessageClick?.onItemLongClick?.(event, this.message)
         }), GestureMask.IgnoreInternal)
+        .onComplete(() => {
+          // 图片加载完成后，缓存 PixelMap（用于预览时作为占位图）
+          this.cacheThumbPixelMap()
+        })
     }
   }
 
@@ -415,6 +501,60 @@ export struct imageBuilder {
     this.message.getImageThumbUrl().then((thumbUrl) => {
       this.thumbUrl = thumbUrl
     })
+  }
+
+  /**
+   * 缓存缩略图的 PixelMap
+   * 用于在图片预览时，网络不可用的情况下作为占位图显示，避免黑屏
+   */
+  private cacheThumbPixelMap(): void {
+    // 如果已经缓存过，则不再重复缓存
+    if (this.message.cachedThumbPixelMap) {
+      return
+    }
+
+    const imageUrl = this.thumbUrl ?? this.url
+    if (!imageUrl) {
+      return
+    }
+
+    // 本地文件路径直接使用 createImageSource
+    if (imageUrl.startsWith('file://') || imageUrl.startsWith('/')) {
+      try {
+        const filePath = imageUrl.startsWith('file://') ? imageUrl.replace('file://', '') : imageUrl
+        const imageSource = image.createImageSource(filePath)
+        imageSource.createPixelMap().then((pixelMap) => {
+          this.message.cachedThumbPixelMap = pixelMap
+        }).catch((err: Error) => {
+          console.debug('netease cacheThumbPixelMap createPixelMap failed:', err.message)
+        })
+      } catch (err) {
+        console.debug('netease cacheThumbPixelMap failed:', err)
+      }
+    } else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      // 网络图片需要先下载再创建 PixelMap
+      import('@ohos.net.http')
+        .then((httpModule) => {
+        const httpRequest = http.createHttp()
+        httpRequest.request(imageUrl, {
+          method: http.RequestMethod.GET,
+          expectDataType: http.HttpDataType.ARRAY_BUFFER
+        }).then((response) => {
+          if (response.responseCode === 200 && response.result instanceof ArrayBuffer) {
+            const imageSource = image.createImageSource(response.result)
+            imageSource.createPixelMap().then((pixelMap) => {
+              this.message.cachedThumbPixelMap = pixelMap
+            }).catch((err: Error) => {
+              console.debug('netease cacheThumbPixelMap createPixelMap from http failed:', err.message)
+            })
+          }
+        }).catch((err: Error) => {
+          console.debug('netease cacheThumbPixelMap http request failed:', err.message)
+        }).finally(() => {
+          httpRequest.destroy()
+        })
+      })
+    }
   }
 }
 
@@ -475,6 +615,16 @@ export struct videoBuilder {
         .color(Color.White)// 进度条前景色为灰色
         .style({ strokeWidth: 3 })// 设置strokeWidth进度条宽度为15.0vp
         .visibility(this.showLoading() ? Visibility.Visible : Visibility.Hidden)
+
+      // 视频时长显示
+      Text(formatVideoDuration(getVideoDuration(this.message)))
+        .fontSize(12)
+        .fontColor(Color.White)
+        .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+        .backgroundColor('rgba(0, 0, 0, 0.5)')
+        .borderRadius(4)
+        .position({ right: 6, bottom: 6 })
+        .visibility(getVideoDuration(this.message) > 0 ? Visibility.Visible : Visibility.Hidden)
     }.gesture(LongPressGesture().onAction((event: GestureEvent) => {
       this.onMessageClick?.onItemLongClick?.(event, this.message)
     }), GestureMask.IgnoreInternal)
@@ -571,7 +721,7 @@ export struct fileBuilder {
           .width('100%')
           .height(20)
           .maxLines(1)
-          .ellipsisMode(EllipsisMode.END)
+          .ellipsisMode(EllipsisMode.CENTER)
         Text(getFileMessageSize(this.message))
           .fontColor('#666666')
           .fontSize(10)

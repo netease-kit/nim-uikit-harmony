@@ -50,14 +50,14 @@ export class ChatUserInfo extends ChatInfo {
     }
     this.readReceipt = readReceipt
     let readCount = -1
-    for (let index = super.msgList.totalCount() - 1; index >= 0; index--) {
-      if (super.msgList.messageData[index].readCount > 0) {
+    for (let index = this.msgList.totalCount() - 1; index >= 0; index--) {
+      if (this.msgList.messageData[index].readCount > 0) {
         break
-      } else if (readCount == -1) {
-        let hasRead = readReceipt?.timestamp >= super.msgList.messageData[index].getCreateTime()
+      } else if (readCount == -1 || readCount == 0) { // 没算过 or 还没到
+        let hasRead = readReceipt?.timestamp >= this.msgList.messageData[index].getCreateTime()
         readCount = hasRead ? 1 : 0;
       }
-      super.msgList.messageData[index].readCount = readCount
+      this.msgList.messageData[index].readCount = readCount
     }
   }
 

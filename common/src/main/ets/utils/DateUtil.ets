@@ -46,24 +46,46 @@ export class DateUtil {
   /**
    * 时间戳序列化
    * @param timestamp
+   * @param isLocalized 是否使用本地化格式（中文：x年x月x日，英文：x-x-x）
    * @returns
    */
-  static formatTimestamp(timestamp: number): string {
+  static formatTimestamp(timestamp: number, isLocalized: boolean = false): string {
     const currentDate = new Date();
     const targetDate = new Date(timestamp);
     const yearDiff = currentDate.getFullYear() - targetDate.getFullYear();
     const monthDiff = currentDate.getMonth() - targetDate.getMonth();
     const dayDiff = currentDate.getDate() - targetDate.getDate();
 
+    const year = targetDate.getFullYear();
+    const month = targetDate.getMonth() + 1;
+    const day = targetDate.getDate();
+    const hours = targetDate.getHours().toString().padStart(2, '0');
+    const minutes = targetDate.getMinutes().toString().padStart(2, '0');
+
     if (yearDiff > 0) {
-      return `${targetDate.getFullYear()}-${targetDate.getMonth() + 1}-${targetDate.getDate()}`;
+      // 跨年
+      if (isLocalized) {
+        try {
+          const formatStr = getContext().resourceManager.getStringByNameSync('date_format_year_month_day');
+          return formatStr.replace('%d', year.toString()).replace('%d', month.toString()).replace('%d', day.toString());
+        } catch (e) {
+          return `${year}-${month}-${day}`;
+        }
+      }
+      return `${year}-${month}-${day}`;
     } else if (monthDiff > 0 || dayDiff > 0) {
-      const hours = targetDate.getHours().toString().padStart(2, '0');
-      const minutes = targetDate.getMinutes().toString().padStart(2, '0');
-      return `${targetDate.getMonth() + 1}-${targetDate.getDate()} ${hours}:${minutes}`;
+      // 跨月或跨日
+      if (isLocalized) {
+        try {
+          const formatStr = getContext().resourceManager.getStringByNameSync('date_format_month_day');
+          return formatStr.replace('%d', month.toString()).replace('%d', day.toString()) + ` ${hours}:${minutes}`;
+        } catch (e) {
+          return `${month}-${day} ${hours}:${minutes}`;
+        }
+      }
+      return `${month}-${day} ${hours}:${minutes}`;
     } else {
-      const hours = targetDate.getHours().toString().padStart(2, '0');
-      const minutes = targetDate.getMinutes().toString().padStart(2, '0');
+      // 当天
       return `${hours}:${minutes}`;
     }
   }

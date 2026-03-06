@@ -92,6 +92,10 @@ export function getNotificationMessageContent(messageInfo: NIMMessageInfo, chatU
     } else if (attachment.type == V2NIMMessageNotificationType.V2NIM_MESSAGE_NOTIFICATION_TYPE_TEAM_KICK) {
       let kickContent = getContext().resourceManager.getStringByNameSync('chat_team_notify_kick_title');
       return targetName + kickContent;
+    } else if (attachment.type == V2NIMMessageNotificationType.V2NIM_MESSAGE_NOTIFICATION_TYPE_TEAM_OWNER_TRANSFER) {
+      // 群主转移通知：xxx转移了群主身份给你（或者xxx）
+      let transferContent = getContext().resourceManager.getStringByNameSync('chat_team_notify_owner_transfer');
+      return fromAccount + transferContent + targetName;
     } else if (attachment.type == V2NIMMessageNotificationType.V2NIM_MESSAGE_NOTIFICATION_TYPE_TEAM_LEAVE) {
       let leaveContent = getContext().resourceManager.getStringByNameSync('chat_team_notify_leave_title');
       return fromAccount + leaveContent.toString();
@@ -499,12 +503,37 @@ export function getAitNodes(startIndex: number, text: string, extension?: string
         for (let segment of value.segments) {
           if (segment.start >= startIndex
             && segment.start < startIndex + text.length) {
-            let node: ChatAitNode = {
-              text: value.text,
-              segment: segment,
-              account: key
+            // 计算 segment 在当前 text 中的位置
+            const segmentStartInText = segment.start - startIndex
+            const segmentEndInText = segment.end - startIndex
+
+            // 边界检查，确保索引在有效范围内
+            let success: boolean = false
+            if (segmentStartInText >= 0 && segmentEndInText <= text.length && segmentStartInText < segmentEndInText) {
+              const actualText = text.substring(segmentStartInText, segmentEndInText)
+
+              // 验证 @ 标记的文本与消息实际内容是否匹配（去除首尾空格后比较）
+              if (actualText.trim() === value.text.trim()) {
+                let node: ChatAitNode = {
+                  text: value.text,
+                  segment: segment,
+                  account: key
+                }
+                segments.push(...[node])
+                success = true
+              }
             }
-            segments.push(...[node])
+
+            // 如果失败，使用默认直接添加逻辑
+            if (!success) {
+              // 索引超出边界，直接添加（保持原有行为）
+              let node: ChatAitNode = {
+                text: value.text,
+                segment: segment,
+                account: key
+              }
+              segments.push(...[node])
+            }
           }
         }
       }
@@ -528,9 +557,10 @@ export function getAitNodes(startIndex: number, text: string, extension?: string
       endIndex = segment.segment?.end ?? 0
     }
     //添加最后非@的Text
-    if (endIndex < startIndex + text.length) {
+    // 使用 lastStartIndex 而不是 endIndex，因为 lastStartIndex 已经考虑了 @节点 后面的空格
+    if (lastStartIndex < startIndex + text.length) {
       let textNode: ChatAitNode = {
-        text: text.substring(endIndex - startIndex)
+        text: text.substring(lastStartIndex - startIndex)
       }
       aitNodes.push(...[textNode])
     }
@@ -869,7 +899,19 @@ export async function createForwardMessageListFileDetail(messages: V2NIMMessage[
       data["sessionId"] = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(chatInfo.conversationId)
       data["depth"] = depth
       data["abstracts"] = buildBody(msgList, chatInfo)[1]
-      if (chatInfo.conversationName) {
+      // 合并转发消息标题：群聊使用群名称，P2P使用对方昵称（不带备注名，因为转发给其他人时接收方看不到发送方的好友备注）
+      const conversationType = ChatKitClient.nim.conversationIdUtil.parseConversationType(chatInfo.conversationId)
+      let sessionName: string | undefined
+      if (conversationType === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
+        // 群聊：直接使用群名称
+        sessionName = chatInfo.conversationName
+      } else {
+        // P2P：使用对方的昵称
+        sessionName = chatInfo.getChatUserShowName(chatInfo.targetId, false, false)
+      }
+      if (sessionName) {
+        data["sessionName"] = sessionName
+      } else if (chatInfo.conversationName) {
         data["sessionName"] = chatInfo.conversationName
       }
 
@@ -879,6 +921,9 @@ export async function createForwardMessageListFileDetail(messages: V2NIMMessage[
       jsonData["type"] = mergedMessageCustomType
 
       let text = `[${getContext().resourceManager.getStringByNameSync('chatHistoryBrief')}]`
+      if (messages.length > 0 && messages[0] && messages[0].text) {
+        text += messages[0].text // 把合并消息的第一条内容的 text 放在合并后消息里面
+      }
       let rawAttach = JSON.stringify(jsonData)
       let mergeMessage = ChatRepo.createCustomMessage(text, rawAttach)
       return mergeMessage
@@ -925,6 +970,36 @@ export function getMessageVideoRatio(message?: NIMMessageInfo) {
     return attachment.width / attachment.height
   }
   return 0
+}
+
+/**
+ * 获取视频消息的时长（毫秒）
+ */
+export function getVideoDuration(message: NIMMessageInfo): number {
+  if (message.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
+    const attachment = message.message.attachment as V2NIMMessageVideoAttachment
+    if (attachment && attachment.duration) {
+      return attachment.duration
+    }
+  }
+  return 0
+}
+
+/**
+ * 格式化视频时长为 mm:ss 格式
+ * @param durationMs 时长（毫秒）
+ * @returns 格式化后的时长字符串
+ */
+export function formatVideoDuration(durationMs: number): string {
+  if (durationMs <= 0) {
+    return '00:00'
+  }
+  const totalSeconds = Math.floor(durationMs / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  const minutesStr = minutes < 10 ? `0${minutes}` : `${minutes}`
+  const secondsStr = seconds < 10 ? `0${seconds}` : `${seconds}`
+  return `${minutesStr}:${secondsStr}`
 }
 
 export async function downloadAttachment(msg: NIMMessageInfo, path: string, chatInfo?: ChatInfo) {
@@ -975,6 +1050,8 @@ export async function getMessageImageUrls(message?: NIMMessageInfo, chatInfo?: C
         if (fs.accessSync(path)) {
           const uri = fileUri.getUriFromPath(path)
           model.imageUrls.push(uri)
+          // 缓存 PixelMap（本地图片无需使用缓存，传 undefined）
+          model.thumbPixelMaps.push(undefined)
 
           // 当前点击的图片
           if (msg?.message.messageClientId === message?.message.messageClientId) {
@@ -986,6 +1063,8 @@ export async function getMessageImageUrls(message?: NIMMessageInfo, chatInfo?: C
           const imageThumbUrl = ChatKitClient.nim.storageUtil?.imageThumbUrl(imageAttach.url, 350)
           if (imageThumbUrl) {
             model.imageUrls.push(imageThumbUrl)
+            // 缓存 PixelMap（用于网络不可用时显示占位图）
+            model.thumbPixelMaps.push(msg.cachedThumbPixelMap)
 
             // 当前点击的图片
             if (msg?.message.messageClientId === message?.message.messageClientId) {

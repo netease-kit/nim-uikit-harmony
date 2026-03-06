@@ -23,4 +23,8 @@ export class IMKitConfigCenter {
    * 是否反垃圾检测提示消息，控制消息发送后命中反垃圾，是否提示TIPS消息
    */
   @Trace static enableAntiSpamTipMessage: boolean = true;
+  /**
+   * 是否开启云端搜索功能
+   */
+  @Trace static enableCloudSearch = false
 }

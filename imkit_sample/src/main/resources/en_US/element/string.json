@@ -101,6 +101,10 @@
       "value": "文本安全提示"
     },
     {
+      "name": "mine_setting_cloud_search",
+      "value": "Cloud search"
+    },
+    {
       "name": "mine_setting_logout",
       "value": "退出登录"
     },

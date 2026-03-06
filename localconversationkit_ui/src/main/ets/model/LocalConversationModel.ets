@@ -34,6 +34,8 @@ export class LocalConversationModel {
   }
   public onFriendInfoChangedHandler: (accountId: string) => void = (accountId: string) => {
   }
+  public onUserProfileChangedHandler: (users: V2NIMUser[]) => void = (users: V2NIMUser[]) => {
+  }
   public onFriendDeletedHandler: (accountId: string, deletionType: V2NIMFriendDeletionType) => void
     = (accountId: string, deletionType: V2NIMFriendDeletionType) => {
   }
@@ -129,6 +131,8 @@ export class LocalConversationModel {
           NEFriendUserCache.mineUserCache.user = user
         }
       })
+      // 通知 ViewModel 更新对应的会话
+      this.onUserProfileChangedHandler(users)
     })
   }
 

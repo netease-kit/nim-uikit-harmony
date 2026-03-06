@@ -61,6 +61,10 @@
       "value": "[Audio Chat]"
     },
     {
+      "name": "chat_merge_history",
+      "value": "[Chat History]"
+    },
+    {
       "name": "msg_send_failed_in_block",
       "value": "The other party has blocked you, message sending failed"
     },

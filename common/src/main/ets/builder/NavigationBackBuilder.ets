@@ -8,6 +8,7 @@
 // 通用导航栏
 interface NavigationBackBuilderParams {
   title?: ResourceStr;
+  titleSuffix?: ResourceStr; // 标题后缀，如 "(在线)" / "(离线)"，始终完整显示
   leftButtonTitle?: ResourceStr;
   leftButtonColor?: ResourceColor;
   leftButtonIcon?: Resource;
@@ -63,19 +64,29 @@ export function NavigationBackBuilder(params?: NavigationBackBuilderParams) {
           .onClick(params?.leftButtonAction)
       }
 
-      Text(params?.title)
-        .fontSize(16)
-        .fontWeight(FontWeight.Bold)
-        .height(18)
-        .width('100%')
-        .margin({
-          left: params?.buttonTextWidth ? (params.buttonTextWidth - 32 + 8) : 8,
-          right: (params?.rightButtonTitle || params?.rightButtonIcon) ? 8 : 60
-        })
-        .layoutWeight(1)
-        .textAlign(TextAlign.Center)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
+      // 标题区域：支持主标题 + 后缀，主标题中间省略，后缀始终完整显示
+      Row() {
+        Text(params?.title)
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .constraintSize({ maxWidth: params?.titleSuffix ? '70%' : '100%' })
+
+        if (params?.titleSuffix) {
+          Text(params.titleSuffix)
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .maxLines(1)
+            .flexShrink(0) // 不允许收缩，始终完整显示
+        }
+      }
+      .justifyContent(FlexAlign.Center)
+      .margin({
+        left: params?.buttonTextWidth ? (params.buttonTextWidth - 32 + 8) : 8,
+        right: (params?.rightButtonTitle || params?.rightButtonIcon) ? 8 : 60
+      })
+      .layoutWeight(1)
 
       if (params?.rightButtonTitle) {
         Text(params?.rightButtonTitle)

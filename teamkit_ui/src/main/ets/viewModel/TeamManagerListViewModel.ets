@@ -191,3 +191,6 @@ export class TeamMangerListViewModel {
     ChatKitClient.nim.teamService?.off('onSyncFinished', this.onSyncFinished)
   }
 }
+
+//管理员人数限制
+export const managerLimit: number = 10

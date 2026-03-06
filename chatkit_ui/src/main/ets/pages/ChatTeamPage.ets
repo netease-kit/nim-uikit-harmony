@@ -79,6 +79,8 @@ import { AitManager } from '../manager/ait/AitManager';
 import { ChatAitNode } from '../model/ChatAitNode';
 import { TextMessageDetailDialog } from '../view/TextMessageDetailDialog';
 import { FraudTipView } from '../view/FraudTipView';
+import { HashMap } from '@kit.ArkTS';
+import { IsReceiveMsgOperation } from '../model/IsReceiveMsg';
 
 @ComponentV2
 export struct ChatTeamPage {
@@ -122,6 +124,19 @@ export struct ChatTeamPage {
   listScrollEndPosition: number = 0;
   //首次加载数据滚动到底部
   firstLoadData: boolean = true;
+  // 新增：是否处于底部
+  @Local isAtBottom: boolean = true;
+  // 新增：是否正在滚动到底部（用于处理连续收到消息的情况）
+  isScrollingToBottom: boolean = false;
+  // 新增：新消息计数
+  @Local newMessageCount: number = 0;
+  @Local newMessageMap: HashMap<string, V2NIMMessage> = new HashMap() // 和 newMessageCount 同步操作的，用于记录 newMessage 里面有的消息
+  // 新增：是否显示滚动到新消息按钮
+  @Local showScrollToNewMessageButton: boolean = false;
+  // 新增：tipBannerArea 的高度（防诈条+断网条）
+  @Local tipBannerHeight: number = 0;
+  // 新增：转发弹窗是否打开（用于阻止键盘弹出时自动滚动到底部）
+  isForwardDialogOpen: boolean = false;
   listScroller: Scroller = new Scroller();
   toScroll: boolean = false
   selectVideoView: CustomDialogController = new CustomDialogController({
@@ -135,6 +150,8 @@ export struct ChatTeamPage {
             } else if (result.type === photoAccessHelper.PhotoType.VIDEO) {
               this.chatViewModel.sendVideoMessage(result.uri, result.duration, result.width, result.height)
             }
+            // 发送图片/视频后滚动到最新消息
+            this.scrollToNewMessage()
           }
         });
       },
@@ -147,6 +164,8 @@ export struct ChatTeamPage {
             } else if (result.type === photoAccessHelper.PhotoType.VIDEO) {
               this.chatViewModel.sendVideoMessage(result.uri, result.duration, result.width, result.height)
             }
+            // 发送图片/视频后滚动到最新消息
+            this.scrollToNewMessage()
           }
         });
       }
@@ -161,7 +180,10 @@ export struct ChatTeamPage {
   @Local currentImageIndex: number = 0
   imageViewerDialog: CustomDialogController = new CustomDialogController({
     builder: ImageViewDialog({
-      imagesIndexModel: this.imagesIndexModel
+      imagesIndexModel: this.imagesIndexModel,
+      onDialogClose: () => {
+        this.chatViewModel.isPageVisible = true
+      }
     }),
     cornerRadius: 0,
     alignment: DialogAlignment.Center,
@@ -170,13 +192,19 @@ export struct ChatTeamPage {
     height: '100%',
     width: '100%',
     customStyle: true,
+    onWillDismiss: () => {
+      this.chatViewModel.isPageVisible = true
+    }
   })
   @Local videoFileUrl?: string
   @Local videoRatio?: number
   videoViewerDialog: CustomDialogController = new CustomDialogController({
     builder: VideoViewerDialog({
       videoUrl: this.videoFileUrl,
-      videoRatio: this.videoRatio
+      videoRatio: this.videoRatio,
+      onDialogClose: () => {
+        this.chatViewModel.isPageVisible = true
+      }
     }),
     cornerRadius: 0,
     alignment: DialogAlignment.Center,
@@ -184,7 +212,10 @@ export struct ChatTeamPage {
     backgroundBlurStyle: BlurStyle.NONE,
     height: '100%',
     width: '100%',
-    customStyle: true
+    customStyle: true,
+    onWillDismiss: () => {
+      this.chatViewModel.isPageVisible = true
+    }
   })
   forwardMessages: V2NIMMessage[] = []
   forwardConversations: ConversationSelectModel[] = []
@@ -199,13 +230,29 @@ export struct ChatTeamPage {
         if (ErrorUtils.checkNetworkAndToast()) {
           this.chatViewModel.forwardMessage(this.forwardMessages, this.forwardConversations, text)
           this.showMultiSelect = false
+          // 只有当转发目标包含当前会话时，才滚动到最新消息
+          const forwardToCurrentConversation: boolean = this.forwardConversations.some(
+            (conv) => conv.conversationId === this.conversationId
+          )
+          if (forwardToCurrentConversation) {
+            this.scrollToNewMessage()
+          }
         }
+      },
+      onDialogClose: () => {
+        this.isForwardDialogOpen = false
+        this.chatViewModel.isPageVisible = true
       }
     }),
     cornerRadius: 14,
     backgroundColor: Color.White,
     height: 250,
     width: 276,
+    onWillDismiss: () => {
+      this.isForwardDialogOpen = false
+      // 弹窗关闭后恢复页面可见状态（系统返回键/手势关闭时触发）
+      this.chatViewModel.isPageVisible = true
+    }
   })
   invalidForwardDialogSureAction?: () => void
   invalidForwardFailureDialog?: CustomDialogController = new CustomDialogController({
@@ -236,23 +283,62 @@ export struct ChatTeamPage {
       this.forwardMessages = [this.operationMsg.message]
       this.forwardConversations = selectedList
       this.currentConversationName = this.chatTeamInfo.team?.name
+      this.isForwardDialogOpen = true
       this.forwardMessageDialog.open()
     }
   }
 
   @Monitor("chatTeamInfo.isReceiveMsg")
   onReceiveMsg() {
-    if (this.firstLoadData || this.chatTeamInfo.isReceiveMsg) {
-      this.listScroller.scrollEdge(Edge.Bottom)
+    if (this.firstLoadData || this.chatTeamInfo.isReceiveMsg.yes) {
+      // 检查是否在底部（需要考虑新增消息导致的 totalCount 变化）
+      // 新增消息数量
+      const newMsgCount = this.chatTeamInfo.isReceiveMsg.messages?.length ?? 0
+      // 用收到消息前的 totalCount 来判断是否在底部
+      const totalCountBeforeReceive = this.chatTeamInfo.msgList.totalCount() - newMsgCount
+      const wasAtBottomBeforeReceive = this.listScrollEndPosition >= totalCountBeforeReceive - 1
+
+      // is call message
+      const isCallMessage: boolean = this.chatTeamInfo.isReceiveMsg.messages
+        && this.chatTeamInfo.isReceiveMsg.messages.length > 0
+        && this.chatTeamInfo.isReceiveMsg.messages[0].messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL
+
+      if (this.firstLoadData) {
+        // 首次加载直接滚动到底部
+        this.isScrollingToBottom = true
+        this.listScroller.scrollEdge(Edge.Bottom)
+        this.clearNewMessageCount()
+        this.showScrollToNewMessageButton = false
+      } else if ((wasAtBottomBeforeReceive || this.isScrollingToBottom) &&
+        (this.chatViewModel.isPageVisible || isCallMessage) &&
+        !this.chatViewModel.hasNew) {
+        // 如果在底部（或正在滚动到底部）且页面可见，且不是定位到历史消息状态，直接滚动到底部
+        // 特例：如果是音视频产生的 Call 消息，也滚到最底部
+        // 注意：hasNew 为 true 时表示当前显示的是历史消息（锚点消息定位），此时不应该自动滚动
+        this.isScrollingToBottom = true
+        this.listScroller.scrollEdge(Edge.Bottom)
+        this.clearNewMessageCount()
+        this.showScrollToNewMessageButton = false
+      } else {
+        // 如果不在底部或页面不可见，显示新消息按钮并增加计数
+        if (this.chatTeamInfo.isReceiveMsg.operation === IsReceiveMsgOperation.DELETE) {
+          // 删除操作需要减少计数
+          this.subNewMessageCount()
+        } else {
+          // 新消息操作需要增加计数
+          this.addNewMessageCount()
+        }
+        this.showScrollToNewMessageButton = true
+      }
+
       this.chatTeamInfo.setReceiveMsg(false)
       this.firstLoadData = false;
     }
   }
-
   @Monitor("chatViewModel.needScrollToBottom")
   onNeedScrollToBottom() {
     if (this.chatViewModel.needScrollToBottom &&
-      this.listScrollEndPosition >= this.chatTeamInfo.msgList.totalCount() - 2) {
+      this.listScrollEndPosition >= this.chatTeamInfo.msgList.totalCount() - 1) {
       this.listScroller.scrollEdge(Edge.Bottom)
       this.chatViewModel.needScrollToBottom = false;
     }
@@ -266,6 +352,8 @@ export struct ChatTeamPage {
         () => {
           ConversationRepo.deleteConversation(this.conversationId, true)
           TeamExitWarningDialog.close(this.getUIContext())
+          // 关闭 @列表弹窗（如果打开的话）
+          this.getUIContext().getHostContext()?.eventHub.emit('aitDialogClose')
           this.pathStack.clear()
         }
       ))
@@ -275,11 +363,9 @@ export struct ChatTeamPage {
   @Monitor("chatTeamInfo.scrollIndex")
   onScrollIndex() {
     if (this.chatTeamInfo.scrollIndex > -1) {
-      let height = DeviceUtils.windowPXHeight / 2
       this.toScroll = true
-      this.listScroller.scrollToIndex(this.chatTeamInfo.scrollIndex, false, undefined, {
-        'extraOffset': new LengthMetrics(-height, 0)
-      })
+      // 使用 ScrollAlign.CENTER 让消息居中显示
+      this.listScroller.scrollToIndex(this.chatTeamInfo.scrollIndex, false, ScrollAlign.CENTER)
       this.chatViewModel.setAnchorMessage(undefined)
       this.chatTeamInfo.setScrollIndex(-1)
     }
@@ -307,6 +393,14 @@ export struct ChatTeamPage {
   @Monitor("expandHeight")
   onExpandInputView() {
     if (this.expandHeight > 10) {
+      // 如果转发弹窗打开，跳过滚动到底部
+      if (this.isForwardDialogOpen) {
+        return
+      }
+      // 如果页面不可见，跳过滚动操作（避免在其他页面输入时影响聊天页）
+      if (!this.chatViewModel.isPageVisible) {
+        return
+      }
       // 如果是定位消息状态，收到键盘展开重新切换最新消息
       if (this.chatViewModel.hasNew) {
         this.chatViewModel.reloadMessageList()
@@ -314,8 +408,71 @@ export struct ChatTeamPage {
         this.listScroller.scrollEdge(Edge.Bottom)
       }
     }
-
   }
+
+
+  /**
+   * 检查是否在底部
+   */
+  checkIfAtBottom() {
+    const totalCount = this.chatTeamInfo.msgList.totalCount()
+    const wasAtBottom = this.isAtBottom
+    this.isAtBottom = this.listScrollEndPosition >= totalCount - 1
+
+    // 特殊处理：当消息列表不满屏时（所有消息都可见），不应该显示新消息提示
+    // 判断依据：如果 listScrollStartPosition 为 0 且 listScrollEndPosition >= totalCount - 1，
+    // 说明所有消息都在可见范围内，不需要滚动
+    const isListFullyVisible = this.listScrollStartPosition === 0 && this.listScrollEndPosition >= totalCount - 1
+
+    if (isListFullyVisible && this.newMessageCount > 0) {
+      // 所有消息都可见，清除新消息提示
+      this.clearNewMessageCount()
+      this.showScrollToNewMessageButton = false
+    } else if (!wasAtBottom && this.isAtBottom) {
+      // 重置新消息计数和按钮状态，相当于手动触发 scrollToNewMessage 的重置逻辑
+      this.clearNewMessageCount()
+      this.showScrollToNewMessageButton = false
+    } else if (wasAtBottom && this.isAtBottom && this.newMessageCount > 0) {
+      // 如果有一直在底下的动作，并且还没有处理掉 newMessageCount，需要兜底处理
+      this.clearNewMessageCount()
+      this.showScrollToNewMessageButton = false
+    } else if (this.isAtBottom && this.newMessageCount === 1) {
+      // 特殊处理：当只有 1 条新消息且已经在底部时，也需要清理
+      // 场景：用户离开前在底部，回来后收到 1 条新消息，此时下沿正好指向新消息
+      this.clearNewMessageCount()
+      this.showScrollToNewMessageButton = false
+    } else if (!this.isAtBottom && this.newMessageCount === 0) {
+      // 额外逻辑：如果不在底部且没有新消息计数，则显示"回到底部"按钮
+      this.showScrollToNewMessageButton = true
+    } else if (this.isAtBottom && this.newMessageCount === 0) {
+      // 如果在底部且没有新消息，隐藏按钮
+      this.showScrollToNewMessageButton = false
+    }
+  }
+
+  /**
+   * 滚动到新消息
+   */
+  scrollToNewMessage() {
+    // 如果 hasNew 为 true，说明当前显示的不是完整消息历史，需要刷新数据
+    if (this.chatViewModel.hasNew) {
+      // 重新加载消息列表，相当于重新进入页面
+      this.chatViewModel.reloadMessageList()
+    } else {
+      // 正常情况下直接滚动到底部
+      this.listScroller.scrollEdge(Edge.Bottom)
+    }
+    // 滚动到底部时，对所有消息发送已读回执（因为会滚动到最新，所以传全部消息列表）
+    if (this.newMessageCount > 0) {
+      const allMessages = this.chatTeamInfo?.msgList.getMessageList() ?? []
+      this.chatViewModel.getAndSendMessageReceipts(allMessages)
+    }
+    // 重置状态
+    this.clearNewMessageCount()
+    this.showScrollToNewMessageButton = false
+    this.isAtBottom = true
+  }
+
 
   aboutToAppear(): void {
     NEEmojiManager.instance.setup()
@@ -357,7 +514,13 @@ export struct ChatTeamPage {
       if (this.keyboardHeight > 10) {
         this.expandHeight = 0
         this.inputStyle = InputStyleType.None;
-        this.listScroller.scrollEdge(Edge.Bottom)
+        setTimeout(() => {
+          // 如果转发弹窗打开或页面不可见，跳过滚动到底部
+          if (!this.isForwardDialogOpen && this.chatViewModel.isPageVisible) {
+            // 延迟执行滚动，确保列表高度更新完成后再滚动到底部
+            this.listScroller.scrollEdge(Edge.Bottom)
+          }
+        }, 20)
       }
     }
   }
@@ -440,6 +603,8 @@ export struct ChatTeamPage {
     this.chatViewModel.setTeamExitListener(() => {
       TeamExitWarningDialog.show(this.getUIContext(), new TeamExitDialogParam(
         () => {
+          // 关闭 @列表弹窗（如果打开的话）
+          this.getUIContext().getHostContext()?.eventHub.emit('aitDialogClose')
           this.pathStack.clear()
           TeamExitWarningDialog.close(this.getUIContext())
         }
@@ -452,6 +617,7 @@ export struct ChatTeamPage {
       const imageModel =
         onlyMsg ? await getMessageImageUrl(msg, this.chatTeamInfo) : await getMessageImageUrls(msg, this.chatTeamInfo)
       this.imagesIndexModel = imageModel
+      this.chatViewModel.isPageVisible = false
       this.imageViewerDialog.open()
     } catch (err) {
       console.error(err)
@@ -467,6 +633,7 @@ export struct ChatTeamPage {
     }
     this.videoRatio = getMessageVideoRatio(msg)
     if (this.videoFileUrl) {
+      this.chatViewModel.isPageVisible = false
       this.videoViewerDialog.open()
     }
   }
@@ -534,20 +701,32 @@ export struct ChatTeamPage {
           this.goToTeamSettingPage(this.pathStack)
         }
       })
-      // 用Stack包裹，实现FraudTipView浮动在RelativeContainer上方
-      Stack({
-        alignContent: Alignment.TopStart // 防诈条靠顶部靠左显示（可根据需求调整）
-      }) {
-        // 防诈条
-        FraudTipView({
-          pathStack: this.pathStack,
-          canReport: true,
-          canCancel: true
+      RelativeContainer() {
+        // 防诈条和断网条 - 放在顶部
+        Column() {
+          // 防诈条
+          FraudTipView({
+            pathStack: this.pathStack,
+            canReport: true,
+            canCancel: true
+          })
+
+          // 断网条 - 仅在断网时显示
+          if (this.chatViewModel.networkBroken) {
+            NetworkBrokenBuilder()
+          }
+        }
+        .width('100%')
+        .id("tipBannerArea")
+        .alignRules({
+          top: { anchor: "__container__", align: VerticalAlign.Top },
+          left: { anchor: "__container__", align: HorizontalAlign.Start },
+          right: { anchor: "__container__", align: HorizontalAlign.End }
         })
-          .zIndex(10)
+        .onAreaChange((_oldValue: Area, newValue: Area) => {
+          this.tipBannerHeight = Number(newValue.height) || 0
+        })
 
-
-        RelativeContainer() {
           List({ scroller: this.listScroller }) {
             LazyForEach(this.chatTeamInfo.msgList, (msg: NIMMessageInfo) => {
               ListItem() {
@@ -729,19 +908,30 @@ export struct ChatTeamPage {
             }
             this.listScrollEndPosition = end;
             this.listScrollStartPosition = start;
+            // 如果有新消息，发送已读回执
+            if (this.newMessageCount > 0) {
+              // 滑到底部时，对可见范围内的消息发送已读回执
+              const allMessages = this.chatTeamInfo.msgList.getMessageList()
+              const visibleMessages = allMessages.slice(this.listScrollStartPosition, this.listScrollEndPosition + 1)
+              this.chatViewModel.getAndSendMessageReceipts(visibleMessages)
+            }
+            // 检查是否在底部，更新状态
+            this.checkIfAtBottom()
           })
           .onScrollStop(() => {
             console.debug('netease to scroll stop:', this.toScroll)
             if (this.toScroll) {
               this.toScroll = false
             }
+            // 滚动结束后，重置"正在滚动到底部"标记
+            this.isScrollingToBottom = false
           })
           .alignRules({
             left: { anchor: "__container__", align: HorizontalAlign.Start },
             right: { anchor: "__container__", align: HorizontalAlign.End },
-            top: { anchor: "__container__", align: VerticalAlign.Top },
+            top: { anchor: "tipBannerArea", align: VerticalAlign.Bottom },
           })
-          .height(this.scrollHeight - this.bottomMargin)
+          .height(this.scrollHeight - this.bottomMargin - this.tipBannerHeight)
           .onScrollStart(() => {
             this.showOperationView = false
           })
@@ -754,10 +944,6 @@ export struct ChatTeamPage {
               this.inputStyle = InputStyleType.None
             }
           })
-
-          if (this.chatViewModel.networkBroken) {
-            NetworkBrokenBuilder()
-          }
 
           Column()
             .height(this.bottomHeight)
@@ -791,6 +977,8 @@ export struct ChatTeamPage {
                     } else if (result.type === photoAccessHelper.PhotoType.VIDEO) {
                       this.chatViewModel.sendVideoMessage(result.uri, result.duration, result.width, result.height);
                     }
+                    // 发送图片/视频后滚动到最新消息
+                    this.scrollToNewMessage()
                   }
                 })
               },
@@ -1036,6 +1224,47 @@ export struct ChatTeamPage {
           .id("input_expand_back_container")
           .backgroundColor($r('app.color.chat_input_background'))
 
+          // 滚动到新消息按钮
+          if (this.showScrollToNewMessageButton && !this.showMultiSelect) {
+            Row() {
+              Image($r('app.media.ic_chat_scroll_down'))
+                .width(16)
+                .height(16)
+                .fillColor('#007AFF')
+                .margin({ right: this.newMessageCount > 0 ? 8 : 0 })
+
+              if (this.newMessageCount > 0) {
+                Text($r('app.string.chat_new_message_count', this.newMessageCount))
+                  .fontSize(14)
+                  .fontColor('#007AFF')
+              }
+            }
+            // .height(36)
+            .backgroundColor(Color.White)
+            .borderRadius(this.newMessageCount > 0 ?
+              {
+                topLeft: 20,
+                bottomLeft: 20,
+                topRight: 0,
+                bottomRight: 0
+              } : 20)
+            .padding(12)
+            .alignRules({
+              right: { anchor: "__container__", align: HorizontalAlign.End },
+              bottom: { anchor: "chat_input", align: VerticalAlign.Top }
+            })
+            .margin({ right: this.newMessageCount > 0 ? 0 : 16, bottom: 18 })
+            .onClick(() => {
+              this.scrollToNewMessage()
+            })
+            .shadow({
+              radius: 20,
+              color: '#20000000',
+              offsetX: 0,
+              offsetY: 4
+            })
+          }
+
           if (this.showOperationView) {
             MessageOperationView({
               operateMsg: this.operationMsg,
@@ -1062,6 +1291,7 @@ export struct ChatTeamPage {
                       this.forwardMessages = [this.operationMsg.message]
                       this.forwardConversations = selectedList
                       this.currentConversationName = this.chatTeamInfo.team?.name
+                      this.isForwardDialogOpen = true
                       this.forwardMessageDialog.open()
                     }
                   }
@@ -1092,10 +1322,6 @@ export struct ChatTeamPage {
 
           }
         }
-        // .margin({ bottom: this.bottomMargin })
-        // .expandSafeArea([SafeAreaType.KEYBOARD])
-        .zIndex(1)
-      }
       .margin({ bottom: this.bottomMargin })
       .expandSafeArea([SafeAreaType.KEYBOARD])
     }
@@ -1110,7 +1336,17 @@ export struct ChatTeamPage {
         this.pathStack.removeByName("ChatTeamPage")
       }
     })
+    .onShown(() => {
+      // 页面显示时设置为可见
+      this.chatViewModel.isPageVisible = true
+      // 回到页面时，只对可见范围内的消息发送已读回执
+      const allMessages = this.chatTeamInfo?.msgList.getMessageList() ?? []
+      const visibleMessages = allMessages.slice(this.listScrollStartPosition, this.listScrollEndPosition + 1)
+      this.chatViewModel.getAndSendMessageReceipts(visibleMessages)
+    })
     .onHidden(() => {
+      // 页面隐藏时设置为不可见
+      this.chatViewModel.isPageVisible = false
       AudioPlayerManager.instance.stopPlayAll()
     })
   }
@@ -1179,6 +1415,7 @@ export struct ChatTeamPage {
         this.forwardMessages = selectMessage
         this.forwardConversations = selectedList
         this.currentConversationName = this.chatTeamInfo.team?.name
+        this.isForwardDialogOpen = true
         this.forwardMessageDialog.open()
       }
 
@@ -1266,6 +1503,7 @@ export struct ChatTeamPage {
         }
         this.forwardConversations = selectedList
         this.currentConversationName = this.chatTeamInfo.team?.name
+        this.isForwardDialogOpen = true
         this.forwardMessageDialog.open()
       }
 
@@ -1431,6 +1669,46 @@ export struct ChatTeamPage {
 
   onPageHide(): void {
     this.chatViewModel.clearUnreadCount()
+  }
+
+  /**
+   * 计算此时的 this.chatTeamInfo.isReceiveMsg 中有多少应该被记录成 newMessageCount 增加的
+   * 满足以下条件的才允许添加：
+   * 1. conversationId 为当前会话
+   * 2. 发送者不是自己
+   * @returns
+   */
+  private addNewMessageCount(): void {
+    for (const message of this.chatTeamInfo.isReceiveMsg.messages) {
+      if (message.conversationId === this.conversationId
+        && message.senderId != ChatKitClient.getLoginUserId()
+      ) {
+        this.newMessageMap.set(message.messageClientId, message)
+        this.newMessageCount = this.newMessageMap.length
+      }
+    }
+  }
+
+  /**
+   * 撤回情况下，需要从 newMessage 里面去掉
+   */
+  private subNewMessageCount(): void {
+    for (const message of this.chatTeamInfo.isReceiveMsg.messages) {
+      if (message.conversationId === this.conversationId
+        && message.senderId != ChatKitClient.getLoginUserId()
+      ) {
+        this.newMessageMap.remove(message.messageClientId)
+        this.newMessageCount = this.newMessageMap.length
+      }
+    }
+  }
+
+  /**
+   * 清理 newMessageCount 和 newMessageMap
+   */
+  private clearNewMessageCount(): void {
+    this.newMessageMap.clear()
+    this.newMessageCount = 0
   }
 
   aboutToDisappear(): void {

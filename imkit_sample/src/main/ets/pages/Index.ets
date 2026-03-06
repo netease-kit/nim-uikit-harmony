@@ -17,6 +17,7 @@ import { DeprecatedIndexButton } from '../other/DeprecatedIndexButton'
  */
 
 PersistentStorage.persistProp(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE, true)
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_CLOUD_SEARCH, false)
 
 @Entry
 @ComponentV2
@@ -39,8 +40,10 @@ struct Index {
     let dataPreferences: preferences.Preferences | null = null;
     let options: preferences.Options = { name: 'imkit_data' };
     dataPreferences = preferences.getPreferencesSync(getContext(this), options);
-    IMKitConfigCenter.enableLocalConversation = dataPreferences.getSync(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, true) as boolean
+    IMKitConfigCenter.enableLocalConversation = dataPreferences.getSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, true) as boolean
+    IMKitConfigCenter.enableShownOnlineState = dataPreferences.getSync(CommonConstants.KEY_SETTING_SHOWN_ONLINE_STATE, true) as boolean
     IMKitConfigCenter.enableAntiSpamTipMessage = AppStorage.get(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE) ?? true
+    IMKitConfigCenter.enableCloudSearch = AppStorage.get(CommonConstants.KEY_SETTING_CLOUD_SEARCH) ?? false
     if (AppConfig.userId) {
       this.login(AppConfig.userId, AppConfig.userToken)
     } else {

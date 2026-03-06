@@ -27,6 +27,21 @@ let avConfig: media.AVRecorderConfig = {
 export class AudioRecordManager {
   public static instance: AudioRecordManager = new AudioRecordManager()
   private avRecorder?: media.AVRecorder;
+  private _isCancelled: boolean = false;
+
+  /**
+   * 设置取消状态
+   */
+  setCancelled(cancelled: boolean) {
+    this._isCancelled = cancelled
+  }
+
+  /**
+   * 获取取消状态
+   */
+  isCancelled(): boolean {
+    return this._isCancelled
+  }
 
   // 初始化
   public setup() {
@@ -56,6 +71,9 @@ export class AudioRecordManager {
   }
 
   async startRecordingProcess(path: string) {
+    // 开始录音时重置取消状态，确保本次录音不会被之前的状态影响
+    this._isCancelled = false;
+
     if (this.avRecorder !== undefined) {
       await this.avRecorder.release();
       this.avRecorder = undefined;

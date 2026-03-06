@@ -25,7 +25,9 @@ export struct ImageItemView {
   @Local imagePixelMap: image.PixelMap | null = null; // 当前图片pixelMap，用于Image组件显示
   @Local fitWH: "width" | "height" | undefined = "width"; // 表示当前图片是根据宽度适配还是高度适配
   @Local imageDefaultSize: image.Size = { width: 0, height: 0 }; // 图片默认大小，即，与屏幕大小最适配的显示大小
+  @Local isImageLoaded: boolean = false; // 图片是否已加载完成
   @Param imageUri: string = ""; // 当前图片uri
+  @Param thumbPixelMap?: image.PixelMap = undefined; // 缓存的缩略图 PixelMap（用于图片加载前显示占位图）
   imageWHRatio: number = 0; // 图片原始宽高比
   imageW: number = 0; // 图片原始宽
   imageH: number = 0; // 图片原始高
@@ -86,6 +88,14 @@ export struct ImageItemView {
 
   build() {
     Stack() {
+      // 如果有缓存的 PixelMap 且图片尚未加载完成，先显示 PixelMap 作为占位图
+      if (this.thumbPixelMap && !this.isImageLoaded) {
+        Image(this.thumbPixelMap)
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Contain)
+      }
+
       Image(this.imageUri)// 宽高只根据其尺寸设置一个，通过保持宽高比来设置另一个属性
         .width(this.fitWH === "width" ? '100%' : undefined)
         .height(this.fitWH === "height" ? '100%' : undefined)
@@ -101,6 +111,7 @@ export struct ImageItemView {
         })
         .onComplete(data => {
           if (data) {
+            this.isImageLoaded = true // 图片加载完成
             this.imageW = px2vp(data.componentWidth)
             this.imageH = px2vp(data.componentHeight)
             this.imageWHRatio = data.width / data.height;
@@ -114,6 +125,10 @@ export struct ImageItemView {
               (this.windowSizeManager.size.height / this.imageDefaultSize.height) :
               (this.windowSizeManager.size.width / this.imageDefaultSize.width);
           }
+        })
+        .onError(() => {
+          // 图片加载失败时，如果有缓存的 PixelMap，则保持显示占位图
+          console.debug('netease ImageItemView onError, imageUri:', this.imageUri)
         })
     }
     .onBlur(() => {

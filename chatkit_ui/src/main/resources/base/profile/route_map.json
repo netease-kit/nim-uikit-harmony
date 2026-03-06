@@ -33,6 +33,14 @@
       }
     },
     {
+      "name": "SearchFTSHistoryPage",
+      "pageSourceFile": "src/main/ets/pages/SearchFTSHistoryPage.ets",
+      "buildFunction": "SearchFTSHistoryPageBuilder",
+      "data": {
+        "description": "this is unified search fts history messages page for P2P and Team"
+      }
+    },
+    {
       "name": "ChatReadReceiptPage",
       "pageSourceFile": "src/main/ets/pages/ChatReadReceiptPage.ets",
       "buildFunction": "ChatReadReceiptPageBuilder",
@@ -62,6 +70,46 @@
       "buildFunction": "ReportWebPageBuilder",
       "data": {
         "description": "report web page"
+      }
+    },
+    {
+      "name": "TeamMemberMessagePage",
+      "pageSourceFile": "src/main/ets/pages/TeamMemberMessagePage.ets",
+      "buildFunction": "TeamMemberMessagePageBuilder",
+      "data": {
+        "description": "this is team member message page"
+      }
+    },
+    {
+      "name": "ChatSearchImageMessagePage",
+      "pageSourceFile": "src/main/ets/pages/ChatSearchImageMessagePage.ets",
+      "buildFunction": "ChatSearchImageMessagePageBuilder",
+      "data": {
+        "description": "this is chat search image message page"
+      }
+    },
+    {
+      "name": "ChatSearchVideoMessagePage",
+      "pageSourceFile": "src/main/ets/pages/ChatSearchVideoMessagePage.ets",
+      "buildFunction": "ChatSearchVideoMessagePageBuilder",
+      "data": {
+        "description": "this is chat search video message page"
+      }
+    },
+    {
+      "name": "ChatSearchFileMessagePage",
+      "pageSourceFile": "src/main/ets/pages/ChatSearchFileMessagePage.ets",
+      "buildFunction": "ChatSearchFileMessagePageBuilder",
+      "data": {
+        "description": "this is chat search file message page"
+      }
+    },
+    {
+      "name": "ChatSearchDateMessagePage",
+      "pageSourceFile": "src/main/ets/pages/ChatSearchDateMessagePage.ets",
+      "buildFunction": "ChatSearchDateMessagePageBuilder",
+      "data": {
+        "description": "this is chat search date message page"
       }
     }
   ]

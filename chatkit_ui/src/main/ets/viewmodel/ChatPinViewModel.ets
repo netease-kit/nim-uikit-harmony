@@ -28,7 +28,7 @@ import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { HashSet } from '@kit.ArkTS';
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { sendMessageFailedTips } from '../common/MessageHelper';
+import { clearForwardAtMark, sendMessageFailedTips } from '../common/MessageHelper';
 
 @ObservedV2
 export class ChatPinViewModel {
@@ -244,6 +244,7 @@ export class ChatPinViewModel {
         const forwardMsg = ChatRepo.createForwardMessage(message.message)
         try {
           if (forwardMsg && conversation.conversationId) {
+            clearForwardAtMark(forwardMsg)
             this.sendForwardMessage(forwardMsg, conversation.conversationId)
           }
         } catch (err) {

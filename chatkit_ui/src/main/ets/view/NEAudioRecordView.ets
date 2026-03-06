@@ -16,6 +16,7 @@ export struct NEAudioRecordView {
   audioManager: AudioManager = AudioManager.instance;
   @Param press: boolean = false;
   @Param scaleValue: ScaleOptions = { x: 1, y: 1 };
+  @Param shouldStop: boolean = false;
   options: AnimatorOptions = {
     duration: 1500,
     easing: "friction",
@@ -39,6 +40,15 @@ export struct NEAudioRecordView {
   maxRecordTimer: number = 60;
   private TAG: string = 'net ease Audio Record'
   private backAnimator: AnimatorResult | undefined = undefined
+
+  @Monitor('shouldStop')
+  onShouldStopChanged() {
+    if (this.shouldStop && this.isRecording) {
+      console.log("net ease record view received stop signal from parent")
+      this.endRecord()
+      this.isRecording = false
+    }
+  }
 
   aboutToAppear(): void {
     this.create()
@@ -87,6 +97,15 @@ export struct NEAudioRecordView {
     }
     if (this.backAnimator) {
       this.backAnimator.finish()
+    }
+    // 检查是否被取消
+    if (AudioRecordManager.instance.isCancelled()) {
+      console.log("net ease record was cancelled, skip sending")
+      AudioRecordManager.instance.setCancelled(false)
+      if (this.onRecordEnd) {
+        this.onRecordEnd()
+      }
+      return
     }
     if (this.path.length > 0 && this.duration > 0) {
       AudioRecordManager.instance.stopRecordingProcess().then(() => {

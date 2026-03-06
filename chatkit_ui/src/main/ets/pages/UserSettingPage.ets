@@ -37,7 +37,13 @@ export struct UserSettingPage {
       itemHeight: 48,
       routerUrl: "PinMessagePage",
       rightIcon: $r('app.media.arrow_right')
-    }
+    },
+    {
+      title: $r('app.string.search_chat_history'),
+      itemHeight: 48,
+      routerUrl: "SearchFTSHistoryPage",
+      rightIcon: $r('app.media.arrow_right')
+    },
   ]
   // 设置是否开启消息提醒
   setP2PNotify = async (isOpen: boolean) => {

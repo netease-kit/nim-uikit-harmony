@@ -23,7 +23,16 @@ import {
 } from '@nimsdk/base'
 import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
 import { TeamSettingViewModel } from '../viewModel/TeamViewModel'
-import { ChatKitClient, NEUserWithFriend, PersonSelectParam, TeamRepo, TeamSettingParam } from '@nimkit/chatkit'
+import {
+  ChatKitClient,
+  ConversationRepo,
+  IMKitConfigCenter,
+  LocalConversationRepo,
+  NEUserWithFriend,
+  PersonSelectParam,
+  TeamRepo,
+  TeamSettingParam
+} from '@nimkit/chatkit'
 import { MemberListParams } from './TeamMemberListPage'
 
 @ComponentV2
@@ -235,8 +244,30 @@ export struct TeamSettingPage {
               })
             })
 
+            // @deprecated 老的历史记录逻辑
+            // Row() {
+            //   Text($r('app.string.team_history_record'))
+            //     .fontSize(16)
+            //     .fontColor('#ff333333')
+            //
+            //   Blank().layoutWeight(1)
+            //
+            //   Image($r('app.media.arrow_right'))
+            //     .width(4.92)
+            //     .height(9.54)
+            // }
+            // .height(40)
+            // .width('100%')
+            // .alignItems(VerticalAlign.Center)
+            // .onClick(() => {
+            //   this.pathStack.pushPath({
+            //     name: 'TeamHistoryPage',
+            //     param: this.teamViewModel?.teamId,
+            //   })
+            // })
+
             Row() {
-              Text($r('app.string.team_history_record'))
+              Text($r('app.string.search_chat_history'))
                 .fontSize(16)
                 .fontColor('#ff333333')
 
@@ -251,8 +282,8 @@ export struct TeamSettingPage {
             .alignItems(VerticalAlign.Center)
             .onClick(() => {
               this.pathStack.pushPath({
-                name: 'TeamHistoryPage',
-                param: this.teamViewModel?.teamId,
+                name: 'SearchFTSHistoryPage',
+                param: ChatKitClient.nim.conversationIdUtil.teamConversationId(this.teamViewModel?.teamId),
               })
             })
 
@@ -526,8 +557,20 @@ export struct TeamSettingPage {
   }
 
   //解散群组
-  dismissTeam() {
+  async dismissTeam() {
     ChatKitClient.selfLeaveTeam = true
+    // 退群/解散群之前，先取消会话置顶
+    try {
+      const conversationId = ChatKitClient.nim.conversationIdUtil.teamConversationId(this.teamId)
+      if (IMKitConfigCenter.enableLocalConversation) {
+        await LocalConversationRepo.stickTopConversation(conversationId, false)
+      } else {
+        await ConversationRepo.stickTopConversation(conversationId, false)
+      }
+    } catch (e) {
+      // 取消置顶失败不影响退群操作
+      ChatKitClient.logger?.debug('dismissTeam: unStickTop failed', e)
+    }
     TeamRepo.dismissTeam(this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL).then(() => {
       const pathNames = this.pathStack.getAllPathName()
       if (pathNames.includes('MyTeamsPage')) {
@@ -544,8 +587,20 @@ export struct TeamSettingPage {
   }
 
   //退出群组
-  leftTeam() {
+  async leftTeam() {
     ChatKitClient.selfLeaveTeam = true
+    // 退群之前，先取消会话置顶
+    try {
+      const conversationId = ChatKitClient.nim.conversationIdUtil.teamConversationId(this.teamId)
+      if (IMKitConfigCenter.enableLocalConversation) {
+        await LocalConversationRepo.stickTopConversation(conversationId, false)
+      } else {
+        await ConversationRepo.stickTopConversation(conversationId, false)
+      }
+    } catch (e) {
+      // 取消置顶失败不影响退群操作
+      ChatKitClient.logger?.debug('leftTeam: unStickTop failed', e)
+    }
     TeamRepo.leaveTeam(this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL).then(() => {
       const pathNames = this.pathStack.getAllPathName()
       if (pathNames.includes('MyTeamsPage')) {

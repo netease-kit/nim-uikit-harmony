@@ -10,6 +10,7 @@ import {
   ChatKitClient,
   ErrorUtils,
   keyExtensionAtAll,
+  keyExtensionLastOptType,
   TeamRepo,
   typeExtensionAllowAll,
   typeExtensionAllowManager
@@ -105,6 +106,8 @@ struct TeamManagePage {
             if (extension) {
               let objectExt = JSON.parse(extension) as object
               objectExt[keyExtensionAtAll] = permission
+              // 设置 lastOpt 标记，用于通知消息解析时识别这是一个 @权限变更操作
+              objectExt[keyExtensionLastOptType] = keyExtensionAtAll
               extension = JSON.stringify(objectExt)
             } else {
               let jsonObject: AitAllPermission = {

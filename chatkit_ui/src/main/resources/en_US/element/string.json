@@ -37,6 +37,10 @@
       "value": " Dissolved Group"
     },
     {
+      "name": "chat_team_notify_owner_transfer",
+      "value": " transferred group ownership to "
+    },
+    {
       "name": "null_message_not_support",
       "value": "Empty messages are not allowed to be sent"
     },
@@ -321,8 +325,44 @@
       "value": "search message history"
     },
     {
+      "name": "search_chat_history_quickly",
+      "value": "Quick search chat messages"
+    },
+    {
+      "name": "search_by_team_member",
+      "value": "Team members"
+    },
+    {
+      "name": "search_by_photo",
+      "value": "Images"
+    },
+    {
+      "name": "search_by_video",
+      "value": "Videos"
+    },
+    {
+      "name": "search_by_date",
+      "value": "Date"
+    },
+    {
+      "name": "search_by_file",
+      "value": "Files"
+    },
+    {
       "name": "team_history_record_empty_tip",
       "value": "No message history"
+    },
+    {
+      "name": "search_image_empty_tip",
+      "value": "No images"
+    },
+    {
+      "name": "search_video_empty_tip",
+      "value": "No videos"
+    },
+    {
+      "name": "search_file_empty_tip",
+      "value": "No files"
     },
     {
       "name": "chat_message_ait_select_tips",
@@ -435,6 +475,142 @@
     {
       "name": "chat_message_antispam_tip_format",
       "value": "The content may involve %s. Please adjust and send."
+    },
+    {
+      "name": "chat_new_message_count",
+      "value": "%d new message"
+    },
+    {
+      "name": "chat_message_loading",
+      "value": "Loading..."
+    },
+    {
+      "name": "chat_message_no_more_data",
+      "value": "No more data"
+    },
+    {
+      "name": "chat_new_message_search_by_member",
+      "value": "Search by member"
+    },
+    {
+      "name": "chat_history_message_operation_locate",
+      "value": "Locate in chat"
+    },
+    {
+      "name": "search_by_date_title",
+      "value": "Filter by Date"
+    },
+    {
+      "name": "search_date_today",
+      "value": "Today"
+    },
+    {
+      "name": "search_date_last_7_days",
+      "value": "Last 7 days"
+    },
+    {
+      "name": "search_date_last_30_days",
+      "value": "Last 30 days"
+    },
+    {
+      "name": "search_date_confirm",
+      "value": "Done"
+    },
+    {
+      "name": "search_date_select_title",
+      "value": "Select chat date"
+    },
+    {
+      "name": "search_date_please_select",
+      "value": "Please select a date"
+    },
+    {
+      "name": "search_date_weekday_sun",
+      "value": "Sun"
+    },
+    {
+      "name": "search_date_weekday_mon",
+      "value": "Mon"
+    },
+    {
+      "name": "search_date_weekday_tue",
+      "value": "Tue"
+    },
+    {
+      "name": "search_date_weekday_wed",
+      "value": "Wed"
+    },
+    {
+      "name": "search_date_weekday_thu",
+      "value": "Thu"
+    },
+    {
+      "name": "search_date_weekday_fri",
+      "value": "Fri"
+    },
+    {
+      "name": "search_date_weekday_sat",
+      "value": "Sat"
+    },
+    {
+      "name": "search_date_year_month_format",
+      "value": "%2$s %1$d"
+    },
+    {
+      "name": "search_date_year_format",
+      "value": "%d"
+    },
+    {
+      "name": "search_date_month_format",
+      "value": "%d"
+    },
+    {
+      "name": "search_date_month_1",
+      "value": "Jan"
+    },
+    {
+      "name": "search_date_month_2",
+      "value": "Feb"
+    },
+    {
+      "name": "search_date_month_3",
+      "value": "Mar"
+    },
+    {
+      "name": "search_date_month_4",
+      "value": "Apr"
+    },
+    {
+      "name": "search_date_month_5",
+      "value": "May"
+    },
+    {
+      "name": "search_date_month_6",
+      "value": "Jun"
+    },
+    {
+      "name": "search_date_month_7",
+      "value": "Jul"
+    },
+    {
+      "name": "search_date_month_8",
+      "value": "Aug"
+    },
+    {
+      "name": "search_date_month_9",
+      "value": "Sep"
+    },
+    {
+      "name": "search_date_month_10",
+      "value": "Oct"
+    },
+    {
+      "name": "search_date_month_11",
+      "value": "Nov"
+    },
+    {
+      "name": "search_date_month_12",
+      "value": "Dec"
     }
   ]
 }

@@ -83,6 +83,61 @@ export struct SenderMessageComponent {
   showRadio: boolean = false
   @Local
   radioOn: boolean = false
+  // anchor 高亮动画透明度（0 = 透明，1 = 完全显示高亮）
+  @Local anchorHighlightOpacity: number = 0
+
+  @Monitor("message.isAnchorHighlight")
+  onAnchorHighlightChange() {
+    if (this.message?.isAnchorHighlight) {
+      // 立即显示高亮背景
+      this.anchorHighlightOpacity = 1
+      // 延迟后开始淡出动画
+      setTimeout(() => {
+        animateTo({
+          duration: 500, // 0.5秒淡出
+          curve: Curve.EaseOut,
+          onFinish: () => {
+            // 动画结束后重置状态
+            if (this.message) {
+              this.message.isAnchorHighlight = false
+            }
+          }
+        }, () => {
+          this.anchorHighlightOpacity = 0
+        })
+      }, 500) // 显示 0.5 秒后开始淡出
+    }
+  }
+
+  aboutToAppear(): void {
+    // 初始化时检查是否需要高亮
+    if (this.message?.isAnchorHighlight) {
+      this.anchorHighlightOpacity = 1
+      setTimeout(() => {
+        animateTo({
+          duration: 500,
+          curve: Curve.EaseOut,
+          onFinish: () => {
+            if (this.message) {
+              this.message.isAnchorHighlight = false
+            }
+          }
+        }, () => {
+          this.anchorHighlightOpacity = 0
+        })
+      }, 500)
+    }
+  }
+
+  getHighlightBackgroundColor(): ResourceColor {
+    if (this.message?.isPinMsg) {
+      return $r('app.color.color_chat_pin_bg')
+    } else if (this.anchorHighlightOpacity > 0) {
+      return $r('app.color.color_chat_anchor_bg')
+    } else {
+      return $r('app.color.color_chat_page_bg')
+    }
+  }
 
   build() {
     Column() {
@@ -112,9 +167,11 @@ export struct SenderMessageComponent {
           }
           Column() {
             Row() {
-              if (this.message.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED
-                || this.message.message.messageStatus?.errorCode !== 200
-                || this.message.isServerAntiSpam) {
+              if (!this.message.isRevokeMsg &&
+                (this.message.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED
+                || (this.message.message.messageStatus?.errorCode !== undefined && this.message.message.messageStatus?.errorCode !== 200)
+                || this.message.isServerAntiSpam)
+              ) {
                 if (this.message.isServerAntiSpam || this.message.message.messageStatus?.errorCode === V2NIMErrorCode.V2NIM_ERROR_CODE_SERVER_ANTISPAM) {
                   Image($r("app.media.ic_chat_message_status_fail_gray"))
                     .width(16)
@@ -235,7 +292,6 @@ export struct SenderMessageComponent {
               .onAction((event: GestureEvent) => {
                 this.onMessageClick?.onItemLongClick?.(event, this.message)
               }))
-
             if (this.message?.isPinMsg) {
               Row() {
                 Image($r('app.media.ic_chat_message_pin')).height(12).width(12).margin({ top: 6 })
@@ -248,6 +304,20 @@ export struct SenderMessageComponent {
               }.width('100%').height('26vp').margin({ bottom: 6, right: 12 }).justifyContent(FlexAlign.End)
             }
           }.alignItems(HorizontalAlign.End).margin({ left: 8 }).width('75%')
+          // 多选模式下的覆盖层 - 使用 TapGesture 只拦截点击，允许滑动穿透
+          if (this.showRadio && !this.message.isRevokeMsg) {
+            Column() {}
+              .width('100%')
+              .height(this.message?.getMessageHeight(this.getUIContext()))
+              .position({ x: 0, y: 0 })
+              .gesture(
+                TapGesture()
+                  .onAction(() => {
+                    this.message!.isSelectedMsg = !this.message!.isSelectedMsg
+                    this.onMessageClick?.onMultiSelect?.(this.message!.isSelectedMsg, this.message)
+                  })
+              )
+          }
 
           CommonAvatar({
             item: new AvatarItem(this.chatUserInfo != null ?
@@ -269,8 +339,7 @@ export struct SenderMessageComponent {
             })
         }
         .width('100%')
-        .backgroundColor(this.message.isPinMsg ? $r('app.color.color_chat_pin_bg') :
-        $r('app.color.color_chat_page_bg'))
+        .backgroundColor(this.getHighlightBackgroundColor())
         .justifyContent(FlexAlign.End)
         .alignItems(VerticalAlign.Top)
       }
@@ -298,6 +367,62 @@ export struct ReceiveMessageComponent {
   onMessageClick: MessageItemClick | undefined = undefined
   @Local
   radioOn: boolean = false
+  // anchor 高亮动画透明度（0 = 透明，1 = 完全显示高亮）
+  @Local anchorHighlightOpacity: number = 0
+
+  @Monitor("message.isAnchorHighlight")
+  onAnchorHighlightChange() {
+    if (this.message?.isAnchorHighlight) {
+      // 立即显示高亮背景
+      this.anchorHighlightOpacity = 1
+      // 延迟后开始淡出动画
+      setTimeout(() => {
+        animateTo({
+          duration: 1500, // 1.5秒淡出
+          curve: Curve.EaseOut,
+          onFinish: () => {
+            // 动画结束后重置状态
+            if (this.message) {
+              this.message.isAnchorHighlight = false
+            }
+          }
+        }, () => {
+          this.anchorHighlightOpacity = 0
+        })
+      }, 500) // 显示 0.5 秒后开始淡出
+    }
+  }
+
+  aboutToAppear(): void {
+    // 初始化时检查是否需要高亮
+    if (this.message?.isAnchorHighlight) {
+      this.anchorHighlightOpacity = 1
+      setTimeout(() => {
+        animateTo({
+          duration: 1500,
+          curve: Curve.EaseOut,
+          onFinish: () => {
+            if (this.message) {
+              this.message.isAnchorHighlight = false
+            }
+          }
+        }, () => {
+          this.anchorHighlightOpacity = 0
+        })
+      }, 500)
+    }
+  }
+
+  // 根据高亮状态和 pin 状态获取背景色
+  getHighlightBackgroundColor(): ResourceColor {
+    if (this.message?.isPinMsg) {
+      return $r('app.color.color_chat_pin_bg')
+    } else if (this.anchorHighlightOpacity > 0) {
+      return $r('app.color.color_chat_anchor_bg')
+    } else {
+      return $r('app.color.color_chat_page_bg')
+    }
+  }
 
   build() {
     Column() {
@@ -395,11 +520,25 @@ export struct ReceiveMessageComponent {
               }.width('100%').height('26vp')
             }
           }.alignItems(HorizontalAlign.Start).margin({ left: 8, top: 6 }).width('68%')
+
+          // 多选模式下的覆盖层 - 使用 TapGesture 只拦截点击，允许滑动穿透
+          if (this.showRadio && !this.message.isRevokeMsg) {
+            Column() {}
+              .width('100%')
+              .height(this.message?.getMessageHeight(this.getUIContext()))
+              .position({ x: 0, y: 0 }) // 跳过头像区域
+              .gesture(
+                TapGesture()
+                  .onAction(() => {
+                    this.message!.isSelectedMsg = !this.message!.isSelectedMsg
+                    this.onMessageClick?.onMultiSelect?.(this.message!.isSelectedMsg, this.message)
+                  })
+              )
+          }
         }
         .width('100%')
         .alignItems(VerticalAlign.Top)
-        .backgroundColor(this.message?.isPinMsg ? $r('app.color.color_chat_pin_bg') :
-        $r('app.color.color_chat_page_bg'))
+        .backgroundColor(this.getHighlightBackgroundColor())
         .id('itemContainer')
       }
     }.width('100%').padding({ top: 6, bottom: 6 })

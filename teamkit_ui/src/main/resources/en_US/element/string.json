@@ -133,6 +133,10 @@
       "value": "最多只能设置%d个管理员"
     },
     {
+      "name": "team_member_select_limit_tip",
+      "value": "最多只能选取%d个群成员"
+    },
+    {
       "name": "team_add_manager_failed_tip",
       "value": "管理员添加失败"
     },
@@ -159,6 +163,14 @@
     {
       "name": "team_ait_permission",
       "value": "谁可以@所有人"
+    },
+    {
+      "name": "team_member_search_placeholder",
+      "value": "Search Members"
+    },
+    {
+      "name": "team_member_search_empty_tip",
+      "value": "No Results"
     }
   ]
 }

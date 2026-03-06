@@ -261,7 +261,7 @@ export function getOperateMenu(operateMsg: NIMMessageInfo | undefined): MessageO
       operationMoreDataList.push(undoItem)
     }
 
-    if (operateMsg !== undefined && operateMsg.isServerAntiSpam === false) {
+    if (operateMsg !== undefined) {
       let selectItem = new MessageOperationItem()
       selectItem.operationType = MessageOperationType.Select;
       selectItem.operationText = $r('app.string.chat_operation_multi_select');

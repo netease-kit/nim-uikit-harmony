@@ -11,6 +11,7 @@ import {
   V2NIMMessageImageAttachment,
   V2NIMMessageType
 } from '@nimsdk/base/src/main/ets/nim/sdk/V2NIMMessageService'
+import { image } from '@kit.ImageKit'
 import {
   ChatKitClient,
   ChatRepo,
@@ -73,6 +74,10 @@ export class NIMMessageInfo {
   // 是否被反垃圾
   @Trace
   isServerAntiSpam: boolean = false
+  // 是否为 anchor 高亮消息（用于跳转定位时的高亮动画）
+  @Trace isAnchorHighlight: boolean = false
+  // 缓存的缩略图 PixelMap（用于图片预览时作为占位图，避免网络不可用时预览黑屏）
+  cachedThumbPixelMap: image.PixelMap | undefined = undefined
 
   constructor(msg: V2NIMMessage) {
     this.message = msg

@@ -61,6 +61,10 @@
       "value": "[语音通话]"
     },
     {
+      "name": "chat_merge_history",
+      "value": "[聊天记录]"
+    },
+    {
       "name": "msg_send_failed_in_block",
       "value": "对方已将你拉黑，发送消息失败"
     },

@@ -1,8 +1,7 @@
 /*
- * Copyright (c) 2022 NetEase, Inc. All rights reserved.
- * Use of this source code is governed by a MIT license that can be
- * found in the LICENSE file.
- *
+ *  Copyright (c) 2022 NetEase, Inc. All rights reserved.
+ *  Use of this source code is governed by a MIT license that can be
+ *  found in the LICENSE file.
  */
 
 export { Logger } from './src/main/ets/utils/Logger';
@@ -76,3 +75,5 @@ export { MatchSearchText } from './src/main/ets/view/MatchSearchText'
 export {CommonLongLoadingProgress } from './src/main/ets/builder/CommonLongLoadingProgress'
 
 export { BreakpointConstants} from './src/main/ets/constants/BreakpointConstants'
+
+export { UserAvatarNameItem } from './src/main/ets/model/UserAvatarNameItem'

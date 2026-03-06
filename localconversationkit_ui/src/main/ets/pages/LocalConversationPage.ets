@@ -40,15 +40,22 @@ export struct LocalConversationPage {
 
   build() {
     NavDestination() {
-      // 防诈条
-      // 用Stack包裹，实现FraudTipView浮动在RelativeContainer上方
-      // 防诈条
-      FraudTipView({
-        pathStack: this.pathStack,
-        canReport: false,
-        canCancel: false
-      })
-        .zIndex(10)
+      // 防诈条和断网条
+      Column() {
+        // 防诈条
+        FraudTipView({
+          pathStack: this.pathStack,
+          canReport: false,
+          canCancel: false
+        })
+
+        // 断网条 - 仅在断网时显示
+        if (this.viewModel.networkBroken) {
+          NetworkBrokenBuilder()
+        }
+      }
+      .width('100%')
+      .zIndex(10)
 
       // ai 数字人列表
       if (IMKitConfigCenter.enableAI && this.viewModelAI.isFinishedSyncLoad) {
@@ -87,10 +94,6 @@ export struct LocalConversationPage {
         })
       } else {
         List({ scroller: this.scroller }) {
-          if (this.viewModel.networkBroken) {
-            NetworkBrokenBuilder()
-          }
-
           LazyForEach(this.viewModel.data, (item: V2NIMLocalConversation, index: number) => {
             ListItem() {
               ConversationViewItem({
@@ -121,6 +124,13 @@ export struct LocalConversationPage {
             })
             .backgroundColor(item.stickTop ? '#ffF3F5F7' : '#ffffffff')
           }, (item: V2NIMLocalConversation) => JSON.stringify(item))
+
+          // 底部留白，防止最后一个会话被底部tab遮挡
+          ListItem() {
+            Row()
+              .width('100%')
+              .height('30%')
+          }
         }
         .listDirection(Axis.Vertical)
         .onReachEnd(() => {
@@ -176,10 +186,9 @@ export struct LocalConversationPage {
     EndItemView({
       conversationInfo: item,
       deleteItem: async () => {
-        if (ErrorUtils.checkNetworkAndToast()) {
-          this.scroller.closeAllSwipeActions();
-          this.viewModel.deleteConversation(item.conversationId)
-        }
+        // 本地会话删除不依赖网络，移除网络检查
+        this.scroller.closeAllSwipeActions();
+        this.viewModel.deleteConversation(item.conversationId)
       },
       stickTopItem: (stickTop: boolean) => {
         if (ErrorUtils.checkNetworkAndToast()) {

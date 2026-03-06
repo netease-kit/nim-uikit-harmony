@@ -45,14 +45,21 @@ export struct ConversationPage {
 
   build() {
     NavDestination() {
-      // 防诈条
-      // 用Stack包裹，实现FraudTipView浮动在RelativeContainer上方
-      // 防诈条
-      FraudTipView({
-        pathStack: this.pathStack,
-        canReport: false,
-        canCancel: false
-      })
+        // 防诈条和断网条
+        Column() {
+          // 防诈条
+          FraudTipView({
+            pathStack: this.pathStack,
+            canReport: false,
+            canCancel: false
+          })
+
+          // 断网条 - 仅在断网时显示
+          if (this.viewModel.networkBroken) {
+            NetworkBrokenBuilder()
+          }
+        }
+        .width('100%')
         .zIndex(10)
 
       // AI 数字人列表
@@ -100,10 +107,6 @@ export struct ConversationPage {
       } else {
         // 会话列表
         List({ scroller: this.scroller }) {
-          if (this.viewModel.networkBroken) {
-            NetworkBrokenBuilder()
-          }
-
           LazyForEach(this.viewModel.data, (item: V2NIMConversation, index: number) => {
             ListItem() {
               ConversationViewItem({
@@ -135,6 +138,13 @@ export struct ConversationPage {
             })
             .backgroundColor(item.stickTop ? '#ffF3F5F7' : '#ffffffff')
           }, (item: V2NIMConversation) => JSON.stringify(item))
+
+          // 底部留白，防止最后一个会话被底部tab遮挡
+          ListItem() {
+            Row()
+              .width('100%')
+              .height('30%')
+          }
         }
         .listDirection(Axis.Vertical)
         .onReachEnd(() => {

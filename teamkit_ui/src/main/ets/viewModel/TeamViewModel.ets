@@ -18,13 +18,15 @@ import {
   V2NIMConversation,
   V2NIMConversationType,
   V2NIMError,
+  V2NIMFriend,
   V2NIMQueryDirection,
   V2NIMTeam,
   V2NIMTeamChatBannedMode,
   V2NIMTeamMember,
   V2NIMTeamMessageMuteMode,
   V2NIMTeamType,
-  V2NIMUpdateSelfMemberInfoParams
+  V2NIMUpdateSelfMemberInfoParams,
+  V2NIMUser
 } from '@nimsdk/base';
 import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser';
 
@@ -159,6 +161,40 @@ export class TeamSettingViewModel {
     })
   }
 
+  /**
+   * 好友信息变化回调 - 更新群成员列表中的好友信息
+   * @param friend 变化的好友信息
+   */
+  onFriendInfoChanged(friend: V2NIMFriend) {
+    let index = this.teamMemberList.findIndex((member) => {
+      return member.getAccId() === friend.accountId
+    })
+    if (index >= 0) {
+      let memberInfo = this.teamMemberList[index]
+      this.teamMemberList.splice(index, 1)
+      memberInfo.friendInfo = friend
+      this.teamMemberList.splice(index, 0, memberInfo)
+    }
+  }
+
+  /**
+   * 用户信息变化回调 - 更新群成员列表中的用户信息（如头像、昵称等）
+   * @param users 变化的用户信息列表
+   */
+  onUserProfileChanged(users: V2NIMUser[]) {
+    users.forEach((user) => {
+      let index = this.teamMemberList.findIndex((member) => {
+        return member.getAccId() === user.accountId
+      })
+      if (index >= 0) {
+        let memberInfo = this.teamMemberList[index]
+        this.teamMemberList.splice(index, 1)
+        memberInfo.userInfo = user
+        this.teamMemberList.splice(index, 0, memberInfo)
+      }
+    })
+  }
+
   initTeamInfo() {
     this.getTeamInfo();
     this.getConversationInfo();
@@ -173,6 +209,10 @@ export class TeamSettingViewModel {
     ChatKitClient.nim.teamService?.on('onTeamMemberLeft', this.onTeamMemberLeft.bind(this))
 
     ChatKitClient.nim.conversationService?.on('onConversationChanged', this.onConversationChanged.bind(this))
+    // 监听好友信息变化，用于更新成员头像（如备注变化导致默认头像变化）
+    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChanged.bind(this))
+    // 监听用户信息变化，用于更新成员头像（如用户修改了自定义头像）
+    ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onUserProfileChanged.bind(this))
   }
 
   /**
@@ -283,5 +323,9 @@ export class TeamSettingViewModel {
     ChatKitClient.nim.teamService?.off('onTeamMemberLeft', this.onTeamMemberLeft)
 
     ChatKitClient.nim.conversationService?.off('onConversationChanged', this.onConversationChanged)
+    // 取消监听好友信息变化
+    ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChanged)
+    // 取消监听用户信息变化
+    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onUserProfileChanged)
   }
 }

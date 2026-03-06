@@ -10,7 +10,8 @@ import {
   V2NIMQueryDirection,
   V2NIMTeamMember,
   V2NIMTeamMemberRole,
-  V2NIMTeamType
+  V2NIMTeamType,
+  V2NIMUser
 } from '@nimsdk/base'
 
 @ObservedV2
@@ -42,6 +43,24 @@ export class TeamMemberListViewModel {
       memberInfo.friendInfo = friend
       this.memberList.splice(index, 0, memberInfo)
     }
+  }
+
+  /**
+   * 用户信息变化回调 - 更新成员列表中的用户信息（如头像、昵称等）
+   * @param users 变化的用户信息列表
+   */
+  onUserProfileChanged(users: V2NIMUser[]) {
+    users.forEach((user) => {
+      let index = this.memberList.findIndex((member) => {
+        return member.getAccId() === user.accountId
+      })
+      if (index >= 0) {
+        let memberInfo = this.memberList[index]
+        this.memberList.splice(index, 1)
+        memberInfo.userInfo = user
+        this.memberList.splice(index, 0, memberInfo)
+      }
+    })
   }
 
   onTeamMemberInfoUpdated(members: V2NIMTeamMember[]) {
@@ -93,6 +112,8 @@ export class TeamMemberListViewModel {
    */
   initMemberChangeListener() {
     ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChanged.bind(this))
+    // 监听用户信息变化，用于更新成员头像
+    ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onUserProfileChanged.bind(this))
     //群成员信息变更
     ChatKitClient.nim.teamService?.on('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated.bind(this))
     ChatKitClient.nim.teamService?.on('onTeamMemberLeft', this.onTeamMemberLeft.bind(this))
@@ -185,6 +206,7 @@ export class TeamMemberListViewModel {
 
   onDestroy() {
     ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChanged)
+    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onUserProfileChanged)
     //群成员信息变更
     ChatKitClient.nim.teamService?.off('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated)
     ChatKitClient.nim.teamService?.off('onTeamMemberLeft', this.onTeamMemberLeft)

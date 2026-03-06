@@ -62,7 +62,7 @@ export class CommonConstants {
    * if true , use local conversation kit
    * if false , use remote conversation kit
    */
-  static readonly KEY_SETTING_LOCAL_CONVERSATION: string = 'KEY_SETTING_MESSAGE_READ_OR';
+  static readonly KEY_SETTING_LOCAL_CONVERSATION: string = 'KEY_SETTING_LOCAL_CONVERSATION';
   /**
    * 在线状态是否显示
    */
@@ -71,4 +71,8 @@ export class CommonConstants {
    * 反垃圾是否发送 TIP 消息
    */
   static readonly KEY_SETTING_ANTISPAM_TIP_MESSAGE: string = 'KEY_SETTING_ANTISPAM_TIP_MESSAGE';
+  /**
+   * 是否启用云端搜索
+   */
+  static readonly KEY_SETTING_CLOUD_SEARCH: string = 'KEY_SETTING_CLOUD_SEARCH';
 }

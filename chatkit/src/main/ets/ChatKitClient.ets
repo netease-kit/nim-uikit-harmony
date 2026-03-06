@@ -181,7 +181,9 @@ export class ChatKitClient {
 
   private static dataSyncFun = (type: V2NIMDataSyncType, state: V2NIMDataSyncState, error?: V2NIMError) => {
     if (state === V2NIMDataSyncState.V2NIM_DATA_SYNC_STATE_COMPLETED) {
+      // 主数据同步完成后，刷新好友列表、黑名单列表
       ContactRepo.getFriendList()
+      ContactRepo.getBlockList()
     }
   }
 

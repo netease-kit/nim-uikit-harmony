@@ -37,6 +37,10 @@
       "value": "解散了群聊"
     },
     {
+      "name": "chat_team_notify_owner_transfer",
+      "value": "转移了群主身份给"
+    },
+    {
       "name": "null_message_not_support",
       "value": "不支持发送空消息"
     },
@@ -341,8 +345,44 @@
       "value": "搜索聊天内容"
     },
     {
+      "name": "search_chat_history_quickly",
+      "value": "快速搜索聊天消息"
+    },
+    {
+      "name": "search_by_team_member",
+      "value": "群成员"
+    },
+    {
+      "name": "search_by_photo",
+      "value": "图片"
+    },
+    {
+      "name": "search_by_video",
+      "value": "视频"
+    },
+    {
+      "name": "search_by_date",
+      "value": "日期"
+    },
+    {
+      "name": "search_by_file",
+      "value": "文件"
+    },
+    {
       "name": "team_history_record_empty_tip",
       "value": "暂无聊天记录"
+    },
+    {
+      "name": "search_image_empty_tip",
+      "value": "暂无图片"
+    },
+    {
+      "name": "search_video_empty_tip",
+      "value": "暂无视频"
+    },
+    {
+      "name": "search_file_empty_tip",
+      "value": "暂无文件"
     },
     {
       "name": "chat_message_ait_select_tips",
@@ -455,6 +495,142 @@
     {
       "name": "chat_message_antispam_tip_format",
       "value": "内容可能涉及%s, 请调整后发送"
+    },
+    {
+      "name": "chat_message_loading",
+      "value": "加载中..."
+    },
+    {
+      "name": "chat_message_no_more_data",
+      "value": "没有更多了"
+    },
+    {
+      "name": "chat_new_message_count",
+      "value": "%d 条新消息"
+    },
+    {
+      "name": "chat_new_message_search_by_member",
+      "value": "按群成员查找"
+    },
+    {
+      "name": "chat_history_message_operation_locate",
+      "value": "定位到聊天"
+    },
+    {
+      "name": "search_by_date_title",
+      "value": "按日期筛选"
+    },
+    {
+      "name": "search_date_today",
+      "value": "今天"
+    },
+    {
+      "name": "search_date_last_7_days",
+      "value": "最近7天"
+    },
+    {
+      "name": "search_date_last_30_days",
+      "value": "最近30天"
+    },
+    {
+      "name": "search_date_confirm",
+      "value": "完成"
+    },
+    {
+      "name": "search_date_select_title",
+      "value": "选择聊天日期"
+    },
+    {
+      "name": "search_date_please_select",
+      "value": "请选择日期"
+    },
+    {
+      "name": "search_date_weekday_sun",
+      "value": "日"
+    },
+    {
+      "name": "search_date_weekday_mon",
+      "value": "一"
+    },
+    {
+      "name": "search_date_weekday_tue",
+      "value": "二"
+    },
+    {
+      "name": "search_date_weekday_wed",
+      "value": "三"
+    },
+    {
+      "name": "search_date_weekday_thu",
+      "value": "四"
+    },
+    {
+      "name": "search_date_weekday_fri",
+      "value": "五"
+    },
+    {
+      "name": "search_date_weekday_sat",
+      "value": "六"
+    },
+    {
+      "name": "search_date_year_month_format",
+      "value": "%d年%d月"
+    },
+    {
+      "name": "search_date_year_format",
+      "value": "%d年"
+    },
+    {
+      "name": "search_date_month_format",
+      "value": "%d月"
+    },
+    {
+      "name": "search_date_month_1",
+      "value": "1月"
+    },
+    {
+      "name": "search_date_month_2",
+      "value": "2月"
+    },
+    {
+      "name": "search_date_month_3",
+      "value": "3月"
+    },
+    {
+      "name": "search_date_month_4",
+      "value": "4月"
+    },
+    {
+      "name": "search_date_month_5",
+      "value": "5月"
+    },
+    {
+      "name": "search_date_month_6",
+      "value": "6月"
+    },
+    {
+      "name": "search_date_month_7",
+      "value": "7月"
+    },
+    {
+      "name": "search_date_month_8",
+      "value": "8月"
+    },
+    {
+      "name": "search_date_month_9",
+      "value": "9月"
+    },
+    {
+      "name": "search_date_month_10",
+      "value": "10月"
+    },
+    {
+      "name": "search_date_month_11",
+      "value": "11月"
+    },
+    {
+      "name": "search_date_month_12",
+      "value": "12月"
     }
   ]
 }

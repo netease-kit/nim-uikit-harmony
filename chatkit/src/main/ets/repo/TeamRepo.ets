@@ -9,6 +9,7 @@ import {
   V2NIMAntispamConfig,
   V2NIMCreateTeamParams,
   V2NIMCreateTeamResult,
+  V2NIMSearchTeamMemberParams,
   V2NIMTeam,
   V2NIMTeamAgreeMode,
   V2NIMTeamChatBannedMode,
@@ -30,6 +31,7 @@ import {
   V2NIMUpdateTeamInfoParams,
   V2NIMUser
 } from '@nimsdk/base'
+import HashMap from '@ohos.util.HashMap'
 import { ChatKitClient } from '../ChatKitClient'
 import { TeamMemberResult, TeamMemberWithUser } from '../model/TeamMemberWithUser'
 import { NEFriendUserCache } from '../NEFriendUserCache'
@@ -516,9 +518,17 @@ export class TeamRepo {
    * @param failure 失败回调
    */
   static async searchTeamMembers(searchOption: V2NIMTeamMemberSearchOption): Promise<V2NIMTeamMemberSearchResult | undefined> {
-    // TODO: 等待SDK实现
-    // return await ChatKitClient.nim.teamService?.searchTeamMembers(searchOption)
-    return undefined
+    return await ChatKitClient.nim.teamService?.searchTeamMembers(searchOption)
+  }
+
+  /**
+   * 根据关键字搜索群成员（扩展版本）
+   *
+   * @param params 搜索参数
+   * @returns HashMap<teamId, V2NIMTeamMember[]> 群ID到群成员列表的映射
+   */
+  static async searchTeamMembersEx(params: V2NIMSearchTeamMemberParams): Promise<HashMap<string, V2NIMTeamMember[]> | undefined> {
+    return await ChatKitClient.nim.teamService?.searchTeamMembersEx(params)
   }
 
   /**

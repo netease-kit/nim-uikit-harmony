@@ -149,6 +149,10 @@
       "value": "历史记录"
     },
     {
+      "name": "search_chat_history",
+      "value": "Search chat history"
+    },
+    {
       "name": "exception_description",
       "value": "异常说明"
     },
@@ -159,6 +163,22 @@
     {
       "name": "conversation_loading",
       "value": "会话加载中..."
+    },
+    {
+      "name": "search_message_loading",
+      "value": "Loading..."
+    },
+    {
+      "name": "search_message_load_more",
+      "value": "More"
+    },
+    {
+      "name": "date_format_year_month_day",
+      "value": "%d-%d-%d"
+    },
+    {
+      "name": "date_format_month_day",
+      "value": "%d-%d"
     }
   ]
 }

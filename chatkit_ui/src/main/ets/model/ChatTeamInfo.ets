@@ -1,8 +1,7 @@
 /*
- * Copyright (c) 2022 NetEase, Inc. All rights reserved.
- * Use of this source code is governed by a MIT license that can be
- * found in the LICENSE file.
- *
+ *  Copyright (c) 2022 NetEase, Inc. All rights reserved.
+ *  Use of this source code is governed by a MIT license that can be
+ *  found in the LICENSE file.
  */
 
 import { ChatInfo } from './ChatInfo';
@@ -46,6 +45,10 @@ export class ChatTeamInfo extends ChatInfo {
     readReceipts.forEach((readReceipt) => {
       this.teamMessageReadReceipt.set(readReceipt.messageClientId, readReceipt);
       let msg = this.getMessage(readReceipt.messageClientId);
+      if (msg && readReceipt.readCount <= msg.readCount) {
+        // 操作过了，不管，因为 onTeamMessageReceiptsHandler 给的数组里面是没有排序的，可能导致 readCount 还会下降
+        return;
+      }
       msg?.setReadCount(readReceipt.readCount, readReceipt.unreadCount)
     })
   }
@@ -203,6 +206,16 @@ export class ChatTeamInfo extends ChatInfo {
 
     if (result == null || result.trim() === '') {
       result = accountId;
+    }
+    return result;
+  }
+
+  getConversationName(): string {
+    let result: string = '';
+    if (this.team !== undefined) {
+      result = this.team?.name
+    } else {
+      result = this.targetId
     }
     return result;
   }

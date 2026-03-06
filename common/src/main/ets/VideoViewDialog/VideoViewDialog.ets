@@ -15,6 +15,8 @@ export struct VideoViewerDialog {
   controller?: CustomDialogController
   videoUrl?: string
   videoRatio?: number = 2 // 元素宽高比
+  // 弹窗关闭回调，用于通知父组件弹窗已关闭
+  onDialogClose?: () => void;
 
   build() {
     Column() {
@@ -29,6 +31,7 @@ export struct VideoViewerDialog {
     .height('100%')
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .onClick(() => {
+      this.onDialogClose?.()
       this.controller?.close()
     })
   }

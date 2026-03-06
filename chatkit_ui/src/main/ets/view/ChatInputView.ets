@@ -11,7 +11,7 @@ import { inputMethod } from '@kit.IMEKit';
 import { V2NIMTeam } from '@nimsdk/base';
 import { ChatAitDialog } from './ChatAitDialog';
 import { TeamMemberCache } from '@nimkit/chatkit/src/main/ets/cache/TeamMemberCache';
-import { accountAll, ChatKitClient, TeamMemberWithUser } from '@nimkit/chatkit';
+import { accountAll, ChatKitClient, ContactRepo, TeamMemberWithUser } from '@nimkit/chatkit';
 import { AitManager } from '../manager/ait/AitManager';
 import { getReplyMessageText, getReplyMessageTitle, parseMessageText, sliceMessageText } from '../common/MessageHelper';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
@@ -195,7 +195,32 @@ export struct NEChatInputView {
     if (teamMemberCache.needFetchMember()) {
       await teamMemberCache.getMemberList()
     }
+    // 检查是否有成员缺失userInfo，如果有则从云端获取
+    await this.ensureMemberUserInfo(teamMemberCache)
     this.chatAitDialogController.open()
+  }
+
+  /**
+   * 确保所有成员都有用户信息（userInfo），缺失的从云端获取
+   * @param teamMemberCache
+   */
+  async ensureMemberUserInfo(teamMemberCache: TeamMemberCache) {
+    const allMembers = teamMemberCache.getAllMembers()
+    // 找出缺失 userInfo 的成员
+    const missingUserInfoAccountIds = allMembers
+      .filter((member) => !member.userInfo)
+      .map((member) => member.getAccId())
+
+    if (missingUserInfoAccountIds.length > 0) {
+      try {
+        // 从云端获取缺失的用户信息
+        const userList = await ContactRepo.getUserListFromCloud(missingUserInfoAccountIds)
+        // 更新到 TeamMemberCache
+        teamMemberCache.onUserProfileChanged(userList)
+      } catch (e) {
+        console.error(`ensureMemberUserInfo failed: ${e}`)
+      }
+    }
   }
 
   /**

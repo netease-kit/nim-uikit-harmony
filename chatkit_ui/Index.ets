@@ -18,3 +18,7 @@ export { MessageItemClick } from './src/main/ets/view/MessageItemClick'
 export { ChatKitUIClient } from './src/main/ets/ChatKitUIClient'
 
 export { AbsCallKitClient } from './src/main/ets/AbsCallKitClient'
+
+export { ChatSearchDateMessagePage } from './src/main/ets/pages/ChatSearchDateMessagePage'
+
+export { ChatSearchDateMessageViewModel, ChatSearchDateMessageParams } from './src/main/ets/viewmodel/ChatSearchDateMessageViewModel'

@@ -6,7 +6,7 @@
  */
 import { ChatRepo, getAitModelFromJson } from '@nimkit/chatkit';
 import { ChatKitClient, currentConversationChanged } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
-import { V2NIMConversation, V2NIMConversationType, V2NIMMessage, V2NIMMessageRevokeNotification } from '@nimsdk/base';
+import { V2NIMConversationType, V2NIMLocalConversation, V2NIMMessage, V2NIMMessageRevokeNotification } from '@nimsdk/base';
 import { AitDatabase } from './AitDatabaseHelper';
 
 export const AitSessionChangeEvent: string = 'AitSessionChangeEvent'
@@ -25,8 +25,8 @@ export class AitServer {
 
   }
 
-  //有@的会话，缓存
-  private aitConversationSet: Set<string> = new Set()
+  //有@的会话及对应的@消息列表，缓存
+  private aitConversationMap: Map<string, Set<string>> = new Map()
   /// 当前会话id, 用于判断是否需要保存@消息
   private _currentSessionId: string | null = null;
 
@@ -41,7 +41,7 @@ export class AitServer {
       this._currentSessionId = conversationId
       if (conversationId.length > 0) {
         this.clearAitMessage(conversationId)
-        this.aitConversationSet.delete(conversationId)
+        this.aitConversationMap.delete(conversationId)
         this.sendAitChange({
           sessionId: conversationId,
           messageId: undefined,
@@ -56,20 +56,28 @@ export class AitServer {
     // 注册消息撤回监听
     ChatRepo.onRevokeMessage(this.onRevokeFun.bind(this))
 
-    //会话已读未读数的变化
-    ChatKitClient.nim.conversationService?.on('onConversationChanged', (updateList: V2NIMConversation[]) => {
-      updateList.forEach((conversation) => {
-        if (conversation.unreadCount === 0 &&
-        this.aitConversationSet.has(conversation.conversationId)) {
-          this.clearAitMessage(conversation.conversationId)
-          this.sendAitChange({
-            sessionId: conversation.conversationId,
-            isAit: false
-          })
-        }
-      })
+    //本地会话已读未读数的变化（其他端 clearUnread 时触发）
+    ChatKitClient.nim.localConversationService?.on('onConversationChanged', (updateList: V2NIMLocalConversation[]) => {
+      this.handleConversationUnreadChanged(updateList)
     })
 
+  }
+
+  /**
+   * 处理会话未读数变化，当未读数为0时清除@消息
+   * @param updateList 变化的会话列表
+   */
+  private handleConversationUnreadChanged(updateList: V2NIMLocalConversation[]): void {
+    updateList.forEach((conversation) => {
+      if (conversation.unreadCount === 0 &&
+        this.aitConversationMap.has(conversation.conversationId)) {
+        this.clearAitMessage(conversation.conversationId)
+        this.sendAitChange({
+          sessionId: conversation.conversationId,
+          isAit: false
+        })
+      }
+    })
   }
 
   //接收到消息
@@ -123,24 +131,55 @@ export class AitServer {
    * @param myAccId
    */
   async handleRevokeAitMessage(msg: V2NIMMessageRevokeNotification, myAccId: string) {
-    //查找出此Conversation 中所有的ait Message
-    let aitMessageList = await AitDatabase.instance.queryMessageIdsBySessionId(msg.messageRefer.conversationId, myAccId)
-    let aitMessageId = aitMessageList.find((e) => e === msg.messageRefer.messageClientId)
-    if (aitMessageId) {
-      await AitDatabase.instance.deleteMessage(msg.messageRefer.conversationId, msg.messageRefer.messageClientId,
-        myAccId)
-      let haveAit = await this.isAitSession(msg.messageRefer.conversationId, myAccId)
-      //if (haveAit === false) {
-        // 回调
-        this.sendAitChange({
-          sessionId: msg.messageRefer.conversationId,
-          messageId: msg.messageRefer.messageClientId,
-          isAit: false
-        })
-        this.aitConversationSet.delete(msg.messageRefer.conversationId)
-      //}
-    }
+    const conversationId = msg.messageRefer.conversationId
+    const messageId = msg.messageRefer.messageClientId
 
+    // 从缓存中移除该消息
+    this.removeAitMessageFromCache(conversationId, messageId)
+
+    // 从数据库中删除该消息
+    await AitDatabase.instance.deleteMessage(conversationId, messageId, myAccId)
+
+    // 检查该会话是否还有其他@消息
+    const aitMessageSet = this.aitConversationMap.get(conversationId)
+    const hasOtherAitMessages = aitMessageSet && aitMessageSet.size > 0
+
+    if (!hasOtherAitMessages) {
+      // 只有当该会话中没有其他@消息时，才隐藏"有人@我"标识
+      this.aitConversationMap.delete(conversationId)
+      this.sendAitChange({
+        sessionId: conversationId,
+        messageId: messageId,
+        isAit: false
+      })
+    }
+  }
+
+  /**
+   * 从缓存中移除指定的@消息
+   * @param sessionId
+   * @param messageId
+   */
+  private removeAitMessageFromCache(sessionId: string, messageId: string): void {
+    const aitMessageSet = this.aitConversationMap.get(sessionId)
+    if (aitMessageSet) {
+      aitMessageSet.delete(messageId)
+      if (aitMessageSet.size === 0) {
+        this.aitConversationMap.delete(sessionId)
+      }
+    }
+  }
+
+  /**
+   * 添加@消息到缓存
+   * @param sessionId
+   * @param messageId
+   */
+  private addAitMessageToCache(sessionId: string, messageId: string): void {
+    if (!this.aitConversationMap.has(sessionId)) {
+      this.aitConversationMap.set(sessionId, new Set())
+    }
+    this.aitConversationMap.get(sessionId)!.add(messageId)
   }
 
   public async saveAitMessage(sessionId: string, messageId: string): Promise<boolean> {
@@ -151,7 +190,11 @@ export class AitServer {
     if (!myId) {
       return false;
     }
-    this.aitConversationSet.add(sessionId)
+
+    // 添加到缓存中
+    this.addAitMessageToCache(sessionId, messageId)
+
+    // 保存到数据库
     return ((await AitDatabase.instance.insertAitMessage(sessionId, messageId, myId)) ?? 0) > 0;
   }
 
@@ -160,7 +203,11 @@ export class AitServer {
     if (!myId) {
       return Promise.resolve(0);
     }
-    this.aitConversationSet.delete(sessionId)
+
+    // 从缓存中清除
+    this.aitConversationMap.delete(sessionId)
+
+    // 从数据库中清除
     return AitDatabase.instance.clearSessionAitMessage(sessionId, myId);
   }
 
@@ -171,11 +218,22 @@ export class AitServer {
    * @returns
    */
   public async isAitSession(sessionId: string, myId: string): Promise<boolean> {
-    if (this.aitConversationSet.has(sessionId)) {
+    // 优先检查缓存
+    const aitMessageSet = this.aitConversationMap.get(sessionId)
+    if (aitMessageSet && aitMessageSet.size > 0) {
       return true
     }
+
+    // 如果缓存中没有，检查数据库
     const msgList = await AitDatabase.instance.queryMessageIdsBySessionId(sessionId, myId);
-    return msgList.length > 0;
+    if (msgList.length > 0) {
+      // 将数据库中的数据同步到缓存
+      const messageSet = new Set(msgList)
+      this.aitConversationMap.set(sessionId, messageSet)
+      return true
+    }
+
+    return false
   }
 
   public async getAllAitSession(myId: string): Promise<string[]> {

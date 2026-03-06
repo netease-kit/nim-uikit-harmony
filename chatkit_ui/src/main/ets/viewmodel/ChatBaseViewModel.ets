@@ -82,6 +82,8 @@ export class ChatBaseViewModel {
   hasLoadData = false
   // 网络连接状态
   @Trace networkBroken: boolean = ChatKitClient.connectBroken()
+  // 页面是否可见（用于控制是否发送已读回执）
+  isPageVisible: boolean = true
   // 流式 ing 缓存数据
   private streamingMessageMap: HashMap<string, StreamMessage> = new HashMap();
   // 发送消息
@@ -91,13 +93,18 @@ export class ChatBaseViewModel {
         if (message.messageClientId !== this.sendingMsgClientId) {
           this.sendingMsgClientId = message.messageClientId
           this.chatInfo?.pushMessage(message)
-          this.chatInfo?.setReceiveMsg(true)
+          this.chatInfo?.setReceiveMsg(true, [message])
         }
 
       } else {
+        // 发送失败 & 发送失败等其他状态
         let result = this.chatInfo?.updateMessageStatus(message)
         if (!result) {
-          this.chatInfo?.setReceiveMsg(true)
+          this.chatInfo?.setReceiveMsg(true, [message])
+        }
+        if (message.sendingState == V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SUCCEEDED) {
+          // 调用钩子方法，子类可以实现自定义逻辑（如获取群消息已读回执）
+          this.toHandleSendMessageSuccess(message)
         }
       }
     }
@@ -160,24 +167,29 @@ export class ChatBaseViewModel {
   // 接受消息
   onReceiveFun = (messages: V2NIMMessage[]) => {
     if (this.hasNew) {
+      // 最后一条消息判断不准的情况下，只要 conversationId 对得上的，都认为是新消息记录下来
+      const messagesWhenHasNew: V2NIMMessage[] = messages.filter((msg: V2NIMMessage) => {
+        return msg.conversationId == this.conversationId
+      })
+      this.chatInfo?.setReceiveMsg(true, messagesWhenHasNew);
       return
     }
     let hasNew = false
-    let receiveMsg: NIMMessageInfo[] = [];
+    let receiveMsgs: NIMMessageInfo[] = [];
     for (let i = messages.length - 1; i >= 0; i--) {
       let msg = messages[i];
       if (msg.conversationId == this.conversationId) {
-        let msgInfo = this.chatInfo?.pushMessage(msg);
+        const msgInfo: NIMMessageInfo | undefined = this.chatInfo?.pushMessage(msg);
         if (msgInfo !== undefined) {
-          receiveMsg.push(msgInfo)
+          receiveMsgs.push(msgInfo)
         }
         hasNew = true;
       }
     }
     if (hasNew) {
-      this.toHandleReceiveMessage(receiveMsg)
+      this.toHandleReceiveMessage(receiveMsgs)
       this.clearUnreadCount()
-      this.chatInfo?.setReceiveMsg(true);
+      this.chatInfo?.setReceiveMsg(true, receiveMsgs.map((receiveMsg: NIMMessageInfo) => { return receiveMsg.message}));
     }
   }
   // 更新消息
@@ -198,18 +210,18 @@ export class ChatBaseViewModel {
       return
     }
     let hasNew = false
-    let receiveMsg: NIMMessageInfo[] = [];
+    let receiveMsgs: NIMMessageInfo[] = [];
     if (message.conversationId == this.conversationId) {
       let msgInfo = this.chatInfo?.pushModifyMessage(message);
       if (msgInfo !== undefined) {
-        receiveMsg.push(msgInfo)
+        receiveMsgs.push(msgInfo)
       }
       hasNew = true;
     }
     if (hasNew) {
-      this.toHandleReceiveMessage(receiveMsg)
+      this.toHandleReceiveMessage(receiveMsgs)
       // this.clearUnreadCount() // 更新消息不做 clear 动作
-      this.chatInfo?.setReceiveMsg(true);
+      this.chatInfo?.setReceiveMsg(true, receiveMsgs.map((receiveMsg: NIMMessageInfo) => { return receiveMsg.message}));
     }
   }
 
@@ -333,7 +345,7 @@ export class ChatBaseViewModel {
       'limit': ChatConst.chatMessagePageSize,
       'direction': this.msgDirection,
       'onlyQueryLocal': false,
-      'strictMode': true
+      'strictMode': false // 非严格模式，允许无网络时回退到本地消息查询
     }).catch((err: BusinessError) => {
       hasError = true
       return []
@@ -357,7 +369,7 @@ export class ChatBaseViewModel {
       }
     }
     // 修改接受消息标志，如果有新消息则更新接受消息标志，否则列表滚动到底部
-    this.chatInfo?.setReceiveMsg(true)
+    this.chatInfo?.setReceiveMsg(true, result.map((receiveMsg: NIMMessageInfo) => { return receiveMsg.message}));
     this.toHandleQueryMessage(result, messageList)
     this.hasLoadData = true
     return result;
@@ -387,7 +399,10 @@ export class ChatBaseViewModel {
     if (errorCount > 1) {
       return result
     }
+    // clear
     this.chatInfo?.cleanMessage()
+
+    // push before message
     if (messageBeforList.length > 0) {
       for (let index = messageBeforList.length - 1; index >= 0; index--) {
         let msgInfo = this.chatInfo?.pushMessage(messageBeforList[index])
@@ -396,8 +411,17 @@ export class ChatBaseViewModel {
         }
       }
     }
-    this.chatInfo?.pushMessageInfo(anchorMsg)
-    let anchorIndex = this.chatInfo?.msgList.totalCount() ?? 1 - 1
+
+    // push current message
+    const currentMsgInfo = this.chatInfo?.pushMessage(anchorMsg.message)
+    if (currentMsgInfo != undefined) {
+      result.push(currentMsgInfo);
+      // 设置 anchor 高亮状态，用于 UI 显示高亮动画
+      // currentMsgInfo.isAnchorHighlight = true // 测试使用
+    }
+
+    // push after message
+    const anchorIndex = (this.chatInfo?.msgList.totalCount() || 1) - 1
     if (messageAfterList.length > 0) {
       for (let index = 0; index < messageAfterList.length; index++) {
         let msgInfo = this.chatInfo?.pushMessage(messageAfterList[index])
@@ -414,11 +438,19 @@ export class ChatBaseViewModel {
     // // 修改接受消息标志，如果有新消息则更新接受消息标志，否则列表滚动到底部
     // this.chatInfo?.setReceiveMsg(true)
     this.toHandleQueryMessage(result, messageAfterList)
-    if (anchorIndex) {
+    if (anchorIndex >= 0) {
       this.chatInfo?.setScrollIndex(anchorIndex)
     }
     this.hasLoadData = true
     return result;
+  }
+
+  /**
+   * 消息发送成功后的钩子方法，子类可以重写以实现自定义逻辑
+   * @param message 发送成功的消息
+   */
+  toHandleSendMessageSuccess(message: V2NIMMessage): void {
+    // 默认实现为空，子类可以重写
   }
 
   // 处理接受消息，用于子类进行特殊业务处理
