@@ -54,6 +54,7 @@ import {
   mergedMessageCustomType,
   mergedMessageLimitCount,
   mergedMessageMaxDepth,
+  NEAIUserCache,
   singleMessageLimitCount,
   TeamMemberCache,
   TeamSettingParam
@@ -745,7 +746,12 @@ export struct ChatTeamPage {
                             name: 'MineInfoPage'
                           })
                         } else {
-                          this.pathStack.pushPath({ name: 'PersonInfoPage', param: msg?.message.senderId })
+                          const senderId = msg?.message.senderId
+                          if (senderId && NEAIUserCache.getAIUser(senderId)) {
+                            this.pathStack.pushPath({ name: 'AIPersonInfoPage', param: senderId })
+                          } else {
+                            this.pathStack.pushPath({ name: 'PersonInfoPage', param: senderId })
+                          }
                         }
                       }
                     },

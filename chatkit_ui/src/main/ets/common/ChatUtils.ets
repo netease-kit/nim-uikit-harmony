@@ -55,7 +55,7 @@ export function showLocationDetail(msg: NIMMessageInfo, context: common.UIAbilit
   });
 }
 
-export function setupMoreOperationData(isP2P: boolean) {
+export function setupMoreOperationData(isP2P: boolean, isBot: boolean = false) {
   let operationMoreDataList: Array<NEChatMoreOperationData> = Array()
 
   // 拍摄功能
@@ -79,8 +79,8 @@ export function setupMoreOperationData(isP2P: boolean) {
   fileOperationData.imageSource = "app.media.ic_public_chat_file";
   operationMoreDataList.push(fileOperationData);
 
-  if (isP2P) {
-    // 呼叫组件功能
+  if (isP2P && !isBot) {
+    // 呼叫组件功能（Bot 不支持音视频通话）
     const callOperationData = new NEChatMoreOperationData();
     callOperationData.operationTitle = $r("app.string.chat_send_call");
     callOperationData.type = NEChatMoreOperationType.Call;
@@ -343,4 +343,3 @@ export function computeOperateViewWidth(msg: NIMMessageInfo | undefined): number
 export function computeOperateViewHeight(msg: NIMMessageInfo | undefined): number {
   return ChatConst.menuItemHeight * (Math.ceil(getOperateMenuSize(msg) / ChatConst.menuItemColumnNum))
 }
-

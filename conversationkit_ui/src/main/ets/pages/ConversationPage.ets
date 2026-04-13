@@ -15,8 +15,9 @@ import {
   PersonSelectParam,
   TeamRepo
 } from '@nimkit/chatkit';
-import { CommonEmptyResult, NetworkBrokenBuilder } from '@nimkit/common';
-import { V2NIMAIUser, V2NIMConversation, V2NIMConversationType } from '@nimsdk/base';
+import { CommonEmptyResult, NECommonUtils, NetworkBrokenBuilder } from '@nimkit/common';
+import { V2NIMAIUser, V2NIMConversation, V2NIMConversationType, V2NIMUserAIBot } from '@nimsdk/base';
+import { scanBarcode, scanCore } from '@kit.ScanKit';
 import { AitServer } from '../service/ait/AitService';
 import { ConversationAIUserViewItem } from '../view/ConversationAIUserViewItem';
 import { ConversationViewItem } from '../view/ConversationViewItem';
@@ -354,6 +355,22 @@ struct ConversationNavigationTitleBar {
           this.goToPersonSelectPage(this.pathStack, false)
         }
       })
+
+      //扫一扫
+      Row() {
+        Image($r('app.media.nav_scan'))
+          .width(14)
+          .height(14)
+        Text('扫一扫')
+          .fontSize(14)
+          .fontColor('#ff333333')
+          .margin({ left: 6 })
+      }.onClick(() => {
+        if (this.conversationPopupShowed) {
+          this.conversationPopupShowed = false
+          this.doScan()
+        }
+      })
     }
     .width(122)
     .padding({
@@ -364,6 +381,51 @@ struct ConversationNavigationTitleBar {
     .alignItems(HorizontalAlign.Start)
     .borderRadius(8)
     .backgroundColor('#ffFFFFFF')
+  }
+
+  private async doScan(): Promise<void> {
+    try {
+      const result = await scanBarcode.startScanForResult(getContext(this), {
+        scanTypes: [scanCore.ScanType.ALL]
+      })
+      const rawValue = result.originalValue ?? ''
+      let qrcode = ''
+      let expireAt: number = 0
+      try {
+        const parsed = JSON.parse(rawValue) as Record<string, string | number>
+        qrcode = (parsed['qrCode'] as string) ?? ''
+        expireAt = (parsed['expireAt'] as number) ?? 0
+      } catch {
+        // 非 JSON 格式的二维码不是合法的 Bot 二维码
+        NECommonUtils.showToast($r('app.string.bot_scan_invalid_qr'))
+        return
+      }
+      if (qrcode.length <= 0) {
+        NECommonUtils.showToast($r('app.string.bot_scan_invalid_qr'))
+        return
+      }
+      if (expireAt > 0 && Date.now() > expireAt) {
+        AlertDialog.show({
+          title: $r('app.string.bot_qr_expired_title'),
+          message: $r('app.string.bot_qr_expired_message'),
+          autoCancel: true,
+          buttons: [{ value: $r('app.string.bot_qr_expired_btn'), fontColor: '#337EFF', action: () => {} }]
+        })
+        return
+      }
+      this.pathStack.pushPath({
+        name: 'BindBotPage',
+        param: qrcode,
+        onPop: (popInfo: PopInfo) => {
+          const bot = popInfo.result as V2NIMUserAIBot | undefined
+          if (bot && bot.accid) {
+            this.pathStack.pushPath({ name: 'BotInfoPage', param: bot })
+          }
+        }
+      })
+    } catch (scanErr) {
+      console.error('[ConversationPage] scan error: ' + JSON.stringify(scanErr))
+    }
   }
 
   /**

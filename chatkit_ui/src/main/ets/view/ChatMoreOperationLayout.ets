@@ -16,9 +16,7 @@ export struct NEChatMoreOperation {
 
   build() {
     GridRow({
-      breakpoints: {
-        reference: BreakpointsReference.WindowSize
-      }
+      columns: 12
     }) {
       ForEach(this.dataList, (data: NEChatMoreOperationData) => {
         GridCol({ span: 3 }) {

@@ -179,6 +179,10 @@
     {
       "name": "date_format_month_day",
       "value": "%d-%d"
+    },
+    {
+      "name": "common_save",
+      "value": "Save"
     }
   ]
 }

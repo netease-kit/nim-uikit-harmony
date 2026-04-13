@@ -179,6 +179,10 @@
     {
       "name": "date_format_month_day",
       "value": "%d月%d日"
+    },
+    {
+      "name": "common_save",
+      "value": "保存"
     }
   ]
 }

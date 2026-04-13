@@ -109,7 +109,7 @@ export class NimRepository {
           // linkUrl: 'imtest-jd.netease.im:8091'
         },
         pushServiceConfig: {
-          harmonyCertificateName: "DEMO_HMOS_PUSH",
+          harmonyCertificateName: "DEMO_HMOS_PUSH_NEW",
           customPushContentType: "CONTENT_TYPE_TEST"
         },
         databaseServiceConfig: {

@@ -41,8 +41,10 @@ import {
   mergedMessageCustomType,
   mergedMessageLimitCount,
   mergedMessageMaxDepth,
+  NEAIUserCache,
   singleMessageLimitCount,
-  SubscriptionRepo
+  SubscriptionRepo,
+  UserAIBotRepo
 } from '@nimkit/chatkit';
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog';
@@ -634,7 +636,12 @@ export struct ChatP2PPage {
                             name: 'MineInfoPage'
                           })
                         } else {
-                          this.pathStack.pushPath({ name: 'PersonInfoPage', param: msg?.message.senderId })
+                          const senderId = msg?.message.senderId
+                          if (senderId && NEAIUserCache.getAIUser(senderId)) {
+                            this.pathStack.pushPath({ name: 'AIPersonInfoPage', param: senderId })
+                          } else {
+                            this.pathStack.pushPath({ name: 'PersonInfoPage', param: senderId })
+                          }
                         }
                       }
                     }),
@@ -1196,6 +1203,19 @@ export struct ChatP2PPage {
       if (param.length > 0) {
         this.conversationId = param[0];
         this.loadChatData();
+        // Bot 不支持音视频通话，不显示 Call 按钮
+        const targetId = this.chatUserInfo.targetId
+        if (targetId) {
+          if (NEAIUserCache.getAIUser(targetId) || UserAIBotRepo.isDeletedUserAIBot(targetId)) {
+            this.operationMoreDataList = setupMoreOperationData(true, true)
+          } else {
+            UserAIBotRepo.getUserAIBot({ accid: targetId }).then((bot) => {
+              if (bot) {
+                this.operationMoreDataList = setupMoreOperationData(true, true)
+              }
+            })
+          }
+        }
       } else {
         this.pathStack.removeByName("ChatP2PPage")
       }

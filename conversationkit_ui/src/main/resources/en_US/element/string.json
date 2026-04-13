@@ -1,6 +1,22 @@
 {
   "string": [
     {
+      "name": "bot_scan_invalid_qr",
+      "value": "Unrecognized QR code"
+    },
+    {
+      "name": "bot_qr_expired_title",
+      "value": "QR Code Expired"
+    },
+    {
+      "name": "bot_qr_expired_message",
+      "value": "Please refresh the QR code on the Web and scan again"
+    },
+    {
+      "name": "bot_qr_expired_btn",
+      "value": "Got it"
+    },
+    {
       "name": "conversation_title",
       "value": "云信 Demo"
     },

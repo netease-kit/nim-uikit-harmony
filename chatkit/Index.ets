@@ -31,6 +31,8 @@ export { ConversationIdUtilRepo } from './src/main/ets/repo/ConversationIdUtilRe
 
 export { AIRepo } from './src/main/ets/repo/AIRepo'
 
+export { UserAIBotRepo } from './src/main/ets/repo/UserAIBotRepo'
+
 export { LocalConversationRepo } from './src/main/ets/repo/LocalConversationRepo'
 
 export { IsDiscussion } from './src/main/ets/utils/Utils'

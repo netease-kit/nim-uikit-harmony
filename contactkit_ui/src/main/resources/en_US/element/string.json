@@ -199,6 +199,178 @@
     {
       "name": "friend_limit",
       "value": "Friend limit has been reached"
+    },
+    {
+      "name": "contact_my_bots",
+      "value": "My Bots"
+    },
+    {
+      "name": "no_bot",
+      "value": "No bots yet"
+    },
+    {
+      "name": "create_bot",
+      "value": "Create Bot"
+    },
+    {
+      "name": "bot_name",
+      "value": "Name"
+    },
+    {
+      "name": "bot_name_hint",
+      "value": "Enter bot name"
+    },
+    {
+      "name": "bot_accid",
+      "value": "Account ID"
+    },
+    {
+      "name": "bot_accid_hint",
+      "value": "Enter account ID (globally unique)"
+    },
+    {
+      "name": "bot_avatar",
+      "value": "Avatar"
+    },
+    {
+      "name": "bot_create_success",
+      "value": "Created successfully"
+    },
+    {
+      "name": "bot_create_fail",
+      "value": "Creation failed"
+    },
+    {
+      "name": "bot_update_success",
+      "value": "Updated successfully"
+    },
+    {
+      "name": "bot_delete_success",
+      "value": "Deleted successfully"
+    },
+    {
+      "name": "bot_delete_confirm_title",
+      "value": "Delete Bot"
+    },
+    {
+      "name": "bot_delete_confirm_message",
+      "value": "Are you sure you want to delete this bot? This cannot be undone"
+    },
+    {
+      "name": "bot_refresh_token",
+      "value": "Refresh Token"
+    },
+    {
+      "name": "bot_refresh_token_confirm_title",
+      "value": "Refresh Token"
+    },
+    {
+      "name": "bot_refresh_token_confirm_message",
+      "value": "The old token will be invalidated immediately. Continue?"
+    },
+    {
+      "name": "bot_refresh_token_success",
+      "value": "Token refreshed and copied to clipboard"
+    },
+    {
+      "name": "bot_config",
+      "value": "View Config"
+    },
+    {
+      "name": "bot_config_copied",
+      "value": "Config copied to clipboard"
+    },
+    {
+      "name": "bot_send_message",
+      "value": "Chat"
+    },
+    {
+      "name": "bot_edit",
+      "value": "Edit"
+    },
+    {
+      "name": "bot_limit_reached_title",
+      "value": "Limit Reached"
+    },
+    {
+      "name": "bot_limit_reached_message",
+      "value": "You can create up to 10 bots. Please delete an existing bot first"
+    },
+    {
+      "name": "bot_token_label",
+      "value": "Token"
+    },
+    {
+      "name": "bot_accid_label",
+      "value": "Account"
+    },
+    {
+      "name": "bot_scan_bind",
+      "value": "Scan to Bind"
+    },
+    {
+      "name": "bot_bind_confirm_title",
+      "value": "Confirm Binding?"
+    },
+    {
+      "name": "bot_bind_confirm_message",
+      "value": "After binding, the robot that has been configured with this account will disconnect and needs to be reconfigured"
+    },
+    {
+      "name": "bot_bind_success",
+      "value": "Bound successfully"
+    },
+    {
+      "name": "bot_bind_fail",
+      "value": "Binding failed, please try again"
+    },
+    {
+      "name": "bot_bind_qr_expired",
+      "value": "QR code has expired, please scan again"
+    },
+    {
+      "name": "bot_scan_invalid_qr",
+      "value": "Unrecognized QR code"
+    },
+    {
+      "name": "bot_config_copy_all",
+      "value": "Copy Full Config"
+    },
+    {
+      "name": "bot_config_security_tip",
+      "value": "Keep it safe, do not share with others"
+    },
+    {
+      "name": "bot_scan_entry",
+      "value": "Scan"
+    },
+    {
+      "name": "bot_bind_create_new",
+      "value": "Create New Bot"
+    },
+    {
+      "name": "bot_bind_select_existing",
+      "value": "Select Existing Bot"
+    },
+    {
+      "name": "bot_limit_bind_tip",
+      "value": "Bot limit reached (10), please select an existing bot to bind"
+    },
+    {
+      "name": "bot_edit_title",
+      "value": "Edit Bot"
+    },
+    {
+      "name": "bot_config_title",
+      "value": "Config"
+    },
+    {
+      "name": "bot_bind_title",
+      "value": "Bind Bot"
+    },
+    {
+      "name": "bot_token_empty_tip",
+      "value": "Please refresh Token first"
     }
   ]
 }

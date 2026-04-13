@@ -13,9 +13,11 @@ import {
   CommonEmptyResult,
   ListGroupHeader,
   NavigationTitleBuilder,
+  NECommonUtils,
   ViewItem,
   ViewItemBuilder
 } from '@nimkit/common';
+import { scanBarcode, scanCore } from '@kit.ScanKit';
 import { V2NIMFriendAddApplication } from '@nimsdk/base';
 import { NEContactItem } from '../model/NEContactItem';
 import { NEContactSection } from '../model/NEContactSection';
@@ -276,6 +278,9 @@ export struct ContactPage {
         new NEContactItem($r('app.media.contact_ai_users'), $r('app.string.contact_ai_users'), 'AIUsersPage')
       )
     }
+    items.push(
+      new NEContactItem($r('app.media.contact_my_bots'), $r('app.string.contact_my_bots'), 'MyBotsPage')
+    )
     return items
   }
 

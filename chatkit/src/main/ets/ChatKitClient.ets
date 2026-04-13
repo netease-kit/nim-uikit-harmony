@@ -28,6 +28,7 @@ export const currentConversationChanged: string = 'CurrentConversationChanged'
 
 export class ChatKitClient {
   declare static nim: NIMInterface
+  static appKey: string = ''
   static haveSyncedConversation: boolean = false
   //是否主动离开群
   static selfLeaveTeam = false
@@ -38,6 +39,7 @@ export class ChatKitClient {
 
   static init(nimSdk: NIMInterface, appKey: string, disableLog?: boolean) {
     ChatKitClient.nim = nimSdk
+    ChatKitClient.appKey = appKey
     if (disableLog !== true) {
       if (nimSdk instanceof NIM) {
         let logger = new LoggerKitImpl(nimSdk.context.cacheDir)

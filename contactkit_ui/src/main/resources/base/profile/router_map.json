@@ -119,6 +119,62 @@
       "data": {
         "description": "this is conversation selected page"
       }
+    },
+    {
+      "name": "MyBotsPage",
+      "pageSourceFile": "src/main/ets/pages/MyBotsPage.ets",
+      "buildFunction": "MyBotsPageBuilder",
+      "data": {
+        "description": "this is my bots list page"
+      }
+    },
+    {
+      "name": "CreateBotPage",
+      "pageSourceFile": "src/main/ets/pages/CreateBotPage.ets",
+      "buildFunction": "CreateBotPageBuilder",
+      "data": {
+        "description": "this is create bot page"
+      }
+    },
+    {
+      "name": "BotInfoPage",
+      "pageSourceFile": "src/main/ets/pages/BotInfoPage.ets",
+      "buildFunction": "BotInfoPageBuilder",
+      "data": {
+        "description": "this is bot info page"
+      }
+    },
+    {
+      "name": "EditBotPage",
+      "pageSourceFile": "src/main/ets/pages/EditBotPage.ets",
+      "buildFunction": "EditBotPageBuilder",
+      "data": {
+        "description": "this is edit bot page"
+      }
+    },
+    {
+      "name": "EditBotNamePage",
+      "pageSourceFile": "src/main/ets/pages/EditBotNamePage.ets",
+      "buildFunction": "EditBotNamePageBuilder",
+      "data": {
+        "description": "this is edit bot name page"
+      }
+    },
+    {
+      "name": "BotConfigPage",
+      "pageSourceFile": "src/main/ets/pages/BotConfigPage.ets",
+      "buildFunction": "BotConfigPageBuilder",
+      "data": {
+        "description": "this is bot config page"
+      }
+    },
+    {
+      "name": "BindBotPage",
+      "pageSourceFile": "src/main/ets/pages/BindBotPage.ets",
+      "buildFunction": "BindBotPageBuilder",
+      "data": {
+        "description": "this is bind bot page"
+      }
     }
   ]
 }

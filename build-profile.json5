@@ -7,7 +7,7 @@
         "name": "default",
         "signingConfig": "default",
         "compatibleSdkVersion": "5.0.0(12)",
-        "compatibleSdkVersionStage": "beta3",
+        "compatibleSdkVersionStage": "release",
         "runtimeOS": "HarmonyOS",
         "buildOption": {
           "strictMode": {

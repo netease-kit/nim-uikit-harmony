@@ -5,7 +5,8 @@
  *
  */
 
-import { ChatKitClient, ContactRepo, ErrorUtils, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit';
+import { ChatKitClient, ContactRepo, ErrorUtils, NEFriendUserCache, NEUserWithFriend, UserAIBotRepo } from '@nimkit/chatkit';
+import { V2NIMGetUserAIBotParams } from '@nimsdk/base';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -192,6 +193,7 @@ export struct PersonInfoPage {
     StringIsEmpty(this.viewModel.userWithFriend?.friend?.alias) ? undefined :
       this.viewModel.userWithFriend?.friend?.alias
   @Local isBlock: boolean = false
+  @Local isBot: boolean = false
   @Local personInfoItems1: PersonInfoArrowItem[] = [
     new PersonInfoArrowItem($r("app.string.person_info_alias"))
   ]
@@ -235,6 +237,14 @@ export struct PersonInfoPage {
           this.viewModel.onAddBlockClick)
       ]
     })
+    // 判断是否为用户级 AI Bot
+    try {
+      const params: V2NIMGetUserAIBotParams = { accid: accountId }
+      const bot = await UserAIBotRepo.getUserAIBot(params)
+      this.isBot = bot !== undefined || UserAIBotRepo.isDeletedUserAIBot(accountId)
+    } catch (e) {
+      this.isBot = UserAIBotRepo.isDeletedUserAIBot(accountId)
+    }
   }
 
   build() {
@@ -570,6 +580,34 @@ export struct PersonInfoPage {
               .height(48)
               .onClick(() => {
                 this.deleteFriendDialog.open()
+              })
+            } else if (this.isBot) {
+              // Bot 不显示添加好友，只显示去聊天
+              ListItem() {
+                Column() {
+                  Row() {
+                    Text($r('app.string.person_info_chat'))
+                      .fontColor("#337EFF")
+                      .textAlign(TextAlign.Center)
+                      .width('100%')
+                  }
+                  .height(47)
+                  .alignItems(VerticalAlign.Center)
+
+                  Row()
+                    .height(1)
+                    .width('100%')
+                    .backgroundColor("#F5F8FC")
+                }
+              }
+              .height(48)
+              .onClick(() => {
+                this.pathStack.popToName('ChatP2PPage')
+                this.pathStack.popToName('ChatTeamPage')
+                this.pathStack.replacePath({
+                  name: 'ChatP2PPage',
+                  param: ChatKitClient.nim.conversationIdUtil.p2pConversationId(this.viewModel.userWithFriend?.user?.accountId)
+                })
               })
             } else {
               ListItem() {

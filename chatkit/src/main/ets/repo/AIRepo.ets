@@ -50,7 +50,7 @@ export class AIRepo {
    * @param response 本次响应的结构体
    */
   static onProxyAIModelCall(onProxyAIModelCallFn: (response: V2NIMAIModelCallResult) => void) {
-    ChatKitClient.nim.messageService?.on('onProxyAIModelCall', onProxyAIModelCallFn);
+    ChatKitClient.nim.aiService?.on('onProxyAIModelCall', onProxyAIModelCallFn);
   }
 
   /**
@@ -61,7 +61,7 @@ export class AIRepo {
    * @param response 本次响应的结构体
    */
   static offProxyAIModelCall(onProxyAIModelCallFn: (response: V2NIMAIModelCallResult) => void) {
-    ChatKitClient.nim.messageService?.off('onProxyAIModelCall', onProxyAIModelCallFn);
+    ChatKitClient.nim.aiService?.off('onProxyAIModelCall', onProxyAIModelCallFn);
   }
 
 
@@ -71,7 +71,7 @@ export class AIRepo {
    * 流式过程中回调此方法，流式结束后还是会统一调用 onProxyAIModelCall 方法
    */
   static onProxyAIModelStreamCall(onProxyAIModelStreamCallFn: (data: V2NIMAIModelStreamCallResult) => void) {
-    ChatKitClient.nim.messageService?.on('onProxyAIModelStreamCall', onProxyAIModelStreamCallFn);
+    ChatKitClient.nim.aiService?.on('onProxyAIModelStreamCall', onProxyAIModelStreamCallFn);
   }
 
   /**
@@ -80,7 +80,7 @@ export class AIRepo {
    * 流式过程中回调此方法，流式结束后还是会统一调用 onProxyAIModelCall 方法
    */
   static offProxyAIModelStreamCall(onProxyAIModelStreamCallFn: (data: V2NIMAIModelStreamCallResult) => void) {
-    ChatKitClient.nim.messageService?.off('onProxyAIModelStreamCall', onProxyAIModelStreamCallFn);
+    ChatKitClient.nim.aiService?.off('onProxyAIModelStreamCall', onProxyAIModelStreamCallFn);
   }
 
 

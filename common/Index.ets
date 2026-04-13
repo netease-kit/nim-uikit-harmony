@@ -25,6 +25,7 @@ export { NetworkBrokenBuilder } from './src/main/ets/builder/NetworkBrokenBuilde
 export { ListGroupHeader } from './src/main/ets/builder/ListGroupHeader';
 
 export { DoubleAlertDialog } from './src/main/ets/builder/DoubleAlertDialog';
+export { VerticalAlertDialog } from './src/main/ets/builder/VerticalAlertDialog';
 
 export type { ViewItem } from './src/main/ets/model/ViewItem';
 

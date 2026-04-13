@@ -1,14 +1,6 @@
 {
   "string": [
     {
-      "name": "contact_title",
-      "value": "通讯录"
-    },
-    {
-      "name": "contact_validation_message",
-      "value": "验证消息"
-    },
-    {
       "name": "contact_blocklist",
       "value": "黑名单"
     },
@@ -199,6 +191,186 @@
     {
       "name": "friend_limit",
       "value": "好友人数已达上限"
+    },
+    {
+      "name": "contact_my_bots",
+      "value": "我的机器人"
+    },
+    {
+      "name": "no_bot",
+      "value": "暂无机器人"
+    },
+    {
+      "name": "create_bot",
+      "value": "创建机器人"
+    },
+    {
+      "name": "bot_name",
+      "value": "昵称"
+    },
+    {
+      "name": "bot_name_hint",
+      "value": "请输入机器人昵称"
+    },
+    {
+      "name": "bot_accid",
+      "value": "账号ID"
+    },
+    {
+      "name": "bot_accid_hint",
+      "value": "请输入账号ID（全局唯一）"
+    },
+    {
+      "name": "bot_avatar",
+      "value": "头像"
+    },
+    {
+      "name": "bot_create_success",
+      "value": "创建成功"
+    },
+    {
+      "name": "bot_create_fail",
+      "value": "创建失败"
+    },
+    {
+      "name": "bot_update_success",
+      "value": "更新成功"
+    },
+    {
+      "name": "bot_delete_success",
+      "value": "删除成功"
+    },
+    {
+      "name": "bot_delete_confirm_title",
+      "value": "确认删除机器人？"
+    },
+    {
+      "name": "bot_delete_confirm_message",
+      "value": "删除后，正在使用的机器人将断开连接，需要重新配置"
+    },
+    {
+      "name": "bot_delete_btn",
+      "value": "删除"
+    },
+    {
+      "name": "bot_delete_item",
+      "value": "删除机器人"
+    },
+    {
+      "name": "bot_refresh_token",
+      "value": "刷新Token"
+    },
+    {
+      "name": "bot_refresh_token_confirm_title",
+      "value": "刷新Token"
+    },
+    {
+      "name": "bot_refresh_token_confirm_message",
+      "value": "刷新后旧Token将立即失效，确定刷新吗？"
+    },
+    {
+      "name": "bot_refresh_token_success",
+      "value": "Token已刷新并复制到剪贴板"
+    },
+    {
+      "name": "bot_config",
+      "value": "查看配置串"
+    },
+    {
+      "name": "bot_config_copied",
+      "value": "配置已复制到剪贴板"
+    },
+    {
+      "name": "bot_send_message",
+      "value": "聊天"
+    },
+    {
+      "name": "bot_edit",
+      "value": "编辑"
+    },
+    {
+      "name": "bot_limit_reached_title",
+      "value": "已达上限"
+    },
+    {
+      "name": "bot_limit_reached_message",
+      "value": "每用户最多创建10个机器人，请删除已有机器人后再创建"
+    },
+    {
+      "name": "bot_token_label",
+      "value": "Token"
+    },
+    {
+      "name": "bot_accid_label",
+      "value": "账号"
+    },
+    {
+      "name": "bot_scan_bind",
+      "value": "扫码绑定"
+    },
+    {
+      "name": "bot_bind_confirm_title",
+      "value": "确认绑定该账号？"
+    },
+    {
+      "name": "bot_bind_confirm_message",
+      "value": "绑定后，已经配置过该账号的机器人将断开连接，需要重新配置"
+    },
+    {
+      "name": "bot_bind_success",
+      "value": "绑定成功"
+    },
+    {
+      "name": "bot_bind_fail",
+      "value": "绑定失败，请重试"
+    },
+    {
+      "name": "bot_bind_qr_expired",
+      "value": "二维码已过期，请重新扫码"
+    },
+    {
+      "name": "bot_scan_invalid_qr",
+      "value": "无法识别的二维码"
+    },
+    {
+      "name": "bot_config_copy_all",
+      "value": "复制完整配置串"
+    },
+    {
+      "name": "bot_config_security_tip",
+      "value": "请妥善保管，不要泄露给他人"
+    },
+    {
+      "name": "bot_scan_entry",
+      "value": "扫一扫"
+    },
+    {
+      "name": "bot_bind_create_new",
+      "value": "新建机器人"
+    },
+    {
+      "name": "bot_bind_select_existing",
+      "value": "选择已有机器人"
+    },
+    {
+      "name": "bot_limit_bind_tip",
+      "value": "机器人数量已达上限（10个），请选择已有机器人进行绑定"
+    },
+    {
+      "name": "bot_edit_title",
+      "value": "编辑机器人"
+    },
+    {
+      "name": "bot_config_title",
+      "value": "配置串"
+    },
+    {
+      "name": "bot_bind_title",
+      "value": "绑定机器人"
+    },
+    {
+      "name": "bot_token_empty_tip",
+      "value": "请先刷新 Token"
     }
   ]
 }
