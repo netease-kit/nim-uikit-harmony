@@ -165,12 +165,40 @@
       "value": "谁可以@所有人"
     },
     {
+      "name": "team_top_sticky_permission",
+      "value": "消息置顶权限"
+    },
+    {
       "name": "team_member_search_placeholder",
       "value": "搜索群成员"
     },
     {
       "name": "team_member_search_empty_tip",
       "value": "无搜索结果"
+    },
+    {
+      "name": "team_join_mode",
+      "value": "入群审核"
+    },
+    {
+      "name": "team_join_mode_subscribe",
+      "value": "开启后，成员入群时需要群主或管理同意后才可加入"
+    },
+    {
+      "name": "team_agree_mode",
+      "value": "入群邀请需同意"
+    },
+    {
+      "name": "team_agree_mode_subscribe",
+      "value": "开启后，拉入入群，需被邀请人同意后才可成功"
+    },
+    {
+      "name": "team_join_mode_title",
+      "value": "进群模式"
+    },
+    {
+      "name": "team_id",
+      "value": "Team ID: "
     }
   ]
 }

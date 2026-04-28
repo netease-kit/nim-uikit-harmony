@@ -8,7 +8,9 @@
 import { media } from '@kit.MediaKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import audio from '@ohos.multimedia.audio'; // 导入audio模块
+import { sensor } from '@kit.SensorServiceKit';
 import { CommonConstants } from '@nimkit/common';
+import { IMKitConfigCenter } from '@nimkit/chatkit';
 
 export class AudioPlayerManager {
   static logTag: string = 'AudioPlayerManager'
@@ -20,8 +22,85 @@ export class AudioPlayerManager {
   playingUrl?: string
   //audioRender
   audioRenderer?: audio.AudioRenderer
+  // 距离传感器是否已注册
+  private isProximitySensorRegistered: boolean = false
+  // 当前是否靠近（距离传感器检测）
+  private isProximityNear: boolean = false
 
   private constructor() {
+  }
+
+  /**
+   * 注册距离传感器监听
+   * 当手机靠近耳朵时自动切换到听筒模式，远离时切换回扬声器
+   */
+  private registerProximitySensor(): void {
+    if (this.isProximitySensorRegistered) {
+      return
+    }
+
+    try {
+      sensor.on(sensor.SensorId.PROXIMITY, (data: sensor.ProximityResponse) => {
+        // distance: 0 表示靠近，> 0 表示远离
+        const isNear = data.distance === 0
+        console.debug(`${AudioPlayerManager.logTag}, proximity sensor: distance=${data.distance}, isNear=${isNear}`)
+
+        if (this.isProximityNear !== isNear) {
+          this.isProximityNear = isNear
+          this.switchAudioOutputByProximity(isNear)
+        }
+      }, { interval: 100000000 }) // 100ms 间隔
+
+      this.isProximitySensorRegistered = true
+      console.info(`${AudioPlayerManager.logTag}, proximity sensor registered`)
+    } catch (error) {
+      const e = error as BusinessError
+      console.error(`${AudioPlayerManager.logTag}, failed to register proximity sensor: ${e.code}, ${e.message}`)
+    }
+  }
+
+  /**
+   * 注销距离传感器监听
+   */
+  private unregisterProximitySensor(): void {
+    if (!this.isProximitySensorRegistered) {
+      return
+    }
+
+    try {
+      sensor.off(sensor.SensorId.PROXIMITY)
+      this.isProximitySensorRegistered = false
+      this.isProximityNear = false
+      console.info(`${AudioPlayerManager.logTag}, proximity sensor unregistered`)
+    } catch (error) {
+      const e = error as BusinessError
+      console.error(`${AudioPlayerManager.logTag}, failed to unregister proximity sensor: ${e.code}, ${e.message}`)
+    }
+  }
+
+  /**
+   * 根据距离传感器状态切换音频输出设备
+   * @param isNear true: 靠近（切换到听筒），false: 远离（切换到扬声器）
+   */
+  private async switchAudioOutputByProximity(isNear: boolean): Promise<void> {
+    if (!this.audioRenderer) {
+      return
+    }
+
+    // 听筒模式下，不需要切换（始终保持听筒）
+    if (IMKitConfigCenter.enableEarphoneMode) {
+      return
+    }
+
+    // 扬声器模式下，靠近切听筒，远离切扬声器
+    try {
+      const deviceType = isNear ? audio.DeviceType.EARPIECE : audio.DeviceType.SPEAKER
+      await this.audioRenderer.setDefaultOutputDevice(deviceType)
+      console.info(`${AudioPlayerManager.logTag}, switched audio output to ${isNear ? 'EARPIECE' : 'SPEAKER'} by proximity`)
+    } catch (error) {
+      const e = error as BusinessError
+      console.error(`${AudioPlayerManager.logTag}, failed to switch audio output: ${e.code}, ${e.message}`)
+    }
   }
 
   // 注册avplayer回调函数
@@ -104,7 +183,7 @@ export class AudioPlayerManager {
     this.audioRenderer = await audio.createAudioRenderer(audioRendererOptions)
     let earpieceOpen = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_EARPIECE_MODE)
     console.log(`${AudioPlayerManager.logTag} , earpieceOpen = ${earpieceOpen}`)
-    await this.audioRenderer.setDefaultOutputDevice((earpieceOpen ?? true) ? audio.DeviceType.EARPIECE :
+    await this.audioRenderer.setDefaultOutputDevice((earpieceOpen ?? false) ? audio.DeviceType.EARPIECE :
     audio.DeviceType.SPEAKER)
     if (this.audioRenderer?.state !== audio.AudioState.STATE_RUNNING) {
       await this.audioRenderer.start()
@@ -132,15 +211,31 @@ export class AudioPlayerManager {
         this.avPlayer?.state === 'playing')) {
       this.playingUrl = undefined
       await this.avPlayer?.reset()
+      // 停止播放时注销距离传感器
+      this.unregisterProximitySensor()
       return
     }
 
     await this.avPlayer?.reset()
     this.playingUrl = url
 
-    this.onStart = onStart
+    // 包装 onStart 回调，在播放开始时注册距离传感器
+    this.onStart = () => {
+      // 注册距离传感器
+      this.registerProximitySensor()
+      if (onStart) {
+        onStart()
+      }
+    }
 
-    this.onFinish = onFinish
+    // 包装 onFinish 回调，在播放结束时注销距离传感器
+    this.onFinish = () => {
+      // 注销距离传感器
+      this.unregisterProximitySensor()
+      if (onFinish) {
+        onFinish()
+      }
+    }
 
     // 创建状态机变化回调函数
     this.setAVPlayerCallback(this.avPlayer);
@@ -149,11 +244,47 @@ export class AudioPlayerManager {
 
   async stopPlayAll() {
     console.log(`${AudioPlayerManager.logTag}, stopPlayAll`)
+    // 注销距离传感器
+    this.unregisterProximitySensor()
     if (this.onFinish) {
       this.onFinish()
     }
     await this.avPlayer?.reset()
     await this.audioRenderer?.stop()
     this.audioRenderer = undefined
+  }
+
+  /**
+   * 播放中切换音频输出设备（听筒/扬声器）
+   * 用于长按消息切换播放模式时立刻生效
+   * @param earphoneMode true: 听筒模式，false: 扬声器模式
+   */
+  async switchAudioOutputDevice(earphoneMode: boolean): Promise<void> {
+    if (!this.audioRenderer || !this.isPlaying()) {
+      return
+    }
+
+    try {
+      // 切换到听筒模式：直接切听筒
+      // 切换到扬声器模式：根据当前距离传感器状态决定（靠近则保持听筒，远离则切扬声器）
+      let deviceType: audio.DeviceType
+      if (earphoneMode) {
+        deviceType = audio.DeviceType.EARPIECE
+      } else {
+        deviceType = this.isProximityNear ? audio.DeviceType.EARPIECE : audio.DeviceType.SPEAKER
+      }
+      await this.audioRenderer.setDefaultOutputDevice(deviceType)
+      console.info(`${AudioPlayerManager.logTag}, switched audio output to ${deviceType === audio.DeviceType.EARPIECE ? 'EARPIECE' : 'SPEAKER'}`)
+    } catch (error) {
+      const e = error as BusinessError
+      console.error(`${AudioPlayerManager.logTag}, failed to switch audio output: ${e.code}, ${e.message}`)
+    }
+  }
+
+  /**
+   * 判断是否正在播放
+   */
+  isPlaying(): boolean {
+    return this.avPlayer?.state === 'playing' || this.avPlayer?.state === 'prepared'
   }
 }

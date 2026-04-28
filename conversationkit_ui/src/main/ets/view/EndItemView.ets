@@ -14,11 +14,11 @@
  *
  */
 
-import { V2NIMConversation } from '@nimsdk/base'
+import { ConversationItem } from '../strategy/ConversationStrategy'
 
 @ComponentV2
 export struct EndItemView {
-  @Param conversationInfo: V2NIMConversation = {} as V2NIMConversation
+  @Param conversationInfo: ConversationItem = {} as ConversationItem
   @Event deleteItem: () => void = () => {
   }
   @Event stickTopItem: (stickTop: boolean) => void = (stickTop: boolean) => {

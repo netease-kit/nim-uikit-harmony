@@ -103,10 +103,10 @@ export class NimRepository {
     } else {
       serviceOptions = {
         loginServiceConfig: {
-          lbsUrls: ['https://lbs.netease.im/lbs/webconf.jsp'],
-          linkUrl: 'weblink.netease.im:443'
-          // lbsUrls: ['https://imtest.netease.im/lbs/webconf'],
-          // linkUrl: 'imtest-jd.netease.im:8091'
+           lbsUrls: ['https://lbs.netease.im/lbs/webconf.jsp'],
+           linkUrl: 'weblink.netease.im:443'
+           // lbsUrls: ['https://imtest.netease.im/lbs/webconf'],
+           // linkUrl: 'weblink-dev-gy.netease.im:443'
         },
         pushServiceConfig: {
           harmonyCertificateName: "DEMO_HMOS_PUSH_NEW",

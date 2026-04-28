@@ -97,12 +97,40 @@
       "value": "单聊在线状态"
     },
     {
+      "name": "mine_setting_read_message",
+      "value": "消息已读未读功能"
+    },
+    {
       "name": "mine_setting_antispam_tip_message",
-      "value": "文本安全提示"
+      "value": "文本安全提示功能"
     },
     {
       "name": "mine_setting_cloud_search",
-      "value": "云端搜索"
+      "value": "云搜索功能"
+    },
+    {
+      "name": "mine_setting_collection",
+      "value": "收藏功能"
+    },
+    {
+      "name": "mine_setting_pin",
+      "value": "标记功能"
+    },
+    {
+      "name": "mine_setting_typing_status",
+      "value": "正在输入功能"
+    },
+    {
+      "name": "mine_setting_only_friend_call",
+      "value": "禁止陌生人音视频通话"
+    },
+    {
+      "name": "mine_setting_rich_text_message",
+      "value": "换行消息"
+    },
+    {
+      "name": "mine_setting_team_mode",
+      "value": "群聊申请邀请功能"
     },
     {
       "name": "mine_setting_logout",
@@ -283,6 +311,158 @@
     {
       "name": "chat_kit_call_camera_permission_denied",
       "value": "相机被禁用"
+    },
+    {
+      "name": "mine_setting_global_config",
+      "value": "全局配置"
+    },
+    {
+      "name": "mine_setting_ai_stream",
+      "value": "AI流式输出模式"
+    },
+    {
+      "name": "mine_setting_rich_text",
+      "value": "换行消息"
+    },
+    {
+      "name": "mine_setting_team_enable",
+      "value": "群聊功能"
+    },
+    {
+      "name": "mine_setting_top_message",
+      "value": "消息置顶功能"
+    },
+    {
+      "name": "mine_setting_team_manager_max_count",
+      "value": "允许添加的管理员人数( -1 表示无限制)"
+    },
+    {
+      "name": "mine_setting_notify_title",
+      "value": "通知提醒设置"
+    },
+    {
+      "name": "mine_setting_translation",
+      "value": "翻译"
+    },
+    {
+      "name": "translation_target_language",
+      "value": "将文本翻译为"
+    },
+    {
+      "name": "translation_target_language_title",
+      "value": "将文本翻译为"
+    },
+    {
+      "name": "translation_target_language_desc",
+      "value": "设置消息翻译的目标语言"
+    },
+    {
+      "name": "translation_save",
+      "value": "保存"
+    },
+    {
+      "name": "translation_auto_title",
+      "value": "自动翻译聊天中的收到消息"
+    },
+    {
+      "name": "translation_auto_desc",
+      "value": "开启后，自动翻译聊天中收到的消息"
+    },
+    {
+      "name": "translation_lang_zh_chs",
+      "value": "中文（简体）"
+    },
+    {
+      "name": "translation_lang_zh_cht",
+      "value": "中文（繁体）"
+    },
+    {
+      "name": "translation_lang_en",
+      "value": "英语"
+    },
+    {
+      "name": "translation_lang_ja",
+      "value": "日语"
+    },
+    {
+      "name": "translation_lang_ko",
+      "value": "韩语"
+    },
+    {
+      "name": "translation_lang_fr",
+      "value": "法语"
+    },
+    {
+      "name": "translation_lang_de",
+      "value": "德语"
+    },
+    {
+      "name": "translation_lang_es",
+      "value": "西班牙语"
+    },
+    {
+      "name": "translation_lang_ru",
+      "value": "俄语"
+    },
+    {
+      "name": "translation_lang_pt",
+      "value": "葡萄牙语"
+    },
+    {
+      "name": "translation_lang_ar",
+      "value": "阿拉伯语"
+    },
+    {
+      "name": "translation_lang_hi",
+      "value": "印地语"
+    },
+    {
+      "name": "translation_lang_vi",
+      "value": "越南语"
+    },
+    {
+      "name": "translation_lang_th",
+      "value": "泰语"
+    },
+    {
+      "name": "translation_lang_id",
+      "value": "印度尼西亚语"
+    },
+    {
+      "name": "translation_bilingual_title",
+      "value": "显示双语"
+    },
+    {
+      "name": "translation_bilingual_desc",
+      "value": "开启后，会同时显示原文和译文"
+    },
+    {
+      "name": "mine_setting_notify_enable",
+      "value": "新消息通知"
+    },
+    {
+      "name": "mine_setting_notify_show_detail",
+      "value": "通知显示详情"
+    },
+    {
+      "name": "push_config",
+      "value": "推送配置"
+    },
+    {
+      "name": "push_config_title",
+      "value": "推送配置"
+    },
+    {
+      "name": "push_config_switch_content",
+      "value": "推送配置生效"
+    },
+    {
+      "name": "push_config_param_title",
+      "value": "推送配置参数"
+    },
+    {
+      "name": "push_config_save",
+      "value": "保存配置"
     }
   ]
 }

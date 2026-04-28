@@ -59,11 +59,7 @@ export struct MemberHistoryMessageComponent {
               .ellipsisMode(EllipsisMode.END)
 
             memberHistoryMessageContent({ message: this.message, onMessageClick: this.onMessageClick })
-              .backgroundColor(
-                // this.message?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ?
-                // Color.Transparent :
-                $r('app.color.color_chat_receive_message_bg')
-              )
+              .backgroundColor($r('app.color.color_chat_receive_message_bg'))
               .borderRadius({
                 topLeft: 0,
                 topRight: 8,

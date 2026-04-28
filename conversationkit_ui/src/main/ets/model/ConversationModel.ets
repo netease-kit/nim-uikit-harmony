@@ -9,21 +9,22 @@
  * Copyright © 2025 Netease. All rights reserved.
  */
 
-import { ChatKitClient, ConversationRepo, NEFriendUserCache } from '@nimkit/chatkit';
+import { ChatKitClient, NEFriendUserCache } from '@nimkit/chatkit'
 import {
   V2NIMConnectStatus,
   V2NIMFriend,
   V2NIMFriendDeletionType,
-  V2NIMConversation,
-  V2NIMConversationResult,
   V2NIMLoginStatus,
   V2NIMTeam,
   V2NIMUser
-} from '@nimsdk/base';
+} from '@nimsdk/base'
+import { ConversationItem, ConversationResult, ConversationStrategy } from '../strategy/ConversationStrategy'
 
 const TAG = '[ConversationModel]'
 
 export class ConversationModel {
+  private readonly strategy: ConversationStrategy
+
   public onSyncStartedHandle: () => void = () => {
   }
   public onSyncFinishedHandle: () => void = () => {
@@ -45,27 +46,31 @@ export class ConversationModel {
   }
   public onTotalUnreadCountChangedHandler: (unreadCount: number) => void = (unreadCount: number) => {
   }
-  public onConversationCreatedHandler: (conversation: V2NIMConversation) => void
-    = (conversation: V2NIMConversation) => {
+  public onConversationCreatedHandler: (conversation: ConversationItem) => void
+    = (conversation: ConversationItem) => {
   }
   public onConversationDeletedHandler: (conversationIds: string[]) => void = (conversationIds: string[]) => {
   }
-  public onConversationChangedHandler: (updateList: V2NIMConversation[]) => void
-    = (updateList: V2NIMConversation[]) => {
+  public onConversationChangedHandler: (updateList: ConversationItem[]) => void
+    = (updateList: ConversationItem[]) => {
   }
 
-  public async getConversationList(offset: number, limit: number): Promise<V2NIMConversationResult | null> {
+  constructor(strategy: ConversationStrategy) {
+    this.strategy = strategy
+  }
+
+  public async getConversationList(offset: number, limit: number): Promise<ConversationResult | null> {
     try {
-      return await ConversationRepo.getConversationList(offset, limit)
+      return await this.strategy.getConversationList(offset, limit)
     } catch (e) {
       ChatKitClient.logger?.error(TAG, 'getConversationList ', offset.toString(), limit.toString(), e)
       return null
     }
   }
 
-  public async getConversation(conversationId: string): Promise<V2NIMConversation | undefined> {
+  public async getConversation(conversationId: string): Promise<ConversationItem | undefined> {
     try {
-      return await ConversationRepo.getConversation(conversationId)
+      return await this.strategy.getConversation(conversationId)
     } catch (e) {
       ChatKitClient.logger?.error(TAG, 'getConversation', conversationId, e)
       return undefined
@@ -74,24 +79,28 @@ export class ConversationModel {
 
   public async deleteConversation(conversationId: string): Promise<void> {
     try {
-      await ConversationRepo.deleteConversation(conversationId)
+      await this.strategy.deleteConversation(conversationId)
     } catch (e) {
       ChatKitClient.logger?.error(TAG, 'deleteConversation', conversationId, e)
     }
   }
 
-  public async stickTopConversation(conversationId: string, stickTop: boolean): Promise<void>{
+  public async stickTopConversation(conversationId: string, stickTop: boolean): Promise<void> {
     try {
-      await ConversationRepo.stickTopConversation(conversationId, stickTop)
-    }catch (e) {
+      await this.strategy.stickTopConversation(conversationId, stickTop)
+    } catch (e) {
       ChatKitClient.logger?.error(TAG, 'stickTopConversation', conversationId, stickTop.toString(), e)
     }
   }
 
+  public requiresNetworkForDelete(): boolean {
+    return this.strategy.requiresNetworkForDelete()
+  }
+
   public addEventListener() {
-    ChatKitClient.nim.conversationService?.on('onSyncStarted', this.onSyncStartedHandle);
-    ChatKitClient.nim.conversationService?.on('onSyncFinished', this.onSyncFinishedHandle);
-    ChatKitClient.nim.conversationService?.on('onSyncFailed', this.onSyncFailedHandle);
+    this.strategy.onSyncStarted(this.onSyncStartedHandle)
+    this.strategy.onSyncFinished(this.onSyncFinishedHandle)
+    this.strategy.onSyncFailed(this.onSyncFailedHandle)
     ChatKitClient.nim.loginService?.on('onConnectStatus',
       (status: V2NIMConnectStatus) => {
         if (status !== V2NIMConnectStatus.V2NIM_CONNECT_STATUS_CONNECTED) {
@@ -115,10 +124,10 @@ export class ConversationModel {
     ChatKitClient.nim.friendService?.on('onFriendDeleted', this.onFriendDeletedHandler)
     ChatKitClient.nim.teamService?.on('onTeamDismissed', this.onTeamDismissedHandler)
     ChatKitClient.nim.teamService?.on('onTeamLeft', this.onTeamLeftHandler)
-    ChatKitClient.nim.conversationService?.on('onTotalUnreadCountChanged', this.onTotalUnreadCountChangedHandler)
-    ChatKitClient.nim.conversationService?.on('onConversationCreated', this.onConversationCreatedHandler)
-    ChatKitClient.nim.conversationService?.on('onConversationDeleted', this.onConversationDeletedHandler)
-    ChatKitClient.nim.conversationService?.on('onConversationChanged', this.onConversationChangedHandler)
+    this.strategy.onTotalUnreadCountChanged(this.onTotalUnreadCountChangedHandler)
+    this.strategy.onConversationCreated(this.onConversationCreatedHandler)
+    this.strategy.onConversationDeleted(this.onConversationDeletedHandler)
+    this.strategy.onConversationChanged(this.onConversationChangedHandler)
     ChatKitClient.nim.userService?.on('onUserProfileChanged', async (users: V2NIMUser[]) => {
       users.forEach((user) => {
         if (NEFriendUserCache.getInstance().isFriend(user.accountId)) {

@@ -51,7 +51,7 @@ export { PermissionsUtils } from './src/main/ets/utils/PermissionsUtils';
 
 export { PermissionsRequestResult } from './src/main/ets/utils/PermissionsUtils';
 
-export { CommonConstants } from './src/main/ets/constants/CommonConstants';
+export { CommonConstants, TranslationLanguageCode, SUPPORTED_TRANSLATION_LANGUAGES } from './src/main/ets/constants/CommonConstants';
 
 export { TextEditParams, TextEditPage } from './src/main/ets/pages/TextEditPage'
 

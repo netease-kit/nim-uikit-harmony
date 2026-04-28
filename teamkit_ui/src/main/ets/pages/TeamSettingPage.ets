@@ -97,16 +97,31 @@ export struct TeamSettingPage {
                   right: 12
                 })
 
-              Text(this.teamViewModel.team.name)
-                .fontColor('ff333333')
-                .fontSize(16)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .width('80%')
-                .maxLines(1)
-                .ellipsisMode(EllipsisMode.END)
-                .margin({
-                  right: 12
-                })
+              Column() {
+                Text(this.teamViewModel.team.name)
+                  .fontColor('#ff333333')
+                  .fontSize(16)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .maxLines(1)
+                  .ellipsisMode(EllipsisMode.END)
+                  .width('100%')
+
+                Row() {
+                  Text($r('app.string.team_id'))
+                    .fontColor('#ff999999')
+                    .fontSize(12)
+                  Text(this.teamViewModel.team.teamId)
+                    .fontColor('#ff999999')
+                    .fontSize(12)
+                }
+                .margin({ top: 4 })
+                .width('100%')
+              }
+              .alignItems(HorizontalAlign.Start)
+              .width('70%')
+              .margin({
+                right: 12
+              })
 
               Blank().layoutWeight(1)
 
@@ -222,27 +237,29 @@ export struct TeamSettingPage {
 
 
           Column() {
-            Row() {
-              Text($r('app.string.setting_pin'))
-                .fontSize(16)
-                .fontColor('#ff333333')
+            if (IMKitConfigCenter.enablePin) {
+              Row() {
+                Text($r('app.string.setting_pin'))
+                  .fontSize(16)
+                  .fontColor('#ff333333')
 
-              Blank().layoutWeight(1)
+                Blank().layoutWeight(1)
 
-              Image($r('app.media.arrow_right'))
-                .width(4.92)
-                .height(9.54)
-            }
-            .height(40)
-            .width('100%')
-            .alignItems(VerticalAlign.Center)
-            .onClick(() => {
-              const conversationId = ChatKitClient.nim.conversationIdUtil.teamConversationId(this.teamViewModel?.teamId)
-              this.pathStack.pushPath({
-                name: 'PinMessagePage',
-                param: conversationId,
+                Image($r('app.media.arrow_right'))
+                  .width(4.92)
+                  .height(9.54)
+              }
+              .height(40)
+              .width('100%')
+              .alignItems(VerticalAlign.Center)
+              .onClick(() => {
+                const conversationId = ChatKitClient.nim.conversationIdUtil.teamConversationId(this.teamViewModel?.teamId)
+                this.pathStack.pushPath({
+                  name: 'PinMessagePage',
+                  param: conversationId,
+                })
               })
-            })
+            }
 
             // @deprecated 老的历史记录逻辑
             // Row() {

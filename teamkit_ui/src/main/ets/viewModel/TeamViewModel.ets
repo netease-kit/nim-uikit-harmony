@@ -291,6 +291,8 @@ export class TeamSettingViewModel {
       V2NIMTeamChatBannedMode.V2NIM_TEAM_CHAT_BANNED_MODE_UNBAN
     ).catch((e: V2NIMError) => {
       ChatKitClient.logger?.debug(e.desc)
+      // 禁言失败，重新请求群信息以回滚 Toggle 状态
+      this.getTeamInfo()
     })
   }
 

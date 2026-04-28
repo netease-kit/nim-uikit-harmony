@@ -5,7 +5,7 @@
  *
  */
 
-import { ChatKitClient } from '@nimkit/chatkit';
+import { ChatKitClient, CustomMessageUtils, getMultiLinePreviewFromAttachment, multiLineMessageCustomType } from '@nimkit/chatkit';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
 import { DateUtil } from '@nimkit/common/src/main/ets/utils/DateUtil';
 import { V2NIMAIUser, V2NIMLocalConversation, V2NIMMessageCallAttachment, V2NIMMessageType } from '@nimsdk/base';
@@ -15,15 +15,6 @@ export struct ConversationAIUserViewItem {
   @Param aiUserInfo: V2NIMAIUser | null = null
   // @Param haveBeanAit: boolean = false
   @Param onItemClick?: () => void | undefined = undefined
-  // dialogController: CustomDialogController = new CustomDialogController({
-  //   builder: LocalConversationOperationDialog({
-  //     conversationInfo: this.conversationInfo
-  //   }),
-  //   cornerRadius: 15,
-  //   borderWidth: 0.5,
-  //   width: '60%',
-  //   borderColor: '#ffDCDFE5'
-  // })
 
   build() {
     if (this.aiUserInfo !== null) {
@@ -150,7 +141,15 @@ export struct ConversationAIUserViewItem {
             return $r('app.string.msg_type_rtc_video')
           }
         }
-
+        break
+      case V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM:
+        if (item.lastMessage?.attachment) {
+          const customType = CustomMessageUtils.typeOfCustomMessage(item.lastMessage.attachment)
+          if (customType === multiLineMessageCustomType) {
+            return getMultiLinePreviewFromAttachment(item.lastMessage?.attachment)
+          }
+        }
+        break
     }
     return item.lastMessage?.text ?? $r('app.string.chatMessageNonsupportType')
 

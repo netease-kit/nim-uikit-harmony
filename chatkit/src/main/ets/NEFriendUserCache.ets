@@ -59,6 +59,14 @@ export class NEFriendUserCache {
     return this.friendCache.has(accountId) && !this.blockAccountList.includes(accountId)
   }
 
+  /// 是否存在好友关系
+  /// 与 isFriend 的区别:
+  /// - isFriend 会排除我主动加入黑名单的好友
+  /// - hasFriendRelation 只判断是否仍然是好友，用于“仅好友可发起音视频通话”这类场景
+  public hasFriendRelation(accountId: string): Boolean {
+    return this.friendCache.has(accountId)
+  }
+
   /// 添加（更新）好友信息
   public updateFriendInfo(params: updateFriendInfoParams) {
     let accountId = ""

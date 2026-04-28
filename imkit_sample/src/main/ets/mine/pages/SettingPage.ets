@@ -14,10 +14,8 @@ import {
   ViewItemArrow,
   ViewItemBuilder
 } from '@nimkit/common';
-import { router } from '@kit.ArkUI';
 import { ChatKitClient } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
 import { ConversationRepo, IMKitConfigCenter } from '@nimkit/chatkit';
-import { ChatKitConfig } from '@nimkit/chatkit_ui/src/main/ets/ChatKitConfig';
 import { preferences } from '@kit.ArkData';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { common, Want } from '@kit.AbilityKit';
@@ -31,21 +29,8 @@ function SettingPageBuilder() {
 @ComponentV2
 export struct SettingPage {
   pathStack: NavPathStack = new NavPathStack()
-  @Local earpieceOpen: boolean = AppStorage.get(CommonConstants.KEY_SETTING_EARPIECE_MODE) ?? true
-  @Local readOrOpen: boolean = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_MESSAGE_READ_OR) ?? true
   @Local localConversationOrOpen: boolean = true
-  @Local shownOnlineState: boolean = true
-  @Local antiSpamTipMessage: boolean = AppStorage.get(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE) ?? true
-  @Local cloudSearch: boolean = AppStorage.get(CommonConstants.KEY_SETTING_CLOUD_SEARCH) ?? false
   dataPreferences: preferences.Preferences | undefined
-  @Local firstItem: ViewItemArrow[] = [
-    {
-      // title: $r("app.string.person_setting_remind"),
-      // itemHeight: 48,
-      // routerUrl: "MessageRemindPage",
-      // rightIcon: $r('app.media.arrow_right')
-    }
-  ]
   @Local secondItems: ViewItemSwitch[] = []
   private context = getContext(this) as common.UIAbilityContext;
   logoutDialog?: CustomDialogController = new CustomDialogController({
@@ -67,21 +52,15 @@ export struct SettingPage {
     this.dataPreferences = preferences.getPreferencesSync(getContext(this), options);
     this.localConversationOrOpen =
       this.dataPreferences?.getSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, true) as boolean
-    this.shownOnlineState =
-      this.dataPreferences?.getSync(CommonConstants.KEY_SETTING_SHOWN_ONLINE_STATE, true) as boolean
+
     this.secondItems = [
-      {
-        title: $r('app.string.mine_setting_earpiece'),
-        itemHeight: 48,
-        isOpen: this.earpieceOpen,
-        switchChange: this.earpieceModeSwitchChange
-      },
-      {
-        title: $r('app.string.mine_setting_read'),
-        itemHeight: 48,
-        isOpen: this.readOrOpen,
-        switchChange: this.readOrSwitchChange
-      },
+      // 听筒模式开关（暂时隐藏，通过长按语音消息切换）
+      // {
+      //   title: $r('app.string.mine_setting_earpiece'),
+      //   itemHeight: 48,
+      //   isOpen: this.earpieceOpen,
+      //   switchChange: this.earpieceModeSwitchChange
+      // },
       {
         title: $r('app.string.mine_setting_conversation'),
         itemHeight: 48,
@@ -109,45 +88,6 @@ export struct SettingPage {
           }
         })
       },
-      {
-        title: $r('app.string.mine_setting_online_state'),
-        itemHeight: 48,
-        isOpen: this.shownOnlineState,
-        switchChange: ((isOpen: boolean) => {
-          this.dataPreferences?.putSync(CommonConstants.KEY_SETTING_SHOWN_ONLINE_STATE, isOpen)
-          this.dataPreferences?.flush((err: BusinessError) => {
-            if (err) {
-              console.error("Failed to flush. code =" + err.code + ", message =" + err.message);
-              return;
-            }
-            console.info("Succeeded in flushing.");
-          })
-          IMKitConfigCenter.enableShownOnlineState = isOpen
-          this.shownOnlineState = isOpen
-          // restart app
-          let applicationContext = this.context.getApplicationContext();
-          let want: Want = {
-            abilityName: 'IMAbility'
-          };
-          try {
-            applicationContext.restartApp(want);
-          } catch (error) {
-            console.error(`restartApp fail, error: ${JSON.stringify(error)}`);
-          }
-        })
-      },
-      {
-        title: $r('app.string.mine_setting_antispam_tip_message'),
-        itemHeight: 48,
-        isOpen: this.antiSpamTipMessage,
-        switchChange: this.antiSpamTipMessageChange
-      },
-      {
-        title: $r('app.string.mine_setting_cloud_search'),
-        itemHeight: 48,
-        isOpen: this.cloudSearch,
-        switchChange: this.cloudSearchChange
-      },
     ]
   }
 
@@ -156,32 +96,10 @@ export struct SettingPage {
       await ChatKitClient.nim.loginService.logout()
       ConversationRepo.removeAllConversationListener()
       ChatKitClient.onDestroy()
-      router.replaceUrl({
-        url: 'pages/Index'
-      })
     } catch (err) {
       console.error(err)
       NECommonUtils.showToast(err)
     }
-  }
-
-  earpieceModeSwitchChange(isOpen: boolean) {
-    AppStorage.set(CommonConstants.KEY_SETTING_EARPIECE_MODE, isOpen)
-  }
-
-  antiSpamTipMessageChange(isOpen: boolean) {
-    AppStorage.set(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE, isOpen)
-    IMKitConfigCenter.enableAntiSpamTipMessage = isOpen
-  }
-
-  cloudSearchChange(isOpen: boolean) {
-    AppStorage.set(CommonConstants.KEY_SETTING_CLOUD_SEARCH, isOpen)
-    IMKitConfigCenter.enableCloudSearch = isOpen
-  }
-
-  readOrSwitchChange(isOpen: boolean) {
-    AppStorage.set(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, isOpen)
-    ChatKitConfig.messageReadState = isOpen
   }
 
   aboutToDisappear(): void {
@@ -200,6 +118,73 @@ export struct SettingPage {
         })
 
         Column({ space: 12 }) {
+          // 第一组：子页面导航入口
+          List() {
+            ListItem() {
+              ViewItemBuilder({
+                title: $r('app.string.mine_setting_notify_title'),
+                itemHeight: 48,
+                routerUrl: 'NotifySettingPage',
+                rightIcon: $r('app.media.arrow_right')
+              })
+            }
+            .width('100%')
+            .height(48)
+            .backgroundColor(Color.White)
+            .onClick(() => {
+              this.pathStack.pushPath({ name: 'NotifySettingPage' })
+            })
+
+            ListItem() {
+              ViewItemBuilder({
+                title: $r('app.string.mine_setting_global_config'),
+                itemHeight: 48,
+                routerUrl: 'GlobalConfigPage',
+                rightIcon: $r('app.media.arrow_right')
+              })
+            }
+            .width('100%')
+            .height(48)
+            .backgroundColor(Color.White)
+            .onClick(() => {
+              this.pathStack.pushPath({ name: 'GlobalConfigPage' })
+            })
+
+            ListItem() {
+              ViewItemBuilder({
+                title: $r('app.string.push_config'),
+                itemHeight: 48,
+                routerUrl: 'PushConfigPage',
+                rightIcon: $r('app.media.arrow_right')
+              })
+            }
+            .width('100%')
+            .height(48)
+            .backgroundColor(Color.White)
+            .onClick(() => {
+              this.pathStack.pushPath({ name: 'PushConfigPage' })
+            })
+
+            ListItem() {
+              ViewItemBuilder({
+                title: $r('app.string.mine_setting_translation'),
+                itemHeight: 48,
+                routerUrl: 'TranslationSettingPage',
+                rightIcon: $r('app.media.arrow_right')
+              })
+            }
+            .width('100%')
+            .height(48)
+            .backgroundColor(Color.White)
+            .onClick(() => {
+              this.pathStack.pushPath({ name: 'TranslationSettingPage' })
+            })
+          }
+          .borderRadius(8)
+          .backgroundColor(Color.White)
+          .margin({ left: 20, right: 20, top: 0 })
+
+          // 第二组：当页基础开关
           List() {
             ForEach(this.secondItems, (item: ViewItemSwitch) => {
               ListItem() {
@@ -214,6 +199,7 @@ export struct SettingPage {
           .backgroundColor(Color.White)
           .margin({ left: 20, right: 20, top: 0 })
 
+          // 退出登录
           Row() {
             Text($r('app.string.mine_setting_logout'))
               .fontColor("#E6605C")

@@ -10,3 +10,5 @@ export { ContactPage } from './src/main/ets/pages/ContactPage'
 export { EditInfoParam } from './src/main/ets/pages/EditInfoPage'
 
 export { EditType, PersonInfoItem as MineInfoItem } from './src/main/ets/model/MineInfoItem'
+
+export { TeamVerifyInfoBean } from './src/main/ets/model/TeamVerifyInfoBean'

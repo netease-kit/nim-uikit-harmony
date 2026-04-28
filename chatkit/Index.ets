@@ -39,7 +39,15 @@ export { IsDiscussion } from './src/main/ets/utils/Utils'
 
 export { ErrorUtils } from './src/main/ets/utils/ErrorUtils'
 
+export { NotificationHelper, NotificationWantParams } from './src/main/ets/utils/NotificationHelper'
+
 export { TeamMemberWithUser, TeamMemberResult } from './src/main/ets/model/TeamMemberWithUser'
+
+export {
+  getTopStickyPermissionMode,
+  hasTopStickyPermission,
+  isDiscussionTeamByServerExtension
+} from './src/main/ets/utils/TopStickyPermissionUtils'
 
 export { PersonSelectParam } from './src/main/ets/model/PersonSelectParam'
 
@@ -68,8 +76,34 @@ export { mergedMessageNickKey,
   typeExtensionAllowAll,
   typeExtensionAllowManager,
   collectionTypeOffset,
-  keyReplyMsgKey
+  keyReplyMsgKey,
+  multiLineMessageCustomType,
+  keyExtensionTopSticky,
+  keyExtensionSticky,
+  keyStickyMessageClientId,
+  keyStickyMessageScene,
+  keyStickyMessageFrom,
+  keyStickyMessageTo,
+  keyStickyMessageServerId,
+  keyStickyMessageTime,
+  keyStickyMessageOperator,
+  keyStickyMessageOperation,
+  keyStickyMessageReceiverId,
+  typeExtensionStickyAdd,
+  typeExtensionStickyRemove
 } from './src/main/ets/constant/Constant'
+// 换行消息（多行消息）相关导出 - 新命名
+export {
+  MultiLineAttachment,
+  MultiLineAttachmentData,
+  parseMultiLineAttachment,
+  createMultiLineAttachment,
+  isMultiLineMessage,
+  getMultiLineTitle,
+  getMultiLineBody,
+  getMultiLinePreview,
+  getMultiLinePreviewFromAttachment
+} from './src/main/ets/model/MultiLineAttachment'
 
 export { TeamMemberCache } from './src/main/ets/cache/TeamMemberCache'
 
@@ -85,6 +119,20 @@ export { KitLogger as Logger } from './src/main/ets/logger/AppLogger'
 
 export { IMKitConfigCenter } from './src/main/ets/IMKitConfigCenter'
 
+export { PushConfigManager } from './src/main/ets/PushConfigManager'
+
 export { TeamSettingParam } from './src/main/ets/model/TeamSettingParam'
 
 export { ManagerSelectorParams, TeamMemberSelectorMode } from './src/main/ets/model/TeamMemberSelector'
+
+export { MessageCallback, MessageSendParams } from './src/main/ets/listener/MessageCallback'
+
+export { IMKitCustomFactory } from './src/main/ets/IMKitCustomFactory'
+
+export {
+  buildTeamCreateInviteLocalExtension,
+  isLocalTeamCreateInviteMessage,
+  isTeamCreateInviteNotification,
+  shouldCollapseTeamCreateInviteNotifications,
+  teamCreateInviteLocalKey
+} from './src/main/ets/utils/TeamInviteNotificationUtils'

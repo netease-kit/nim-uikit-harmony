@@ -18,7 +18,7 @@ import {
   ViewItemBuilder
 } from '@nimkit/common';
 import { scanBarcode, scanCore } from '@kit.ScanKit';
-import { V2NIMFriendAddApplication } from '@nimsdk/base';
+import { V2NIMFriendAddApplication, V2NIMTeamJoinActionInfo } from '@nimsdk/base';
 import { NEContactItem } from '../model/NEContactItem';
 import { NEContactSection } from '../model/NEContactSection';
 import { ContactViewModel } from '../viewmodel/ContactViewModel';
@@ -100,7 +100,7 @@ export struct ContactPage {
   loadData = async () => {
     try {
       await this.viewModel.getFriendList()
-      await this.loadUnreadApplication()
+      await this.loadCombinedUnreadCount()
     } catch (err) {
       console.error(err)
     }
@@ -109,8 +109,14 @@ export struct ContactPage {
   private listScroller: Scroller = new Scroller()
 
   async aboutToAppear(): Promise<void> {
+    // 监听好友申请
     ChatKitClient.nim.friendService?.on('onFriendAddApplication', async (application: V2NIMFriendAddApplication) => {
-      await this.loadUnreadApplication()
+      await this.loadCombinedUnreadCount()
+    })
+
+    // 监听群验证消息
+    ChatKitClient.nim.teamService?.on('onReceiveTeamJoinActionInfo', async (actionInfo: V2NIMTeamJoinActionInfo) => {
+      await this.loadCombinedUnreadCount()
     })
 
     ContactRepo.listener.on('loadFriendCache', () => {
@@ -154,7 +160,8 @@ export struct ContactPage {
                 this.pathStack.pushPath({
                   name: obj.item.routerUrl,
                   onPop: (popInfo: PopInfo) => {
-                    this.loadUnreadApplication()
+                    // 返回时刷新合并的未读数
+                    this.loadCombinedUnreadCount()
                   }
                 })
               })
@@ -268,11 +275,18 @@ export struct ContactPage {
 
   private getContactHeaderItems(): NEContactItem[] {
     const items: NEContactItem[] = [
+      // 合并的验证消息入口（包含好友验证和群验证）
       new NEContactItem($r('app.media.contact_validation_message'), $r('app.string.contact_validation_message'),
-        'ValidationMessagePage', undefined, this.loadUnreadApplication),
-      new NEContactItem($r('app.media.contact_blocklist'), $r('app.string.contact_blocklist'), 'BlockListPage'),
-      new NEContactItem($r('app.media.contact_my_teams'), $r('app.string.contact_my_teams'), 'MyTeamsPage')
+        'ValidationMessagePage', undefined, this.loadCombinedUnreadCount)
     ]
+    items.push(
+      new NEContactItem($r('app.media.contact_blocklist'), $r('app.string.contact_blocklist'), 'BlockListPage'),
+    )
+    if (IMKitConfigCenter.enableTeam) {
+      items.push(
+        new NEContactItem($r('app.media.contact_my_teams'), $r('app.string.contact_my_teams'), 'MyTeamsPage'),
+      )
+    }
     if (IMKitConfigCenter.enableAI) {
       items.push(
         new NEContactItem($r('app.media.contact_ai_users'), $r('app.string.contact_ai_users'), 'AIUsersPage')
@@ -284,12 +298,25 @@ export struct ContactPage {
     return items
   }
 
-  private async loadUnreadApplication() {
+  /**
+   * 加载合并的未读数（好友验证 + 群验证）
+   */
+  private async loadCombinedUnreadCount() {
     try {
-      const unreadCount = await this.viewModel.getUnreadApplication()
-      this.headerItems[0].unreadCount = unreadCount
+      // 获取好友验证未读数
+      const friendUnreadCount = await this.viewModel.getUnreadApplication()
+      // 获取群验证未读数
+      const teamUnreadCount = await this.viewModel.getUnreadTeamVerify()
+      // 合并未读数
+      const totalUnreadCount = (Number(friendUnreadCount) || 0) + (Number(teamUnreadCount) || 0)
+      const totalUnreadStr = totalUnreadCount > 0 ? String(totalUnreadCount) : undefined
+      
+      // 更新验证消息入口的未读数
+      this.headerItems[0].unreadCount = totalUnreadStr
+      
+      // 通知 TabIndex 更新底部 Tab 红点
       if (this.onUnreadApplicationChange) {
-        this.onUnreadApplicationChange(unreadCount)
+        this.onUnreadApplicationChange(totalUnreadStr)
       }
     } catch (err) {
       console.error(err)

@@ -43,7 +43,7 @@ export class NEFriendAddApplication {
     this.displayUserWithFriend = userWithFriend
   }
 
-  // 是否是同一申请
+  // 是否是同一申请（accid + status 相同时去重）
   isEqualTo(nimApplication: V2NIMFriendAddApplication): boolean {
     if (this.friendAddApplication.applicantAccountId === nimApplication.applicantAccountId &&
       this.friendAddApplication.recipientAccountId === nimApplication.recipientAccountId) {

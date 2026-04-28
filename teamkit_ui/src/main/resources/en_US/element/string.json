@@ -165,12 +165,36 @@
       "value": "谁可以@所有人"
     },
     {
+      "name": "team_top_sticky_permission",
+      "value": "Top Sticky Permission"
+    },
+    {
       "name": "team_member_search_placeholder",
       "value": "Search Members"
     },
     {
       "name": "team_member_search_empty_tip",
       "value": "No Results"
+    },
+    {
+      "name": "team_join_mode",
+      "value": "Require verification to join"
+    },
+    {
+      "name": "team_join_mode_subscribe",
+      "value": "When enabled, members must obtain approval from the team owner or administrators before joining the team."
+    },
+    {
+      "name": "team_agree_mode",
+      "value": "Invitation acceptance requirement"
+    },
+    {
+      "name": "team_agree_mode_subscribe",
+      "value": "When enabled, inviting someone to join the team requires the invitee to agree."
+    },
+    {
+      "name": "team_join_mode_title",
+      "value": "Join Group Mode"
     }
   ]
 }

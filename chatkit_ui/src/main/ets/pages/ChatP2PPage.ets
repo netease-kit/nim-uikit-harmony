@@ -14,8 +14,9 @@ import { NEEmojiManager, NEEmojiParseResult, NIMEmoticonType } from '../manager/
 import { NEChatMoreOperation } from '../view/ChatMoreOperationLayout';
 import { NEChatMoreOperationData, NEChatMoreOperationType } from '../model/NEChatMoreOperationData';
 import { NEAudioRecordView } from '../view/NEAudioRecordView';
-import { InputStyleType, NEChatInputView } from '../view/ChatInputView';
-import { DoubleAlertDialog, ImagesIndexModel, MediaUtils, NavigationBackBuilder, NECommonUtils, NetworkBrokenBuilder, PermissionsUtils, VideoViewerDialog } from '@nimkit/common';
+import { AitEditorSpan, InputStyleType, NEChatInputView } from '../view/ChatInputView';
+import { MultiLineInputView } from '../view/MultiLineInputView';
+import { DoubleAlertDialog, ImagesIndexModel, MediaUtils, NavigationBackBuilder, NECommonUtils, NetworkBrokenBuilder, PermissionsUtils, VideoViewerDialog, CommonConstants } from '@nimkit/common';
 import { NECameraSelectView } from '../view/NECameraSelectView';
 import { common } from '@kit.AbilityKit';
 import { cameraPicker } from '@kit.CameraKit';
@@ -36,28 +37,43 @@ import {
   ConversationSelectParam,
   CustomMessageUtils,
   ErrorUtils,
+  getMultiLineBody,
+  getMultiLineTitle,
   IMKitConfigCenter,
   MergedMessageAttachment,
   mergedMessageCustomType,
   mergedMessageLimitCount,
   mergedMessageMaxDepth,
   NEAIUserCache,
+  NEFriendUserCache,
+  parseMultiLineAttachment,
   singleMessageLimitCount,
   SubscriptionRepo,
-  UserAIBotRepo
+  UserAIBotRepo,
+  ChatRepo
 } from '@nimkit/chatkit';
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
-import { downLoadAndOpenFile, getMessageImageUrl, getMessageImageUrls, getMessageVideoRatio, getMessageVideoUrl, parseMessageText } from '../common/MessageHelper';
+import { contentOfMessage, downLoadAndOpenFile, getMessageImageUrl, getMessageImageUrls, getMessageVideoRatio, getMessageVideoUrl, getReplyMessageTitle, parseMessageText } from '../common/MessageHelper';
 import { sceneMap } from '@kit.MapKit';
-import { computeOperateViewHeight, computeOperateViewWidth, setupMoreOperationData } from '../common/ChatUtils';
+import {
+  computeOperateViewHeight,
+  computeOperateViewWidth,
+  getTranslationOperateMenu,
+  setupMoreOperationData
+} from '../common/ChatUtils';
 import { ChatMultiSelectView } from '../view/ChatMultiSelectView';
 import { TextMessageDetailDialog } from '../view/TextMessageDetailDialog';
 import { ChatKitUIClient } from '../ChatKitUIClient';
 import { FraudTipView } from '../view/FraudTipView';
 import { HashMap } from '@kit.ArkTS';
 import { IsReceiveMsgOperation } from '../model/IsReceiveMsg';
+import { MessageTranslationService } from '../service/translation/MessageTranslationService';
+import {
+  RichInputTransferNode,
+  RichInputTransferNodeType
+} from '../common/InputTransferUtils';
 
 @ComponentV2
 export struct ChatP2PPage {
@@ -78,7 +94,18 @@ export struct ChatP2PPage {
   defaultInputViewHeight: number = 0;
   // 长按操作选中的消息
   @Local operationMsg: NIMMessageInfo | undefined = undefined
+  @Local translatedActionMsg: NIMMessageInfo | undefined = undefined
+  @Local translationOperationMode: boolean = false
+  @Local operationMenuItems: Array<MessageOperationItem> | undefined = undefined
   @Local replyMsg: NIMMessageInfo | undefined = undefined
+  // 撤回重编辑的富文本内容
+  @Local revokeMultiLineContent: string = ''
+  // 多行输入模式的标题和正文
+  @Local multiLineTitle: string = ''
+  @Local multiLineBody: string = ''
+  @Local multiLineBodyNodes: RichInputTransferNode[] = []
+  // 多行输入面板组件实例引用
+  multiLineInputViewInstance?: MultiLineInputView = undefined
   @Local operationRect: NERectData = new NERectData()
   screenHeight: number = 0;
   screenWidth: number = 0;
@@ -116,6 +143,11 @@ export struct ChatP2PPage {
   @Local tipBannerHeight: number = 0;
   // 新增：转发弹窗是否打开（用于阻止键盘弹出时自动滚动到底部）
   isForwardDialogOpen: boolean = false;
+  private singleLineFocusTask: number = -1
+  private multiLineFocusTask: number = -1
+  private translationFinishedListener: (messageClientId: string) => void = (messageClientId: string) => {
+    this.handleTranslationFinished(messageClientId)
+  }
   selectVideoView: CustomDialogController = new CustomDialogController({
     builder: NECameraSelectView({
       onTakePhotoFromCamera: () => {
@@ -207,6 +239,10 @@ export struct ChatP2PPage {
         if (ErrorUtils.checkNetworkAndToast()) {
           this.chatViewModel.forwardMessage(this.forwardMessages, this.forwardConversations, text)
           this.showMultiSelect = false
+          // 退出多选模式后，如果是多行输入模式，恢复 bottomHeight
+          if (this.inputStyle === InputStyleType.Multiline) {
+            this.bottomHeight = 0
+          }
           // 只有当转发目标包含当前会话时，才滚动到最新消息
           const forwardToCurrentConversation: boolean = this.forwardConversations.some(
             (conv) => conv.conversationId === this.conversationId
@@ -426,10 +462,32 @@ export struct ChatP2PPage {
     this.isAtBottom = true
   }
 
+  private handleTranslationFinished(messageClientId: string): void {
+    const allMessages = this.chatUserInfo.msgList.getMessageList()
+    const lastMessage = allMessages[allMessages.length - 1]
+    if (!lastMessage || lastMessage.message.messageClientId !== messageClientId) {
+      return
+    }
+    if (!this.isAtBottom || this.isForwardDialogOpen || !this.chatViewModel.isPageVisible) {
+      return
+    }
+    setTimeout(() => {
+      if (this.chatViewModel.hasNew) {
+        this.chatViewModel.reloadMessageList()
+      } else {
+        this.scrollToNewMessage()
+      }
+    }, 20)
+  }
+
+  /**
+   * 从多行正文 RichEditor 提取纯文本
+   */
   aboutToAppear(): void {
     NEEmojiManager.instance.setup();
     DeviceUtils.rootDirPath = getContext(this).filesDir
     this.operationMoreDataList = setupMoreOperationData(true)
+    MessageTranslationService.instance.addTranslationFinishedListener(this.translationFinishedListener)
     window.getLastWindow(getContext(this)).then(currentWindow => {
       let property = currentWindow.getWindowProperties();
       // 初始化窗口高度
@@ -461,6 +519,17 @@ export struct ChatP2PPage {
     if ((this.inputStyle === InputStyleType.Emoji || this.inputStyle === InputStyleType.Record ||
       this.inputStyle === InputStyleType.More) && this.keyboardHeight <= 0) {
       this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight - this.expandHeight
+    } else if (this.inputStyle === InputStyleType.Multiline) {
+      // 多行模式：bottomHeight = 0，需要考虑 expandHeight
+      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.expandHeight
+      // 键盘弹出时滚动到底部
+      if (this.keyboardHeight > 10) {
+        setTimeout(() => {
+          if (!this.isForwardDialogOpen && this.chatViewModel.isPageVisible) {
+            this.listScroller.scrollEdge(Edge.Bottom)
+          }
+        }, 20)
+      }
     } else {
       this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight
       if (this.keyboardHeight > 10) {
@@ -523,6 +592,34 @@ export struct ChatP2PPage {
     return text
   }
 
+  private restoreSingleLineTransferNodes(title: string, bodyText: string, bodyNodes: RichInputTransferNode[]) {
+    this.controller.deleteSpans()
+    if (title.length > 0) {
+      this.controller.addTextSpan(bodyText.length > 0 || bodyNodes.length > 0 ? `${title}\n` : title)
+    }
+    if (bodyNodes.length > 0) {
+      bodyNodes.forEach((node) => {
+        if (node.type === RichInputTransferNodeType.Text) {
+          if (node.text.length > 0) {
+            this.controller.addTextSpan(node.text)
+          }
+          return
+        }
+
+        if (node.type === RichInputTransferNodeType.Emoji && node.emojiFile) {
+          this.controller.addImageSpan($rawfile(`emoji/${node.emojiFile}`), {
+            imageStyle: { size: [16, 16] }
+          })
+        }
+      })
+      return
+    }
+
+    if (bodyText.length > 0) {
+      this.controller.addTextSpan(bodyText)
+    }
+  }
+
   loadChatData() {
     this.chatUserInfo.setConversationId(this.conversationId)
     this.chatViewModel.init(this.conversationId, this.chatUserInfo);
@@ -579,8 +676,13 @@ export struct ChatP2PPage {
     NavDestination() {
       NavigationBackBuilder({
         title: this.chatUserInfo.conversationName,
+        // 在线状态显示
         titleSuffix: IMKitConfigCenter.enableShownOnlineState
           ? (SubscriptionRepo.onlineStateMap.get(this.chatUserInfo.targetId) ? '(在线)' : '(离线)')
+          : undefined,
+        // 听筒模式时显示听筒图标
+        titleSuffixIcon: IMKitConfigCenter.enableEarphoneMode
+          ? $r('app.media.ic_chat_audio_earphone')
           : undefined,
         rightButtonIcon: this.showMultiSelect ? undefined : $r('app.media.ic_public_more_dot'),
         rightButtonTitle: this.showMultiSelect ? $r('app.string.chat_msg_dialog_cancel') : undefined,
@@ -589,7 +691,11 @@ export struct ChatP2PPage {
         },
         leftButtonAction: () => {
           this.pathStack.pop()
-        }
+        },
+        // 正在输入提示
+        enableTypingIndicator: IMKitConfigCenter.enableTypingStatus,
+        showTypingIndicator: this.chatViewModel.isRemoteTyping,
+        typingIndicatorText: $r('app.string.chat_typing_indicator')
       })
 
       RelativeContainer() {
@@ -650,6 +756,8 @@ export struct ChatP2PPage {
                         return
                       }
                       this.operationMsg = msg
+                      this.translationOperationMode = false
+                      this.operationMenuItems = undefined
                       let opMenuWidth = computeOperateViewWidth(msg)
                       let opMenuHeight = computeOperateViewHeight(msg)
                       let marginSize = this.operationViewMargin
@@ -699,10 +807,27 @@ export struct ChatP2PPage {
                         return
                       }
                       if (msg?.checkRevokeEdit()) {
+                        const attachment = msg.revokeInfo?.revokeMsgAttachment
+                        const multiLine = attachment && attachment.length > 0 ? parseMultiLineAttachment(attachment) : null
+
+                        this.resetMultiLineDraft()
+                        if (!multiLine) {
+                          this.exitMultiLineEditMode()
+                        }
+
                         this.clearInput(true)
                         if (msg.isReplyMsg && msg.replyMsg) {
                           this.loadReplyInfo(msg.replyMsg)
                         }
+                        if (multiLine) {
+                          this.revokeMultiLineContent = JSON.stringify({
+                            title: multiLine.data.title,
+                            body: multiLine.data.body,
+                            _ts: Date.now()
+                          })
+                          return
+                        }
+
                         parseMessageText(msg.revokeInfo?.revokeMsgText)?.forEach((item: NEEmojiParseResult) => {
                           if (item.text) {
                             this.controller.addTextSpan(item.text)
@@ -743,6 +868,38 @@ export struct ChatP2PPage {
                       }
                       if (msg) {
                         this.chatViewModel.resendMessage(msg)
+                      }
+                    },
+                    onTranslatedAreaLongClick: (event: GestureEvent, msg: NIMMessageInfo | undefined) => {
+                      if (msg) {
+                        this.operationMsg = msg
+                        this.translatedActionMsg = msg
+                        this.translationOperationMode = true
+                        this.operationMenuItems = getTranslationOperateMenu()
+                        const itemCount = this.operationMenuItems.length
+                        const opMenuWidth = ChatConst.menuItemWidth * Math.min(itemCount, ChatConst.menuItemColumnNum)
+                        const opMenuHeight =
+                          ChatConst.menuItemHeight * (Math.ceil(itemCount / ChatConst.menuItemColumnNum))
+                        let marginSize = this.operationViewMargin
+                        let xPoint = Number(event.target.area.globalPosition.x) +
+                          (Number(event.target.area.width) - opMenuWidth) / 2
+                        if (xPoint < marginSize) {
+                          xPoint = marginSize
+                        }
+                        if (xPoint + opMenuWidth + marginSize > this.screenWidth) {
+                          xPoint = this.screenWidth - opMenuWidth - marginSize
+                        }
+                        this.operationRect.x = xPoint
+                        let yPoint = Number(event.target.area.globalPosition.y) - this.navBarHeight +
+                          Number(event.target.area.height)
+                        if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
+                          yPoint = yPoint - opMenuHeight - marginSize * 2 - Number(event.target.area.height)
+                        }
+                        if (yPoint < 0) {
+                          yPoint = this.scrollHeight / 2
+                        }
+                        this.operationRect.y = yPoint
+                        this.showOperationView = true
                       }
                     },
                     onAvatarLongPress: () => {
@@ -808,6 +965,12 @@ export struct ChatP2PPage {
             if (event.type == TouchType.Down) {
               this.showOperationView = false
               this.getUIContext().getFocusController().clearFocus();
+              // 多行模式下点击消息列表不切换模式，只收起键盘
+              if (this.inputStyle === InputStyleType.Multiline) {
+                return
+              }
+              // 非多行模式：收起 emoji/more/record 面板
+              this.bottomHeight = 105
               this.scrollHeight = this.defaultInputViewHeight;
               this.expandHeight = 0;
               this.inputStyle = InputStyleType.None
@@ -825,13 +988,25 @@ export struct ChatP2PPage {
               top: { anchor: "chatPageListView", align: VerticalAlign.Bottom },
             })
 
-          if (this.hideInput === false && !this.showMultiSelect) {
+          // 单行输入框：使用 visibility 控制显隐，避免组件销毁导致内容丢失
+          if (this.hideInput === false) {
             NEChatInputView({
               controller: this.controller,
               placeHolder: (this.chatUserInfo.conversationName ?? '').length > 15 ?
                 this.chatUserInfo.conversationName?.substring(0, 15) + '...' : this.chatUserInfo.conversationName,
               replyMsg: this.replyMsg,
               chatInfo: this.chatUserInfo,
+              revokeMultiLineContent: this.revokeMultiLineContent,
+              onRestoreMultiLineContent: (title: string, body: string) => {
+                // 恢复撤回重编辑的多行内容
+                this.multiLineTitle = title
+                this.multiLineBody = body
+                this.multiLineBodyNodes = []
+                // 如果当前已经在多行模式，需要直接更新 MultiLineInputView 的内容
+                if (this.inputStyle === InputStyleType.Multiline && this.multiLineInputViewInstance) {
+                  this.multiLineInputViewInstance.setContent(title, body)
+                }
+              },
               onDidClickCloseReply: () => {
                 this.clearInput(false)
               },
@@ -904,6 +1079,48 @@ export struct ChatP2PPage {
                 this.chatViewModel.sendTextMessage(text, this.replyMsg)
                 this.clearInput(true)
               },
+              onSendMultiLineMessage: (title: string, body: string) => {
+                this.showOperationView = false
+                this.chatViewModel.sendMultiLineMessage(title, body, this.replyMsg)
+                this.clearInput(true)
+                // 发送后滚动到最新消息
+                this.scrollToNewMessage()
+              },
+              onInputTextChange: (hasText: boolean) => {
+                // 通知 ViewModel 输入状态变化（用于"正在输入"功能）
+                this.chatViewModel.sendInputNotification(hasText)
+              },
+              onMultilineModeChange: (
+                isMultiline: boolean,
+                transferTitle?: string,
+                transferBody?: string,
+                transferBodyNodes?: RichInputTransferNode[]
+              ) => {
+                this.showOperationView = false
+                if (isMultiline) {
+                  this.inputStyle = InputStyleType.Multiline
+                  // 多行模式：隐藏单行输入框，使用 expandHeight 显示多行面板
+                  this.bottomHeight = 0
+                  // 有回复时高度增加 36（32px 回复预览 + 4px margin）
+                  this.expandHeight = this.replyMsg ? 186 : 150
+                  this.scrollHeight = this.screenHeight - this.bottomHeight - this.expandHeight
+                  // 单行 → 多行转换：
+                  // - 单行第一行 → 多行标题
+                  // - 单行第二行起 → 多行正文
+                  this.multiLineTitle = transferTitle ?? ''
+                  this.multiLineBody = transferBody ?? ''
+                  this.multiLineBodyNodes = transferBodyNodes ?? []
+                  this.scrollToNewMessage()
+                } else {
+                  this.inputStyle = InputStyleType.None
+                  this.bottomHeight = this.replyMsg ? this.bottomWithReplyHeight : 105
+                  this.expandHeight = 0
+                  this.scrollHeight = this.screenHeight - this.bottomHeight
+                  this.restoreSingleLineTransferNodes(transferTitle ?? '', transferBody ?? '', transferBodyNodes ?? [])
+                  this.multiLineBodyNodes = []
+                }
+              },
+              conversationName: this.chatUserInfo.conversationName ?? '',
               inputStyle: this.inputStyle
             }).alignRules({
               left: { anchor: "chat_input", align: HorizontalAlign.Start },
@@ -911,7 +1128,11 @@ export struct ChatP2PPage {
               bottom: { anchor: "chat_input", align: VerticalAlign.Bottom },
               top: { anchor: "chat_input", align: VerticalAlign.Top },
             }).backgroundColor($r('app.color.chat_input_background'))
-          } else if (this.showMultiSelect) {
+              .visibility(this.showMultiSelect ? Visibility.None : Visibility.Visible)
+          }
+
+          // 多选操作栏
+          if (this.showMultiSelect) {
             ChatMultiSelectView({
               isEnable: this.multiSelectCount > 0,
               onMultiForward: () => {
@@ -1041,6 +1262,13 @@ export struct ChatP2PPage {
                         }
 
                         const targetId: string = this.chatUserInfo.targetId;
+                        // 检查是否仅允许好友通话
+                        if (IMKitConfigCenter.enableOnlyFriendCall &&
+                            !NEFriendUserCache.getInstance().hasFriendRelation(targetId)) {
+                          // 非好友，弹出提示框
+                          NECommonUtils.showToast($r('app.string.chat_not_friend_call_tip'))
+                          return;
+                        }
                         ChatKitUIClient.getInstance().call(targetId, callType)
                       })
                       .catch((err: Error) => {
@@ -1085,6 +1313,66 @@ export struct ChatP2PPage {
                   right: { anchor: "__container__", align: HorizontalAlign.End },
                   top: { anchor: "__container__", align: VerticalAlign.Top }
                 })
+            } else if (this.inputStyle === InputStyleType.Multiline) {
+              // 多行输入模式面板：使用 visibility 控制显隐，避免组件销毁导致内容丢失
+              MultiLineInputView({
+                teamId: undefined,  // P2P 不需要群聊功能
+                team: undefined,
+                conversationName: this.chatUserInfo.conversationName ?? '',
+                initialTitle: this.multiLineTitle,
+                initialBody: this.multiLineBody,
+                initialBodyNodes: this.multiLineBodyNodes,
+                aitManager: undefined,  // P2P 不需要 @ 功能
+                replyMsg: this.replyMsg,
+                chatInfo: this.chatUserInfo,
+                onInputTextChange: (hasText: boolean) => {
+                  // 通知 ViewModel 输入状态变化（用于"正在输入"功能）
+                  this.chatViewModel.sendInputNotification(hasText)
+                },
+                onComponentReady: (instance: MultiLineInputView) => {
+                  // 保存组件实例引用
+                  this.multiLineInputViewInstance = instance
+                },
+                onCloseReply: () => {
+                  this.replyMsg = undefined
+                  // 恢复高度
+                  this.expandHeight = 150
+                  this.scrollHeight = this.screenHeight - this.keyboardHeight - this.expandHeight
+                },
+                onSendMultiLineMessage: (title: string, body: string) => {
+                  // 发送消息
+                  if (title.length > 0) {
+                    this.chatViewModel.sendMultiLineMessage(title, body, this.replyMsg)
+                  } else {
+                    this.chatViewModel.sendTextMessage(body, this.replyMsg)
+                  }
+                  // 清空缓存
+                  this.multiLineTitle = ''
+                  this.multiLineBody = ''
+                  this.multiLineBodyNodes = []
+                  // 清除回复消息（但保持多行模式和键盘状态）
+                  if (this.replyMsg) {
+                    this.replyMsg = undefined
+                    // 恢复到无回复时的高度（保持多行模式和键盘）
+                    this.expandHeight = 150
+                    this.scrollHeight = this.screenHeight - this.keyboardHeight - this.expandHeight
+                  }
+                  this.scrollToNewMessage()
+                },
+                onCollapseClick: (title: string, bodyText: string, bodyNodes: RichInputTransferNode[]) => {
+                  // 收起按钮点击
+                  this.multiLineTitle = ''
+                  this.multiLineBody = ''
+                  this.multiLineBodyNodes = []
+                  // 切换回单行模式
+                  this.inputStyle = InputStyleType.None
+                  this.bottomHeight = this.replyMsg ? this.bottomWithReplyHeight : 105
+                  this.expandHeight = 0
+                  this.scrollHeight = this.screenHeight - this.bottomHeight
+                  this.restoreSingleLineTransferNodes(title, bodyText, bodyNodes)
+                }
+              })
+                .visibility(this.showMultiSelect ? Visibility.None : Visibility.Visible)
             }
           }
           .height(this.expandHeight)
@@ -1141,14 +1429,25 @@ export struct ChatP2PPage {
           if (this.showOperationView) {
             MessageOperationView({
               operateMsg: this.operationMsg,
+              operationItems: this.operationMenuItems,
               didClickItem: (item: MessageOperationItem) => {
                 this.showOperationView = false
                 if (this.operationMsg == undefined) {
                   return;
                 }
                 if (item.operationType == MessageOperationType.Copy) {
+                  // 获取要复制的文本内容
+                  let copyText = this.translationOperationMode ?
+                    MessageTranslationService.instance.getTranslatedDisplayText(this.operationMsg!) :
+                    (this.operationMsg.message.text ?? '')
+                  // 多行消息：复制 标题 + 换行 + 正文
+                  if (!this.translationOperationMode && this.operationMsg.isMultiLineMsg) {
+                    const title = getMultiLineTitle(this.operationMsg.message)
+                    const body = getMultiLineBody(this.operationMsg.message)
+                    copyText = title && body ? `${title}\n${body}` : (title || body)
+                  }
                   const pasteboardData =
-                    pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.operationMsg.message.text)
+                    pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, copyText)
                   pasteboard.getSystemPasteboard().setDataSync(pasteboardData)
                   NECommonUtils.showToast($r('app.string.chat_message_copy_success_tips'))
                 } else if (item.operationType == MessageOperationType.Delete) {
@@ -1158,8 +1457,18 @@ export struct ChatP2PPage {
                 } else if (item.operationType == MessageOperationType.Forward) {
                   // 转发
                   this.forwardMessageAction = (selectedList: ConversationSelectModel[]) => {
-                    if (this.operationMsg?.message) {
+                    if (this.translationOperationMode) {
+                      const translatedText = MessageTranslationService.instance.getTranslatedDisplayText(this.operationMsg!)
+                      if (translatedText.length === 0) {
+                        return
+                      }
+                      this.forwardMessages = [ChatRepo.createTextMessage(translatedText)]
+                    } else if (this.operationMsg?.message) {
                       this.forwardMessages = [this.operationMsg.message]
+                    } else {
+                      return
+                    }
+                    if (this.operationMsg?.message) {
                       this.forwardConversations = selectedList
                       this.currentConversationName = this.chatUserInfo.getConversationName()
                       this.isForwardDialogOpen = true
@@ -1182,9 +1491,32 @@ export struct ChatP2PPage {
                   this.chatViewModel.clearSelectMessage()
                   this.chatViewModel.addSelectMessage(this.operationMsg)
                   this.showMultiSelect = true
+                  this.bottomHeight = 100
                 } else if (item.operationType == MessageOperationType.Reply) {
                   this.loadReplyInfo(this.operationMsg)
+                } else if (item.operationType == MessageOperationType.VoicePlayMode) {
+                  // 切换语音播放模式
+                  const newMode = !IMKitConfigCenter.enableEarphoneMode
+                  IMKitConfigCenter.enableEarphoneMode = newMode
+                  AppStorage.setOrCreate(CommonConstants.KEY_SETTING_EARPIECE_MODE, newMode)
+                  // 播放中立刻切换输出设备
+                  AudioPlayerManager.instance.switchAudioOutputDevice(newMode)
+                  // 显示 Toast 提示
+                  if (newMode) {
+                    NECommonUtils.showToast($r('app.string.chat_message_audio_earphone_tip'))
+                  } else {
+                    NECommonUtils.showToast($r('app.string.chat_message_audio_speaker_tip'))
+                  }
+                } else if (item.operationType == MessageOperationType.VoiceToText) {
+                  // 语音转文字
+                  this.chatViewModel.voiceToText(this.operationMsg)
+                } else if (item.operationType == MessageOperationType.Translate) {
+                  MessageTranslationService.instance.translate(this.operationMsg)
+                } else if (item.operationType == MessageOperationType.HideTranslation) {
+                  MessageTranslationService.instance.hideTranslation(this.operationMsg)
                 }
+                this.translationOperationMode = false
+                this.operationMenuItems = undefined
               }
             })
               .position({ x: this.operationRect.x, y: this.operationRect.y })
@@ -1242,9 +1574,81 @@ export struct ChatP2PPage {
   }
 
   loadReplyInfo(msg: NIMMessageInfo) {
-    this.bottomHeight = this.bottomWithReplyHeight
     this.replyMsg = msg
-    this.getUIContext().getFocusController().requestFocus("chat_edit_input")
+    this.clearPendingReplyTasks()
+    // 多行模式下调整 expandHeight 并弹出键盘
+    if (this.inputStyle === InputStyleType.Multiline) {
+      this.expandHeight = 186
+      this.scrollHeight = this.screenHeight - this.expandHeight
+      this.scheduleMultiLineFocus()
+      return
+    }
+    this.bottomHeight = this.bottomWithReplyHeight
+    this.scheduleSingleLineFocus()
+  }
+
+  private resetMultiLineDraft() {
+    this.clearPendingReplyTasks()
+    this.multiLineInputViewInstance?.clearContent()
+    this.multiLineTitle = ''
+    this.multiLineBody = ''
+    this.multiLineBodyNodes = []
+    this.revokeMultiLineContent = ''
+  }
+
+  private exitMultiLineEditMode() {
+    this.clearPendingReplyTasks()
+    if (this.inputStyle === InputStyleType.Multiline) {
+      this.inputStyle = InputStyleType.None
+      this.expandHeight = 0
+      this.bottomHeight = 105
+      this.computeScrollHeight()
+    }
+  }
+
+  private clearPendingReplyTasks() {
+    if (this.singleLineFocusTask >= 0) {
+      clearTimeout(this.singleLineFocusTask)
+      this.singleLineFocusTask = -1
+    }
+    if (this.multiLineFocusTask >= 0) {
+      clearTimeout(this.multiLineFocusTask)
+      this.multiLineFocusTask = -1
+    }
+  }
+
+  private scheduleSingleLineFocus() {
+    if (this.singleLineFocusTask >= 0) {
+      clearTimeout(this.singleLineFocusTask)
+    }
+    this.singleLineFocusTask = setTimeout(() => {
+      this.singleLineFocusTask = -1
+      if (this.inputStyle === InputStyleType.Multiline || this.hideInput || this.showMultiSelect || this.bottomHeight <= 0) {
+        return
+      }
+      try {
+        this.getUIContext().getFocusController().requestFocus("chat_edit_input")
+      } catch (e) {
+        console.warn(`ChatP2PPage scheduleSingleLineFocus failed: ${e}`)
+      }
+    }, 100)
+  }
+
+  private scheduleMultiLineFocus() {
+    if (this.multiLineFocusTask >= 0) {
+      clearTimeout(this.multiLineFocusTask)
+    }
+    this.multiLineFocusTask = setTimeout(() => {
+      this.multiLineFocusTask = -1
+      if (this.inputStyle !== InputStyleType.Multiline || this.showMultiSelect || !this.multiLineInputViewInstance) {
+        return
+      }
+      try {
+        this.getUIContext().getFocusController().requestFocus("multiline_body_input")
+      } catch (e) {
+        console.warn(`ChatP2PPage scheduleMultiLineFocus failed: ${e}`)
+      }
+    }, 100)
   }
 
   clearInput(clearInput?: boolean) {
@@ -1505,6 +1909,10 @@ export struct ChatP2PPage {
           action: () => {
             this.chatViewModel.deleteMessageList(messages)
             this.showMultiSelect = false
+            // 退出多选模式后，如果是多行输入模式，恢复 bottomHeight
+            if (this.inputStyle === InputStyleType.Multiline) {
+              this.bottomHeight = 0
+            }
           }
         }
       }
@@ -1544,6 +1952,9 @@ export struct ChatP2PPage {
     if (this.showMultiSelect) {
       this.chatViewModel.clearSelectMessage()
       this.showMultiSelect = false
+      if (this.inputStyle === InputStyleType.Multiline) {
+        this.bottomHeight = 0
+      }
     } else {
       pathStack.pushPath({
         name: 'UserSettingPage',
@@ -1598,9 +2009,16 @@ export struct ChatP2PPage {
   }
 
   aboutToDisappear(): void {
+    MessageTranslationService.instance.removeTranslationFinishedListener(this.translationFinishedListener)
     this.chatViewModel.clearUnreadCount()
     this.chatViewModel.onDestroy()
     AudioPlayerManager.instance.stopPlayAll()
+    
+    // 清空多行输入框状态和内容（退出聊天页面时）
+    this.multiLineTitle = ''
+    this.multiLineBody = ''
+    this.expandHeight = 0
+    this.inputStyle = InputStyleType.None
   }
 }
 

@@ -12,7 +12,6 @@ import {
   V2NIMConversationType,
   V2NIMLoginStatus,
   V2NIMMessage,
-  V2NIMMessageConfig,
   V2NIMMessageDeletedNotification,
   V2NIMMessageNotificationAttachment,
   V2NIMMessagePin,
@@ -29,6 +28,7 @@ import { HashSet } from '@kit.ArkTS';
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { clearForwardAtMark, sendMessageFailedTips } from '../common/MessageHelper';
+import { buildSendMessageParams } from '../common/SendMessageParamsHelper';
 
 @ObservedV2
 export class ChatPinViewModel {
@@ -208,12 +208,8 @@ export class ChatPinViewModel {
 
 
   // 消息发送之前调用，用于配置消息通用参数
-  beforeSendMessage(msg: V2NIMMessage): V2NIMMessage {
-    let msgConfig: V2NIMMessageConfig = {
-      readReceiptEnabled: true
-    }
-    msg.messageConfig = msgConfig
-    return msg
+  beforeSendMessage(params?: V2NIMSendMessageParams): V2NIMSendMessageParams | undefined {
+    return buildSendMessageParams(params)
   }
 
   /**
@@ -225,7 +221,8 @@ export class ChatPinViewModel {
    */
   async sendForwardMessage(msg: V2NIMMessage, conversationId: string, params?: V2NIMSendMessageParams,
     progress?: (percentage: number) => void) {
-    ChatRepo.sendMessage(this.beforeSendMessage(msg), conversationId, params, progress).catch((err: BusinessError) => {
+    const mergedParams = this.beforeSendMessage(params)
+    ChatRepo.sendMessage(msg, conversationId, mergedParams, progress).catch((err: BusinessError) => {
       console.error("net ease send message error", err.code, err.message);
       sendMessageFailedTips(msg, err, conversationId)
     })

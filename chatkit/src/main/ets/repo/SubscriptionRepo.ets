@@ -18,6 +18,7 @@ export class SubscriptionRepo {
   // 状态缓存（网络断开自动清除）
   @Trace static onlineStateMap: Map<string, boolean> = new Map();
   static subscriptionArray: string[] = [];
+  static subscriptionInFlightSet: Set<string> = new Set();
 
   /**
    * 订阅用户状态，包括在线状态，或自定义状态
@@ -27,17 +28,31 @@ export class SubscriptionRepo {
    * @returns string[] 订阅失败的 account 数组
    */
   static async subscribeUserStatus(accountId: string): Promise<string[]> {
-    const failedSubscribeUsers = await ChatKitClient.nim.subscriptionService?.subscribeUserStatus({
-      accountIds: [accountId],
-      duration: subscriptionOnlineStateDuration,
-      immediateSync: true
-    });
-
-    if (!SubscriptionRepo.subscriptionArray.includes(accountId)) {
-      SubscriptionRepo.subscriptionArray.push(accountId);
+    if (!accountId) {
+      return [];
     }
 
-    return failedSubscribeUsers;
+    if (SubscriptionRepo.subscriptionArray.includes(accountId) ||
+      SubscriptionRepo.subscriptionInFlightSet.has(accountId)) {
+      return [];
+    }
+
+    SubscriptionRepo.subscriptionInFlightSet.add(accountId);
+    try {
+      const failedSubscribeUsers = await ChatKitClient.nim.subscriptionService?.subscribeUserStatus({
+        accountIds: [accountId],
+        duration: subscriptionOnlineStateDuration,
+        immediateSync: true
+      }) ?? [];
+
+      if (!SubscriptionRepo.subscriptionArray.includes(accountId)) {
+        SubscriptionRepo.subscriptionArray.push(accountId);
+      }
+
+      return failedSubscribeUsers;
+    } finally {
+      SubscriptionRepo.subscriptionInFlightSet.delete(accountId);
+    }
   }
 
   /**
@@ -69,6 +84,9 @@ export class SubscriptionRepo {
   static async onLoginStatusFun(status: V2NIMLoginStatus): Promise<void> {
     switch (status) {
       case V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGOUT:
+        SubscriptionRepo.onlineStateMap.clear();
+        SubscriptionRepo.subscriptionArray = [];
+        SubscriptionRepo.subscriptionInFlightSet.clear();
         break;
       case V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED:
         //SubscriptionRepo.resubscribe();
@@ -77,6 +95,7 @@ export class SubscriptionRepo {
       case V2NIMLoginStatus.V2NIM_LOGIN_STATUS_UNLOGIN:
         // 断网或者状态错误还原在线状态
         SubscriptionRepo.onlineStateMap.clear();
+        SubscriptionRepo.subscriptionInFlightSet.clear();
         break;
       default:
       // doing nothing

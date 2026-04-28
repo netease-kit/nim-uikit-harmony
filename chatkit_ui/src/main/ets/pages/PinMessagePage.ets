@@ -37,6 +37,9 @@ import {
   conversationSelectLimitCount,
   CustomMessageUtils,
   ErrorUtils,
+  getMultiLineBody,
+  getMultiLineTitle,
+  isMultiLineMessage,
   MergedMessageAttachment,
   mergedMessageCustomType
 } from '@nimkit/chatkit';
@@ -65,7 +68,13 @@ export struct PinMoreActionDialog {
     }
   }
   copyMessage = () => {
-    const copyData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.message.message.text)
+    let copyText = this.message.message.text ?? ''
+    if (isMultiLineMessage(this.message.message)) {
+      const title = getMultiLineTitle(this.message.message)
+      const body = getMultiLineBody(this.message.message)
+      copyText = title && body ? `${title}\n${body}` : (title || body)
+    }
+    const copyData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, copyText)
     pasteboard.getSystemPasteboard().setData(copyData).then(() => {
       NECommonUtils.showToast($r('app.string.copy_success'))
       this.cancel()
@@ -90,7 +99,8 @@ export struct PinMoreActionDialog {
           .width('100%')
           .onClick(this.unpinMessage)
 
-        if (this.message.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+        if (this.message.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ||
+          isMultiLineMessage(this.message.message)) {
           Row()
             .height(1)
             .width('100%')
@@ -259,7 +269,8 @@ export struct PinMessagePage {
 
   getPinMoreActionDialogHeight(message?: NIMMessageInfo): number {
     let height = 42
-    if (message?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+    if (message && (message.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ||
+      isMultiLineMessage(message.message))) {
       height += 43
     }
     if (message?.message.messageType !== V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
@@ -336,6 +347,8 @@ export struct PinMessagePage {
                     } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
                       this.showVideoDetail(msg)
                     } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+                      this.textMessageDetailDialog.open()
+                    } else if (msg && isMultiLineMessage(msg.message)) {
                       this.textMessageDetailDialog.open()
                     } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
                       showLocationDetail(msg, getContext(this) as common.UIAbilityContext)
@@ -417,4 +430,3 @@ export struct PinMessagePage {
 export function PinMessagePageBuilder() {
   PinMessagePage()
 }
-

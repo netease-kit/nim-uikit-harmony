@@ -1,13 +1,12 @@
 {
   "name": "imkit_sample",
-  "version": "10.9.10",
+  "version": "10.9.11",
   "description": "Please describe the basic information.",
   "main": "",
   "author": "",
   "license": "",
   "dependencies": {
     "@nimkit/conversationkit_ui": "file:../conversationkit_ui",
-    "@nimkit/localconversationkit_ui": "file:../localconversationkit_ui",
     "@nimkit/contactkit_ui": "file:../contactkit_ui",
     "@nimkit/teamkit_ui": "file:../teamkit_ui",
     "@nimkit/chatkit": "file:../chatkit",

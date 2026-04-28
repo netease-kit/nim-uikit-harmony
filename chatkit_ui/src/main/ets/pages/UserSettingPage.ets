@@ -9,6 +9,7 @@ import {
   ChatKitClient,
   ContactRepo,
   ErrorUtils,
+  IMKitConfigCenter,
   NEFriendUserCache,
   NEUserWithFriend,
   PersonSelectParam,
@@ -31,20 +32,25 @@ export struct UserSettingPage {
   accountId?: string
   @Local userWithFriend?: NEUserWithFriend
   viewModel: UserSettingViewModel = new UserSettingViewModel()
-  firstItems: ViewItemArrow[] = [
-    {
-      title: $r("app.string.setting_pin"),
-      itemHeight: 48,
-      routerUrl: "PinMessagePage",
-      rightIcon: $r('app.media.arrow_right')
-    },
-    {
-      title: $r('app.string.search_chat_history'),
-      itemHeight: 48,
-      routerUrl: "SearchFTSHistoryPage",
-      rightIcon: $r('app.media.arrow_right')
-    },
-  ]
+  getFirstItems(): ViewItemArrow[] {
+    const firstItems: ViewItemArrow[] = [
+      {
+        title: $r('app.string.search_chat_history'),
+        itemHeight: 48,
+        routerUrl: 'SearchFTSHistoryPage',
+        rightIcon: $r('app.media.arrow_right')
+      },
+    ]
+    if (IMKitConfigCenter.enablePin) {
+      firstItems.unshift({
+        title: $r("app.string.setting_pin"),
+        itemHeight: 48,
+        routerUrl: "PinMessagePage",
+        rightIcon: $r('app.media.arrow_right')
+      })
+    }
+    return firstItems
+  }
   // 设置是否开启消息提醒
   setP2PNotify = async (isOpen: boolean) => {
     if (ErrorUtils.checkNetworkAndToast()) {
@@ -181,15 +187,17 @@ export struct UserSettingPage {
             .width(42)
             .height(80)
 
-            Image($r('app.media.team_invite'))
-              .width(42)
-              .height(42)
-              .margin({
-                left: 16
-              })
-              .onClick(() => {
-                this.onAddButtonClick()
-              })
+            if (IMKitConfigCenter.enableTeam) {
+              Image($r('app.media.team_invite'))
+                .width(42)
+                .height(42)
+                .margin({
+                  left: 16
+                })
+                .onClick(() => {
+                  this.onAddButtonClick()
+                })
+            }
           }
           .alignSelf(ItemAlign.Start)
           .alignItems(VerticalAlign.Top)
@@ -210,7 +218,7 @@ export struct UserSettingPage {
         })
 
         List() {
-          ForEach(this.firstItems, (item: ViewItemArrow) => {
+          ForEach(this.getFirstItems(), (item: ViewItemArrow) => {
             ListItem() {
               ViewItemBuilder(item)
             }

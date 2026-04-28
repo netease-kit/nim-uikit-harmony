@@ -11,4 +11,5 @@ export interface RevokeMessageExtension {
   revoke_message_local_edit: boolean,
   revoke_message_local_content: string,
   revoke_message_client_id: string,
+  revoke_message_attachment?: string,  // 用于自定义消息（如富文本消息）的附件
 }

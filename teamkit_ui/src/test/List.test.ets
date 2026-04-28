@@ -6,7 +6,9 @@
  */
 
 import localUnitTest from './LocalUnit.test';
+import teamJoinManageTest from './TeamJoinManage.test';
 
 export default function testsuite() {
   localUnitTest();
+  teamJoinManageTest();
 }

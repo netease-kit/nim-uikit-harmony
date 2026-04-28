@@ -23,7 +23,19 @@ export enum MessageOperationType {
   // 收藏
   Collection = 8,
   // 回复
-  Reply = 9
+  Reply = 9,
+  // 语音播放模式切换（听筒/扬声器）
+  VoicePlayMode = 10,
+  // 置顶消息
+  TopSticky = 11,
+  // 取消置顶消息
+  UnTopSticky = 12,
+  // 语音转文字
+  VoiceToText = 13,
+  // 翻译
+  Translate = 14,
+  // 隐藏翻译
+  HideTranslation = 15
 }
 
 export class MessageOperationItem {

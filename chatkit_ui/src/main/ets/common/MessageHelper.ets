@@ -24,8 +24,10 @@ import {
   V2NIMErrorCode,
   V2NIMMessageNotificationAttachment,
   V2NIMMessageSendingState,
+  V2NIMTeamAgreeMode,
   V2NIMTeamChatBannedMode,
   V2NIMTeamInviteMode,
+  V2NIMTeamJoinMode,
   V2NIMTeamUpdateInfoMode
 } from '@nimsdk/base';
 import {
@@ -35,6 +37,9 @@ import {
   CustomMessageUtils,
   getAitModelFromJson,
   keyExtensionAtAll,
+  keyExtensionSticky,
+  keyExtensionTopSticky,
+  getMultiLinePreviewFromAttachment,
   keyExtensionLastOptType,
   keyReplyMsgKey,
   MergedMessageAttachment,
@@ -42,8 +47,10 @@ import {
   mergedMessageCustomType,
   mergedMessageNickKey,
   multiForwardFileName,
+  multiLineMessageCustomType,
   StorageRepo,
-  typeExtensionAllowAll
+  typeExtensionAllowAll,
+  typeExtensionStickyAdd
 } from '@nimkit/chatkit';
 import { DeviceUtils } from './DeviceUtils';
 import { FileUtils } from './FileUtils';
@@ -89,6 +96,14 @@ export function getNotificationMessageContent(messageInfo: NIMMessageInfo, chatU
       let inviteContent = getContext().resourceManager.getStringByNameSync('chat_team_notify_invite_title')
       let inviteJoin = getContext().resourceManager.getStringByNameSync('chat_team_notify_invite_join')
       return fromAccount + inviteContent.toString() + targetName + inviteJoin;
+    } else if (attachment.type == V2NIMMessageNotificationType.V2NIM_MESSAGE_NOTIFICATION_TYPE_TEAM_APPLY_PASS ||
+      attachment.type == V2NIMMessageNotificationType.V2NIM_MESSAGE_NOTIFICATION_TYPE_SUPER_TEAM_APPLY_PASS) {
+      let inviteJoin = getContext().resourceManager.getStringByNameSync('chat_team_notify_invite_join')
+      return (targetName.length > 0 ? targetName : fromAccount) + inviteJoin;
+    } else if (attachment.type == V2NIMMessageNotificationType.V2NIM_MESSAGE_NOTIFICATION_TYPE_TEAM_INVITE_ACCEPT ||
+      attachment.type == V2NIMMessageNotificationType.V2NIM_MESSAGE_NOTIFICATION_TYPE_SUPER_TEAM_INVITE_ACCEPT) {
+      let inviteJoin = getContext().resourceManager.getStringByNameSync('chat_team_notify_invite_join')
+      return fromAccount + inviteJoin;
     } else if (attachment.type == V2NIMMessageNotificationType.V2NIM_MESSAGE_NOTIFICATION_TYPE_TEAM_KICK) {
       let kickContent = getContext().resourceManager.getStringByNameSync('chat_team_notify_kick_title');
       return targetName + kickContent;
@@ -137,6 +152,20 @@ export function getNotificationMessageContent(messageInfo: NIMMessageInfo, chatU
         } else {
           notifyContent = notifyContent + getContext().resourceManager.getStringByNameSync('chat_team_full_mute')
         }
+      } else if (teamInfo?.agreeMode !== undefined) {
+        // 入群邀请需同意设置变更
+        if (teamInfo.agreeMode === V2NIMTeamAgreeMode.V2NIM_TEAM_AGREE_MODE_AUTH) {
+          notifyContent = getContext().resourceManager.getStringByNameSync('chat_team_agree_mode_on')
+        } else {
+          notifyContent = getContext().resourceManager.getStringByNameSync('chat_team_agree_mode_off')
+        }
+      } else if (teamInfo?.joinMode !== undefined) {
+        // 入群审核设置变更
+        if (teamInfo.joinMode === V2NIMTeamJoinMode.V2NIM_TEAM_JOIN_MODE_FREE) {
+          notifyContent = getContext().resourceManager.getStringByNameSync('chat_team_join_mode_off')
+        } else {
+          notifyContent = getContext().resourceManager.getStringByNameSync('chat_team_join_mode_on')
+        }
       } else if (teamInfo?.serverExtension !== undefined) {
         let extensionObj = JSON.parse(teamInfo.serverExtension) as object | null
         if (extensionObj != null && extensionObj[keyExtensionLastOptType] == keyExtensionAtAll) {
@@ -144,6 +173,21 @@ export function getNotificationMessageContent(messageInfo: NIMMessageInfo, chatU
             notifyContent = getContext().resourceManager.getStringByNameSync('chat_team_at_permission_all_tips')
           } else {
             notifyContent = getContext().resourceManager.getStringByNameSync('chat_team_at_permission_manager_tips')
+          }
+        } else if (extensionObj != null && extensionObj[keyExtensionLastOptType] == keyExtensionSticky) {
+          // 置顶/取消置顶消息通知
+          let stickyObj = extensionObj[keyExtensionSticky] as object
+          if (stickyObj && (stickyObj['operation'] as number) === typeExtensionStickyAdd) {
+            notifyContent = getContext().resourceManager.getStringByNameSync('chat_team_top_sticky_tips')
+          } else {
+            notifyContent = getContext().resourceManager.getStringByNameSync('chat_team_un_top_sticky_tips')
+          }
+        } else if (extensionObj != null && extensionObj[keyExtensionLastOptType] == keyExtensionTopSticky) {
+          // 置顶权限变更通知
+          if (extensionObj[keyExtensionTopSticky] === typeExtensionAllowAll) {
+            notifyContent = getContext().resourceManager.getStringByNameSync('chat_team_top_permission_all_tips')
+          } else {
+            notifyContent = getContext().resourceManager.getStringByNameSync('chat_team_top_permission_manager_tips')
           }
         }
 
@@ -720,7 +764,7 @@ export function clearForwardAtMark(forwardMessage: V2NIMMessage) {
 /// 获取消息外显文案
 /// - Parameter message: 消息
 /// - Returns: 外显文案
-function contentOfMessage(message: V2NIMMessage): string {
+export function contentOfMessage(message: V2NIMMessage): string {
   const resourceManager = getContext().resourceManager
   switch (message.messageType) {
     case V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT:
@@ -753,6 +797,8 @@ function contentOfMessage(message: V2NIMMessage): string {
         let type = CustomMessageUtils.typeOfCustomMessage(message.attachment)
         if (type === mergedMessageCustomType) {
           return '[' + resourceManager.getStringSync($r('app.string.chatHistoryBrief').id) + ']'
+        } else if (type === multiLineMessageCustomType) {
+          return getMultiLinePreviewFromAttachment(message.attachment)
         }
       }
       return resourceManager.getStringSync($r('app.string.chat_msg_unknown_type').id)
@@ -1304,7 +1350,8 @@ export function isSupportMessage(msgInfo: NIMMessageInfo): boolean {
   } else if (msgInfo.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
     result = true
   } else if (msgInfo.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM) {
-    if (msgInfo.isMergeMsg) {
+    // 合并转发消息 (type=101) 和富文本消息 (type=102) 都支持
+    if (msgInfo.isMergeMsg || msgInfo.isMultiLineMsg) {
       result = true
     } else {
       result = false
@@ -1314,4 +1361,3 @@ export function isSupportMessage(msgInfo: NIMMessageInfo): boolean {
   }
   return result
 }
-

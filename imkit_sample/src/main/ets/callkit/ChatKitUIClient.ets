@@ -12,6 +12,51 @@ import { JSON } from "@kit.ArkTS";
 import { promptAction } from "@kit.ArkUI";
 import { AbsCallKitClient } from "@nimkit/chatkit_ui/Index";
 
+/**
+ * 华为推送点击动作
+ */
+interface HarmonyClickAction {
+  actionType: number; // 0: 打开应用
+}
+
+/**
+ * 华为推送通知配置
+ */
+interface HarmonyNotification {
+  category: string; // "IM"
+  clickAction: HarmonyClickAction;
+}
+
+/**
+ * 华为推送载荷
+ */
+interface HarmonyPayload {
+  notification: HarmonyNotification;
+}
+
+/**
+ * 华为推送选项
+ */
+interface HarmonyPushOptions {
+  testMessage: boolean;
+}
+
+/**
+ * 华为推送 harmonyField 结构
+ */
+interface HarmonyField {
+  payload: HarmonyPayload;
+  pushOptions: HarmonyPushOptions;
+}
+
+/**
+ * 华为推送数据结构
+ */
+interface PushPayloadData {
+  harmonyField: HarmonyField;
+  harmonyPushType: number; // 0: 普通推送
+}
+
 export class CallKitClient extends AbsCallKitClient {
   className():  string {
     return "CallKitClient";
@@ -43,6 +88,31 @@ export class CallKitClient extends AbsCallKitClient {
       });
   }
 
+  /**
+   * 生成华为推送的 pushPayload
+   * 使用普通推送类型 (harmonyPushType: 0)
+   */
+  private generatePushPayload(): string {
+    const pushPayload: PushPayloadData = {
+      harmonyField: {
+        payload: {
+          notification: {
+            category: 'IM',
+            clickAction: {
+              actionType: 0
+            }
+          }
+        },
+        pushOptions: {
+          testMessage: true
+        }
+      },
+      harmonyPushType: 0
+    };
+
+    return JSON.stringify(pushPayload);
+  }
+
   public call(target: string, callType: number): void {
     // 创建呼叫参数（核心：动态传入选中的callType）
     const param: NECallParam = new NECallParam(
@@ -50,14 +120,17 @@ export class CallKitClient extends AbsCallKitClient {
       callType// 动态赋值：音频=NECallType.AUDIO / 视频=NECallType.VIDEO
     );
 
-    // 可选：设置推送配置
+    // 设置推送配置
     const pushConfig: NECallPushConfig = new NECallPushConfig();
     pushConfig.pushEnabled = true;
     pushConfig.pushTitle = '来电提醒';
     pushConfig.pushContent = callType === NECallType.AUDIO ? '您有一个音频通话' : '您有一个视频通话';
+    pushConfig.pushPayload = this.generatePushPayload();
     param.pushConfig = pushConfig;
 
-    // 5. 发起呼叫
+    console.info('CallKit', `call pushPayload: ${pushConfig.pushPayload}`);
+
+    // 发起呼叫
     NECallUI.getInstance().call(param)
       .then((result: NEResult) => {
         console.info('CallKit', `call success, result: ${JSON.stringify(result)}`);

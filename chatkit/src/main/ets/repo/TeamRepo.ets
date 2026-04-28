@@ -9,6 +9,10 @@ import {
   V2NIMAntispamConfig,
   V2NIMCreateTeamParams,
   V2NIMCreateTeamResult,
+  V2NIMMessage,
+  V2NIMMessageNotificationAttachment,
+  V2NIMMessageNotificationType,
+  V2NIMMessageType,
   V2NIMSearchTeamMemberParams,
   V2NIMTeam,
   V2NIMTeamAgreeMode,
@@ -33,13 +37,42 @@ import {
 } from '@nimsdk/base'
 import HashMap from '@ohos.util.HashMap'
 import { ChatKitClient } from '../ChatKitClient'
+import { IMKitConfigCenter } from '../IMKitConfigCenter'
 import { TeamMemberResult, TeamMemberWithUser } from '../model/TeamMemberWithUser'
 import { NEFriendUserCache } from '../NEFriendUserCache'
+import { buildTeamCreateInviteLocalExtension } from '../utils/TeamInviteNotificationUtils'
+import { isDiscussionTeamByServerExtension } from '../utils/TopStickyPermissionUtils'
+import { ChatRepo } from './ChatRepo'
+import { ConversationRepo } from './ConversationRepo'
 import { ContactRepo } from './ContactRepo'
+import { LocalConversationRepo } from './LocalConversationRepo'
 
+export function getTeamCreateInviteNotificationType(teamType: V2NIMTeamType): V2NIMMessageNotificationType {
+  return teamType === V2NIMTeamType.V2NIM_TEAM_TYPE_SUPER
+    ? V2NIMMessageNotificationType.V2NIM_MESSAGE_NOTIFICATION_TYPE_SUPER_TEAM_INVITE
+    : V2NIMMessageNotificationType.V2NIM_MESSAGE_NOTIFICATION_TYPE_TEAM_INVITE
+}
 
-interface TeamExtension {
-  im_ui_kit_group: boolean
+export function buildTeamCreateInviteNotificationAttachment(teamType: V2NIMTeamType,
+  inviteeAccountIds: string[]): V2NIMMessageNotificationAttachment {
+  const attachment = {
+    type: getTeamCreateInviteNotificationType(teamType),
+    targetIds: [...inviteeAccountIds]
+  } as V2NIMMessageNotificationAttachment
+  attachment.raw = JSON.stringify(attachment)
+  return attachment
+}
+
+export function getCreateTeamSuccessTipResourceName(createTeamParams: V2NIMCreateTeamParams): string | undefined {
+  if (createTeamParams.teamType !== V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL) {
+    return undefined
+  }
+
+  if (isDiscussionTeamByServerExtension(createTeamParams.serverExtension)) {
+    return undefined
+  }
+
+  return 'createAdvancedTeamSuccess'
 }
 
 export class TeamRepo {
@@ -84,18 +117,7 @@ export class TeamRepo {
    * @returns
    */
   static isGroupTeam(team: V2NIMTeam) {
-    if (team.serverExtension && team.serverExtension.length > 0) {
-      try {
-        let obj = JSON.parse(team.serverExtension) as object | undefined
-        if (obj && obj['im_ui_kit_group'] === true) {
-          return true
-        }
-      } catch (e) {
-        console.error('TeamRepo isGroupTeam json parse error')
-      }
-
-    }
-    return false
+    return isDiscussionTeamByServerExtension(team.serverExtension)
   }
 
   /**
@@ -112,9 +134,9 @@ export class TeamRepo {
     let createParams: V2NIMCreateTeamParams = {
       name: TeamRepo.getTeamNameByMemberId(inviteeAccountIds),
       teamType: V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
-      joinMode: V2NIMTeamJoinMode.V2NIM_TEAM_JOIN_MODE_FREE,
+      joinMode: IMKitConfigCenter.teamJoinMode,
       inviteMode: V2NIMTeamInviteMode.V2NIM_TEAM_INVITE_MODE_MANAGER,
-      agreeMode: V2NIMTeamAgreeMode.V2NIM_TEAM_AGREE_MODE_NO_AUTH,
+      agreeMode: IMKitConfigCenter.teamAgreeMode,
       updateInfoMode: V2NIMTeamUpdateInfoMode.V2NIM_TEAM_UPDATE_INFO_MODE_MANAGER,
       updateExtensionMode: V2NIMTeamUpdateExtensionMode.V2NIM_TEAM_UPDATE_EXTENSION_MODE_MANAGER,
       avatar: TeamRepo.teamDefaultIcons[Math.floor(Math.random() * 5)]
@@ -144,8 +166,79 @@ export class TeamRepo {
     inviteeAccountIds?: string[],
     postscript?: string,
     antispamConfig?: V2NIMAntispamConfig): Promise<V2NIMCreateTeamResult | undefined> {
-    return await ChatKitClient.nim.teamService?.createTeam(createTeamParams, inviteeAccountIds, postscript,
+    const result = await ChatKitClient.nim.teamService?.createTeam(createTeamParams, inviteeAccountIds, postscript,
       antispamConfig)
+    await TeamRepo.ensureTeamConversationCreated(result?.team)
+    await TeamRepo.insertCreateTeamSuccessTip(result, createTeamParams)
+    await TeamRepo.insertCreateTeamInviteNotification(result, createTeamParams.teamType, inviteeAccountIds)
+    return result
+  }
+
+  private static async ensureTeamConversationCreated(team?: V2NIMTeam): Promise<void> {
+    if (!team) {
+      return
+    }
+
+    const conversationId = team.teamType === V2NIMTeamType.V2NIM_TEAM_TYPE_SUPER
+      ? ChatKitClient.nim.conversationIdUtil.superTeamConversationId(team.teamId)
+      : ChatKitClient.nim.conversationIdUtil.teamConversationId(team.teamId)
+
+    try {
+      if (IMKitConfigCenter.enableLocalConversation) {
+        await LocalConversationRepo.createConversation(conversationId)
+      } else {
+        await ConversationRepo.createConversation(conversationId)
+      }
+    } catch (err) {
+      console.error('ensureTeamConversationCreated error: ' + JSON.stringify(err))
+    }
+  }
+
+  private static async insertCreateTeamInviteNotification(result: V2NIMCreateTeamResult | undefined,
+    teamType: V2NIMTeamType,
+    inviteeAccountIds?: string[]): Promise<void> {
+    if (!result?.team || !inviteeAccountIds || inviteeAccountIds.length === 0) {
+      return
+    }
+
+    const message: V2NIMMessage = ChatRepo.createTipsMessage('')
+    message.messageType = V2NIMMessageType.V2NIM_MESSAGE_TYPE_NOTIFICATION
+    message.text = ''
+    message.attachment = buildTeamCreateInviteNotificationAttachment(result.team.teamType ?? teamType,
+      inviteeAccountIds)
+    message.localExtension = buildTeamCreateInviteLocalExtension()
+
+    const conversationId = result.team.teamType === V2NIMTeamType.V2NIM_TEAM_TYPE_SUPER
+      ? ChatKitClient.nim.conversationIdUtil.superTeamConversationId(result.team.teamId)
+      : ChatKitClient.nim.conversationIdUtil.teamConversationId(result.team.teamId)
+
+    await ChatRepo.insertMessageToLocal(message,
+      conversationId,
+      ChatKitClient.getLoginUserId(),
+      result.team.createTime || Date.now())
+  }
+
+  private static async insertCreateTeamSuccessTip(result: V2NIMCreateTeamResult | undefined,
+    createTeamParams: V2NIMCreateTeamParams): Promise<void> {
+    if (!result?.team) {
+      return
+    }
+
+    const resourceName = getCreateTeamSuccessTipResourceName(createTeamParams)
+    if (!resourceName) {
+      return
+    }
+
+    const text = getContext().resourceManager.getStringByNameSync(resourceName)
+    const message: V2NIMMessage = ChatRepo.createTipsMessage(text)
+    const conversationId = result.team.teamType === V2NIMTeamType.V2NIM_TEAM_TYPE_SUPER
+      ? ChatKitClient.nim.conversationIdUtil.superTeamConversationId(result.team.teamId)
+      : ChatKitClient.nim.conversationIdUtil.teamConversationId(result.team.teamId)
+    const createTime = result.team.createTime && result.team.createTime > 0
+      ? result.team.createTime - 1
+      : Date.now()
+
+    await ChatRepo.insertMessageToLocal(message, conversationId, ChatKitClient.getLoginUserId(), createTime)
   }
 
   /**
@@ -189,6 +282,16 @@ export class TeamRepo {
    */
   static async getTeamInfo(teamId: string, teamType: V2NIMTeamType): Promise<V2NIMTeam | undefined> {
     return await ChatKitClient.nim.teamService?.getTeamInfo(teamId, teamType)
+  }
+
+  /**
+   * 从云端获取群组信息
+   *
+   * @param teamId 群组id
+   * @param teamType 群组类型
+   */
+  static async getTeamInfoFromCloud(teamId: string, teamType: V2NIMTeamType): Promise<V2NIMTeam | undefined> {
+    return await ChatKitClient.nim.teamService?.getTeamInfoFromCloud(teamId, teamType)
   }
 
   /**

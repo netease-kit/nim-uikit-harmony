@@ -85,6 +85,22 @@
       "value": "回复 | "
     },
     {
+      "name": "chat_operation_collection",
+      "value": "收藏"
+    },
+    {
+      "name": "chat_message_top_sticky",
+      "value": "置顶"
+    },
+    {
+      "name": "chat_message_un_top_sticky",
+      "value": "取消置顶"
+    },
+    {
+      "name": "chat_top_no_permission",
+      "value": "没有权限进行此操作"
+    },
+    {
       "name": "chat_reply_not_exist",
       "value": "该消息已撤回或删除"
     },
@@ -93,12 +109,12 @@
       "value": "转发"
     },
     {
-      "name": "chat_operation_multi_select",
-      "value": "多选"
+      "name": "chat_operation_translate",
+      "value": "翻译"
     },
     {
-      "name": "chat_operation_collection",
-      "value": "收藏"
+      "name": "chat_operation_multi_select",
+      "value": "多选"
     },
     {
       "name": "chat_collection_success",
@@ -265,6 +281,22 @@
       "value": "群禁言已开启"
     },
     {
+      "name": "chat_team_agree_mode_on",
+      "value": "开启了入群邀请需要同意"
+    },
+    {
+      "name": "chat_team_agree_mode_off",
+      "value": "关闭了入群邀请需要同意"
+    },
+    {
+      "name": "chat_team_join_mode_on",
+      "value": "开启了入群审核"
+    },
+    {
+      "name": "chat_team_join_mode_off",
+      "value": "关闭了入群审核"
+    },
+    {
       "name": "chat_permission_camera_desc",
       "value": "用于发送图片和视频消息"
     },
@@ -322,7 +354,7 @@
     },
     {
       "name": "chat_network_error_tips",
-      "value": "当前网络不可用，请检查你的网络设置。"
+      "value": "当前网络异常，请检查你的网络设置"
     },
     {
       "name": "chat_pin_limit_error_tips",
@@ -443,6 +475,22 @@
     {
       "name": "chat_team_at_permission_all_tips",
       "value": "更新@所有人权限更新为所有人"
+    },
+    {
+      "name": "chat_team_top_sticky_tips",
+      "value": " 置顶了一条消息"
+    },
+    {
+      "name": "chat_team_un_top_sticky_tips",
+      "value": " 移除了置顶消息"
+    },
+    {
+      "name": "chat_team_top_permission_all_tips",
+      "value": "置顶消息权限更新为所有人"
+    },
+    {
+      "name": "chat_team_top_permission_manager_tips",
+      "value": "置顶消息权限更新为群主和管理员"
     },
     {
       "name": "chat_message_empty_notification_text",
@@ -631,6 +679,74 @@
     {
       "name": "search_date_month_12",
       "value": "12月"
+    },
+    {
+      "name": "chat_typing_indicator",
+      "value": "正在输入中..."
+    },
+    {
+      "name": "chat_not_friend_call_tip",
+      "value": "非好友暂不支持音视频通话"
+    },
+    {
+      "name": "rich_text_title_placeholder",
+      "value": "请输入标题"
+    },
+    {
+      "name": "rich_text_body_placeholder_prefix",
+      "value": "发送给 "
+    },
+    {
+      "name": "multiline_title_placeholder",
+      "value": "请输入标题"
+    },
+    {
+      "name": "chat_message_action_voice_play_earphone",
+      "value": "听筒播放"
+    },
+    {
+      "name": "chat_message_action_voice_play_speaker",
+      "value": "扬声器"
+    },
+    {
+      "name": "chat_message_audio_earphone_tip",
+      "value": "切换听筒播放模式，请贴近手机聆听"
+    },
+    {
+      "name": "chat_message_audio_speaker_tip",
+      "value": "扬声器播放"
+    },
+    {
+      "name": "chat_message_voice_to_text",
+      "value": "转文字"
+    },
+    {
+      "name": "chat_message_voice_to_text_failed",
+      "value": "转文字失败"
+    },
+    {
+      "name": "chat_translation_loading",
+      "value": "翻译中..."
+    },
+    {
+      "name": "chat_translation_failed_retry",
+      "value": "翻译失败，点击重试"
+    },
+    {
+      "name": "chat_translation_tag",
+      "value": "译文"
+    },
+    {
+      "name": "chat_translation_action_hide",
+      "value": "隐藏"
+    },
+    {
+      "name": "chat_translation_action_switch_language",
+      "value": "切换语言"
+    },
+    {
+      "name": "chat_message_voice_too_long",
+      "value": "语音过长，无法转换"
     }
   ]
 }

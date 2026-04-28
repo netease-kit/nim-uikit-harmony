@@ -50,6 +50,8 @@ export class ChatConst {
   static readonly revokeMsgTextKey: string = 'revoke_message_local_content';
   // 消息撤回本地存储，撤回的消息是否为编辑状态
   static readonly revokeMsgEditKey: string = 'revoke_message_local_edit';
+  // 消息撤回本地存储，撤回的消息附件（用于自定义消息如富文本消息）
+  static readonly revokeMsgAttachmentKey: string = 'revoke_message_attachment';
   // 消息删除限制
   static readonly messageDeleteLimit: number = 50;
 }

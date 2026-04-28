@@ -5,7 +5,11 @@
  *
  */
 
-import { ChatKitClient } from '@nimkit/chatkit';
+import {
+  ChatKitClient,
+  isLocalTeamCreateInviteMessage,
+  shouldCollapseTeamCreateInviteNotifications
+} from '@nimkit/chatkit';
 import { V2NIMMessagePin } from '@nimsdk/base';
 import { V2NIMMessage, V2NIMMessageSendingState } from '@nimsdk/base/src/main/ets/nim/sdk/V2NIMMessageService';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
@@ -23,6 +27,9 @@ export class ChatInfo {
   @Trace msgPinMap: Map<string, V2NIMMessagePin> = new Map();
   conversationId: string = '';
   targetId: string = '';
+  // 语音转文字结果缓存：clientId -> voiceToText
+  // 用于从历史记录/标记列表页面回来时恢复转文字结果
+  voiceToTextCache: Map<string, string> = new Map();
 
   constructor(conversationId: string) {
     this.conversationId = conversationId;
@@ -117,6 +124,26 @@ export class ChatInfo {
     })
   }
 
+  /**
+   * 缓存语音转文字结果
+   * @param clientId 消息客户端 ID
+   * @param voiceToText 转文字结果
+   */
+  cacheVoiceToText(clientId: string, voiceToText: string) {
+    this.voiceToTextCache.set(clientId, voiceToText)
+  }
+
+  /**
+   * 从缓存恢复语音转文字结果
+   * @param msgInfo 消息信息
+   */
+  restoreVoiceToTextFromCache(msgInfo: NIMMessageInfo) {
+    const cachedText = this.voiceToTextCache.get(msgInfo.message.messageClientId)
+    if (cachedText) {
+      msgInfo.voiceToText = cachedText
+    }
+  }
+
   removePinMessage(pinMsg: V2NIMMessagePin[]) {
     pinMsg.forEach(pin => {
       this.msgPinMap.delete(pin.messageRefer.messageClientId)
@@ -143,6 +170,11 @@ export class ChatInfo {
   }
 
   insertMessage(message: V2NIMMessage): NIMMessageInfo {
+    const duplicateHandled = this.handleTeamCreateInviteDuplicate(message)
+    if (duplicateHandled !== undefined) {
+      return duplicateHandled
+    }
+
     let addIndex = this.msgList.searchInsertPosition(message.createTime)
     if (addIndex > this.msgList.totalCount()) {
       let result: NIMMessageInfo = this.pushMessage(message)
@@ -156,6 +188,8 @@ export class ChatInfo {
       let msgInfo = new NIMMessageInfo(message)
       msgInfo.setLastMessageTime(lastMessageTime)
       this.updateMessageReadReceipt(msgInfo)
+      // 从缓存恢复语音转文字结果
+      this.restoreVoiceToTextFromCache(msgInfo)
       this.msgMap.set(message.messageClientId, msgInfo)
       if (this.msgPinMap.has(message.messageClientId)) {
         msgInfo.setPinMessage(this.msgPinMap.get(message.messageClientId))
@@ -180,6 +214,12 @@ export class ChatInfo {
     if (current !== undefined) {
       return current;
     }
+
+    const duplicateHandled = this.handleTeamCreateInviteDuplicate(message)
+    if (duplicateHandled !== undefined) {
+      return duplicateHandled
+    }
+
     let lastMessageTime = 0
     if (this.msgList.totalCount() > 0) {
       lastMessageTime = this.msgList.getMessageList()[this.msgList.totalCount() - 1]?.message.createTime;
@@ -187,6 +227,8 @@ export class ChatInfo {
     let msgInfo = new NIMMessageInfo(message)
     msgInfo.setLastMessageTime(lastMessageTime)
     this.updateMessageReadReceipt(msgInfo)
+    // 从缓存恢复语音转文字结果
+    this.restoreVoiceToTextFromCache(msgInfo)
     this.msgList.push(msgInfo);
     this.msgMap.set(message.messageClientId, msgInfo)
     if (this.msgPinMap.has(message.messageClientId)) {
@@ -219,6 +261,7 @@ export class ChatInfo {
     let lastMessageTime = this.msgList.getMessageList()[this.msgList.totalCount() - 1]?.message.createTime;
     msgInfo.setLastMessageTime(lastMessageTime)
     this.updateMessageReadReceipt(msgInfo)
+    this.restoreVoiceToTextFromCache(msgInfo)
     this.msgMap.set(msgInfo.message.messageClientId, msgInfo)
     if (this.msgPinMap.has(msgInfo.message.messageClientId)) {
       msgInfo.setPinMessage(this.msgPinMap.get(msgInfo.message.messageClientId))
@@ -229,10 +272,17 @@ export class ChatInfo {
   unshiftMessage(messageList: V2NIMMessage[]): NIMMessageInfo[] {
     let result: NIMMessageInfo[] = [];
     for (let index = 0; index < messageList.length; index++) {
+      const duplicateHandled = this.handleTeamCreateInviteDuplicate(messageList[index])
+      if (duplicateHandled !== undefined) {
+        result.push(duplicateHandled)
+        continue
+      }
+
       let msg = new NIMMessageInfo(messageList[index]);
       if (index < messageList.length - 1) {
         msg.setLastMessageTime(messageList[index+1].createTime);
       }
+      this.restoreVoiceToTextFromCache(msg)
       this.msgMap.set(msg.message.messageClientId, msg)
       if (this.msgPinMap.has(msg.message.messageClientId)) {
         msg.setPinMessage(this.msgPinMap.get(msg.message.messageClientId))
@@ -251,6 +301,8 @@ export class ChatInfo {
     }
     this.msgList.delete(msgClientId)
     this.msgMap.delete(msgClientId)
+    // 清理语音转文字缓存
+    this.voiceToTextCache.delete(msgClientId)
   }
 
   revokeMessage(msgClientId: string) {
@@ -268,6 +320,47 @@ export class ChatInfo {
   public cleanMessage() {
     this.msgList.clean()
     this.msgMap.clear()
+  }
+
+  private handleTeamCreateInviteDuplicate(message: V2NIMMessage): NIMMessageInfo | undefined {
+    const duplicateMessage = this.findTeamCreateInviteDuplicate(message)
+    if (!duplicateMessage) {
+      return undefined
+    }
+
+    if (isLocalTeamCreateInviteMessage(message)) {
+      return duplicateMessage
+    }
+
+    return this.replaceMessageInfo(duplicateMessage, message)
+  }
+
+  private findTeamCreateInviteDuplicate(message: V2NIMMessage): NIMMessageInfo | undefined {
+    return this.msgList.getMessageList().find((item) => {
+      return shouldCollapseTeamCreateInviteNotifications(item.message, message)
+    })
+  }
+
+  private replaceMessageInfo(oldMessage: NIMMessageInfo, message: V2NIMMessage): NIMMessageInfo {
+    const oldClientId = oldMessage.message.messageClientId
+    const index = this.msgList.searchPosition(oldClientId)
+    if (index < 0) {
+      return oldMessage
+    }
+
+    const messageInfo = new NIMMessageInfo(message)
+    messageInfo.setLastMessageTime(oldMessage.lastMessageTime)
+    this.updateMessageReadReceipt(messageInfo)
+    this.restoreVoiceToTextFromCache(messageInfo)
+    if (this.msgPinMap.has(message.messageClientId)) {
+      messageInfo.setPinMessage(this.msgPinMap.get(message.messageClientId))
+    }
+
+    this.msgMap.delete(oldClientId)
+    this.voiceToTextCache.delete(oldClientId)
+    this.msgMap.set(message.messageClientId, messageInfo)
+    this.msgList.replaceData(index, messageInfo)
+    return messageInfo
   }
 }
 

@@ -50,6 +50,12 @@ struct FileMessageActionDialog {
     this.controller?.close()
   }
 
+  private getDialogHeight(): number {
+    const actionCount = IMKitConfigCenter.enableCollection ? 3 : 2
+    const dividerHeight = IMKitConfigCenter.enableCollection ? 1 : 0
+    return 42 * actionCount + 10 + dividerHeight
+  }
+
   build() {
     Column() {
       Column() {
@@ -63,18 +69,20 @@ struct FileMessageActionDialog {
           .onClick(this.forwardFile)
 
 
-        Row()
-          .height(1)
-          .width('100%')
-          .backgroundColor('#EFF1F4')
+        if (IMKitConfigCenter.enableCollection) {
+          Row()
+            .height(1)
+            .width('100%')
+            .backgroundColor('#EFF1F4')
 
-        Text($r('app.string.chat_operation_collection'))
-          .fontSize(14)
-          .fontColor('#333333')
-          .textAlign(TextAlign.Center)
-          .height(42)
-          .width('100%')
-          .onClick(this.collectMessage)
+          Text($r('app.string.chat_operation_collection'))
+            .fontSize(14)
+            .fontColor('#333333')
+            .textAlign(TextAlign.Center)
+            .height(42)
+            .width('100%')
+            .onClick(this.collectMessage)
+        }
 
       }
       .width('100%')
@@ -97,7 +105,7 @@ struct FileMessageActionDialog {
       .borderRadius(12)
       .margin({ top: 10, left: 12, right: 12 })
     }
-    .height(42 * 4 + 10 + 2)
+    .height(this.getDialogHeight())
     .backgroundColor(Color.Transparent)
   }
 }
@@ -271,6 +279,9 @@ export struct ChatSearchFileMessagePage {
   private listScroller: Scroller = new Scroller()
   //收藏
   collectMessage = async () => {
+    if (!IMKitConfigCenter.enableCollection) {
+      return
+    }
     if (this.tapMessage && this.chatInfo) {
       const senderId = this.tapMessage.message.senderId
       let senderName: string = ''
@@ -405,7 +416,7 @@ export struct ChatSearchFileMessagePage {
     this.fileActionDialog = new CustomDialogController({
       builder: FileMessageActionDialog({
         message: this.tapMessage,
-        onMessageCollect: this.collectMessage,
+        onMessageCollect: IMKitConfigCenter.enableCollection ? this.collectMessage : undefined,
         onMessageForward: this.forwardMessage
       }),
       cornerRadius: 0,

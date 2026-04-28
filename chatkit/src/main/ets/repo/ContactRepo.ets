@@ -6,6 +6,7 @@
  */
 
 import { HashMap } from '@kit.ArkTS';
+import { common } from '@kit.AbilityKit';
 import { initalLetter } from '@nimkit/common';
 import {
   V2NIMCheckFriendResult,
@@ -28,8 +29,19 @@ import { NEUserWithFriend } from '../model/NEUserWithFriend';
 import { NEFriendUserCache } from '../NEFriendUserCache';
 
 export class ContactRepo {
-  public static listener = getContext(this).eventHub
+  private static _listener: common.EventHub | undefined = undefined
   public static pinyinHasMap: HashMap<string, string> = new HashMap()
+
+  /**
+   * 获取 EventHub 实例（懒加载）
+   * 注意：不能在模块初始化时调用 getContext()，需要延迟到运行时获取
+   */
+  public static get listener(): common.EventHub {
+    if (!ContactRepo._listener) {
+      ContactRepo._listener = getContext().eventHub
+    }
+    return ContactRepo._listener
+  }
 
   static onBlockListAddedFun = async (user: V2NIMUser) => {
     NEFriendUserCache.getInstance().addBlockAccount(user.accountId)

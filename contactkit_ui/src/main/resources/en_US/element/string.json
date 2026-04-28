@@ -201,6 +201,98 @@
       "value": "Friend limit has been reached"
     },
     {
+      "name": "team_search_title",
+      "value": "Search Team"
+    },
+    {
+      "name": "team_search_placeholder",
+      "value": "Enter team ID"
+    },
+    {
+      "name": "team_profile_title",
+      "value": "Team Profile"
+    },
+    {
+      "name": "team_profile_id",
+      "value": "Team ID"
+    },
+    {
+      "name": "team_profile_intro",
+      "value": "Introduction"
+    },
+    {
+      "name": "team_profile_owner",
+      "value": "Owner"
+    },
+    {
+      "name": "team_profile_join",
+      "value": "Join Team"
+    },
+    {
+      "name": "team_profile_chat",
+      "value": "Chat"
+    },
+    {
+      "name": "team_apply_join_tip",
+      "value": "Application submitted, waiting for approval"
+    },
+    {
+      "name": "team_apply_join_error",
+      "value": "Failed to apply"
+    },
+    {
+      "name": "team_member_limit_tip",
+      "value": "Team member limit reached"
+    },
+    {
+      "name": "joined_team_limit_tip",
+      "value": "Joined team limit reached"
+    },
+    {
+      "name": "already_in_team_tip",
+      "value": "Already in the group"
+    },
+    {
+      "name": "no_permission_tip",
+      "value": "No permission"
+    },
+    {
+      "name": "team_not_exist_tip",
+      "value": "Team does not exist"
+    },
+    {
+      "name": "team_verify_title",
+      "value": "Team Verification"
+    },
+    {
+      "name": "team_verify_empty",
+      "value": "No verification messages"
+    },
+    {
+      "name": "team_verify_application",
+      "value": "Apply to join"
+    },
+    {
+      "name": "team_verify_invitation",
+      "value": "Invite to join"
+    },
+    {
+      "name": "team_verify_accept_application",
+      "value": "Accepted the join application"
+    },
+    {
+      "name": "team_verify_reject_application",
+      "value": "Rejected the join application"
+    },
+    {
+      "name": "team_verify_accept_invitation",
+      "value": "Accepted the join invitation"
+    },
+    {
+      "name": "team_verify_reject_invitation",
+      "value": "Rejected the join invitation"
+    },
+    {
       "name": "contact_my_bots",
       "value": "My Bots"
     },
@@ -371,6 +463,14 @@
     {
       "name": "bot_token_empty_tip",
       "value": "Please refresh Token first"
+    },
+    {
+      "name": "verify_tab_friend",
+      "value": "Friend"
+    },
+    {
+      "name": "verify_tab_team",
+      "value": "Team"
     }
   ]
 }

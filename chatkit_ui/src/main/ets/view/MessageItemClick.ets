@@ -25,4 +25,6 @@ export interface MessageItemClick {
   onReplyClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void
   // 发送失败点击
   onSendFailClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void
+  // 长按译文区域
+  onTranslatedAreaLongClick?: (event: GestureEvent, msg: NIMMessageInfo | undefined) => void
 }

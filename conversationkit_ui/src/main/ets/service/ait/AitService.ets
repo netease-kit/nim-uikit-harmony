@@ -6,7 +6,8 @@
  */
 import { ChatRepo, getAitModelFromJson } from '@nimkit/chatkit';
 import { ChatKitClient, currentConversationChanged } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
-import { V2NIMConversation, V2NIMConversationType, V2NIMLocalConversation, V2NIMMessage, V2NIMMessageRevokeNotification } from '@nimsdk/base';
+import { V2NIMConversationType, V2NIMMessage, V2NIMMessageRevokeNotification } from '@nimsdk/base';
+import { ConversationItem, ConversationMode } from '../../strategy/ConversationStrategy';
 import { AitDatabase } from './AitDatabaseHelper';
 
 export const AitSessionChangeEvent: string = 'AitSessionChangeEvent'
@@ -29,45 +30,55 @@ export class AitServer {
   private aitConversationMap: Map<string, Set<string>> = new Map()
   /// 当前会话id, 用于判断是否需要保存@消息
   private _currentSessionId: string | null = null;
+  private commonListenerInitialized: boolean = false
+  private unreadListenerModes: Set<ConversationMode> = new Set()
 
-  public init() {
-    this.initListener()
+  public init(mode: ConversationMode = ConversationMode.CLOUD) {
+    this.initListener(mode)
   }
 
-  private initListener(): void {
+  private initListener(mode: ConversationMode): void {
+    if (!this.commonListenerInitialized) {
+      this.commonListenerInitialized = true
+      getContext().eventHub.on(currentConversationChanged, (conversationId: string) => {
+        this._currentSessionId = conversationId
+        if (conversationId.length > 0) {
+          this.clearAitMessage(conversationId)
+          this.aitConversationMap.delete(conversationId)
+          this.sendAitChange({
+            sessionId: conversationId,
+            messageId: undefined,
+            isAit: false
+          })
+        }
+      })
 
-    //当前会话设置变更的回到
-    getContext().eventHub.on(currentConversationChanged, (conversationId: string) => {
-      this._currentSessionId = conversationId
-      if (conversationId.length > 0) {
-        this.clearAitMessage(conversationId)
-        this.aitConversationMap.delete(conversationId)
-        this.sendAitChange({
-          sessionId: conversationId,
-          messageId: undefined,
-          isAit: false
-        })
-      }
-    })
+      ChatRepo.onReceiverMessage(this.onReceiveFun.bind(this))
+      ChatRepo.onRevokeMessage(this.onRevokeFun.bind(this))
+    }
 
-    // 注册消息接受监听
-    ChatRepo.onReceiverMessage(this.onReceiveFun.bind(this))
+    if (this.unreadListenerModes.has(mode)) {
+      return
+    }
 
-    // 注册消息撤回监听
-    ChatRepo.onRevokeMessage(this.onRevokeFun.bind(this))
+    this.unreadListenerModes.add(mode)
+    if (mode === ConversationMode.LOCAL) {
+      ChatKitClient.nim.localConversationService?.on('onConversationChanged', (updateList: ConversationItem[]) => {
+        this.handleConversationUnreadChanged(updateList)
+      })
+      return
+    }
 
-    //云端会话已读未读数的变化（其他端 clearUnread 时触发）
-    ChatKitClient.nim.conversationService?.on('onConversationChanged', (updateList: V2NIMConversation[]) => {
+    ChatKitClient.nim.conversationService?.on('onConversationChanged', (updateList: ConversationItem[]) => {
       this.handleConversationUnreadChanged(updateList)
     })
   }
 
   /**
    * 处理会话未读数变化，当未读数为0时清除@消息
-   * 支持云端会话和本地会话
    * @param updateList 变化的会话列表
    */
-  private handleConversationUnreadChanged(updateList: (V2NIMConversation | V2NIMLocalConversation)[]): void {
+  private handleConversationUnreadChanged(updateList: ConversationItem[]): void {
     updateList.forEach((conversation) => {
       if (conversation.unreadCount === 0 &&
       this.aitConversationMap.has(conversation.conversationId)) {

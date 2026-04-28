@@ -11,11 +11,16 @@ import { inputMethod } from '@kit.IMEKit';
 import { V2NIMTeam } from '@nimsdk/base';
 import { ChatAitDialog } from './ChatAitDialog';
 import { TeamMemberCache } from '@nimkit/chatkit/src/main/ets/cache/TeamMemberCache';
-import { accountAll, ChatKitClient, ContactRepo, TeamMemberWithUser } from '@nimkit/chatkit';
+import { accountAll, ChatKitClient, ContactRepo, IMKitConfigCenter, TeamMemberWithUser } from '@nimkit/chatkit';
 import { AitManager } from '../manager/ait/AitManager';
 import { getReplyMessageText, getReplyMessageTitle, parseMessageText, sliceMessageText } from '../common/MessageHelper';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { ChatInfo } from '../model/ChatInfo';
+import {
+  collectRichInputTransferNodes,
+  RichInputTransferNode,
+  splitSingleLineTransferNodes
+} from '../common/InputTransferUtils';
 
 export enum InputStyleType {
   // 底部无内容
@@ -26,6 +31,8 @@ export enum InputStyleType {
   Record = 3,
   // 更多面板展示
   More = 4,
+  // 多行输入模式（换行消息）
+  Multiline = 5,
 }
 
 @ComponentV2
@@ -46,6 +53,12 @@ export struct NEChatInputView {
   onDidClickMore?: () => void;
   @Param @Require
   onDidClickCloseReply?: () => void;
+  /**
+   * 输入框内容变化回调（用于"正在输入"功能）
+   * @param hasText true 表示输入框有内容，false 表示输入框为空
+   */
+  @Param
+  onInputTextChange: (hasText: boolean) => void = (_: boolean) => { /* nothing*/ };
   @Param inputStyle: InputStyleType = InputStyleType.None;
   @Param @Require
   controller?: RichEditorController;
@@ -70,6 +83,50 @@ export struct NEChatInputView {
   replyMsg: NIMMessageInfo | undefined = undefined
   @Param
   chatInfo: ChatInfo | undefined = undefined
+  /**
+   * 会话名称（用于多行模式 placeholder）
+   */
+  @Param
+  conversationName: string = ''
+  /**
+   * 发送多行消息回调
+   */
+  @Param
+  onSendMultiLineMessage?: (title: string, body: string) => void = undefined
+  /**
+   * 多行模式切换回调
+   * @param isMultiline 是否切换到多行模式
+   * @param transferTitle 切换时传递的标题（单行->多行：单行第一行；多行->单行：标题）
+   * @param transferBody 切换时传递的正文（单行->多行：单行第二行起；多行->单行：正文内容）
+   * @param transferBodyNodes 切换时传递的正文富文本节点（用于保留 emoji / @ 信息）
+   */
+  @Param
+  onMultilineModeChange?: (
+    isMultiline: boolean,
+    transferTitle?: string,
+    transferBody?: string,
+    transferBodyNodes?: RichInputTransferNode[]
+  ) => void = undefined
+  /**
+   * 撤回重编辑恢复多行内容的回调
+   * 页面收到回调后设置自己的 multiLineTitle 和 multiLineBody
+   */
+  @Param
+  onRestoreMultiLineContent?: (title: string, body: string) => void = undefined
+  /**
+   * 撤回重编辑时恢复的多行内容（外部传入）
+   * 格式: { title: string, body: string } 的 JSON 字符串
+   */
+  @Param
+  revokeMultiLineContent: string = ''
+  /**
+   * 多行模式下的标题内容
+   */
+  @Local multiLineTitle: string = ''
+  /**
+   * 多行模式下的正文内容
+   */
+  @Local multiLineBody: string = ''
   /**
    * @弹框
    */
@@ -287,6 +344,121 @@ export struct NEChatInputView {
     return true;
   }
 
+  /**
+   * 获取单行输入框的文本内容
+   */
+  getSingleLineTransferNodes(): RichInputTransferNode[] {
+    const spans = this.controller?.getSpans() ?? []
+    return collectRichInputTransferNodes(spans, this.builderSpans)
+  }
+
+  /**
+   * 切换到多行输入模式
+   * 单行 → 多行转换规则：
+   * - 单行只有一行时 → 转到正文（不设置标题）
+   * - 单行有多行时 → 第一行 → 标题，第二行起 → 正文
+   */
+  switchToMultilineMode() {
+    inputMethod.getController().stopInputSession()
+    const transferNodes = this.getSingleLineTransferNodes()
+    const transferPayload = splitSingleLineTransferNodes(transferNodes)
+    // 清空单行输入框
+    this.controller?.deleteSpans()
+    this.builderSpans.splice(0, this.builderSpans.length)
+
+    this.onMultilineModeChange?.(
+      true,
+      transferPayload.title,
+      transferPayload.bodyText,
+      transferPayload.bodyNodes
+    )
+  }
+
+  /**
+   * 收起多行输入模式
+   * 将多行 body 的内容传递回单行输入框
+   */
+  collapseToSingleLine() {
+    // 获取多行 body 内容作为 transferText（标题不传递，只传递 body）
+    const bodyText = this.multiLineBody.trim()
+    // 清空多行内容
+    this.multiLineTitle = ''
+    this.multiLineBody = ''
+    this.onMultilineModeChange?.(false, bodyText)
+  }
+
+  /**
+   * 发送消息（多行模式）
+   */
+  sendMultiLineMessage() {
+    const title = this.multiLineTitle.trim()
+    const body = this.multiLineBody.trim()
+
+    if (title.length === 0 && body.length === 0) {
+      return // 内容为空，不发送
+    }
+
+    if (title.length > 0) {
+      // 有标题，发送多行消息
+      this.onSendMultiLineMessage?.(title, body)
+    } else {
+      // 无标题，仅有正文，发送普通文本消息
+      // 将正文设置到 RichEditor 中然后发送
+      this.controller?.addTextSpan(body)
+      this.onSendTextMessage?.()
+    }
+
+    // 清空并收起
+    this.multiLineTitle = ''
+    this.multiLineBody = ''
+    this.onMultilineModeChange?.(false)
+  }
+
+  /**
+   * 监听撤回重编辑多行内容变化
+   */
+  @Monitor('revokeMultiLineContent')
+  onRevokeMultiLineChanged() {
+    if (this.revokeMultiLineContent && this.revokeMultiLineContent.length > 0) {
+      try {
+        const title = JSON.parse(this.revokeMultiLineContent)['title'] as string ?? ''
+        const body = JSON.parse(this.revokeMultiLineContent)['body'] as string ?? ''
+        // 关闭软键盘
+        inputMethod.getController().stopInputSession()
+        // 通过回调通知页面恢复内容并切换到多行模式
+        if (title && title.length > 0) {
+          this.onRestoreMultiLineContent?.(title, body)
+          this.onMultilineModeChange?.(true, title, body)
+        } else {
+          // 仅有 body，设置到单行输入框
+          this.controller?.addTextSpan(body)
+        }
+      } catch (e) {
+        console.error('onRevokeMultiLineChanged parse error:', e)
+      }
+    }
+  }
+
+  /**
+   * 设置多行内容（用于撤回重编辑）
+   */
+  setMultiLineContent(title: string, body: string) {
+    if (title && title.length > 0) {
+      this.multiLineTitle = title
+      this.multiLineBody = body
+    } else {
+      // 仅设置 body 到单行输入框
+      this.controller?.addTextSpan(body)
+    }
+  }
+
+  /**
+   * 发送按钮是否可用
+   */
+  canSendMultiLine(): boolean {
+    return this.multiLineTitle.trim().length > 0 || this.multiLineBody.trim().length > 0
+  }
+
   build() {
     RelativeContainer() {
       Column() {
@@ -331,148 +503,172 @@ export struct NEChatInputView {
           .width('100%')
         }
 
-        RichEditor({ controller: this.controller })
-          .backgroundColor(this.mute ? $r('app.color.color_chat_mute_bg') : $r('app.color.color_chat_page_bg'))
-          .height(40)
-          .placeholder(this.mute ? $r('app.string.chat_team_all_mute') :
-          $r('app.string.chat_send_tips', this.placeHolder))
-          .onWillChange((value: RichEditorChangeValue) => {
-            console.debug(`ChatInputView onWillChange before: ${value.rangeBefore}`)
-            return true
-          })
-          .aboutToDelete(this.aboutToDelete)
-          .onDidChange((rangeBefore: TextRange, rangeAfter: TextRange) => {
-            console.debug(`ChatInputView onDidChange before ${rangeBefore.start} ~ ${rangeBefore.end} after ${rangeAfter.start} ~ ${rangeAfter.end}`)
-            this.inputSpans = this.controller?.getSpans() ?? []
-          })
-          .onSelectionChange((range: RichEditorRange) => {
-            console.debug(`ChatInputView onSelectionChange ${range.start} ~ ${range.end}`)
-          })
-          .onIMEInputComplete((result: RichEditorTextSpanResult) => {
-            //记录输入内容
-            this.inputSpans = this.controller?.getSpans() ?? []
-            let value = result.value
-            let indexStart: number = result.offsetInSpan[0]
-            //span长度
-            let spanLen = result.offsetInSpan[1] - result.offsetInSpan[0]
-            console.debug(` onIMEInputComplete value = ${value} index = ${indexStart} len = ${spanLen}}`)
-            if (this.teamId && this.teamId.length > 0) {
-              //判断span 长度，解决复制粘贴问题
-              if (spanLen === 1 && value.charAt(indexStart) === "@") {
-                //输入@
-                this.showAitDialog()
+        // 单行输入模式（始终存在，多行模式时隐藏）
+        Stack({ alignContent: Alignment.TopEnd }) {
+          RichEditor({ controller: this.controller })
+            .backgroundColor(this.mute ? $r('app.color.color_chat_mute_bg') : $r('app.color.color_chat_page_bg'))
+            .height(40)
+            .width('100%')
+            .placeholder(this.mute ? $r('app.string.chat_team_all_mute') :
+            $r('app.string.chat_send_tips', this.placeHolder))
+            .onWillChange((value: RichEditorChangeValue) => {
+              console.debug(`ChatInputView onWillChange before: ${value.rangeBefore}`)
+              return true
+            })
+            .aboutToDelete(this.aboutToDelete)
+            .onDidChange((rangeBefore: TextRange, rangeAfter: TextRange) => {
+              console.debug(`ChatInputView onDidChange before ${rangeBefore.start} ~ ${rangeBefore.end} after ${rangeAfter.start} ~ ${rangeAfter.end}`)
+              this.inputSpans = this.controller?.getSpans() ?? []
+              // 通知输入状态变化（用于"正在输入"功能）
+              if (this.onInputTextChange) {
+                const hasText = this.inputSpans.length > 0
+                this.onInputTextChange(hasText)
               }
-
-            }
-          })
-          .borderRadius(8)
-          .id('chat_edit_input')
-          .onSubmit((enterKey: EnterKeyType, event: SubmitEvent) => {
-            if (enterKey == EnterKeyType.Send) {
-              if (this.onSendTextMessage) {
-                this.onSendTextMessage();
-                event.keepEditableState()
-              }
-            }
-          })
-          .enterKeyType(EnterKeyType.Send)
-
-        Row({ space: 0 }) {
-          if (this.inputStyle === InputStyleType.Record) {
-            NEImageButton({
-              image: $r('app.media.ic_public_chat_speaker_select'), onDidClick: (): void => {
-                console.log("net ease click speaker");
-                if (this.onDidClickAudio) {
-                  inputMethod.getController().stopInputSession();
-                  this.onDidClickAudio()
+            })
+            .onSelectionChange((range: RichEditorRange) => {
+              console.debug(`ChatInputView onSelectionChange ${range.start} ~ ${range.end}`)
+            })
+            .onIMEInputComplete((result: RichEditorTextSpanResult) => {
+              //记录输入内容
+              this.inputSpans = this.controller?.getSpans() ?? []
+              let value = result.value
+              let indexStart: number = result.offsetInSpan[0]
+              //span长度
+              let spanLen = result.offsetInSpan[1] - result.offsetInSpan[0]
+              console.debug(` onIMEInputComplete value = ${value} index = ${indexStart} len = ${spanLen}}`)
+              if (this.teamId && this.teamId.length > 0) {
+                //判断span 长度，解决复制粘贴问题
+                if (spanLen === 1 && value.charAt(indexStart) === "@") {
+                  //输入@
+                  this.showAitDialog()
                 }
               }
             })
-              .width('25%')
-              .height(40)
+            .borderRadius(8)
+            .id('chat_edit_input')
+            .onSubmit((enterKey: EnterKeyType, event: SubmitEvent) => {
+              if (enterKey == EnterKeyType.Send) {
+                if (this.onSendTextMessage) {
+                  this.onSendTextMessage();
+                  event.keepEditableState()
+                }
+              }
+            })
+            .enterKeyType(EnterKeyType.Send)
 
-            NEImageButton({
-              image: $r("app.media.ic_public_chat_emoji"), onDidClick: (): void => {
-                console.log("net ease click emoji");
-                if (this.onDidClickEmoji) {
-                  inputMethod.getController().stopInputSession();
-                  this.onDidClickEmoji()
-                }
-              }
-            })
-              .width('25%')
-              .height(40)
+          // 扩展按钮（仅在开关开启且非静音且非多行模式时显示）
+          if (IMKitConfigCenter.enableRichTextMessage && !this.mute && this.inputStyle !== InputStyleType.Multiline) {
+            Image($r('app.media.ic_chat_input_expand'))
+              .width(20)
+              .height(20)
+              .margin({ right: 8, top: 10 })
+              .onClick(() => {
+                this.switchToMultilineMode()
+              })
+          }
+        }
+        .width('100%')
+        .height(40)
+        .visibility(this.inputStyle === InputStyleType.Multiline ? Visibility.None : Visibility.Visible)
 
-            NEImageButton({
-              image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
-                console.log("net ease click image");
-                if (this.onDidClickImage) {
-                  this.onDidClickImage()
+        // 底部工具栏（多行模式下隐藏）
+        if (this.inputStyle !== InputStyleType.Multiline) {
+          Row({ space: 0 }) {
+            if (this.inputStyle === InputStyleType.Record) {
+              NEImageButton({
+                image: $r('app.media.ic_public_chat_speaker_select'), onDidClick: (): void => {
+                  console.log("net ease click speaker");
+                  if (this.onDidClickAudio) {
+                    inputMethod.getController().stopInputSession();
+                    this.onDidClickAudio()
+                  }
                 }
-              }
-            })
-              .width('25%')
-              .height(40)
+              })
+                .width('25%')
+                .height(40)
 
-            NEImageButton({
-              image: $r("app.media.ic_public_chat_more"), onDidClick: (): void => {
-                console.log("net ease click more");
-                if (this.onDidClickMore) {
-                  inputMethod.getController().stopInputSession();
-                  this.onDidClickMore()
+              NEImageButton({
+                image: $r("app.media.ic_public_chat_emoji"), onDidClick: (): void => {
+                  console.log("net ease click emoji");
+                  if (this.onDidClickEmoji) {
+                    inputMethod.getController().stopInputSession();
+                    this.onDidClickEmoji()
+                  }
                 }
-              }
-            })
-              .width('25%')
-              .height(40)
-          } else if (this.inputStyle === InputStyleType.More) {
-            NEImageButton({
-              image: $r('app.media.ic_public_chat_speaker'), onDidClick: (): void => {
-                console.log("net ease click speaker");
-                if (this.onDidClickAudio) {
-                  inputMethod.getController().stopInputSession();
-                  this.onDidClickAudio()
-                }
-              }
-            })
-              .width('25%')
-              .height(40)
+              })
+                .width('25%')
+                .height(40)
 
-            NEImageButton({
-              image: $r("app.media.ic_public_chat_emoji"), onDidClick: (): void => {
-                console.log("net ease click emoji");
-                if (this.onDidClickEmoji) {
-                  inputMethod.getController().stopInputSession();
-                  this.onDidClickEmoji()
+              NEImageButton({
+                image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
+                  console.log("net ease click image");
+                  if (this.onDidClickImage) {
+                    this.onDidClickImage()
+                  }
                 }
-              }
-            })
-              .width('25%')
-              .height(40)
+              })
+                .width('25%')
+                .height(40)
 
-            NEImageButton({
-              image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
-                console.log("net ease click image");
-                if (this.onDidClickImage) {
-                  this.onDidClickImage()
+              NEImageButton({
+                image: $r("app.media.ic_public_chat_more"), onDidClick: (): void => {
+                  console.log("net ease click more");
+                  if (this.onDidClickMore) {
+                    inputMethod.getController().stopInputSession();
+                    this.onDidClickMore()
+                  }
                 }
-              }
-            })
-              .width('25%')
-              .height(40)
+              })
+                .width('25%')
+                .height(40)
+            } else if (this.inputStyle === InputStyleType.More) {
+              NEImageButton({
+                image: $r('app.media.ic_public_chat_speaker'), onDidClick: (): void => {
+                  console.log("net ease click speaker");
+                  if (this.onDidClickAudio) {
+                    inputMethod.getController().stopInputSession();
+                    this.onDidClickAudio()
+                  }
+                }
+              })
+                .width('25%')
+                .height(40)
 
-            NEImageButton({
-              image: $r("app.media.ic_public_chat_more_select"), onDidClick: (): void => {
-                console.log("net ease click more");
-                if (this.onDidClickMore) {
-                  inputMethod.getController().stopInputSession();
-                  this.onDidClickMore()
+              NEImageButton({
+                image: $r("app.media.ic_public_chat_emoji"), onDidClick: (): void => {
+                  console.log("net ease click emoji");
+                  if (this.onDidClickEmoji) {
+                    inputMethod.getController().stopInputSession();
+                    this.onDidClickEmoji()
+                  }
                 }
-              }
-            })
-              .width('25%')
-              .height(40)
-          } else if (this.inputStyle === InputStyleType.Emoji) {
+              })
+                .width('25%')
+                .height(40)
+
+              NEImageButton({
+                image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
+                  console.log("net ease click image");
+                  if (this.onDidClickImage) {
+                    this.onDidClickImage()
+                  }
+                }
+              })
+                .width('25%')
+                .height(40)
+
+              NEImageButton({
+                image: $r("app.media.ic_public_chat_more_select"), onDidClick: (): void => {
+                  console.log("net ease click more");
+                  if (this.onDidClickMore) {
+                    inputMethod.getController().stopInputSession();
+                    this.onDidClickMore()
+                  }
+                }
+              })
+                .width('25%')
+                .height(40)
+            } else if (this.inputStyle === InputStyleType.Emoji) {
             NEImageButton({
               image: $r('app.media.ic_public_chat_speaker'), onDidClick: (): void => {
                 console.log("net ease click speaker");
@@ -497,81 +693,81 @@ export struct NEChatInputView {
               .width('25%')
               .height(40)
 
-            NEImageButton({
-              image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
-                console.log("net ease click image");
-                if (this.onDidClickImage) {
-                  this.onDidClickImage()
+              NEImageButton({
+                image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
+                  console.log("net ease click image");
+                  if (this.onDidClickImage) {
+                    this.onDidClickImage()
+                  }
                 }
-              }
-            })
-              .width('25%')
-              .height(40)
+              })
+                .width('25%')
+                .height(40)
 
-            NEImageButton({
-              image: $r("app.media.ic_public_chat_more"), onDidClick: (): void => {
-                console.log("net ease click more");
-                if (this.onDidClickMore) {
-                  inputMethod.getController().stopInputSession();
-                  this.onDidClickMore()
+              NEImageButton({
+                image: $r("app.media.ic_public_chat_more"), onDidClick: (): void => {
+                  console.log("net ease click more");
+                  if (this.onDidClickMore) {
+                    inputMethod.getController().stopInputSession();
+                    this.onDidClickMore()
+                  }
                 }
-              }
-            })
-              .width('25%')
-              .height(40)
-          } else if (this.inputStyle === InputStyleType.None) {
-            NEImageButton({
-              image: $r('app.media.ic_public_chat_speaker'), onDidClick: (): void => {
-                console.log("net ease click speaker");
-                if (this.onDidClickAudio) {
-                  inputMethod.getController().stopInputSession();
-                  this.onDidClickAudio()
+              })
+                .width('25%')
+                .height(40)
+            } else if (this.inputStyle === InputStyleType.None) {
+              NEImageButton({
+                image: $r('app.media.ic_public_chat_speaker'), onDidClick: (): void => {
+                  console.log("net ease click speaker");
+                  if (this.onDidClickAudio) {
+                    inputMethod.getController().stopInputSession();
+                    this.onDidClickAudio()
+                  }
                 }
-              }
-            })
-              .width('25%')
-              .height(40)
+              })
+                .width('25%')
+                .height(40)
 
-            NEImageButton({
-              image: $r("app.media.ic_public_chat_emoji"), onDidClick: (): void => {
-                console.log("net ease click emoji");
-                if (this.onDidClickEmoji) {
-                  inputMethod.getController().stopInputSession();
-                  this.onDidClickEmoji()
+              NEImageButton({
+                image: $r("app.media.ic_public_chat_emoji"), onDidClick: (): void => {
+                  console.log("net ease click emoji");
+                  if (this.onDidClickEmoji) {
+                    inputMethod.getController().stopInputSession();
+                    this.onDidClickEmoji()
+                  }
                 }
-              }
-            })
-              .width('25%')
-              .height(40)
+              })
+                .width('25%')
+                .height(40)
 
-            NEImageButton({
-              image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
-                console.log("net ease click image");
-                if (this.onDidClickImage) {
-                  this.onDidClickImage()
+              NEImageButton({
+                image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
+                  console.log("net ease click image");
+                  if (this.onDidClickImage) {
+                    this.onDidClickImage()
+                  }
                 }
-              }
-            })
-              .width('25%')
-              .height(40)
+              })
+                .width('25%')
+                .height(40)
 
-            NEImageButton({
-              image: $r("app.media.ic_public_chat_more"), onDidClick: (): void => {
-                console.log("net ease click more");
-                if (this.onDidClickMore) {
-                  inputMethod.getController().stopInputSession();
-                  this.onDidClickMore()
+              NEImageButton({
+                image: $r("app.media.ic_public_chat_more"), onDidClick: (): void => {
+                  console.log("net ease click more");
+                  if (this.onDidClickMore) {
+                    inputMethod.getController().stopInputSession();
+                    this.onDidClickMore()
+                  }
                 }
-              }
-            })
-              .width('25%')
-              .height(40)
+              })
+                .width('25%')
+                .height(40)
+            }
           }
-
+          .width('100%')
+          .height(60)
+          .id("action_button")
         }
-        .width('100%')
-        .height(60)
-        .id("action_button")
       }.padding({ top: 6, left: 7, right: 7 })
 
       if (this.mute) {

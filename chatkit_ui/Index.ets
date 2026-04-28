@@ -22,3 +22,9 @@ export { AbsCallKitClient } from './src/main/ets/AbsCallKitClient'
 export { ChatSearchDateMessagePage } from './src/main/ets/pages/ChatSearchDateMessagePage'
 
 export { ChatSearchDateMessageViewModel, ChatSearchDateMessageParams } from './src/main/ets/viewmodel/ChatSearchDateMessageViewModel'
+
+export { TextLinkifyUtils, LinkInfo, LinkType } from './src/main/ets/utils/TextLinkifyUtils'
+
+export { LinkClickUtils } from './src/main/ets/utils/LinkClickUtils'
+
+export { parseTextWithLinks, TextNode, TextNodeType } from './src/main/ets/utils/TextNodeParser'

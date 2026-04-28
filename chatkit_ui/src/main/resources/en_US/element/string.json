@@ -81,6 +81,10 @@
       "value": "forward"
     },
     {
+      "name": "chat_operation_translate",
+      "value": "translate"
+    },
+    {
       "name": "chat_operation_multi_forward",
       "value": "multi forward"
     },
@@ -123,6 +127,18 @@
     {
       "name": "chat_operation_collection",
       "value": "Collection"
+    },
+    {
+      "name": "chat_message_top_sticky",
+      "value": "Top"
+    },
+    {
+      "name": "chat_message_un_top_sticky",
+      "value": "Untop"
+    },
+    {
+      "name": "chat_top_no_permission",
+      "value": "No permission for this operation"
     },
     {
       "name": "chat_collection_success",
@@ -425,6 +441,22 @@
       "value": "Update Everyone can @all"
     },
     {
+      "name": "chat_team_top_sticky_tips",
+      "value": " pinned a message"
+    },
+    {
+      "name": "chat_team_un_top_sticky_tips",
+      "value": " unpinned a message"
+    },
+    {
+      "name": "chat_team_top_permission_all_tips",
+      "value": "Top sticky permission updated to all members"
+    },
+    {
+      "name": "chat_team_top_permission_manager_tips",
+      "value": "Top sticky permission updated to owner and managers"
+    },
+    {
       "name": "chat_message_empty_notification_text",
       "value": "One empty notification message"
     },
@@ -611,6 +643,74 @@
     {
       "name": "search_date_month_12",
       "value": "Dec"
+    },
+    {
+      "name": "chat_typing_indicator",
+      "value": "Typing..."
+    },
+    {
+      "name": "chat_not_friend_call_tip",
+      "value": "Non-friend calls are not supported"
+    },
+    {
+      "name": "rich_text_title_placeholder",
+      "value": "Enter title"
+    },
+    {
+      "name": "rich_text_body_placeholder_prefix",
+      "value": "Send to "
+    },
+    {
+      "name": "multiline_title_placeholder",
+      "value": "Enter title"
+    },
+    {
+      "name": "chat_message_action_voice_play_earphone",
+      "value": "Earpiece"
+    },
+    {
+      "name": "chat_message_action_voice_play_speaker",
+      "value": "Speaker"
+    },
+    {
+      "name": "chat_message_audio_earphone_tip",
+      "value": "Switched to ear speaker, Move phone to ear to hear audio"
+    },
+    {
+      "name": "chat_message_audio_speaker_tip",
+      "value": "turn on speaker"
+    },
+    {
+      "name": "chat_message_voice_to_text",
+      "value": "Convert to text"
+    },
+    {
+      "name": "chat_message_voice_to_text_failed",
+      "value": "Text conversion failed."
+    },
+    {
+      "name": "chat_translation_loading",
+      "value": "Translating..."
+    },
+    {
+      "name": "chat_translation_failed_retry",
+      "value": "Translation failed, tap to retry"
+    },
+    {
+      "name": "chat_translation_tag",
+      "value": "Translation"
+    },
+    {
+      "name": "chat_translation_action_hide",
+      "value": "Hide"
+    },
+    {
+      "name": "chat_translation_action_switch_language",
+      "value": "Switch Language"
+    },
+    {
+      "name": "chat_message_voice_too_long",
+      "value": "Voice too long, cannot convert."
     }
   ]
 }

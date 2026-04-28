@@ -97,12 +97,40 @@
       "value": "单聊在线状态"
     },
     {
+      "name": "mine_setting_read_message",
+      "value": "Message Read Receipt"
+    },
+    {
       "name": "mine_setting_antispam_tip_message",
-      "value": "文本安全提示"
+      "value": "Anti-Spam Tip"
     },
     {
       "name": "mine_setting_cloud_search",
-      "value": "Cloud search"
+      "value": "Cloud Search"
+    },
+    {
+      "name": "mine_setting_collection",
+      "value": "Collection"
+    },
+    {
+      "name": "mine_setting_pin",
+      "value": "Pin Message"
+    },
+    {
+      "name": "mine_setting_typing_status",
+      "value": "Typing Indicator"
+    },
+    {
+      "name": "mine_setting_only_friend_call",
+      "value": "Block Stranger Call"
+    },
+    {
+      "name": "mine_setting_rich_text_message",
+      "value": "Rich Text Message"
+    },
+    {
+      "name": "mine_setting_team_mode",
+      "value": "Team Join Approval"
     },
     {
       "name": "mine_setting_logout",
@@ -162,6 +190,174 @@
     {
       "name": "chat_kit_call_camera_permission_denied",
       "value": "Camera media permission denied"
+    },
+    {
+      "name": "mine_setting_global_config",
+      "value": "Global Config"
+    },
+    {
+      "name": "mine_setting_ai_stream",
+      "value": "AI Streaming Mode"
+    },
+    {
+      "name": "mine_setting_rich_text",
+      "value": "Rich Text Message"
+    },
+    {
+      "name": "mine_setting_team_enable",
+      "value": "Team Feature"
+    },
+    {
+      "name": "mine_setting_top_message",
+      "value": "Pinned Message"
+    },
+    {
+      "name": "mine_setting_team_manager_max_count",
+      "value": "Team Manager count limit"
+    },
+    {
+      "name": "mine_setting_notify_title",
+      "value": "Notification"
+    },
+    {
+      "name": "mine_setting_translation",
+      "value": "Translation"
+    },
+    {
+      "name": "translation_target_language",
+      "value": "Translate text to"
+    },
+    {
+      "name": "translation_target_language_title",
+      "value": "Translate text to"
+    },
+    {
+      "name": "translation_target_language_desc",
+      "value": "Set the target language for message translation"
+    },
+    {
+      "name": "translation_save",
+      "value": "Save"
+    },
+    {
+      "name": "translation_auto_title",
+      "value": "Automatically translate received messages"
+    },
+    {
+      "name": "translation_auto_desc",
+      "value": "When enabled, received chat messages are translated automatically"
+    },
+    {
+      "name": "translation_lang_zh_chs",
+      "value": "Chinese (Simplified)"
+    },
+    {
+      "name": "translation_lang_zh_cht",
+      "value": "Chinese (Traditional)"
+    },
+    {
+      "name": "translation_lang_en",
+      "value": "English"
+    },
+    {
+      "name": "translation_lang_ja",
+      "value": "Japanese"
+    },
+    {
+      "name": "translation_lang_ko",
+      "value": "Korean"
+    },
+    {
+      "name": "translation_lang_fr",
+      "value": "French"
+    },
+    {
+      "name": "translation_lang_de",
+      "value": "German"
+    },
+    {
+      "name": "translation_lang_es",
+      "value": "Spanish"
+    },
+    {
+      "name": "translation_lang_ru",
+      "value": "Russian"
+    },
+    {
+      "name": "translation_lang_pt",
+      "value": "Portuguese"
+    },
+    {
+      "name": "translation_lang_ar",
+      "value": "Arabic"
+    },
+    {
+      "name": "translation_lang_hi",
+      "value": "Hindi"
+    },
+    {
+      "name": "translation_lang_vi",
+      "value": "Vietnamese"
+    },
+    {
+      "name": "translation_lang_th",
+      "value": "Thai"
+    },
+    {
+      "name": "translation_lang_id",
+      "value": "Indonesian"
+    },
+    {
+      "name": "translation_bilingual_title",
+      "value": "Show bilingual"
+    },
+    {
+      "name": "translation_bilingual_desc",
+      "value": "When enabled, both original text and translation are shown"
+    },
+    {
+      "name": "mine_setting_notify_enable",
+      "value": "New Message Notification"
+    },
+    {
+      "name": "mine_setting_notify_ring",
+      "value": "Ring Mode"
+    },
+    {
+      "name": "mine_setting_notify_vibrate",
+      "value": "Vibration Mode"
+    },
+    {
+      "name": "mine_setting_notify_show_detail",
+      "value": "Message Notification Banner"
+    },
+    {
+      "name": "mine_setting_notify_mode",
+      "value": "Notification Mode"
+    },
+    {
+      "name": "mine_setting_push_setting",
+      "value": "Push Settings"
+    },
+    {
+      "name": "push_config",
+      "value": "Push config"
+    },
+    {
+      "name": "push_config_title",
+      "value": "Push Config"
+    },
+    {
+      "name": "push_config_switch_content",
+      "value": "Push config effective"
+    },
+    {
+      "name": "push_config_param_title",
+      "value": "Push config param"
+    },
+    {
+      "name": "push_config_save",
+      "value": "Save"
     }
   ]
 }

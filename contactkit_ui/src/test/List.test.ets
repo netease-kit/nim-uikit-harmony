@@ -6,7 +6,13 @@
  */
 
 import localUnitTest from './LocalUnit.test';
+import contactVerifyUnreadTest from './ContactVerifyUnread.test';
+import teamVerifyViewModelTest from './TeamVerifyViewModel.test';
+import teamProfilePageTest from './TeamProfilePage.test';
 
 export default function testsuite() {
   localUnitTest();
+  contactVerifyUnreadTest();
+  teamVerifyViewModelTest();
+  teamProfilePageTest();
 }

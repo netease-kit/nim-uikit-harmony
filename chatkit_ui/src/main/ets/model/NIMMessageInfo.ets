@@ -18,6 +18,7 @@ import {
   CustomMessageUtils,
   keyReplyMsgKey,
   mergedMessageCustomType,
+  multiLineMessageCustomType,
   StorageRepo
 } from '@nimkit/chatkit'
 import { DateUtils } from '../common/DateUtils'
@@ -55,7 +56,9 @@ export class NIMMessageInfo {
   @Trace revokeEditMsg: boolean = false
   // 是否为PIN消息
   @Trace isPinMsg: boolean = false
-  // 是否为合并转发消息
+  // 是否为换行消息（多行消息，type=102）
+  isMultiLineMsg: boolean = false
+  // 是否为合并转发消息（合并转发消息，type=101）
   isMergeMsg: boolean = false
   mergedContent: string = ''
   // 是否为合并转发详情页中的消息
@@ -78,6 +81,20 @@ export class NIMMessageInfo {
   @Trace isAnchorHighlight: boolean = false
   // 缓存的缩略图 PixelMap（用于图片预览时作为占位图，避免网络不可用时预览黑屏）
   cachedThumbPixelMap: image.PixelMap | undefined = undefined
+  // 语音转文字结果（运行时数据，不持久化）
+  @Trace voiceToText?: string
+  // 语音转文字加载中状态
+  @Trace voiceToTextLoading: boolean = false
+  // 翻译结果（最后一次翻译）
+  @Trace translatedText?: string
+  @Trace translatedTitle?: string
+  @Trace translatedBody?: string
+  @Trace translationLoading: boolean = false
+  @Trace translationFailed: boolean = false
+  @Trace showTranslatedText: boolean = false
+  @Trace showOriginalText: boolean = true
+  @Trace translationLanguageMismatch: boolean = false
+  translationHydrated: boolean = false
 
   constructor(msg: V2NIMMessage) {
     this.message = msg
@@ -95,13 +112,18 @@ export class NIMMessageInfo {
         (systemDateTime.getTime() - this.revokeInfo.revokeTime < ChatKitConfig.messageRevokeTimeLimit)
     }
 
-    // 解析合并转发
+    // 解析自定义消息类型
     if (message.messageType == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM && message.attachment != null) {
       this.customAttachment = CustomMessageUtils.dataOfCustomMessage(message.attachment)
       let customType = CustomMessageUtils.typeOfCustomMessage(message.attachment)
+      // 合并转发消息 (type=101)
       if (customType == mergedMessageCustomType) {
         this.isMergeMsg = true
         this.mergedContent = getMergedMessageContent(this.customAttachment)
+      }
+      // 换行消息 (type=102)
+      if (customType == multiLineMessageCustomType) {
+        this.isMultiLineMsg = true
       }
     }
 
@@ -363,6 +385,7 @@ export class RevokeInfo {
   isEditMsg: boolean = false
   revokeMsgText: string = ''
   revokeMsgClientId: string = ''
+  revokeMsgAttachment: string = ''  // 用于自定义消息（如富文本消息）的附件
 
   static parseRevokeInfo(msg: V2NIMMessage): RevokeInfo | undefined {
     if (msg == undefined || msg.messageType !== V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ||
@@ -380,6 +403,7 @@ export class RevokeInfo {
       revokeInfo.revokeTime = localObject?.[ChatConst.revokeLocalTimeKey]
       revokeInfo.isLocalRevoke = localObject?.[ChatConst.revokeLocalKey]
       revokeInfo.isEditMsg = localObject?.[ChatConst.revokeMsgEditKey]
+      revokeInfo.revokeMsgAttachment = localObject?.[ChatConst.revokeMsgAttachmentKey] ?? ''
       return revokeInfo
     }
 

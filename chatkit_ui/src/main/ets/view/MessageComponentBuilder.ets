@@ -37,12 +37,76 @@ import { image } from '@kit.ImageKit'
 import { staticMap } from '@kit.MapKit'
 import { BusinessError } from '@kit.BasicServicesKit'
 import { ChatAitNode } from '../model/ChatAitNode'
-import { ChatKitClient, MergedMessageAttachment } from '@nimkit/chatkit'
+import { ChatKitClient, getMultiLineBody, getMultiLineTitle, IMKitConfigCenter, MergedMessageAttachment, NEFriendUserCache } from '@nimkit/chatkit'
 import { ChatInfo } from '../model/ChatInfo'
+import { NECommonUtils } from '@nimkit/common'
 import { Markdown } from '@nimkit/markdown'
+import { markConfig } from '@nimkit/markdown'
 import { get } from '@nimsdk/vendor'
 import { ChatKitUIClient } from '../ChatKitUIClient'
 import { http } from '@kit.NetworkKit'
+import { common } from '@kit.AbilityKit'
+import { parseTextWithLinks, TextNode, TextNodeType, LinkInfo, LinkType } from '../utils/TextNodeParser'
+import { LinkClickUtils } from '../utils/LinkClickUtils'
+import { linkifyExtension } from '../utils/MarkdownLinkifyExtension'
+import { MessageTranslationService } from '../service/translation/MessageTranslationService'
+
+/**
+ * 初始化 Markdown 组件的 linkify 支持
+ * 通过 marked 的 tokenizer 扩展机制，在解析阶段识别 URL/电话/邮箱
+ */
+function initMarkdownLinkify() {
+  // 注册 linkify tokenizer 扩展
+  markConfig.addPlugin([linkifyExtension])
+
+  // 注册链接点击回调
+  // Markdown 组件渲染 link token 时会调用这个回调
+  markConfig.registerLinkClick = (url?: string) => {
+    if (!url) return
+
+    // 从 AppStorage 获取 context
+    const context = AppStorage.get<common.UIAbilityContext>('currentUIAbilityContext')
+    if (!context) return
+
+    // 根据 URL 格式判断类型并处理
+    if (url.startsWith('mailto:')) {
+      // 邮箱
+      const email = url.replace('mailto:', '')
+      const linkInfo: LinkInfo = {
+        type: LinkType.EMAIL,
+        text: email,
+        url: url,
+        start: 0,
+        end: email.length
+      }
+      LinkClickUtils.handleLinkClick(context, linkInfo)
+    } else if (url.startsWith('tel:')) {
+      // 电话
+      const phone = url.replace('tel:', '')
+      const linkInfo: LinkInfo = {
+        type: LinkType.PHONE,
+        text: phone,
+        url: url,
+        start: 0,
+        end: phone.length
+      }
+      LinkClickUtils.handleLinkClick(context, linkInfo)
+    } else {
+      // URL
+      const linkInfo: LinkInfo = {
+        type: LinkType.URL,
+        text: url,
+        url: url,
+        start: 0,
+        end: url.length
+      }
+      LinkClickUtils.handleLinkClick(context, linkInfo)
+    }
+  }
+}
+
+// 初始化（模块加载时执行一次）
+initMarkdownLinkify()
 
 @ComponentV2
 export struct messageContent {
@@ -81,7 +145,9 @@ export struct messageContent {
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
       callBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM) {
-      if (this.message.isMergeMsg) {
+      if (this.message.isMultiLineMsg) {
+        multiLineMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick, chatInfo: this.chatInfo })
+      } else if (this.message.isMergeMsg) {
         mergedMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick })
       } else {
         unknownBuilder({ message: this.message, onMessageClick: this.onMessageClick });
@@ -116,7 +182,9 @@ export struct pinMessageContent {
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
       callBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM) {
-      if (this.message.isMergeMsg) {
+      if (this.message.isMultiLineMsg) {
+        multiLineMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick, isPinCollectionMode: true })
+      } else if (this.message.isMergeMsg) {
         mergedMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick }).width('80%')
       } else {
         unknownBuilder({ message: this.message, onMessageClick: this.onMessageClick });
@@ -150,7 +218,9 @@ export struct memberHistoryMessageContent {
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
       callBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM) {
-      if (this.message.isMergeMsg) {
+      if (this.message.isMultiLineMsg) {
+        multiLineMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick })
+      } else if (this.message.isMergeMsg) {
         mergedMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick }).width('80%')
       } else {
         unknownBuilder({ message: this.message, onMessageClick: this.onMessageClick });
@@ -161,6 +231,265 @@ export struct memberHistoryMessageContent {
   }
 }
 
+/**
+ * 富文本消息（换行消息）渲染组件
+ * 消息类型为 type=102 的自定义消息
+ *
+ * 链接高亮规则（按冒烟用例 108/109）：
+ * - 标题：不做链接高亮，作为普通文本显示（加粗）
+ * - 正文：支持链接（邮箱、URL、电话）识别和高亮，可点击
+ */
+@ComponentV2
+export struct multiLineMessageBuilder {
+  @Require @Param
+  message: NIMMessageInfo
+  @Param
+  onMessageClick: MessageItemClick | undefined = undefined
+  @Param
+  chatInfo: ChatInfo | undefined = undefined
+  /**
+   * 是否为列表模式（Pin/Collection 列表）
+   * 列表模式下：标题最多 1 行，标题+正文一共最多 3 行
+   */
+  @Param
+  isPinCollectionMode: boolean = false
+  private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
+
+  /**
+   * 处理链接点击
+   */
+  private onLinkClick(linkInfo: LinkInfo) {
+    LinkClickUtils.handleLinkClick(this.context, linkInfo)
+  }
+
+  /**
+   * 处理回复消息点击
+   */
+  private onReplyClick(event: ClickEvent) {
+    this.onMessageClick?.onReplyClick?.(event, this.message.replyMsg)
+  }
+
+  @Builder
+  private MultiLineTitleContent(title: string) {
+    ForEach(parseMessageText(title) ?? [], (item: NEEmojiParseResult) => {
+      if (item.text) {
+        Span(item.text)
+          .fontWeight(FontWeight.Bold)
+          .fontSize($r('app.float.chat_message_text_font_size'))
+          .fontColor($r('app.color.color_chat_title'))
+      } else if (item.emoji) {
+        ImageSpan($rawfile(`emoji/${item.emoji.file}`))
+          .width(18)
+          .height(18)
+          .objectFit(ImageFit.Fill)
+          .verticalAlign(ImageSpanAlignment.CENTER)
+      }
+    })
+  }
+
+  @Builder
+  private MultiLineBodyContent(body: string) {
+    ForEach(parseMessageText(body) ?? [], (item: NEEmojiParseResult) => {
+      if (item.text) {
+        ForEach(getAitNodes(item.startIndex, item.text, this.message.message.serverExtension),
+          (node: ChatAitNode) => {
+            if (node.segment) {
+              Span(node.text)
+                .fontSize($r('app.float.chat_message_text_font_size'))
+                .fontColor('#337EFF')
+            } else {
+              ForEach(parseTextWithLinks(node.text), (textNode: TextNode) => {
+                if (textNode.type === TextNodeType.LINK && textNode.linkInfo) {
+                  Span(textNode.text)
+                    .fontSize($r('app.float.chat_message_text_font_size'))
+                    .fontColor('#337EFF')
+                    .onClick(() => {
+                      this.onLinkClick(textNode.linkInfo!)
+                    })
+                } else {
+                  Span(textNode.text)
+                    .fontSize($r('app.float.chat_message_text_font_size'))
+                    .fontColor($r('app.color.color_chat_title'))
+                }
+              })
+            }
+          })
+      } else if (item.emoji) {
+        ImageSpan($rawfile(`emoji/${item.emoji.file}`))
+          .width(18)
+          .height(18)
+          .objectFit(ImageFit.Fill)
+          .verticalAlign(ImageSpanAlignment.CENTER)
+      }
+    })
+  }
+
+  aboutToAppear(): void {
+    if (!this.isPinCollectionMode) {
+      MessageTranslationService.instance.prepareMessage(this.message)
+    }
+  }
+
+  build() {
+    Column() {
+      // 回复消息预览（如果有）
+      if (!this.message.isRevokeMsg && this.message.isReplyMsg) {
+        if (this.message.replyMsg) {
+          Text() {
+            if (this.chatInfo) {
+              Span(' | ' + parseReplyMessageUserInfo(this.message.replyMsg, this.chatInfo))
+                .fontSize($r('app.float.chat_desc_text_font_size'))
+                .textCase(TextCase.Normal)
+                .fontColor($r('app.color.color_chat_desc'))
+            }
+            ForEach(sliceMessageText(parseMessageText(getReplyMessageText(this.message.replyMsg)), 30),
+              (item: NEEmojiParseResult) => {
+                if (item.text) {
+                  Span(item.text)
+                    .fontSize($r('app.float.chat_desc_text_font_size'))
+                    .textCase(TextCase.Normal)
+                    .fontColor($r('app.color.color_chat_desc'))
+                } else if (item.emoji) {
+                  ImageSpan($rawfile(`emoji/${item.emoji.file}`)).width('16')
+                    .height('16')
+                    .objectFit(ImageFit.Fill)
+                    .verticalAlign(ImageSpanAlignment.CENTER)
+                }
+              })
+          }
+          .fontColor($r('app.color.color_chat_desc'))
+          .fontSize($r('app.float.chat_desc_text_font_size'))
+          .height(20)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .ellipsisMode(EllipsisMode.END)
+          .margin({ bottom: 4 })
+          .onClick((event) => this.onReplyClick(event))
+        } else {
+          Text(getContext().resourceManager.getStringSync($r('app.string.chat_reply_not_exist').id))
+            .fontColor($r('app.color.color_chat_desc'))
+            .fontSize($r('app.float.chat_desc_text_font_size'))
+            .height(20)
+            .maxLines(1)
+            .ellipsisMode(EllipsisMode.END)
+            .margin({ bottom: 4 })
+        }
+      }
+
+      if (!this.message.isReceiveMessage() || !this.message.translatedText || this.message.translationLoading || this.message.translationFailed ||
+        this.isPinCollectionMode || this.message.showOriginalText) {
+        // 标题：加粗显示，不做链接高亮和 @ 高亮（按冒烟用例 108 要求）
+        // 列表模式下：最多 1 行，超长打点
+        if (getMultiLineTitle(this.message.message).length > 0) {
+          Text() {
+            this.MultiLineTitleContent(getMultiLineTitle(this.message.message))
+          }
+            .fontWeight(FontWeight.Bold)
+            .fontSize($r('app.float.chat_message_text_font_size'))
+            .fontColor($r('app.color.color_chat_title'))
+            .textAlign(TextAlign.Start)
+            .maxLines(this.isPinCollectionMode ? 1 : undefined)
+            .textOverflow(this.isPinCollectionMode ? { overflow: TextOverflow.Ellipsis } : undefined)
+            .ellipsisMode(this.isPinCollectionMode ? EllipsisMode.END : undefined)
+        }
+        if (getMultiLineBody(this.message.message).length > 0) {
+          Text() {
+            this.MultiLineBodyContent(getMultiLineBody(this.message.message))
+          }
+          .textAlign(TextAlign.Start)
+          .margin({ top: getMultiLineTitle(this.message.message).length > 0 ? 4 : 0 })
+          .maxLines(this.isPinCollectionMode ? (getMultiLineTitle(this.message.message).length > 0 ? 2 : 3) : undefined)
+          .textOverflow(this.isPinCollectionMode ? { overflow: TextOverflow.Ellipsis } : undefined)
+          .ellipsisMode(this.isPinCollectionMode ? EllipsisMode.END : undefined)
+        }
+      }
+
+      if (!this.isPinCollectionMode && this.message.isReceiveMessage() && this.message.translationLoading) {
+        Row() {
+          Image($r('app.media.ic_chat_menu_translate'))
+            .width(12)
+            .height(12)
+            .opacity(0.5)
+          Text($r('app.string.chat_translation_loading'))
+            .fontSize(11)
+            .fontColor('#98A2B3')
+            .margin({ left: 4 })
+        }
+        .margin({ top: 8 })
+      } else if (!this.isPinCollectionMode && this.message.isReceiveMessage() && this.message.translationFailed) {
+        Row() {
+          Image($r('app.media.ic_chat_message_status_fail'))
+            .width(12)
+            .height(12)
+          Text($r('app.string.chat_translation_failed_retry'))
+            .fontSize(11)
+            .fontColor('#F24957')
+            .margin({ left: 4 })
+        }
+        .margin({ top: 8 })
+        .onClick(() => {
+          MessageTranslationService.instance.retry(this.message)
+        })
+      } else if (!this.isPinCollectionMode && this.message.isReceiveMessage() &&
+        this.message.showTranslatedText && this.message.translatedText) {
+        Column() {
+          if (this.message.showOriginalText) {
+            Divider()
+              .strokeWidth(1)
+              .color('#D6DAE0')
+              .width('100%')
+              .margin({ top: 8, bottom: 8 })
+          }
+          if (this.message.translatedTitle && this.message.translatedTitle.length > 0) {
+            Text(this.message.translatedTitle)
+              .fontWeight(FontWeight.Bold)
+              .fontSize($r('app.float.chat_message_text_font_size'))
+              .fontColor($r('app.color.color_chat_title'))
+              .textAlign(TextAlign.Start)
+          }
+          if (this.message.translatedBody && this.message.translatedBody.length > 0) {
+            Text(this.message.translatedBody)
+              .fontSize($r('app.float.chat_message_text_font_size'))
+              .fontColor($r('app.color.color_chat_title'))
+              .textAlign(TextAlign.Start)
+              .margin({ top: this.message.translatedTitle && this.message.translatedTitle.length > 0 ? 4 : 0 })
+          } else if ((!this.message.translatedTitle || this.message.translatedTitle.length === 0) &&
+            this.message.translatedText.length > 0) {
+            Text(this.message.translatedText)
+              .fontSize($r('app.float.chat_message_text_font_size'))
+              .fontColor($r('app.color.color_chat_title'))
+              .textAlign(TextAlign.Start)
+          }
+          Row() {
+            Image($r('app.media.ic_chat_menu_translate'))
+              .width(12)
+              .height(12)
+              .opacity(0.5)
+            Text($r('app.string.chat_translation_tag'))
+              .fontSize(11)
+              .fontColor('#98A2B3')
+              .margin({ left: 4 })
+          }
+          .margin({ top: 8 })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .gesture(LongPressGesture().onAction((event: GestureEvent) => {
+          this.onMessageClick?.onTranslatedAreaLongClick?.(event, this.message)
+        }))
+      }
+    }
+    .alignItems(HorizontalAlign.Start)
+    .padding({
+      left: 12,
+      top: 12,
+      bottom: 12,
+      right: 12
+    })
+    .onClick((event: ClickEvent) => {
+      this.onMessageClick?.onItemClick?.(event, this.message)
+    })
+  }
+}
 
 @ComponentV2
 export struct richTextBuilder {
@@ -170,6 +499,13 @@ export struct richTextBuilder {
   onMessageClick: MessageItemClick | undefined
   @BuilderParam
   chatInfo: ChatInfo | undefined
+  private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
+
+  aboutToAppear(): void {
+    // 设置当前 context 到 AppStorage，供 linkify 点击回调使用
+    const context = getContext(this) as common.UIAbilityContext
+    AppStorage.setOrCreate('currentUIAbilityContext', context)
+  }
 
   private onItemClick(event: ClickEvent) {
     this.onMessageClick?.onReplyClick?.(event, this.message.replyMsg)
@@ -177,7 +513,13 @@ export struct richTextBuilder {
 
   private onRevokeEditClick(event: ClickEvent) {
     this.onMessageClick?.onRevokeEditClick?.(event, this.message)
+  }
 
+  /**
+   * 处理链接点击
+   */
+  private onLinkClick(linkInfo: LinkInfo) {
+    LinkClickUtils.handleLinkClick(this.context, linkInfo)
   }
 
   build() {
@@ -246,6 +588,7 @@ export struct richTextBuilder {
                       .textCase(TextCase.Normal)
                       .fontColor('#337EFF')
                   } else {
+                    // 使用 Markdown 组件渲染，linkify 扩展会在解析阶段识别 URL/电话/邮箱
                     Markdown({
                       content: node.text,
                       lineSpace: 0,
@@ -287,6 +630,7 @@ export struct textBuilder {
   onMessageClick: MessageItemClick | undefined
   @BuilderParam
   chatInfo: ChatInfo | undefined
+  private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
 
   private onItemClick(event: ClickEvent) {
     this.onMessageClick?.onReplyClick?.(event, this.message.replyMsg)
@@ -294,7 +638,17 @@ export struct textBuilder {
 
   private onRevokeEditClick(event: ClickEvent) {
     this.onMessageClick?.onRevokeEditClick?.(event, this.message)
+  }
 
+  /**
+   * 处理链接点击
+   */
+  private onLinkClick(linkInfo: LinkInfo) {
+    LinkClickUtils.handleLinkClick(this.context, linkInfo)
+  }
+
+  aboutToAppear(): void {
+    MessageTranslationService.instance.prepareMessage(this.message)
   }
 
   build() {
@@ -342,48 +696,122 @@ export struct textBuilder {
         }
 
       }
-      Text() {
-        if (this.message.isRevokeMsg) {
-          Span(this.message.message.text)
-          if (this.message.revokeEditMsg) {
-            Span($r('app.string.chat_msg_undo_edit_tips'))
-              .fontColor($r('app.color.color_chat_send'))
-              .onClick((event) => {
-                this.onRevokeEditClick(event)
-              })
-          }
-        } else {
-          ForEach(parseMessageText(this.message.message.text?.trimStart()?.trimEnd()), (item: NEEmojiParseResult) => {
-            if (item.text) {
-              ForEach(getAitNodes(item.startIndex, item.text, this.message.message.serverExtension),
-                (node: ChatAitNode) => {
-                  if (node.segment) {
-                    Span(node.text)
-                      .fontSize($r('app.float.chat_message_text_font_size'))
-                      .textCase(TextCase.Normal)
-                      .fontColor('#337EFF')
-                  } else {
-                    Span(node.text)
-                      .fontSize($r('app.float.chat_message_text_font_size'))
-                      .textCase(TextCase.Normal)
-                      .fontColor($r('app.color.color_chat_title'))
-                  }
+      if (!this.message.isReceiveMessage() || !this.message.translatedText || this.message.translationLoading ||
+        this.message.translationFailed ||
+        this.message.showOriginalText) {
+        Text() {
+          if (this.message.isRevokeMsg) {
+            Span(this.message.message.text)
+            if (this.message.revokeEditMsg) {
+              Span($r('app.string.chat_msg_undo_edit_tips'))
+                .fontColor($r('app.color.color_chat_send'))
+                .onClick((event) => {
+                  this.onRevokeEditClick(event)
                 })
-
-            } else if (item.emoji) {
-              ImageSpan($rawfile(`emoji/${item.emoji.file}`))
-                .width(18)
-                .height(18)
-                .objectFit(ImageFit.Fill)
-                .verticalAlign(ImageSpanAlignment.CENTER)
             }
-          })
+          } else {
+            ForEach(parseMessageText(this.message.message.text?.trimStart()?.trimEnd()), (item: NEEmojiParseResult) => {
+              if (item.text) {
+                ForEach(getAitNodes(item.startIndex, item.text, this.message.message.serverExtension),
+                  (node: ChatAitNode) => {
+                    if (node.segment) {
+                      Span(node.text)
+                        .fontSize($r('app.float.chat_message_text_font_size'))
+                        .textCase(TextCase.Normal)
+                        .fontColor('#337EFF')
+                    } else {
+                      ForEach(parseTextWithLinks(node.text), (textNode: TextNode) => {
+                        if (textNode.type === TextNodeType.LINK && textNode.linkInfo) {
+                          Span(textNode.text)
+                            .fontSize($r('app.float.chat_message_text_font_size'))
+                            .textCase(TextCase.Normal)
+                            .fontColor('#337EFF')
+                            .onClick(() => {
+                              this.onLinkClick(textNode.linkInfo!)
+                            })
+                        } else {
+                          Span(textNode.text)
+                            .fontSize($r('app.float.chat_message_text_font_size'))
+                            .textCase(TextCase.Normal)
+                            .fontColor($r('app.color.color_chat_title'))
+                        }
+                      })
+                    }
+                  })
+
+              } else if (item.emoji) {
+                ImageSpan($rawfile(`emoji/${item.emoji.file}`))
+                  .width(18)
+                  .height(18)
+                  .objectFit(ImageFit.Fill)
+                  .verticalAlign(ImageSpanAlignment.CENTER)
+              }
+            })
+          }
         }
+        .lineHeight(20)
+        .fontSize($r('app.float.chat_subtitle_text_font_size'))
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .ellipsisMode(EllipsisMode.END)
       }
-      .lineHeight(20)
-      .fontSize($r('app.float.chat_subtitle_text_font_size'))
-      .textOverflow({ overflow: TextOverflow.Ellipsis })
-      .ellipsisMode(EllipsisMode.END)
+
+      if (this.message.isReceiveMessage() && this.message.translationLoading) {
+        Row() {
+          Image($r('app.media.ic_chat_menu_translate'))
+            .width(12)
+            .height(12)
+            .opacity(0.5)
+          Text($r('app.string.chat_translation_loading'))
+            .fontSize(11)
+            .fontColor('#98A2B3')
+            .margin({ left: 4 })
+        }
+        .margin({ top: 8 })
+      } else if (this.message.isReceiveMessage() && this.message.translationFailed) {
+        Row() {
+          Image($r('app.media.ic_chat_message_status_fail'))
+            .width(12)
+            .height(12)
+          Text($r('app.string.chat_translation_failed_retry'))
+            .fontSize(11)
+            .fontColor('#F24957')
+            .margin({ left: 4 })
+        }
+        .margin({ top: 8 })
+        .onClick(() => {
+          MessageTranslationService.instance.retry(this.message)
+        })
+      } else if (this.message.isReceiveMessage() && this.message.showTranslatedText && this.message.translatedText) {
+        Column() {
+          if (this.message.showOriginalText) {
+            Divider()
+              .strokeWidth(1)
+              .color('#D6DAE0')
+              .width('100%')
+              .margin({ top: 8, bottom: 8 })
+          }
+          Text(this.message.translatedText)
+            .lineHeight(20)
+            .fontSize($r('app.float.chat_subtitle_text_font_size'))
+            .fontColor($r('app.color.color_chat_title'))
+            .textAlign(TextAlign.Start)
+          Row() {
+            Image($r('app.media.ic_chat_menu_translate'))
+              .width(12)
+              .height(12)
+              .opacity(0.5)
+            Text($r('app.string.chat_translation_tag'))
+              .fontSize(11)
+              .fontColor('#98A2B3')
+              .margin({ left: 4 })
+          }
+          .margin({ top: 8 })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .gesture(LongPressGesture().onAction((event: GestureEvent) => {
+          this.onMessageClick?.onTranslatedAreaLongClick?.(event, this.message)
+        }))
+      }
     }.alignItems(HorizontalAlign.Start)
     .padding({
       left: 12,
@@ -401,16 +829,36 @@ export struct pinTextBuilder {
   message: NIMMessageInfo
   @BuilderParam
   onMessageClick: MessageItemClick | undefined
+  private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
+
+  /**
+   * 处理链接点击
+   */
+  private onLinkClick(linkInfo: LinkInfo) {
+    LinkClickUtils.handleLinkClick(this.context, linkInfo)
+  }
 
   build() {
     Column() {
       Text() {
         ForEach(parseMessageText(this.message.message.text?.trimStart()?.trimEnd()), (item: NEEmojiParseResult) => {
           if (item.text) {
-            Span(item.text)
-              .fontSize($r('app.float.chat_message_text_font_size'))
-              .textCase(TextCase.Normal)
-              .fontColor($r('app.color.color_chat_title'))
+            ForEach(parseTextWithLinks(item.text), (textNode: TextNode) => {
+              if (textNode.type === TextNodeType.LINK && textNode.linkInfo) {
+                Span(textNode.text)
+                  .fontSize($r('app.float.chat_message_text_font_size'))
+                  .textCase(TextCase.Normal)
+                  .fontColor('#337EFF')
+                  .onClick(() => {
+                    this.onLinkClick(textNode.linkInfo!)
+                  })
+              } else {
+                Span(textNode.text)
+                  .fontSize($r('app.float.chat_message_text_font_size'))
+                  .textCase(TextCase.Normal)
+                  .fontColor($r('app.color.color_chat_title'))
+              }
+            })
           } else if (item.emoji) {
             ImageSpan($rawfile(`emoji/${item.emoji.file}`)).width('18')
               .height('18')
@@ -436,16 +884,36 @@ export struct historyTextBuilder {
   message: NIMMessageInfo
   @BuilderParam
   onMessageClick: MessageItemClick | undefined
+  private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
+
+  /**
+   * 处理链接点击
+   */
+  private onLinkClick(linkInfo: LinkInfo) {
+    LinkClickUtils.handleLinkClick(this.context, linkInfo)
+  }
 
   build() {
     Column() {
       Text() {
         ForEach(parseMessageText(this.message.message.text?.trimStart()?.trimEnd()), (item: NEEmojiParseResult) => {
           if (item.text) {
-            Span(item.text)
-              .fontSize($r('app.float.chat_message_text_font_size'))
-              .textCase(TextCase.Normal)
-              .fontColor($r('app.color.color_chat_title'))
+            ForEach(parseTextWithLinks(item.text), (textNode: TextNode) => {
+              if (textNode.type === TextNodeType.LINK && textNode.linkInfo) {
+                Span(textNode.text)
+                  .fontSize($r('app.float.chat_message_text_font_size'))
+                  .textCase(TextCase.Normal)
+                  .fontColor('#337EFF')
+                  .onClick(() => {
+                    this.onLinkClick(textNode.linkInfo!)
+                  })
+              } else {
+                Span(textNode.text)
+                  .fontSize($r('app.float.chat_message_text_font_size'))
+                  .textCase(TextCase.Normal)
+                  .fontColor($r('app.color.color_chat_title'))
+              }
+            })
           } else if (item.emoji) {
             ImageSpan($rawfile(`emoji/${item.emoji.file}`)).width('18')
               .height('18')
@@ -666,13 +1134,20 @@ export struct callBuilder {
         return
       }
 
+      // 创建呼叫参数（核心：动态传入选中的callType）
+      const targetId: string = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(this.message.getConversationId())
+
+      // 检查是否开启仅好友通话限制
+      if (IMKitConfigCenter.enableOnlyFriendCall && !NEFriendUserCache.getInstance().hasFriendRelation(targetId)) {
+        NECommonUtils.showToast($r('app.string.chat_not_friend_call_tip'))
+        return
+      }
+
       // call
       let callType: number = 1; // 默认音频通话
       if (get(this.message.message.attachment ?? {}, 'type') === 2) { // is video?
         callType = 2;
       }
-      // 创建呼叫参数（核心：动态传入选中的callType）
-      const targetId: string = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(this.message.getConversationId())
       ChatKitUIClient.getInstance().call(targetId, callType)
     })
   }
@@ -897,11 +1372,19 @@ export struct mergedMessageBuilder {
   @BuilderParam
   onMessageClick: MessageItemClick | undefined
   mergedAttachment: MergedMessageAttachment | undefined
+  private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
 
   aboutToAppear(): void {
     if (this.message) {
       this.mergedAttachment = this.message.customAttachment as MergedMessageAttachment
     }
+  }
+
+  /**
+   * 处理链接点击
+   */
+  private onLinkClick(linkInfo: LinkInfo) {
+    LinkClickUtils.handleLinkClick(this.context, linkInfo)
   }
 
   build() {
@@ -918,11 +1401,25 @@ export struct mergedMessageBuilder {
         Text() {
           ForEach(parseText(this.message.mergedContent), (item: NEEmojiParseResult) => {
             if (item.text) {
-              Span(item.text)
-                .fontSize($r('app.float.chat_message_text_font_size'))
-                .textCase(TextCase.Normal)
-                .fontColor($r('app.color.color_chat_desc'))
-
+              // 解析文本中的链接
+              ForEach(parseTextWithLinks(item.text), (textNode: TextNode) => {
+                if (textNode.type === TextNodeType.LINK && textNode.linkInfo) {
+                  // 链接文本 - 蓝色可点击
+                  Span(textNode.text)
+                    .fontSize($r('app.float.chat_message_text_font_size'))
+                    .textCase(TextCase.Normal)
+                    .fontColor('#337EFF')
+                    .onClick(() => {
+                      this.onLinkClick(textNode.linkInfo!)
+                    })
+                } else {
+                  // 普通文本
+                  Span(textNode.text)
+                    .fontSize($r('app.float.chat_message_text_font_size'))
+                    .textCase(TextCase.Normal)
+                    .fontColor($r('app.color.color_chat_desc'))
+                }
+              })
             } else if (item.emoji) {
               ImageSpan($rawfile(`emoji/${item.emoji.file}`)).width('18')
                 .height('18')

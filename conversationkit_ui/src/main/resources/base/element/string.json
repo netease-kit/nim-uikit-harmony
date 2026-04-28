@@ -51,6 +51,10 @@
     {
       "name": "createAdvancedTeamSuccess",
       "value": "成功创建高级群"
+    },
+    {
+      "name": "join_team",
+      "value": "加入群组"
     }
   ]
 }

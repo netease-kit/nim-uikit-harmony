@@ -7,7 +7,6 @@ import { ChatRepo, IMKitConfigCenter } from '@nimkit/chatkit'
 import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel'
 import {
   V2NIMMessage,
-  V2NIMMessageConfig,
   V2NIMMessageDeletedNotification,
   V2NIMMessageRevokeNotification,
   V2NIMMessageSearchExParams,
@@ -16,6 +15,7 @@ import {
   V2NIMSendMessageParams
 } from '@nimsdk/base'
 import { sendMessageFailedTips } from '../common/MessageHelper'
+import { buildSendMessageParams } from '../common/SendMessageParamsHelper'
 import { NIMMessageInfo } from '../model/NIMMessageInfo'
 import { BusinessError } from '@kit.BasicServicesKit'
 
@@ -194,12 +194,8 @@ export class ChatSearchVideoMessageViewModel {
   }
 
   // 消息发送之前调用，用于配置消息通用参数
-  beforeSendMessage(msg: V2NIMMessage): V2NIMMessage {
-    let msgConfig: V2NIMMessageConfig = {
-      readReceiptEnabled: true
-    }
-    msg.messageConfig = msgConfig
-    return msg
+  beforeSendMessage(params?: V2NIMSendMessageParams): V2NIMSendMessageParams | undefined {
+    return buildSendMessageParams(params)
   }
 
   /**
@@ -211,7 +207,8 @@ export class ChatSearchVideoMessageViewModel {
    */
   async sendForwardMessage(msg: V2NIMMessage, conversationId: string, params?: V2NIMSendMessageParams,
     progress?: (percentage: number) => void) {
-    ChatRepo.sendMessage(this.beforeSendMessage(msg), conversationId, params, progress).catch((err: BusinessError) => {
+    const mergedParams = this.beforeSendMessage(params)
+    ChatRepo.sendMessage(msg, conversationId, mergedParams, progress).catch((err: BusinessError) => {
       console.error("net ease send message error", err.code, err.message);
       sendMessageFailedTips(msg, err, conversationId)
     })

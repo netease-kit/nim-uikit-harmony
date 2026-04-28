@@ -11,13 +11,17 @@ import { MessageOperationItem } from '../model/MessageOperationItem';
 import { MessageOperationItemView } from '../view/MessageOperationItemView';
 import { ChatConst } from '../constants/ChatConst';
 import { ChatKitConfig } from '../ChatKitConfig';
-import { getOperateMenu } from '../common/ChatUtils';
+import { getOperateMenu, getTopStickyMenuItem } from '../common/ChatUtils';
 
 @ComponentV2
 export struct MessageOperationView {
   @Local operationMoreDataList: Array<MessageOperationItem> = Array();
+  @Param
+  operationItems?: Array<MessageOperationItem> = undefined;
   @Param @Require
   operateMsg: NIMMessageInfo | undefined = undefined;
+  /** 当前置顶消息（用于判断「置顶」还是「取消置顶」） */
+  @Param topMessage: NIMMessageInfo | undefined = undefined;
   @Param @Require
   didClickItem?: (item: MessageOperationItem) => void;
   //撤回时间限制2分钟
@@ -26,7 +30,11 @@ export struct MessageOperationView {
   @Local viewWidth: number = 0;
 
   aboutToAppear(): void {
-    this.operationMoreDataList = getOperateMenu(this.operateMsg)
+    if (this.operationItems && this.operationItems.length > 0) {
+      this.operationMoreDataList = this.operationItems
+    } else {
+      this.operationMoreDataList = getOperateMenu(this.operateMsg, this.topMessage)
+    }
     this.viewHeight =
       ChatConst.menuItemHeight * (Math.ceil(this.operationMoreDataList.length / ChatConst.menuItemColumnNum))
     this.viewWidth = ChatConst.menuItemWidth * Math.min(this.operationMoreDataList.length, ChatConst.menuItemColumnNum)

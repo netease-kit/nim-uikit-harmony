@@ -4,26 +4,176 @@
  * found in the LICENSE file.
  *
  */
-import { IMKitConfigCenter } from '@nimkit/chatkit';
-import { CommonConstants, NECommonUtils } from '@nimkit/common';
+import {
+  ChatKitClient, ChatRepo, IMKitConfigCenter,
+  IMKitCustomFactory,
+  MessageCallback,
+  MessageSendParams,
+  PushConfigManager
+} from '@nimkit/chatkit';
+import { ChatKitConfig } from '@nimkit/chatkit_ui/src/main/ets/ChatKitConfig';
+import { CommonConstants, NECommonUtils, SUPPORTED_TRANSLATION_LANGUAGES, TranslationLanguageCode } from '@nimkit/common';
+
 import { NimRepository } from '../ability/NimRepository';
 import { AppConfig } from '../constants/AppConfig';
+import { resolveReadMessageEnabled, resolveTeamJoinAgreeModeEnabled } from '../manager/GlobalConfigStorage';
 import { preferences } from '@kit.ArkData';
 import { DeprecatedIndexButton } from '../other/DeprecatedIndexButton'
+import { V2NIMConversationType, V2NIMSendMessageParams } from '@nimsdk/base';
+
+/** 推送跳转数据 */
+interface PushJumpData {
+  sessionType: string   // "p2p" | "team"
+  sessionId: string     // accountId 或 teamId
+}
+
+/** 华为推送点击动作 */
+interface HarmonyClickAction {
+  actionType: number    // 0: 打开应用
+  data: PushJumpData    // 跳转数据（JSON 对象）
+}
+
+/** 华为推送通知 */
+interface HarmonyNotification {
+  category: string      // "IM"
+  clickAction: HarmonyClickAction
+}
+
+/** 华为推送载荷 */
+interface HarmonyPayload {
+  notification: HarmonyNotification
+}
+
+/** 华为推送选项 */
+interface HarmonyPushOptions {
+  testMessage: boolean
+}
+
+/** 华为推送字段 */
+interface HarmonyField {
+  payload: HarmonyPayload
+  pushOptions: HarmonyPushOptions
+}
+
+/** 推送载荷数据 */
+interface PushPayloadData {
+  harmonyField: HarmonyField
+  harmonyPushType: number  // 0
+}
+
+/**
+ * 消息发送回调实现
+ * 在消息发送前注入华为推送跳转参数
+ */
+class MessageSendCallbackImpl implements MessageCallback {
+  beforeSend(sendParams: MessageSendParams): MessageSendParams | undefined {
+    // 解析 conversationId 获取会话类型
+    const conversationId = sendParams.conversationId
+    const conversationType = ChatKitClient.nim.conversationIdUtil.parseConversationType(conversationId)
+    const targetId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversationId)
+
+    // 确定 sessionType 和 sessionId
+    // 注意：推送是发给对方的，对方点击后需要跳转到和发送者的会话
+    // - P2P：sessionId 应该是发送者的 ID（对方点击后跳转到和发送者的会话）
+    // - Team：sessionId 是群 ID（不变）
+    let sessionType: string
+    let sessionId: string
+    if (conversationType === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
+      sessionType = 'p2p'
+      sessionId = ChatKitClient.nim.loginService.getLoginUser()
+    } else if (conversationType === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
+      sessionType = 'team'
+      sessionId = targetId // 群会话：sessionId 是群 ID
+    } else {
+      sessionType = 'p2p'
+      sessionId = ChatKitClient.nim.loginService.getLoginUser()
+    }
+
+    // 构造华为推送载荷
+    const pushPayloadData: PushPayloadData = {
+      harmonyField: {
+        payload: {
+          notification: {
+            category: 'IM',
+            clickAction: {
+              actionType: 0,
+              data: {
+                sessionType: sessionType,
+                sessionId: sessionId
+              }
+            }
+          }
+        },
+        pushOptions: {
+          testMessage: true
+        }
+      },
+      harmonyPushType: 0
+    }
+
+    // 保留原有 params 配置，添加 pushPayload
+    const params: V2NIMSendMessageParams = sendParams.params ?? {}
+    // 保留原有 pushConfig 配置
+    params.pushConfig = params.pushConfig ?? {}
+    // 设置 pushPayload（华为推送跳转参数）
+    params.pushConfig.pushPayload = JSON.stringify(pushPayloadData)
+
+    sendParams.params = params
+    return sendParams
+  }
+}
 
 /**
  * Index is the entry of application and Here is a list showing three buttons,
  * click the button to jump to different pages.
  */
 
-PersistentStorage.persistProp(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE, true)
-PersistentStorage.persistProp(CommonConstants.KEY_SETTING_CLOUD_SEARCH, false)
+// 初始化 PersistentStorage，必须在 @Entry 组件加载前执行
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_EARPIECE_MODE, false);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_SHOWN_ONLINE_STATE, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_CLOUD_SEARCH, false);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_COLLECTION_ENABLE, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_PIN_ENABLE, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_TYPING_STATUS, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_ONLY_FRIEND_CALL, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_TEAM_ENABLE, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_TOP_MESSAGE, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_AI_STREAM, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_RICH_TEXT_MESSAGE, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_TEAM_MANAGER_MAX_COUNT, 10);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_PUSH_CONFIG_ENABLED, false);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_PUSH_CONFIG_CONTENT, '');
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_NOTIFY_RING, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_NOTIFY_VIBRATE, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_AUTO_TRANSLATION_ENABLE_TIME, 0);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_TRANSLATION_TARGET_LANGUAGE, TranslationLanguageCode.ZH_CHS);
 
 @Entry
 @ComponentV2
 struct Index {
   pathStack: NavPathStack = new NavPathStack()
   @Local showLoginPage: boolean = false
+
+  private resolveAutoTranslationEnableTime(): number {
+    const autoTranslationEnableTime = AppStorage.get<number>(CommonConstants.KEY_SETTING_AUTO_TRANSLATION_ENABLE_TIME)
+    if (typeof autoTranslationEnableTime === 'number') {
+      return autoTranslationEnableTime > 0 ? autoTranslationEnableTime : 0
+    }
+    const legacyAutoTranslate = AppStorage.get<boolean>('KEY_SETTING_TRANSLATION_AUTO')
+    return legacyAutoTranslate ? Date.now() : 0
+  }
+
+  private resolveTranslationTargetLanguage(): string {
+    const storedValue = AppStorage.get<string>(CommonConstants.KEY_SETTING_TRANSLATION_TARGET_LANGUAGE)
+    if (storedValue && SUPPORTED_TRANSLATION_LANGUAGES.includes(storedValue as TranslationLanguageCode)) {
+      return storedValue
+    }
+    return TranslationLanguageCode.ZH_CHS
+  }
+
   login = async (accountId: string, token: string) => {
     const nimRepository = NimRepository.getInstance(getContext(this))
     try {
@@ -38,17 +188,52 @@ struct Index {
 
   async onPageShow(): Promise<void> {
     let dataPreferences: preferences.Preferences | null = null;
-    let options: preferences.Options = { name: 'imkit_data' };
+    const options: preferences.Options = { name: 'imkit_data' };
     dataPreferences = preferences.getPreferencesSync(getContext(this), options);
     IMKitConfigCenter.enableLocalConversation = dataPreferences.getSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, true) as boolean
     IMKitConfigCenter.enableShownOnlineState = dataPreferences.getSync(CommonConstants.KEY_SETTING_SHOWN_ONLINE_STATE, true) as boolean
+    IMKitConfigCenter.enableTeamJoinAgreeModelAuth = resolveTeamJoinAgreeModeEnabled(
+      dataPreferences.getSync(CommonConstants.KEY_SETTING_TEAM_JOIN_AGREE_MODE, undefined) as boolean | undefined
+    )
+    const legacyReadMessageEnable = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_MESSAGE_READ_OR)
+    const readMessageEnable = resolveReadMessageEnabled(
+      dataPreferences.getSync(CommonConstants.KEY_SETTING_READ_MESSAGE, undefined) as boolean | undefined,
+      legacyReadMessageEnable
+    )
+    IMKitConfigCenter.enableReadMessage = readMessageEnable
+    ChatKitConfig.messageReadState = readMessageEnable
+    AppStorage.set(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, readMessageEnable)
     IMKitConfigCenter.enableAntiSpamTipMessage = AppStorage.get(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE) ?? true
     IMKitConfigCenter.enableCloudSearch = AppStorage.get(CommonConstants.KEY_SETTING_CLOUD_SEARCH) ?? false
+    IMKitConfigCenter.enableCollection = AppStorage.get(CommonConstants.KEY_SETTING_COLLECTION_ENABLE) ?? true
+    IMKitConfigCenter.enablePin = AppStorage.get(CommonConstants.KEY_SETTING_PIN_ENABLE) ?? true
+    IMKitConfigCenter.enableTypingStatus = AppStorage.get(CommonConstants.KEY_SETTING_TYPING_STATUS) ?? true
+    IMKitConfigCenter.enableOnlyFriendCall = AppStorage.get(CommonConstants.KEY_SETTING_ONLY_FRIEND_CALL) ?? true
+    IMKitConfigCenter.enableTeam = AppStorage.get(CommonConstants.KEY_SETTING_TEAM_ENABLE) ?? true
+    IMKitConfigCenter.enableTopMessage = AppStorage.get(CommonConstants.KEY_SETTING_TOP_MESSAGE) ?? true
+    IMKitConfigCenter.enableAIStream = AppStorage.get(CommonConstants.KEY_SETTING_AI_STREAM) ?? true
+    IMKitConfigCenter.enableRichTextMessage = AppStorage.get(CommonConstants.KEY_SETTING_RICH_TEXT_MESSAGE) ?? true
+    IMKitConfigCenter.teamManagerMaxCount = AppStorage.get(CommonConstants.KEY_SETTING_TEAM_MANAGER_MAX_COUNT) ?? 10
+    IMKitConfigCenter.enableEarphoneMode = AppStorage.get(CommonConstants.KEY_SETTING_EARPIECE_MODE) ?? false
+    const autoTranslationEnableTime = this.resolveAutoTranslationEnableTime()
+    const translationTargetLanguage = this.resolveTranslationTargetLanguage()
+    AppStorage.set(CommonConstants.KEY_SETTING_AUTO_TRANSLATION_ENABLE_TIME, autoTranslationEnableTime)
+    AppStorage.set(CommonConstants.KEY_SETTING_TRANSLATION_TARGET_LANGUAGE, translationTargetLanguage)
+    IMKitConfigCenter.autoTranslationEnableTime = autoTranslationEnableTime
+    IMKitConfigCenter.translationTargetLanguage = translationTargetLanguage
+    // 加载推送配置
+    const pushConfigEnabled = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_PUSH_CONFIG_ENABLED) ?? false
+    const pushConfigContent = AppStorage.get<string>(CommonConstants.KEY_SETTING_PUSH_CONFIG_CONTENT) ||
+      PushConfigManager.getInstance().getDefaultConfig()
+    PushConfigManager.getInstance().initConfig(pushConfigEnabled, pushConfigContent)
+
     if (AppConfig.userId) {
       this.login(AppConfig.userId, AppConfig.userToken)
     } else {
       this.showLoginPage = true
     }
+    // 注册消息发送回调（注入华为推送跳转参数）
+    IMKitCustomFactory.setMessageSendCallback(new MessageSendCallbackImpl())
   }
 
   build() {

@@ -11,9 +11,11 @@ import {
   ChatRepo,
   collectionTypeOffset,
   ConversationRepo,
+  createMultiLineAttachment,
   ErrorUtils,
   IMKitConfigCenter,
   LocalConversationRepo,
+  PushConfigManager,
   StorageRepo,
   YxAitMsg
 } from '@nimkit/chatkit';
@@ -32,6 +34,7 @@ import {
   V2NIMMessageAIConfigParams,
   V2NIMMessageAIStatus,
   V2NIMMessageAIStreamStatus,
+  V2NIMMessageAudioAttachment,
   V2NIMMessageConfig,
   V2NIMMessageDeletedNotification,
   V2NIMMessageFileAttachment,
@@ -42,7 +45,8 @@ import {
   V2NIMMessageType,
   V2NIMQueryDirection,
   V2NIMSendMessageParams,
-  V2NIMSendMessageResult
+  V2NIMSendMessageResult,
+  V2NIMVoiceToTextParams
 } from '@nimsdk/base';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { ChatInfo } from '../model/ChatInfo';
@@ -58,9 +62,11 @@ import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/Conv
 import { ChatKitConfig } from '../ChatKitConfig';
 import { sceneMap } from '@kit.MapKit';
 import { clearForwardAtMark, createForwardMessageListFileDetail, sendMessageFailedTips } from '../common/MessageHelper';
+import { buildSendMessageParams } from '../common/SendMessageParamsHelper';
 import { instanceToPlain } from 'class-transformer';
 import { NECommonUtils } from '@nimkit/common';
 import { HashMap, JSON } from '@kit.ArkTS';
+import { buildMessageJumpPlan } from '../utils/ChatJumpUtils';
 
 @ObservedV2
 export class ChatBaseViewModel {
@@ -113,6 +119,24 @@ export class ChatBaseViewModel {
 
   setAnchorMessage(msg: NIMMessageInfo | undefined) {
     this.anchorMsg = msg
+  }
+
+  jumpToMessage(msg: NIMMessageInfo | undefined): void {
+    if (!msg) {
+      return
+    }
+
+    const messageClientIds = this.chatInfo?.msgList.getMessageList().map((item: NIMMessageInfo) => {
+      return item.message.messageClientId
+    }) ?? []
+    const jumpPlan = buildMessageJumpPlan(msg.message.messageClientId, messageClientIds)
+    if (jumpPlan.scrollIndex >= 0) {
+      this.chatInfo?.setScrollIndex(jumpPlan.scrollIndex)
+      return
+    }
+    if (jumpPlan.shouldLoadAnchor) {
+      this.setAnchorMessage(msg)
+    }
   }
 
   init(conversationId: string, chatInfo: ChatInfo) {
@@ -308,8 +332,10 @@ export class ChatBaseViewModel {
         console.debug('netease viewmodel onRevokeFun revoke message', msg.revokeAccountId,
           msg.messageRefer.messageClientId)
         if (revokeMsg !== undefined && msg.messageRefer.senderId == ChatKitClient.getLoginUserId()) {
+          // 文本消息和多行消息（type=102）都支持撤回重编辑
           let canEdit =
-            !revokeMsg.isReceiveMsg && revokeMsg.message.messageType == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT
+            !revokeMsg.isReceiveMsg && (revokeMsg.message.messageType == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ||
+              revokeMsg.isMultiLineMsg)
           saveLocalRevokeMessage(msg.messageRefer.conversationId, revokeMsg.message, canEdit)
         } else {
           saveLocalRevokeMessageFormOther(msg.messageRefer.conversationId, msg, false)
@@ -686,20 +712,19 @@ export class ChatBaseViewModel {
     }
   }
 
-  // 消息发送之前调用，用于配置消息通用参数
-  beforeSendMessage(msg: V2NIMMessage): V2NIMMessage {
-    if (ChatKitConfig.messageReadState) {
-      let msgConfig: V2NIMMessageConfig = {
-        readReceiptEnabled: true
-      }
-      msg.messageConfig = msgConfig
-    }
-    return msg
+  /**
+   * 消息发送之前调用，用于配置消息通用参数
+   * @param params 原始发送参数（如调用方设置的 pushConfig 等）
+   * @returns 合并后的 V2NIMSendMessageParams，beforeSendMessage 的配置优先；如果没有任何配置则返回 undefined
+   */
+  beforeSendMessage(params?: V2NIMSendMessageParams): V2NIMSendMessageParams | undefined {
+    return buildSendMessageParams(params)
   }
 
   // 发送消息并设置发送进度
   sendMessageAndSetProgress(message: V2NIMMessage) {
-    this.sendMessage(this.beforeSendMessage(message), undefined, (percentage: number) => {
+    const mergedParams = this.beforeSendMessage()
+    this.sendMessage(message, mergedParams, (percentage: number) => {
       let msgInfo = this.chatInfo?.getMessage(message.messageClientId)
       if (msgInfo) {
         let progress = percentage * 100
@@ -784,6 +809,50 @@ export class ChatBaseViewModel {
     const message = ChatRepo.createLocationMessage(data.location.latitude, data.location.longitude, data.address)
     message.text = data.name
     this.sendMessage(message)
+  }
+
+  /**
+   * 发送富文本消息（换行消息）
+   * @param title 标题
+   * @param body 正文
+   * @param replyMsg 回复消息（可选）
+   * @param aitModel @ 信息（可选）
+   * @param pushList 推送列表（可选）
+   */
+  async sendMultiLineMessage(title: string, body: string, replyMsg?: NIMMessageInfo, aitModel?: AitModel, pushList?: string[]) {
+    const attachment = createMultiLineAttachment(title, body)
+    // 将标题和正文拼接为 text 字段，用于 FTS 全文搜索
+    // 格式：标题在前，正文在后，中间用空格分隔
+    const searchText = `${title}\n${body}`
+    const message = ChatRepo.createCustomMessage(searchText, attachment)
+
+    // 设置 Ait
+    if (aitModel && aitModel.aitBlocks.size > 0) {
+      let extensionMap: YxAitMsg = {
+        yxAitMsg: aitModel.aitBlocks
+      }
+      let extension = JSON.stringify(instanceToPlain(extensionMap))
+      message.serverExtension = extension
+    }
+
+    // 设置推送
+    let params: V2NIMSendMessageParams | undefined = undefined
+    if (pushList) {
+      params = {
+        pushConfig: {
+          forcePush: true,
+          forcePushAccountIds: pushList.length >= 0 ? pushList : undefined
+        }
+      }
+    }
+
+    // 回复
+    if (replyMsg) {
+      this.replyMessage(message, replyMsg.message, params)
+      return
+    }
+
+    this.sendMessage(message, params)
   }
 
   /**
@@ -924,7 +993,8 @@ export class ChatBaseViewModel {
    */
   async sendMessage(msg: V2NIMMessage, params?: V2NIMSendMessageParams, progress?: (percentage: number) => void): Promise<void> {
     try {
-      const result: V2NIMSendMessageResult | undefined = await ChatRepo.sendMessage(this.beforeSendMessage(msg), this.conversationId!, params, progress)
+      const mergedParams = this.beforeSendMessage(params)
+      const result: V2NIMSendMessageResult | undefined = await ChatRepo.sendMessage(msg, this.conversationId!, mergedParams, progress)
 
       // 命中反垃圾的需要进行更新消息 & 添加反垃圾 TIP
       if (result && result.antispamResult) {
@@ -946,7 +1016,8 @@ export class ChatBaseViewModel {
    */
   async replyMessage(msg: V2NIMMessage, replyMsg: V2NIMMessage, params?: V2NIMSendMessageParams,
     progress?: (percentage: number) => void) {
-    ChatRepo.replyMessage(this.beforeSendMessage(msg), replyMsg, params, progress)
+    const mergedParams = this.beforeSendMessage(params)
+    ChatRepo.replyMessage(msg, replyMsg, mergedParams, progress)
       .catch((err: BusinessError) => {
         console.error('net ease reply message error', err.code, err.message);
         sendMessageFailedTips(msg, err, this.conversationId!)
@@ -962,7 +1033,8 @@ export class ChatBaseViewModel {
    */
   async sendForwardMessage(msg: V2NIMMessage, conversationId: string, params?: V2NIMSendMessageParams,
     progress?: (percentage: number) => void) {
-    ChatRepo.sendMessage(this.beforeSendMessage(msg), conversationId, params, progress)
+    const mergedParams = this.beforeSendMessage(params)
+    ChatRepo.sendMessage(msg, conversationId, mergedParams, progress)
       .catch((err: BusinessError) => {
         console.error('net ease send message error', err.code, err.message);
         sendMessageFailedTips(msg, err, conversationId)
@@ -1025,7 +1097,8 @@ export class ChatBaseViewModel {
           const leaveMsg = ChatRepo.createTextMessage(leaveText)
           if (leaveMsg && conversation.conversationId) {
             setTimeout(() => {
-              ChatRepo.sendMessage(this.beforeSendMessage(leaveMsg), conversation.conversationId!)
+              const mergedParams = this.beforeSendMessage()
+              ChatRepo.sendMessage(leaveMsg, conversation.conversationId!, mergedParams)
                 .catch((err: BusinessError) => {
                   console.error('net ease send message error', err.code, err.message);
                   sendMessageFailedTips(leaveMsg, err, conversation.conversationId!)
@@ -1254,6 +1327,85 @@ export class ChatBaseViewModel {
       return
     }
     this.chatInfo?.pushModifyMessage(updatedMessage)
+  }
+
+  /**
+   * 语音转文字
+   * @param msg 语音消息
+   */
+  async voiceToText(msg: NIMMessageInfo): Promise<void> {
+    if (!msg || msg.message.messageType !== V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
+      return
+    }
+
+    // 如果正在加载中，不重复请求
+    if (msg.voiceToTextLoading) {
+      return
+    }
+
+    const audioAttachment = msg.message.attachment as V2NIMMessageAudioAttachment
+    if (!audioAttachment) {
+      return
+    }
+
+    // 检查语音时长是否超过 60 秒限制
+    const duration = audioAttachment.duration ?? 0
+    if (duration > 60000) {
+      NECommonUtils.showToast($r('app.string.chat_message_voice_too_long'))
+      return
+    }
+
+    // 构造语音转文字参数
+    const params: V2NIMVoiceToTextParams = {
+      duration: duration
+    }
+
+    // 优先使用 URL，其次使用本地路径
+    if (audioAttachment.url && audioAttachment.url.length > 0) {
+      params.voiceUrl = audioAttachment.url
+    } else if (audioAttachment.path && audioAttachment.path.length > 0) {
+      params.voicePath = audioAttachment.path
+    } else {
+      NECommonUtils.showToast($r('app.string.chat_message_voice_to_text_failed'))
+      return
+    }
+
+    // 设置场景名
+    if (audioAttachment.sceneName) {
+      params.sceneName = audioAttachment.sceneName
+    }
+
+    // 设置加载状态
+    msg.voiceToTextLoading = true
+
+    try {
+      const result = await ChatRepo.voiceToText(params)
+      if (result && result.length > 0) {
+        // 更新消息的转文字结果
+        msg.voiceToText = result
+        // 缓存转文字结果，用于从历史记录/标记列表回来时恢复
+        this.chatInfo?.cacheVoiceToText(msg.message.messageClientId, result)
+        
+        // 转文字成功后，自动定位到该消息（让用户能看到完整的转文字结果）
+        setTimeout(() => {
+          this.setAnchorMessage(msg)
+        }, 100)
+      } else {
+        NECommonUtils.showToast($r('app.string.chat_message_voice_to_text_failed'))
+      }
+      // SDK 返回空字符串时不做任何处理（实际场景中 SDK 会返回失败而非空字符串）
+    } catch (err) {
+      console.error('netease voiceToText error', err.code, err.message)
+      // 网络错误显示特定提示
+      if (err.code === V2NIMErrorCode.V2NIM_ERROR_CODE_ILLEGAL_STATE) {
+        NECommonUtils.showToast($r('app.string.chat_network_error_tips'))
+      } else {
+        NECommonUtils.showToast($r('app.string.chat_message_voice_to_text_failed'))
+      }
+    } finally {
+      // 无论成功失败，都结束加载状态
+      msg.voiceToTextLoading = false
+    }
   }
 
   /**

@@ -4,19 +4,65 @@
  * found in the LICENSE file.
  *
  */
-import { ChatKitClient, keyExtensionAtAll, TeamRepo, typeExtensionAllowAll } from '@nimkit/chatkit'
-import { JSONUtil } from '@nimkit/common'
-import { V2NIMTeam, V2NIMTeamMember, V2NIMTeamMemberRole, V2NIMTeamMemberRoleQueryType } from '@nimsdk/base'
+import {
+  ChatKitClient,
+  ErrorUtils,
+  getTopStickyPermissionMode,
+  keyExtensionAtAll,
+  TeamRepo,
+  typeExtensionAllowAll
+} from '@nimkit/chatkit'
+import { JSONUtil, NECommonUtils } from '@nimkit/common'
+import {
+  V2NIMError,
+  V2NIMErrorCode,
+  V2NIMTeam,
+  V2NIMTeamAgreeMode,
+  V2NIMTeamJoinMode,
+  V2NIMTeamMember,
+  V2NIMTeamMemberRole,
+  V2NIMTeamMemberRoleQueryType,
+  V2NIMTeamUpdateExtensionMode,
+  V2NIMUpdateTeamInfoParams
+} from '@nimsdk/base'
+
+export function getAgreeModeToggleState(agreeMode?: V2NIMTeamAgreeMode): boolean {
+  return agreeMode === V2NIMTeamAgreeMode.V2NIM_TEAM_AGREE_MODE_AUTH
+}
+
+export function getJoinModeToggleState(joinMode?: V2NIMTeamJoinMode): boolean {
+  return joinMode !== V2NIMTeamJoinMode.V2NIM_TEAM_JOIN_MODE_FREE
+}
+
+export function getAgreeModeByToggleState(isOn: boolean): V2NIMTeamAgreeMode {
+  return isOn ? V2NIMTeamAgreeMode.V2NIM_TEAM_AGREE_MODE_AUTH :
+    V2NIMTeamAgreeMode.V2NIM_TEAM_AGREE_MODE_NO_AUTH
+}
+
+export function getJoinModeByToggleState(isOn: boolean): V2NIMTeamJoinMode {
+  return isOn ? V2NIMTeamJoinMode.V2NIM_TEAM_JOIN_MODE_APPLY :
+    V2NIMTeamJoinMode.V2NIM_TEAM_JOIN_MODE_FREE
+}
+
+export function getTopStickyUpdateExtensionMode(permission: string): V2NIMTeamUpdateExtensionMode {
+  return permission === typeExtensionAllowAll ?
+  V2NIMTeamUpdateExtensionMode.V2NIM_TEAM_UPDATE_EXTENSION_MODE_ALL :
+  V2NIMTeamUpdateExtensionMode.V2NIM_TEAM_UPDATE_EXTENSION_MODE_MANAGER
+}
 
 @ObservedV2
 export class TeamManageViewModel {
   @Trace teamInfo?: V2NIMTeam = undefined
   @Trace managerCount?: number = undefined
+  @Trace agreeModeToggleOn: boolean = false
+  @Trace joinModeToggleOn: boolean = false
+  agreeModeValue?: V2NIMTeamAgreeMode = undefined
+  joinModeValue?: V2NIMTeamJoinMode = undefined
   //管理员
   managerList: V2NIMTeamMember[] = []
 
   init(teamInfo?: V2NIMTeam) {
-    this.teamInfo = teamInfo
+    this.applyTeamInfo(teamInfo)
     this.initTeamListener()
   }
 
@@ -44,14 +90,14 @@ export class TeamManageViewModel {
     if (this.teamInfo) {
       TeamRepo.getTeamInfo(this.teamInfo.teamId, this.teamInfo.teamType)
         .then((team) => {
-          this.teamInfo = team
+          this.applyTeamInfo(team)
         })
     }
   }
 
   onTeamInfoUpdated(team: V2NIMTeam) {
     if (team.teamId === this.teamInfo?.teamId) {
-      this.teamInfo = team
+      this.applyTeamInfo(team)
     }
   }
 
@@ -99,6 +145,102 @@ export class TeamManageViewModel {
       }
     }
     return result
+  }
+
+  /**
+   * 获取消息置顶权限
+   * 从 serverExtension 中读取 yxAllowTop
+   * 讨论组默认所有人可置顶，高级群默认群主和管理员可置顶
+   */
+  getTopStickyPermission(): string {
+    return getTopStickyPermissionMode(this.teamInfo?.serverExtension,
+      this.teamInfo ? TeamRepo.isGroupTeam(this.teamInfo) : false)
+  }
+
+  async updateAgreeModeToggle(isOn: boolean) {
+    const teamInfo = this.teamInfo
+    if (!teamInfo) {
+      this.syncJoinManageToggleState()
+      return
+    }
+
+    const previousAgreeMode = this.agreeModeValue
+    this.agreeModeToggleOn = isOn
+    this.agreeModeValue = getAgreeModeByToggleState(isOn)
+
+    if (!ErrorUtils.checkNetworkAndToast()) {
+      this.rollbackAgreeMode(previousAgreeMode)
+      return
+    }
+
+    const param: V2NIMUpdateTeamInfoParams = {
+      agreeMode: this.agreeModeValue
+    }
+
+    try {
+      await TeamRepo.updateTeamInfo(teamInfo.teamId, teamInfo.teamType, param)
+    } catch (e) {
+      this.rollbackAgreeMode(previousAgreeMode)
+      this.handleUpdateJoinManageModeError(e as V2NIMError)
+    }
+  }
+
+  async updateJoinModeToggle(isOn: boolean) {
+    const teamInfo = this.teamInfo
+    if (!teamInfo) {
+      this.syncJoinManageToggleState()
+      return
+    }
+
+    const previousJoinMode = this.joinModeValue
+    this.joinModeToggleOn = isOn
+    this.joinModeValue = getJoinModeByToggleState(isOn)
+
+    if (!ErrorUtils.checkNetworkAndToast()) {
+      this.rollbackJoinMode(previousJoinMode)
+      return
+    }
+
+    const param: V2NIMUpdateTeamInfoParams = {
+      joinMode: this.joinModeValue
+    }
+
+    try {
+      await TeamRepo.updateTeamInfo(teamInfo.teamId, teamInfo.teamType, param)
+    } catch (e) {
+      this.rollbackJoinMode(previousJoinMode)
+      this.handleUpdateJoinManageModeError(e as V2NIMError)
+    }
+  }
+
+  private applyTeamInfo(teamInfo?: V2NIMTeam) {
+    this.teamInfo = teamInfo
+    this.agreeModeValue = teamInfo?.agreeMode
+    this.joinModeValue = teamInfo?.joinMode
+    this.syncJoinManageToggleState()
+  }
+
+  private syncJoinManageToggleState() {
+    this.agreeModeToggleOn = getAgreeModeToggleState(this.agreeModeValue)
+    this.joinModeToggleOn = getJoinModeToggleState(this.joinModeValue)
+  }
+
+  private rollbackAgreeMode(previousAgreeMode?: V2NIMTeamAgreeMode) {
+    this.agreeModeValue = previousAgreeMode
+    this.agreeModeToggleOn = getAgreeModeToggleState(previousAgreeMode)
+  }
+
+  private rollbackJoinMode(previousJoinMode?: V2NIMTeamJoinMode) {
+    this.joinModeValue = previousJoinMode
+    this.joinModeToggleOn = getJoinModeToggleState(previousJoinMode)
+  }
+
+  private handleUpdateJoinManageModeError(error: V2NIMError) {
+    if (error.code === V2NIMErrorCode.V2NIM_ERROR_CODE_TEAM_OWNER_OR_MANAGER_OPERATION_PERMISSION_REQUIRED) {
+      NECommonUtils.showToast($r('app.string.team_operate_no_permission_tip'))
+      return
+    }
+    ChatKitClient.logger?.debug(`update join manage mode error = ${error.message}`)
   }
 
   /**

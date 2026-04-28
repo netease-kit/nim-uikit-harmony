@@ -6,9 +6,8 @@
  */
 
 import { V2NIMUser } from '@nimsdk/base';
-import { ViewItem } from '@nimkit/common/src/main/ets/model/ViewItem';
-import { AvatarColorUntil, AvatarItem, CommonAvatar, CommonConstants, ViewItemBuilder } from '@nimkit/common';
-import { ChatKitClient, NEFriendUserCache } from '@nimkit/chatkit';
+import { AvatarColorUntil, AvatarItem, CommonAvatar, ViewItemBuilder } from '@nimkit/common';
+import { ChatKitClient, IMKitConfigCenter, NEFriendUserCache } from '@nimkit/chatkit';
 
 // 跳转页面入口函数
 @Builder
@@ -16,43 +15,10 @@ function MinePageBuilder() {
   MinePage()
 }
 
-PersistentStorage.persistProp(CommonConstants.KEY_SETTING_EARPIECE_MODE, true)
-PersistentStorage.persistProp(CommonConstants.KEY_SETTING_MESSAGE_READ_OR, true)
-PersistentStorage.persistProp(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, true)
-PersistentStorage.persistProp(CommonConstants.KEY_SETTING_SHOWN_ONLINE_STATE, true)
-PersistentStorage.persistProp(CommonConstants.KEY_SETTING_ANTISPAM_TIP_MESSAGE, true)
-PersistentStorage.persistProp(CommonConstants.KEY_SETTING_CLOUD_SEARCH, false)
-
 @ComponentV2
 export struct MinePage {
   @Param pathStack: NavPathStack = new NavPathStack()
   @Local myUser?: V2NIMUser = NEFriendUserCache.mineUserCache?.user;
-  @Local mineItems: ViewItem[] = [
-    {
-      avatarItem: new AvatarItem($r('app.media.mine_setting')),
-      title: $r("app.string.mine_setting"),
-      itemHeight: 52,
-      titleIconSize: 24,
-      titleFontSize: 16,
-      routerUrl: "SettingPage"
-    },
-    {
-      avatarItem: new AvatarItem($r('app.media.mine_collection')),
-      title: $r("app.string.chat_operation_collection"),
-      itemHeight: 52,
-      titleIconSize: 24,
-      titleFontSize: 16,
-      routerUrl: "CollectionMessagePage"
-    },
-    {
-      avatarItem: new AvatarItem($r('app.media.mine_about')),
-      title: $r("app.string.mine_about"),
-      itemHeight: 52,
-      titleIconSize: 24,
-      titleFontSize: 16,
-      routerUrl: "AboutPage"
-    },
-  ]
 
   getAvatarName(): string {
     let user = NEFriendUserCache.mineUserCache?.user
@@ -74,10 +40,6 @@ export struct MinePage {
         NEFriendUserCache.mineUserCache.user = user
       }
     })
-  }
-
-  onPageShow(): void {
-    this.build()
   }
 
   build() {
@@ -129,15 +91,51 @@ export struct MinePage {
         })
 
         List() {
-          ForEach(this.mineItems, (item: ViewItem) => {
+          // 设置
+          ListItem() {
+            ViewItemBuilder({
+              avatarItem: new AvatarItem($r('app.media.mine_setting')),
+              title: $r("app.string.mine_setting"),
+              itemHeight: 52,
+              titleIconSize: 24,
+              titleFontSize: 16,
+              routerUrl: "SettingPage"
+            })
+          }
+          .onClick(() => {
+            this.pathStack.pushPath({ name: 'SettingPage' })
+          })
+
+          // 收藏（根据配置显示/隐藏）
+          if (IMKitConfigCenter.enableCollection) {
             ListItem() {
-              ViewItemBuilder(item)
+              ViewItemBuilder({
+                avatarItem: new AvatarItem($r('app.media.mine_collection')),
+                title: $r("app.string.chat_operation_collection"),
+                itemHeight: 52,
+                titleIconSize: 24,
+                titleFontSize: 16,
+                routerUrl: "CollectionMessagePage"
+              })
             }
             .onClick(() => {
-              this.pathStack.pushPath({
-                name: item.routerUrl
-              })
+              this.pathStack.pushPath({ name: 'CollectionMessagePage' })
             })
+          }
+
+          // 关于
+          ListItem() {
+            ViewItemBuilder({
+              avatarItem: new AvatarItem($r('app.media.mine_about')),
+              title: $r("app.string.mine_about"),
+              itemHeight: 52,
+              titleIconSize: 24,
+              titleFontSize: 16,
+              routerUrl: "AboutPage"
+            })
+          }
+          .onClick(() => {
+            this.pathStack.pushPath({ name: 'AboutPage' })
           })
         }
         .height('100%')

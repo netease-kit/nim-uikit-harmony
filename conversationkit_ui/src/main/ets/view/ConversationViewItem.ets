@@ -5,17 +5,17 @@
  *
  */
 
-import { ChatKitClient, CustomMessageUtils, IMKitConfigCenter, mergedMessageCustomType } from '@nimkit/chatkit';
+import { ChatKitClient, CustomMessageUtils, getMultiLinePreviewFromAttachment, IMKitConfigCenter, mergedMessageCustomType, multiLineMessageCustomType } from '@nimkit/chatkit';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
 import { DateUtil } from '@nimkit/common/src/main/ets/utils/DateUtil';
-import { V2NIMConversation, V2NIMConversationType, V2NIMMessageCallAttachment, V2NIMMessageType } from '@nimsdk/base';
-import { ConversationOperationDialog } from './ConversationOperationDialog';
+import { V2NIMConversationType, V2NIMMessageCallAttachment, V2NIMMessageType } from '@nimsdk/base';
+import { ConversationItem } from '../strategy/ConversationStrategy';
 
 @ComponentV2
 export struct ConversationViewItem {
-  @Param conversationInfo: V2NIMConversation | null = null
+  @Param conversationInfo: ConversationItem | null = null
   @Param haveBeanAit: boolean = false
-  @Param @Require onItemClick?: () => void
+  @Param onItemClick?: () => void | undefined = undefined
   @Param onlineState: boolean = false
 
   build() {
@@ -191,14 +191,17 @@ export struct ConversationViewItem {
    * @param item
    * @returns
    */
-  getConversationContent(item: V2NIMConversation): string | Resource {
+  getConversationContent(item: ConversationItem): string | Resource {
     if (!item.lastMessage) {
       return ''
     }
 
     switch (item.lastMessage?.messageType) {
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT:
-        return item.lastMessage.text ?? ''
+        // 只返回第一行文本，避免多行文本导致会话列表显示省略号
+        const text = item.lastMessage.text ?? ''
+        const firstLineEnd = text.indexOf('\n')
+        return firstLineEnd === -1 ? text : text.substring(0, firstLineEnd)
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE:
         return $r('app.string.imageMessageType')
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO:
@@ -228,6 +231,9 @@ export struct ConversationViewItem {
           const customType = CustomMessageUtils.typeOfCustomMessage(item.lastMessage.attachment)
           if (customType === mergedMessageCustomType) {
             return $r('app.string.chat_merge_history')
+          }
+          if (customType === multiLineMessageCustomType) {
+            return getMultiLinePreviewFromAttachment(item.lastMessage?.attachment)
           }
         }
         break

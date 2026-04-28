@@ -4,7 +4,7 @@
  *  found in the LICENSE file.
  */
 
-import { ChatKitClient, IMKitConfigCenter } from '@nimkit/chatkit';
+import { ChatKitClient, getMultiLineBody, getMultiLineTitle, IMKitConfigCenter, isMultiLineMessage } from '@nimkit/chatkit';
 import { ChatBaseViewModel } from '../viewmodel/ChatBaseViewModel';
 import { AvatarColorUntil, AvatarItem, CommonAvatar, CommonEmptyResult, CommonTextInput, NavigationBackBuilder, NECommonUtils, TailString } from '@nimkit/common';
 import { EmojiParseType, NEEmojiManager, NEEmojiParseResult, NIMInputEmoticon } from '../manager/NEEmojiManager';
@@ -192,7 +192,7 @@ export struct SearchFTSHistoryPage {
                         .maxLines(1)
                         .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-                      // 消息内容：文本消息使用自定义 emoji + 高亮渲染，其他类型使用 memberHistoryMessageContent
+                      // 消息内容：文本消息和换行消息使用自定义 emoji + 高亮渲染，其他类型使用 memberHistoryMessageContent
                       if (item.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
                         // 文本消息：使用 parseTextWithEmojiAndHighlight 解析 emoji 并高亮关键词
                         Row() {
@@ -215,6 +215,65 @@ export struct SearchFTSHistoryPage {
                           }
                           .constraintSize({ maxWidth: '100%' })
                         }
+                        .backgroundColor($r('app.color.color_chat_receive_message_bg'))
+                        .borderRadius({
+                          topLeft: 0,
+                          topRight: 8,
+                          bottomLeft: 8,
+                          bottomRight: 8
+                        })
+                        .padding({
+                          left: 14,
+                          right: 14,
+                          top: 10,
+                          bottom: 10
+                        })
+                        .margin({ top: 6 })
+                      } else if (isMultiLineMessage(item.message)) {
+                        // 换行消息：标题+正文，支持关键词高亮
+                        Column() {
+                          // 标题（如果有）
+                          if (getMultiLineTitle(item.message).length > 0) {
+                            Text() {
+                              ForEach(parseTextWithEmojiAndHighlight(getMultiLineTitle(item.message), this.searchText.trim()),
+                                (segment: EmojiTextSegment, index: number) => {
+                                  if (segment.emoji && segment.emoji.file) {
+                                    ImageSpan($rawfile(`emoji/${segment.emoji.file}`))
+                                      .width(18)
+                                      .height(18)
+                                      .verticalAlign(ImageSpanAlignment.CENTER)
+                                  } else if (segment.text) {
+                                    Span(segment.text)
+                                      .fontSize($r('app.float.chat_message_text_font_size'))
+                                      .fontWeight(FontWeight.Bold)
+                                      .fontColor(segment.isHighlight ? '#337EFF' : $r('app.color.color_chat_title'))
+                                  }
+                                }, (segment: EmojiTextSegment, index: number) => `title-${index}-${segment.text ?? segment.emoji?.tag ?? ''}`)
+                            }
+                            .constraintSize({ maxWidth: '100%' })
+                            .margin({ bottom: 4 })
+                          }
+                          // 正文（如果有）
+                          if (getMultiLineBody(item.message).length > 0) {
+                            Text() {
+                              ForEach(parseTextWithEmojiAndHighlight(getMultiLineBody(item.message), this.searchText.trim()),
+                                (segment: EmojiTextSegment, index: number) => {
+                                  if (segment.emoji && segment.emoji.file) {
+                                    ImageSpan($rawfile(`emoji/${segment.emoji.file}`))
+                                      .width(18)
+                                      .height(18)
+                                      .verticalAlign(ImageSpanAlignment.CENTER)
+                                  } else if (segment.text) {
+                                    Span(segment.text)
+                                      .fontSize($r('app.float.chat_message_text_font_size'))
+                                      .fontColor(segment.isHighlight ? '#337EFF' : $r('app.color.color_chat_title'))
+                                  }
+                                }, (segment: EmojiTextSegment, index: number) => `body-${index}-${segment.text ?? segment.emoji?.tag ?? ''}`)
+                            }
+                            .constraintSize({ maxWidth: '100%' })
+                          }
+                        }
+                        .alignItems(HorizontalAlign.Start)
                         .backgroundColor($r('app.color.color_chat_receive_message_bg'))
                         .borderRadius({
                           topLeft: 0,

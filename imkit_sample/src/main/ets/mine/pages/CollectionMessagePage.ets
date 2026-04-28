@@ -22,6 +22,9 @@ import {
   conversationSelectLimitCount,
   CustomMessageUtils,
   ErrorUtils,
+  getMultiLineBody,
+  getMultiLineTitle,
+  isMultiLineMessage,
   MergedMessageAttachment,
   mergedMessageCustomType
 } from '@nimkit/chatkit';
@@ -49,8 +52,14 @@ export struct CollectionMoreActionDialog {
   @BuilderParam deleteCollectionMessage?: () => void
   controller?: CustomDialogController
   copyMessage = () => {
+    let copyText = this.collectionMessageModel.message?.message.text ?? ''
+    if (this.collectionMessageModel.message && isMultiLineMessage(this.collectionMessageModel.message.message)) {
+      const title = getMultiLineTitle(this.collectionMessageModel.message.message)
+      const body = getMultiLineBody(this.collectionMessageModel.message.message)
+      copyText = title && body ? `${title}\n${body}` : (title || body)
+    }
     const copyData =
-      pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.collectionMessageModel.message?.message.text)
+      pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, copyText)
     pasteboard.getSystemPasteboard().setData(copyData).then(() => {
       NECommonUtils.showToast($r('app.string.copy_success'))
       this.cancel()
@@ -77,7 +86,9 @@ export struct CollectionMoreActionDialog {
           .width('100%')
           .onClick(this.deleteCollectionMessage)
 
-        if (this.collectionMessageModel.message?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+        if (this.collectionMessageModel.message &&
+          (this.collectionMessageModel.message.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ||
+          isMultiLineMessage(this.collectionMessageModel.message.message))) {
           Row()
             .height(1)
             .width('100%')
@@ -259,7 +270,8 @@ export struct CollectionMessagePage {
 
   getMoreActionDialogHeight(message?: NIMMessageInfo): number {
     let height = 42
-    if (message?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+    if (message && (message.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ||
+      isMultiLineMessage(message.message))) {
       height += 43
     }
     if (message?.message.messageType !== V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
@@ -307,6 +319,8 @@ export struct CollectionMessagePage {
     } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
       this.showVideoDetail(msg)
     } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+      this.textMessageDetailDialog.open()
+    } else if (msg && isMultiLineMessage(msg.message)) {
       this.textMessageDetailDialog.open()
     } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
       showLocationDetail(msg, getContext(this) as common.UIAbilityContext)

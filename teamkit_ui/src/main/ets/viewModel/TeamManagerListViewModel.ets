@@ -20,12 +20,36 @@ export class TeamMangerListViewModel {
   teamId?: string
   //是否结束
   isFinish: boolean = false
+  //是否正在拉取中，避免重复分页
+  isLoading: boolean = false
   //下次请求所需token
   nextToken?: string | undefined
   //每次请求的条数限制
   teamMemberLimit = 100
   @Trace managerList: TeamMemberWithUser[] = []
   @Trace haveInitData: boolean = false
+
+  needFillNextPage(): boolean {
+    return !this.isFinish && this.managerList.length < this.teamMemberLimit
+  }
+
+  appendManagerList(members: TeamMemberWithUser[]) {
+    let newMembers = members.filter((member) => !member.isOwner() &&
+      !this.managerList.find((item) => item.getAccId() === member.getAccId()))
+
+    if (newMembers.length > 0) {
+      this.managerList.push(...newMembers)
+      this.managerList.sort((a, b) => this.sortTeamMember(a, b))
+    }
+  }
+
+  removeManagersFromList(removeIds: string[]) {
+    let oldLength = this.managerList.length
+    this.managerList = this.managerList.filter((member) => !removeIds.includes(member.getAccId()))
+    if (this.managerList.length < oldLength && this.needFillNextPage()) {
+      this.getTeamManagerList()
+    }
+  }
 
   init(teamId: string) {
     this.teamId = teamId
@@ -66,7 +90,9 @@ export class TeamMangerListViewModel {
       V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL
         && this.managerList.find((a) => a.teamMember.accountId === e.accountId))
 
-      this.managerList = this.managerList.filter((m) => !normalMembers.find((e) => e.accountId === m.getAccId()))
+      if (normalMembers.length > 0) {
+        this.removeManagersFromList(normalMembers.map((member) => member.accountId))
+      }
 
 
     }
@@ -75,14 +101,14 @@ export class TeamMangerListViewModel {
   onTeamMemberLeft(members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
       let removeIds: string[] = members.map(member => member.accountId)
-      this.managerList = this.managerList.filter(m => !removeIds.includes(m.getAccId()))
+      this.removeManagersFromList(removeIds)
     }
   }
 
   onTeamMemberKicked(accId: string, members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
       let removeIds: string[] = members.map(member => member.accountId)
-      this.managerList = this.managerList.filter(m => !removeIds.includes(m.getAccId()))
+      this.removeManagersFromList(removeIds)
     }
   }
 
@@ -112,7 +138,7 @@ export class TeamMangerListViewModel {
         this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
         [removeManagerId], V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL
       ).then(() => {
-        this.managerList = this.managerList.filter(member => member.getAccId() !== removeManagerId)
+        this.removeManagersFromList([removeManagerId])
       })
     }
   }
@@ -122,6 +148,9 @@ export class TeamMangerListViewModel {
    * @param first
    */
   async getTeamManagerList(first?: boolean) {
+    if (this.isLoading) {
+      return
+    }
     if (first === true) {
       this.isFinish = false
       this.nextToken = undefined
@@ -131,6 +160,7 @@ export class TeamMangerListViewModel {
       return
     }
     if (this.teamId) {
+      this.isLoading = true
       try {
         let result = await TeamRepo.getTeamMembers(this.teamId,
           V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, {
@@ -142,13 +172,12 @@ export class TeamMangerListViewModel {
         if (result) {
           this.isFinish = result.finished
           this.nextToken = result.nextToken
-          this.managerList.push(...result.memberList)
-          this.managerList = this.managerList.filter((member) => !member.isOwner())
-          this.managerList.sort((a, b) => this.sortTeamMember(a, b))
+          this.appendManagerList(result.memberList)
           this.haveInitData = true
         }
       } catch (e) {
-
+      } finally {
+        this.isLoading = false
       }
     }
   }
@@ -157,8 +186,7 @@ export class TeamMangerListViewModel {
     if (this.teamId) {
       let members = await TeamRepo.getTeamMembersByIds(this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
         memberIds)
-      this.managerList.push(...members)
-      this.managerList.sort((a, b) => this.sortTeamMember(a, b))
+      this.appendManagerList(members)
     }
   }
 
@@ -191,6 +219,3 @@ export class TeamMangerListViewModel {
     ChatKitClient.nim.teamService?.off('onSyncFinished', this.onSyncFinished)
   }
 }
-
-//管理员人数限制
-export const managerLimit: number = 10

@@ -5,7 +5,7 @@
  *
  */
 
-import { ChatKitClient, TeamRepo } from '@nimkit/chatkit'
+import { ChatKitClient, TeamRepo, IMKitConfigCenter } from '@nimkit/chatkit'
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -17,7 +17,7 @@ import {
 } from '@nimkit/common'
 import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
 import { V2NIMTeamMemberRole, V2NIMTeamType } from '@nimsdk/base'
-import { managerLimit, TeamMangerListViewModel } from '../viewModel/TeamManagerListViewModel'
+import { TeamMangerListViewModel } from '../viewModel/TeamManagerListViewModel'
 import { ManagerSelectorParams, TeamMemberSelectorMode } from '@nimkit/chatkit/src/main/ets/model/TeamMemberSelector'
 
 /**
@@ -79,9 +79,29 @@ struct TeamManagerListPage {
       })
       .borderRadius(8)
       .onClick(() => {
+        // 获取管理员人数上限配置
+        const maxCount = IMKitConfigCenter.teamManagerMaxCount
+        const currentCount = this.viewModel.managerList.length
+        
+        // 用例 213: 配置为 0 时，禁止添加管理员
+        if (maxCount === 0) {
+          NECommonUtils.showToast('管理员人数上限为0，无法添加管理员')
+          return
+        }
+        
+        // 用例 211: -1 表示无上限
+        // 用例 212: 任意正整数表示具体上限
+        const selectLimit = maxCount === -1 ? Number.MAX_SAFE_INTEGER : maxCount - currentCount
+        
+        // 如果已达上限（maxCount > 0 且当前数量 >= 上限）
+        if (maxCount > 0 && currentCount >= maxCount) {
+          NECommonUtils.showToast(`管理员人数已达上限（${maxCount}人）`)
+          return
+        }
+        
         let params: ManagerSelectorParams = {
           teamId: this.teamId ?? '',
-          selectLimit: managerLimit - this.viewModel.managerList.length,
+          selectLimit: selectLimit,
           mode: TeamMemberSelectorMode.ADD_MANAGER
         }
         this.pathStack.pushPath({

@@ -5,14 +5,12 @@
  *
  */
 
-import { ChatKitClient, ContactRepo, ConversationRepo, IMKitConfigCenter,
+import { ChatKitClient, ContactRepo, ConversationIdUtilRepo, ConversationRepo, IMKitConfigCenter,
   LocalConversationRepo } from '@nimkit/chatkit';
 import { ChatKitConfig } from '@nimkit/chatkit_ui/src/main/ets/ChatKitConfig';
-import { CommonConstants } from '@nimkit/common';
 import { ContactPage } from '@nimkit/contactkit_ui';
-import { ConversationPage } from '@nimkit/conversationkit_ui';
-import { LocalConversationPage } from '@nimkit/localconversationkit_ui';
-import { V2NIMFriendAddApplication } from '@nimsdk/base';
+import { ConversationPage, LocalConversationPage } from '@nimkit/conversationkit_ui';
+import { V2NIMConversationType, V2NIMFriendAddApplication, V2NIMTeamJoinActionInfo } from '@nimsdk/base';
 import { MinePage } from '../mine/pages/MinePage';
 
 @ObservedV2
@@ -45,16 +43,25 @@ struct TabIndex {
     new TabBarItem($r('app.string.tab_mine'), 2, $r('app.media.tab_mine'), $r('app.media.tab_mine_light'))
   ];
   @Local useLocalConversation: boolean = IMKitConfigCenter.enableLocalConversation;
+  /**
+   * 加载通讯录验证消息未读数（好友申请 + 群验证）
+   * 用例 247：通讯录验证消息未读数为群聊和好友的总和
+   */
   loadUnreadApplication = async () => {
     try {
-      const unreadCount = await ContactRepo.getAddApplicationUnreadCount()
-      this.tabs[1].showRedPoint = unreadCount > 0
+      const friendUnread = await ContactRepo.getAddApplicationUnreadCount()
+      const teamUnread = await ChatKitClient.nim.teamService?.getTeamJoinActionInfoUnreadCount() ?? 0
+      this.tabs[1].showRedPoint = (friendUnread + teamUnread) > 0
     } catch (err) {
       console.log(err)
     }
   }
-  onUnreadApplicationChange = (unreadCountString?: string) => {
-    this.tabs[1].showRedPoint = unreadCountString !== undefined
+  /**
+   * 好友申请未读数变化回调
+   * 需要重新计算总未读数（好友 + 群验证）
+   */
+  onUnreadApplicationChange = async (unreadCountString?: string) => {
+    await this.loadUnreadApplication()
   }
   //未读消息回调
   onUreadMessageChange = (unreadCount?: number) => {
@@ -75,12 +82,72 @@ struct TabIndex {
   }
   // 加载配置信息
   loadConfig = () => {
-    let readOrOpen: boolean = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_MESSAGE_READ_OR) ?? true
-    ChatKitConfig.messageReadState = readOrOpen
+    ChatKitConfig.messageReadState = IMKitConfigCenter.enableReadMessage
+  }
+
+  /**
+   * 检查并处理通知点击跳转
+   * 支持两种参数格式：
+   * 1. conversationId + conversationType（本地通知）
+   * 2. sessionType + sessionId（华为推送）
+   */
+  private checkPendingNotification(): void {
+    // 首先检查 conversationId 格式（本地通知）
+    const conversationId = AppStorage.get<string>('pendingConversationId');
+    const conversationType = AppStorage.get<number>('pendingConversationType');
+
+    if (conversationId) {
+      // 清除待处理的跳转参数
+      AppStorage.delete('pendingConversationId');
+      AppStorage.delete('pendingConversationType');
+
+      // 根据会话类型跳转到对应聊天页面
+      if (conversationType === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
+        this.pathStack.pushPath({ name: 'ChatP2PPage', param: conversationId });
+      } else if (conversationType === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM ||
+        conversationType === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_SUPER_TEAM) {
+        this.pathStack.pushPath({ name: 'ChatTeamPage', param: conversationId });
+      } else {
+        // 默认当作 P2P 处理
+        this.pathStack.pushPath({ name: 'ChatP2PPage', param: conversationId });
+      }
+
+      console.info(`TabIndex: Navigated to chat page for conversation: ${conversationId}`);
+      return;
+    }
+
+    // 然后检查 sessionType + sessionId 格式（华为推送）
+    const sessionType = AppStorage.get<string>('pendingSessionType');
+    const sessionId = AppStorage.get<string>('pendingSessionId');
+
+    if (sessionType && sessionId) {
+      // 清除待处理的跳转参数
+      AppStorage.delete('pendingSessionType');
+      AppStorage.delete('pendingSessionId');
+      AppStorage.delete('pendingConversationType');
+
+      // 根据 sessionType 和 sessionId 构建 conversationId 并跳转
+      if (sessionType === 'p2p') {
+        // P2P 会话：sessionId 是发送者的账号
+        const p2pConversationId = ConversationIdUtilRepo.p2pConversationId(sessionId);
+        this.pathStack.pushPath({ name: 'ChatP2PPage', param: p2pConversationId });
+        console.info(`TabIndex: Navigated to P2P chat page for sessionId: ${sessionId}`);
+      } else if (sessionType === 'team') {
+        // 群会话：sessionId 是群 ID
+        const teamConversationId = ConversationIdUtilRepo.teamConversationId(sessionId);
+        this.pathStack.pushPath({ name: 'ChatTeamPage', param: teamConversationId });
+        console.info(`TabIndex: Navigated to Team chat page for sessionId: ${sessionId}`);
+      }
+    }
   }
 
   async aboutToAppear(): Promise<void> {
+    // 监听好友申请
     ChatKitClient.nim.friendService?.on('onFriendAddApplication', async (application: V2NIMFriendAddApplication) => {
+      await this.loadUnreadApplication()
+    })
+    // 监听群验证消息（用例 247：通讯录验证消息未读数为群聊和好友的总和）
+    ChatKitClient.nim.teamService?.on('onReceiveTeamJoinActionInfo', async (actionInfo: V2NIMTeamJoinActionInfo) => {
       await this.loadUnreadApplication()
     })
     try {
@@ -90,6 +157,16 @@ struct TabIndex {
     }
     this.loadConfig()
     this.loadUnreadMessageCount()
+
+    // 检查是否有通知点击跳转
+    this.checkPendingNotification()
+  }
+
+  /**
+   * 页面显示时检查是否有新的通知跳转（应用已在前台时点击通知）
+   */
+  onPageShow(): void {
+    this.checkPendingNotification()
   }
 
   @Builder

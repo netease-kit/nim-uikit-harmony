@@ -13,6 +13,7 @@ import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
 import { messageContent } from './MessageComponentBuilder';
 import { MessageItemClick } from './MessageItemClick';
 import { ChatKitConfig } from '../ChatKitConfig';
+import { IMKitConfigCenter } from '@nimkit/chatkit';
 
 /**
  * 消息组件按照UI样式，划分为发送消息组件、接收消息组件、通知消息组件和提示消息组件
@@ -130,7 +131,8 @@ export struct SenderMessageComponent {
   }
 
   getHighlightBackgroundColor(): ResourceColor {
-    if (this.message?.isPinMsg) {
+    // 仅当标记功能开启时显示标记背景色
+    if (IMKitConfigCenter.enablePin && this.message?.isPinMsg) {
       return $r('app.color.color_chat_pin_bg')
     } else if (this.anchorHighlightOpacity > 0) {
       return $r('app.color.color_chat_anchor_bg')
@@ -292,7 +294,9 @@ export struct SenderMessageComponent {
               .onAction((event: GestureEvent) => {
                 this.onMessageClick?.onItemLongClick?.(event, this.message)
               }))
-            if (this.message?.isPinMsg) {
+
+            // 仅当标记功能开启时显示标记提示
+            if (IMKitConfigCenter.enablePin && this.message?.isPinMsg) {
               Row() {
                 Image($r('app.media.ic_chat_message_pin')).height(12).width(12).margin({ top: 6 })
                 Text(getPinMessagesTips(this.message, this.chatUserInfo))
@@ -415,7 +419,8 @@ export struct ReceiveMessageComponent {
 
   // 根据高亮状态和 pin 状态获取背景色
   getHighlightBackgroundColor(): ResourceColor {
-    if (this.message?.isPinMsg) {
+    // 仅当标记功能开启时显示标记背景色
+    if (IMKitConfigCenter.enablePin && this.message?.isPinMsg) {
       return $r('app.color.color_chat_pin_bg')
     } else if (this.anchorHighlightOpacity > 0) {
       return $r('app.color.color_chat_anchor_bg')
@@ -508,7 +513,8 @@ export struct ReceiveMessageComponent {
               this.onMessageClick?.onItemLongClick?.(event, this.message)
             }))
 
-            if (this.message?.isPinMsg) {
+            // 仅当标记功能开启时显示标记提示
+            if (IMKitConfigCenter.enablePin && this.message?.isPinMsg) {
               Row() {
                 Image($r('app.media.ic_chat_message_pin')).height(12).width(12).margin({ top: 6 })
                 Text(getPinMessagesTips(this.message, this.chatUserInfo))
@@ -706,7 +712,7 @@ export struct MergeDetailMessageComponent {
         }
         .width('100%')
         .alignItems(VerticalAlign.Top)
-        .backgroundColor(this.message?.isPinMsg ? $r('app.color.color_chat_pin_bg') :
+        .backgroundColor((IMKitConfigCenter.enablePin && this.message?.isPinMsg) ? $r('app.color.color_chat_pin_bg') :
         $r('app.color.color_chat_page_bg'))
         .id('itemContainer')
       }

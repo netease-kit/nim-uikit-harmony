@@ -16,6 +16,7 @@ import {
   V2NIMEnableServiceType,
   V2NIMError,
   V2NIMLoginStatus,
+  V2NIMMessage,
   V2NIMMessageRevokeNotification
 } from '@nimsdk/base';
 import { ContactRepo, IMKitConfigCenter, LocalConversationRepo, SubscriptionRepo } from '../../../Index';
@@ -23,6 +24,7 @@ import { KitLogger } from './logger/AppLogger';
 import { LoggerKitImpl } from './logger/LoggerKitImpl';
 import { ChatRepo } from './repo/ChatRepo';
 import { saveLocalRevokeMessageFormOther } from './utils/MessageUtils';
+import { NotificationHelper } from './utils/NotificationHelper';
 
 export const currentConversationChanged: string = 'CurrentConversationChanged'
 
@@ -150,6 +152,7 @@ export class ChatKitClient {
     ChatKitClient.selfLeaveTeam = false
     ChatKitClient.currentConversationId = ''
     ChatRepo.offRevokeMessage(ChatKitClient.onRevokeFun)
+    ChatRepo.offReceiverMessage(ChatKitClient.onReceiveMessageFun)
     ChatKitClient.nim.conversationService?.off('onSyncFinished', ChatKitClient.onSyncFinishedFun)
     ChatKitClient.nim.loginService.off('onDataSync', ChatKitClient.dataSyncFun)
 
@@ -168,6 +171,8 @@ export class ChatKitClient {
     ChatKitClient.nim.loginService.on('onDataSync', ChatKitClient.dataSyncFun)
     // 消息撤回监听，消息撤回后，会收到通知
     ChatRepo.onRevokeMessage(ChatKitClient.onRevokeFun)
+    // 消息接收监听，用于触发响铃和震动
+    ChatRepo.onReceiverMessage(ChatKitClient.onReceiveMessageFun)
     // 显示在线状态
     if(IMKitConfigCenter.enableShownOnlineState){
       SubscriptionRepo.addListener()
@@ -195,6 +200,17 @@ export class ChatKitClient {
         saveLocalRevokeMessageFormOther(msg.messageRefer.conversationId, msg, false)
       }
     })
+  }
+
+  /**
+   * 消息接收回调，用于触发响铃和震动
+   */
+  private static onReceiveMessageFun = (messages: V2NIMMessage[]) => {
+    if (messages.length === 0) {
+      return
+    }
+    // 收到新消息时触发响铃和震动（传递消息列表用于检查会话级别免打扰）
+    NotificationHelper.notifyNewMessage(messages)
   }
 
   // 设置当前聊天会话

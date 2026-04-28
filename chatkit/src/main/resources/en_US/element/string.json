@@ -75,6 +75,10 @@
     {
       "name": "msg_send_failed_friend_application",
       "value": "reapply for contact"
+    },
+    {
+      "name": "createAdvancedTeamSuccess",
+      "value": "Successfully created advanced team"
     }
   ]
 }

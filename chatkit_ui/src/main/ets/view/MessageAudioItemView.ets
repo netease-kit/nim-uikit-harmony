@@ -56,22 +56,52 @@ export struct MessageAudioItemView {
   }
 
   build() {
-    Row() {
-      if (this.showReceiveStyle()) {
-        Image(this.sendSoundImages[this.sendSoundIndex]).objectFit(ImageFit.Auto).width(28).height(28)
-        Text(getAudioMessageText(this.message))
-          .margin({ left: 8 }).maxLines(1)
+    Column() {
+      Row() {
+        if (this.showReceiveStyle()) {
+          Image(this.sendSoundImages[this.sendSoundIndex]).objectFit(ImageFit.Auto).width(28).height(28)
+          Text(getAudioMessageText(this.message))
+            .margin({ left: 8 }).maxLines(1)
+            .fontColor('#ff333333')
+            .fontSize(14)
+        } else {
+          Text(getAudioMessageText(this.message))
+            .margin({ right: 8 }).maxLines(1)
+            .fontColor('#ff333333')
+            .fontSize(14)
+          Image(this.receiveSoundImages[this.receiveSoundIndex]).objectFit(ImageFit.Auto).width(28).height(28)
+        }
+      }
+      .justifyContent(this.showReceiveStyle() ? FlexAlign.Start : FlexAlign.End)
+      .width(getAudioMessageWidth(this.message))
+      .height(ChatConst.audioMessageWidth)
+
+      // 语音转文字加载中
+      if (this.message.voiceToTextLoading) {
+        Row() {
+          LoadingProgress()
+            .width(16)
+            .height(16)
+            .color('#ff666666')
+          Text($r('app.string.chat_message_voice_to_text'))
+            .fontSize(14)
+            .fontColor('#ff666666')
+            .margin({ left: 4 })
+        }
+        .margin({ top: 12 })
+        .justifyContent(FlexAlign.Start)
+      } else if (this.message.voiceToText && this.message.voiceToText.length > 0) {
+        // 语音转文字结果
+        Text(this.message.voiceToText)
+          .fontSize(16)
           .fontColor('#ff333333')
-          .fontSize(14)
-      } else {
-        Text(getAudioMessageText(this.message))
-          .margin({ right: 8 }).maxLines(1)
-          .fontColor('#ff333333')
-          .fontSize(14)
-        Image(this.receiveSoundImages[this.receiveSoundIndex]).objectFit(ImageFit.Auto).width(28).height(28)
+          .margin({ top: 12 })
+          .width('100%')
+          .textAlign(TextAlign.JUSTIFY)
+          .lineHeight(24)
       }
     }
-    .justifyContent(this.showReceiveStyle() ? FlexAlign.Start : FlexAlign.End)
+    .alignItems(this.showReceiveStyle() ? HorizontalAlign.Start : HorizontalAlign.End)
     .margin({
       left: 12,
       top: 4,
@@ -93,7 +123,6 @@ export struct MessageAudioItemView {
     //   this.onMessageClick?.onItemLongClick?.(event, this.message)
     // }))
     .width(getAudioMessageWidth(this.message))
-    .height(ChatConst.audioMessageWidth)
   }
 
   startPlayAni() {

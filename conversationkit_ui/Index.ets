@@ -5,4 +5,4 @@
  *
  */
 
-export { ConversationPage } from './src/main/ets/pages/ConversationPage'
+export { ConversationPage, LocalConversationPage } from './src/main/ets/pages/ConversationPage'

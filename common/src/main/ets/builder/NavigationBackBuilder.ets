@@ -9,6 +9,7 @@
 interface NavigationBackBuilderParams {
   title?: ResourceStr;
   titleSuffix?: ResourceStr; // 标题后缀，如 "(在线)" / "(离线)"，始终完整显示
+  titleSuffixIcon?: Resource; // 标题后缀图标，如听筒图标
   leftButtonTitle?: ResourceStr;
   leftButtonColor?: ResourceColor;
   leftButtonIcon?: Resource;
@@ -21,6 +22,10 @@ interface NavigationBackBuilderParams {
   backgroundColor?: ResourceColor;
   buttonTextWidth?: number;
   onlineState?: boolean;
+  // 正在输入提示（始终占位，通过 visibility 控制显隐）
+  enableTypingIndicator?: boolean;
+  showTypingIndicator?: boolean;
+  typingIndicatorText?: ResourceStr;
 }
 
 @Builder
@@ -64,24 +69,46 @@ export function NavigationBackBuilder(params?: NavigationBackBuilderParams) {
           .onClick(params?.leftButtonAction)
       }
 
-      // 标题区域：支持主标题 + 后缀，主标题中间省略，后缀始终完整显示
-      Row() {
-        Text(params?.title)
-          .fontSize(16)
-          .fontWeight(FontWeight.Bold)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .constraintSize({ maxWidth: params?.titleSuffix ? '70%' : '100%' })
-
-        if (params?.titleSuffix) {
-          Text(params.titleSuffix)
+      // 标题区域：两行结构，昵称居中，正在输入提示在下方
+      Column() {
+        // 第一行：昵称 + 后缀 + 后缀图标
+        Row() {
+          Text(params?.title)
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .maxLines(1)
-            .flexShrink(0) // 不允许收缩，始终完整显示
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .constraintSize({ maxWidth: (params?.titleSuffix || params?.titleSuffixIcon) ? '70%' : '100%' })
+
+          if (params?.titleSuffix) {
+            Text(params.titleSuffix)
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .maxLines(1)
+              .flexShrink(0) // 不允许收缩，始终完整显示
+          }
+
+          if (params?.titleSuffixIcon) {
+            Image(params.titleSuffixIcon)
+              .width(16)
+              .height(16)
+              .margin({ left: 4 })
+              .flexShrink(0) // 不允许收缩，始终完整显示
+          }
+        }
+        .justifyContent(FlexAlign.Center)
+
+        // 第二行：正在输入提示（始终占位，visibility 控制显隐）
+        if (params?.enableTypingIndicator && params?.typingIndicatorText !== undefined) {
+          Text(params.typingIndicatorText)
+            .fontSize(11)
+            .fontColor('#999999')
+            .visibility(params?.showTypingIndicator ? Visibility.Visible : Visibility.Hidden)
+            .padding({ top: 2, bottom: 2 })
         }
       }
       .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Center)
       .margin({
         left: params?.buttonTextWidth ? (params.buttonTextWidth - 32 + 8) : 8,
         right: (params?.rightButtonTitle || params?.rightButtonIcon) ? 8 : 60
@@ -113,8 +140,8 @@ export function NavigationBackBuilder(params?: NavigationBackBuilderParams) {
           .onClick(params?.rightButtonAction)
       }
     }
-    .height(55)
-    .alignSelf(ItemAlign.Start)
+    .height(56)
+    .alignItems(VerticalAlign.Center)
 
     if (params?.showDivideLine) {
       Row()
@@ -123,7 +150,6 @@ export function NavigationBackBuilder(params?: NavigationBackBuilderParams) {
         .backgroundColor("#E9EFF5")
     }
   }
-  .height(56)
   .width('100%')
   .justifyContent(FlexAlign.End)
   .backgroundColor(params?.backgroundColor ?? Color.White)

@@ -75,6 +75,10 @@
     {
       "name": "msg_send_failed_friend_application",
       "value": "好友验证"
+    },
+    {
+      "name": "createAdvancedTeamSuccess",
+      "value": "成功创建高级群"
     }
   ]
 }

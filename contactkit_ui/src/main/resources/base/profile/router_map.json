@@ -121,6 +121,30 @@
       }
     },
     {
+      "name": "SearchTeamPage",
+      "pageSourceFile": "src/main/ets/pages/SearchTeamPage.ets",
+      "buildFunction": "SearchTeamPageBuilder",
+      "data": {
+        "description": "this is search team page"
+      }
+    },
+    {
+      "name": "TeamProfilePage",
+      "pageSourceFile": "src/main/ets/pages/TeamProfilePage.ets",
+      "buildFunction": "TeamProfilePageBuilder",
+      "data": {
+        "description": "this is team profile page"
+      }
+    },
+    {
+      "name": "TeamVerifyPage",
+      "pageSourceFile": "src/main/ets/pages/TeamVerifyPage.ets",
+      "buildFunction": "TeamVerifyPageBuilder",
+      "data": {
+        "description": "this is team verify page"
+      }
+    },
+    {
       "name": "MyBotsPage",
       "pageSourceFile": "src/main/ets/pages/MyBotsPage.ets",
       "buildFunction": "MyBotsPageBuilder",

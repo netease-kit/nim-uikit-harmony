@@ -7,11 +7,29 @@
 
 import { ChatTeamInfo } from '../model/ChatTeamInfo';
 import { ChatBaseViewModel } from './ChatBaseViewModel';
-import { ChatKitClient, ChatRepo, ContactRepo, TeamMemberCache, TeamRepo } from '@nimkit/chatkit';
 import {
+  ChatKitClient,
+  ChatRepo,
+  ContactRepo,
+  ErrorUtils,
+  IMKitConfigCenter,
+  keyExtensionLastOptType,
+  keyExtensionSticky,
+  keyExtensionTopSticky,
+  TeamMemberCache,
+  TeamRepo,
+  typeExtensionStickyAdd,
+  typeExtensionStickyRemove
+} from '@nimkit/chatkit';
+import {
+  V2NIMConversationType,
+  V2NIMErrorCode,
   V2NIMFriend,
   V2NIMMessage,
+  V2NIMMessageDeletedNotification,
   V2NIMMessageNotificationAttachment,
+  V2NIMMessageRevokeNotification,
+  V2NIMMessageRefer,
   V2NIMMessageType,
   V2NIMTeam,
   V2NIMTeamChatBannedMode,
@@ -19,15 +37,36 @@ import {
   V2NIMTeamMemberRole,
   V2NIMTeamMessageReadReceipt,
   V2NIMTeamType,
+  V2NIMUpdateTeamInfoParams,
   V2NIMUser
 } from '@nimsdk/base';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { HashSet } from '@kit.ArkTS';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { ChatKitConfig } from '../ChatKitConfig';
+import { TopStickyMessage } from '../model/TopStickyMessage';
+import { havePermissionForTopSticky } from '../common/ChatUtils';
+import { isTopMessageDeleted, isTopMessageRevoked } from '../utils/TopMessageBarUtils';
+import { NECommonUtils } from '@nimkit/common';
+
+class InvalidTeamResolution {
+  teamInfo?: V2NIMTeam
+  shouldShowExitWarning: boolean
+
+  constructor(teamInfo: V2NIMTeam | undefined, shouldShowExitWarning: boolean) {
+    this.teamInfo = teamInfo
+    this.shouldShowExitWarning = shouldShowExitWarning
+  }
+}
 
 @ObservedV2
 export class ChatTeamViewModel extends ChatBaseViewModel {
   @Trace chatTeamInfo: ChatTeamInfo | undefined
+  /** 当前置顶消息 */
+  @Trace topMessage: NIMMessageInfo | undefined = undefined
+  /** 当前用户是否有置顶操作权限 */
+  @Trace hasTopPermission: boolean = false
+  @Trace shouldShowTeamExitWarning: boolean = false
   dialogToExit?: () => void
   private needUserMessageList: NIMMessageInfo[] = []
   //拉取全量成员的阈值
@@ -56,6 +95,8 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
   init(conversationId: string, chatInfo: ChatTeamInfo): void {
     super.init(conversationId, chatInfo);
     this.chatTeamInfo = chatInfo;
+    ChatRepo.onDeleteMessage(this.onTopMessageDeleteFun)
+    ChatRepo.onRevokeMessage(this.onTopMessageRevokeFun)
     ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChangedFun)
     ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onUserProfileChangedFun)
     ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', this.teamUpdateFun)
@@ -110,7 +151,19 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
   }
   teamUpdateFun = (team: V2NIMTeam) => {
     if (team.teamId === ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(this.conversationId)) {
+      if (team.isValidTeam) {
+        this.shouldShowTeamExitWarning = false
+      }
       this.chatTeamInfo?.setTeam(team)
+      if (!IMKitConfigCenter.enableTopMessage) {
+        this.topMessage = undefined
+      } else if (team.serverExtension) {
+        this.handleTopMessage(team.serverExtension)
+      }
+      // 处理置顶消息和权限变更
+      if (team.serverExtension) {
+        this.handleTopMessagePermission(team.serverExtension)
+      }
     }
   }
   onTeamMemberJoinedFun = (teamMembers: V2NIMTeamMember[]) => {
@@ -132,7 +185,8 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
       }
     })
     if (currentTeamMember.length > 0) {
-      this.chatTeamInfo?.addTeamMember(teamMembers)
+      this.chatTeamInfo?.addTeamMember(currentTeamMember)
+      this.updateTopPermission()
     }
   }
   onTeamDismissedFun = (team: V2NIMTeam) => {
@@ -152,6 +206,52 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
   }
   onTeamSyncFinishedFun = () => {
     this.getTeamInfo()
+  }
+
+  private onTopMessageDeleteFun = (messages: V2NIMMessageDeletedNotification[]) => {
+    const currentTopMessage = this.topMessage
+    if (!currentTopMessage) {
+      return
+    }
+
+    for (const message of messages) {
+      if (message.messageRefer.conversationId !== this.conversationId) {
+        continue
+      }
+
+      if (isTopMessageDeleted(
+        currentTopMessage.message.messageClientId,
+        currentTopMessage.message.messageServerId,
+        message.messageRefer.messageClientId,
+        message.messageRefer.messageServerId
+      )) {
+        this.topMessage = undefined
+        break
+      }
+    }
+  }
+
+  private onTopMessageRevokeFun = (messages: V2NIMMessageRevokeNotification[]) => {
+    const currentTopMessage = this.topMessage
+    if (!currentTopMessage) {
+      return
+    }
+
+    for (const message of messages) {
+      if (message.messageRefer.conversationId !== this.conversationId) {
+        continue
+      }
+
+      if (isTopMessageRevoked(
+        currentTopMessage.message.messageClientId,
+        currentTopMessage.message.messageServerId,
+        message.messageRefer.messageClientId,
+        message.messageRefer.messageServerId
+      )) {
+        this.topMessage = undefined
+        break
+      }
+    }
   }
 
   async loadData() {
@@ -196,6 +296,9 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
 
   toHandleDataSyncFinished(): void {
     if (this.hasLoadData) {
+      if ((this.chatTeamInfo?.msgList.totalCount() ?? 0) === 0) {
+        this.getMessageList()
+      }
       if (this.needUserMessageList.length > 0) {
         this.getTeamMemberInfoWithMessage(this.needUserMessageList)
         this.needUserMessageList = []
@@ -254,15 +357,56 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
   //获取群信息
   async getTeamInfo(): Promise<V2NIMTeam | undefined> {
     let teamId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(this.conversationId);
-    const teamInfo = await TeamRepo.getTeamInfo(teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL);
+    let teamInfo = await TeamRepo.getTeamInfo(teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL);
     ChatKitClient.selfLeaveTeam = false
-    if (teamInfo && teamInfo.isValidTeam !== true) {
-      this.onTeamDismissedFun(teamInfo)
-    } else {
+    const invalidTeamResolution = await this.resolveInvalidTeam(teamId, teamInfo)
+    teamInfo = invalidTeamResolution.teamInfo
+    this.shouldShowTeamExitWarning = invalidTeamResolution.shouldShowExitWarning
+    if (!invalidTeamResolution.shouldShowExitWarning && teamInfo) {
       this.getTeamMemberListInfo([ChatKitClient.getLoginUserId()])
     }
     this.chatTeamInfo?.setTeam(teamInfo)
+    if (!IMKitConfigCenter.enableTopMessage) {
+      this.topMessage = undefined
+    } else if (teamInfo?.serverExtension) {
+      // 进入群聊时加载置顶消息
+      this.handleTopMessage(teamInfo.serverExtension)
+    }
+    // 权限取决于 team 类型 + 当前成员角色，不能只在 serverExtension 存在时刷新
+    this.updateTopPermission()
     return teamInfo
+  }
+
+  private async resolveInvalidTeam(teamId: string,
+    teamInfo?: V2NIMTeam): Promise<InvalidTeamResolution> {
+    if (!teamInfo || teamInfo.isValidTeam === true) {
+      return new InvalidTeamResolution(teamInfo, false)
+    }
+
+    const selfInTeam = await this.isCurrentUserStillInTeam(teamId)
+    if (!selfInTeam) {
+      return new InvalidTeamResolution(teamInfo, true)
+    }
+
+    try {
+      const refreshedTeam = await TeamRepo.getTeamInfoFromCloud(teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL)
+      return new InvalidTeamResolution(refreshedTeam ?? teamInfo, false)
+    } catch (err) {
+      console.error('ChatTeamViewModel resolveInvalidTeam getTeamInfoFromCloud error', err)
+      return new InvalidTeamResolution(teamInfo, false)
+    }
+  }
+
+  private async isCurrentUserStillInTeam(teamId: string): Promise<boolean> {
+    try {
+      const teamMembers = await TeamRepo.getTeamMemberListByIds(teamId,
+        V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
+        [ChatKitClient.getLoginUserId()])
+      return teamMembers.some(member => member.inTeam !== false)
+    } catch (err) {
+      console.error('ChatTeamViewModel isCurrentUserStillInTeam error', err)
+      return false
+    }
   }
 
   //获取群信息和群成员信息，包括群成员信息、用户信息
@@ -270,6 +414,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
     TeamRepo.getTeamMemberListByIds(this.targetId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, accountList)
       .then((teamMemberList: V2NIMTeamMember[]) => {
         this.chatTeamInfo?.addTeamMember(teamMemberList)
+        this.updateTopPermission()
       })
       .catch((error: Error) => {
         console.error('netease getTeamMemberListInfo:getUserList ', error.name)
@@ -285,6 +430,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
   //获取群信息和群成员信息，包括群成员信息、用户信息
   async getTeamMemberUserInfo(teamMembers: V2NIMTeamMember[]) {
     this.chatTeamInfo?.addTeamMember(teamMembers)
+    this.updateTopPermission()
     let accountList: string[] = [];
     teamMembers.forEach((member) => {
       accountList.push(member.accountId)
@@ -340,8 +486,193 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
     }
   }
 
+  // ========== 置顶消息相关方法 ==========
+
+  /**
+   * 解析 serverExtension 中的置顶消息信息
+   * operation=0 时获取完整消息并展示，operation=1 时隐藏
+   */
+  handleTopMessage(serverExtension: string): void {
+    if (!IMKitConfigCenter.enableTopMessage) {
+      this.topMessage = undefined
+      return
+    }
+    try {
+      const ext = JSON.parse(serverExtension) as object
+      const topJson = ext?.[keyExtensionSticky] as object
+      if (!topJson) {
+        return
+      }
+      const topStickyMsg = TopStickyMessage.fromJson(topJson)
+      if (topStickyMsg.operation === typeExtensionStickyAdd) {
+        // 添加置顶：通过消息引用获取完整消息
+        this.getTopStickyMessage(topStickyMsg)
+      } else if (topStickyMsg.operation === typeExtensionStickyRemove) {
+        // 移除置顶
+        this.topMessage = undefined
+      }
+    } catch (_e) {
+      ChatKitClient.logger?.debug('handleTopMessage parse error')
+    }
+  }
+
+  /**
+   * 根据置顶消息引用获取完整消息内容
+   */
+  private async getTopStickyMessage(topStickyMsg: TopStickyMessage): Promise<void> {
+    try {
+      const refer: V2NIMMessageRefer = {
+        senderId: topStickyMsg.from,
+        receiverId: topStickyMsg.receiverId,
+        messageClientId: topStickyMsg.idClient,
+        messageServerId: topStickyMsg.idServer,
+        createTime: topStickyMsg.time,
+        conversationType: V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM,
+        conversationId: this.conversationId
+      }
+      const messages = await ChatRepo.getMessageListByRefers([refer])
+      if (messages && messages.length > 0) {
+        this.topMessage = new NIMMessageInfo(messages[0])
+      } else {
+        // 消息已被删除，隐藏横幅
+        this.topMessage = undefined
+      }
+    } catch (_e) {
+      ChatKitClient.logger?.debug('getTopStickyMessage error')
+      this.topMessage = undefined
+    }
+  }
+
+  /**
+   * 添加置顶消息
+   * @param message 要置顶的消息
+   */
+  async addStickyMessage(message: NIMMessageInfo): Promise<void> {
+    const team = this.chatTeamInfo?.team
+    if (!team) {
+      return
+    }
+    if (ChatKitClient.connectBroken()) {
+      this.showTopStickyNetworkError()
+      return
+    }
+
+    const topMsg = new TopStickyMessage()
+    topMsg.idClient = message.message.messageClientId
+    topMsg.scene = 1 // 群聊
+    topMsg.from = message.message.senderId
+    topMsg.to = this.conversationId
+    topMsg.idServer = message.message.messageServerId
+    topMsg.time = message.message.createTime
+    topMsg.operator = ChatKitClient.getLoginUserId()
+    topMsg.operation = typeExtensionStickyAdd
+    topMsg.receiverId = this.targetId
+
+    let extension = team.serverExtension ?? '{}'
+    try {
+      const extObj = JSON.parse(extension) as Record<string, Object>
+      extObj[keyExtensionSticky] = topMsg.toJson()
+      extObj[keyExtensionLastOptType] = keyExtensionSticky
+      extension = JSON.stringify(extObj)
+    } catch (_e) {
+      const jsonObj: Record<string, Object> = {}
+      jsonObj[keyExtensionSticky] = topMsg.toJson()
+      jsonObj[keyExtensionLastOptType] = keyExtensionSticky
+      extension = JSON.stringify(jsonObj)
+    }
+
+    const param: V2NIMUpdateTeamInfoParams = {
+      serverExtension: extension
+    }
+    try {
+      await TeamRepo.updateTeamInfo(team.teamId, team.teamType, param)
+    } catch (error) {
+      this.handleTopStickyActionError(error as BusinessError)
+    }
+  }
+
+  /**
+   * 移除置顶消息
+   */
+  async removeStickyMessage(): Promise<void> {
+    const team = this.chatTeamInfo?.team
+    if (!team || !this.topMessage) {
+      return
+    }
+    if (ChatKitClient.connectBroken()) {
+      this.showTopStickyNetworkError()
+      return
+    }
+
+    const topMsg = new TopStickyMessage()
+    topMsg.idClient = this.topMessage.message.messageClientId
+    topMsg.operator = ChatKitClient.getLoginUserId()
+    topMsg.operation = typeExtensionStickyRemove
+
+    let extension = team.serverExtension ?? '{}'
+    try {
+      const extObj = JSON.parse(extension) as Record<string, Object>
+      extObj[keyExtensionSticky] = topMsg.toRemoveJson()
+      extObj[keyExtensionLastOptType] = keyExtensionSticky
+      extension = JSON.stringify(extObj)
+    } catch (_e) {
+      const jsonObj: Record<string, Object> = {}
+      jsonObj[keyExtensionSticky] = topMsg.toRemoveJson()
+      jsonObj[keyExtensionLastOptType] = keyExtensionSticky
+      extension = JSON.stringify(jsonObj)
+    }
+
+    const param: V2NIMUpdateTeamInfoParams = {
+      serverExtension: extension
+    }
+    try {
+      await TeamRepo.updateTeamInfo(team.teamId, team.teamType, param)
+    } catch (error) {
+      this.handleTopStickyActionError(error as BusinessError)
+    }
+  }
+
+  private handleTopStickyActionError(error: BusinessError): void {
+    if (ChatKitClient.connectBroken() || error.code === V2NIMErrorCode.V2NIM_ERROR_CODE_ILLEGAL_STATE) {
+      this.showTopStickyNetworkError()
+      return
+    }
+    ErrorUtils.handleErrorToast(error.code)
+  }
+
+  private showTopStickyNetworkError(): void {
+    NECommonUtils.showToast($r('app.string.chat_network_error_tips'))
+  }
+
+  /**
+   * 处理置顶权限变更（当 lastOpt == "yxAllowTop" 时触发）
+   */
+  handleTopMessagePermission(serverExtension: string): void {
+    try {
+      const ext = JSON.parse(serverExtension) as object
+      const lastOpt = ext?.[keyExtensionLastOptType] as string
+      if (lastOpt === keyExtensionTopSticky) {
+        this.updateTopPermission()
+      }
+    } catch (_e) {
+      // ignore
+    }
+  }
+
+  /**
+   * 更新当前用户的置顶权限状态
+   */
+  private updateTopPermission(): void {
+    this.hasTopPermission = havePermissionForTopSticky(
+      this.chatTeamInfo?.team,
+      this.chatTeamInfo?.getCurrentUserTeamMember()?.memberRole
+    )
+  }
+
   onDestroy(): void {
     super.onDestroy()
+    ChatRepo.offDeleteMessage(this.onTopMessageDeleteFun)
+    ChatRepo.offRevokeMessage(this.onTopMessageRevokeFun)
     ChatKitClient.nim.teamService?.off('onTeamInfoUpdated', this.teamUpdateFun)
     ChatKitClient.nim.teamService?.off('onTeamMemberJoined', this.onTeamMemberJoinedFun)
     ChatKitClient.nim.teamService?.off('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdatedFun)

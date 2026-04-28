@@ -1,6 +1,14 @@
 {
   "string": [
     {
+      "name": "contact_title",
+      "value": "通讯录"
+    },
+    {
+      "name": "contact_validation_message",
+      "value": "验证消息"
+    },
+    {
       "name": "contact_blocklist",
       "value": "黑名单"
     },
@@ -193,6 +201,98 @@
       "value": "好友人数已达上限"
     },
     {
+      "name": "team_search_title",
+      "value": "搜索群组"
+    },
+    {
+      "name": "team_search_placeholder",
+      "value": "请输入群号"
+    },
+    {
+      "name": "team_profile_title",
+      "value": "群资料"
+    },
+    {
+      "name": "team_profile_id",
+      "value": "群ID"
+    },
+    {
+      "name": "team_profile_intro",
+      "value": "群介绍"
+    },
+    {
+      "name": "team_profile_owner",
+      "value": "群主"
+    },
+    {
+      "name": "team_profile_join",
+      "value": "加入群组"
+    },
+    {
+      "name": "team_profile_chat",
+      "value": "聊天"
+    },
+    {
+      "name": "team_apply_join_tip",
+      "value": "申请已提交，等待审批"
+    },
+    {
+      "name": "team_apply_join_error",
+      "value": "申请加入失败"
+    },
+    {
+      "name": "team_member_limit_tip",
+      "value": "群组人数达到上限"
+    },
+    {
+      "name": "joined_team_limit_tip",
+      "value": "加入群组数量超过上限"
+    },
+    {
+      "name": "already_in_team_tip",
+      "value": "已在群组"
+    },
+    {
+      "name": "no_permission_tip",
+      "value": "无操作权限"
+    },
+    {
+      "name": "team_not_exist_tip",
+      "value": "群组不存在"
+    },
+    {
+      "name": "team_verify_title",
+      "value": "入群验证消息"
+    },
+    {
+      "name": "team_verify_empty",
+      "value": "暂无入群验证消息"
+    },
+    {
+      "name": "team_verify_application",
+      "value": "申请加入"
+    },
+    {
+      "name": "team_verify_invitation",
+      "value": "邀请加入"
+    },
+    {
+      "name": "team_verify_accept_application",
+      "value": "同意了入群申请"
+    },
+    {
+      "name": "team_verify_reject_application",
+      "value": "拒绝了入群申请"
+    },
+    {
+      "name": "team_verify_accept_invitation",
+      "value": "同意了入群邀请"
+    },
+    {
+      "name": "team_verify_reject_invitation",
+      "value": "拒绝了入群邀请"
+    },
+    {
       "name": "contact_my_bots",
       "value": "我的机器人"
     },
@@ -371,6 +471,14 @@
     {
       "name": "bot_token_empty_tip",
       "value": "请先刷新 Token"
+    },
+    {
+      "name": "verify_tab_friend",
+      "value": "好友"
+    },
+    {
+      "name": "verify_tab_team",
+      "value": "群"
     }
   ]
 }

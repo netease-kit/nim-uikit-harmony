@@ -7,9 +7,17 @@ import {
   V2NIMUser} from '@nimsdk/base';
 import { ChatKitClient } from '../ChatKitClient';
 import { NEAIUserCache } from '../NEAIUserCache'
+import common from '@ohos.app.ability.common';
 
 export class AIRepo {
-  public static listener = getContext(this).eventHub
+  private static _listener: common.EventHub | undefined = undefined;
+
+  public static get listener(): common.EventHub {
+    if (!AIRepo._listener) {
+      AIRepo._listener = getContext().eventHub;
+    }
+    return AIRepo._listener;
+  }
 
   /**
    * 数字人拉取接口

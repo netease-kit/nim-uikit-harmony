@@ -9,6 +9,7 @@ import {
   V2NIMAddCollectionParams,
   V2NIMCollection,
   V2NIMCollectionOption,
+  V2NIMCustomNotification,
   V2NIMMessage,
   V2NIMMessageDeletedNotification,
   V2NIMMessageListOption,
@@ -22,14 +23,24 @@ import {
   V2NIMMessageSearchParams,
   V2NIMMessageSearchResult,
   V2NIMP2PMessageReadReceipt,
+  V2NIMSendCustomNotificationParams,
   V2NIMSendMessageParams,
   V2NIMSendMessageResult,
+  V2NIMTextTranslateParams,
+  V2NIMTextTranslationResult,
   V2NIMTeamMessageReadReceipt,
-  V2NIMTeamMessageReadReceiptDetail
+  V2NIMTeamMessageReadReceiptDetail,
+  V2NIMVoiceToTextParams
 } from '@nimsdk/base';
 import { ChatKitClient } from '../ChatKitClient';
+import { MessageCallback, MessageSendParams } from '../listener/MessageCallback';
 
 export class ChatRepo {
+  /**
+   * 消息发送回调（用于在发送前拦截和修改消息）
+   * 通过 IMKitCustomFactory.setMessageSendCallback() 设置
+   */
+  static sendCallback: MessageCallback | undefined = undefined;
   /**
    * 发送消息
    * @param sendFn 消息接受处理方法
@@ -242,7 +253,28 @@ export class ChatRepo {
     params?: V2NIMSendMessageParams,
     progress?: (percentage: number) => void
   ): Promise<V2NIMSendMessageResult | undefined> {
-    return ChatKitClient.nim.messageService?.sendMessage(message, conversationId, params, progress);
+    // 最终发送的消息和参数
+    let msgFinal: V2NIMMessage = message
+    let paramFinal: V2NIMSendMessageParams | undefined = params
+
+    // 调用 beforeSend 回调，允许 demo 层修改消息和参数
+    if (ChatRepo.sendCallback) {
+      const sendParams: MessageSendParams = {
+        conversationId: conversationId,
+        message: message,
+        params: params
+      }
+      const customParams = ChatRepo.sendCallback.beforeSend(sendParams)
+      if (customParams) {
+        msgFinal = customParams.message
+        paramFinal = customParams.params
+      } else {
+        // 返回 undefined 则拦截该消息不发送
+        return undefined
+      }
+    }
+
+    return ChatKitClient.nim.messageService?.sendMessage(msgFinal, conversationId, paramFinal, progress);
   }
 
   /**
@@ -253,10 +285,32 @@ export class ChatRepo {
    * @param params 发送消息相关配置参数
    * @param progress 发送消息进度回调. 作用于需要上传的文件，图片，音视频消息
    */
-  static async replyMessage(message: V2NIMMessage, replyMessage: V2NIMMessage, params?: V2NIMSendMessageParams,
-    progress?: (percentage: number) => void): Promise<V2NIMSendMessageResult> {
-    const res = await ChatKitClient.nim.messageService?.replyMessage(message, replyMessage, params, progress);
-    return res!;
+  static async replyMessage(message: V2NIMMessage, replyMessage: V2NIMMessage,
+    params?: V2NIMSendMessageParams,
+    progress?: (percentage: number) => void): Promise<V2NIMSendMessageResult | undefined> {
+    // 最终发送的消息和参数
+    let msgFinal: V2NIMMessage = message
+    let paramFinal: V2NIMSendMessageParams | undefined = params
+
+    // 调用 beforeSend 回调，允许 demo 层修改消息和参数
+    if (ChatRepo.sendCallback) {
+      const sendParams: MessageSendParams = {
+        conversationId: replyMessage.conversationId,
+        message: message,
+        params: params
+      }
+      const customParams = ChatRepo.sendCallback.beforeSend(sendParams)
+      if (customParams) {
+        msgFinal = customParams.message
+        paramFinal = customParams.params
+      } else {
+        // 返回 undefined 则拦截该消息不发送
+        return undefined
+      }
+    }
+
+    const res = await ChatKitClient.nim.messageService?.replyMessage(msgFinal, replyMessage, paramFinal, progress);
+    return res;
   }
 
   /**
@@ -561,5 +615,54 @@ export class ChatRepo {
    */
   static async updateMessageLocalExtension(message: V2NIMMessage, localExtension: string): Promise<V2NIMMessage | undefined> {
     return ChatKitClient.nim.messageService?.updateMessageLocalExtension(message, localExtension)
+  }
+
+  /**
+   * 文本翻译
+   * @param params 翻译参数
+   * @returns 翻译结果
+   */
+  static async translateText(params: V2NIMTextTranslateParams): Promise<V2NIMTextTranslationResult | undefined> {
+    return ChatKitClient.nim.messageService?.translateText(params)
+  }
+
+  /**
+   * 发送自定义通知
+   * @param conversationId 会话 ID
+   * @param content 通知内容（JSON 字符串，如 {"typing": 1}）
+   * @param params 发送参数配置
+   */
+  static async sendCustomNotification(
+    conversationId: string,
+    content: string,
+    params?: V2NIMSendCustomNotificationParams
+  ): Promise<void> {
+    return ChatKitClient.nim.notificationService?.sendCustomNotification(conversationId, content, params)
+  }
+
+  /**
+   * 注册自定义通知监听
+   * @param receiveFn 自定义通知接收处理方法
+   */
+  static onReceiveCustomNotifications(receiveFn: (notifications: V2NIMCustomNotification[]) => void) {
+    ChatKitClient.nim.notificationService?.on('onReceiveCustomNotifications', receiveFn)
+  }
+
+  /**
+   * 取消注册自定义通知监听
+   * @param receiveFn 自定义通知接收处理方法
+   */
+  static offReceiveCustomNotifications(receiveFn: (notifications: V2NIMCustomNotification[]) => void) {
+    ChatKitClient.nim.notificationService?.off('onReceiveCustomNotifications', receiveFn)
+  }
+
+  /**
+   * 语音转文字
+   * @param params 语音转文字参数
+   * @returns 转换后的文字
+   */
+  static async voiceToText(params: V2NIMVoiceToTextParams): Promise<string> {
+    const result = await ChatKitClient.nim.messageService?.voiceToText(params)
+    return result ?? ''
   }
 }

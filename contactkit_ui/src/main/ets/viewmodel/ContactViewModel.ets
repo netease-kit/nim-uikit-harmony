@@ -5,7 +5,7 @@
  *
  */
 
-import { ContactRepo, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit'
+import { ChatKitClient, ContactRepo, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit'
 import { GetUnreadCountStr, initalLetter } from '@nimkit/common'
 import { V2NIMFriend, V2NIMUser } from '@nimsdk/base'
 import { NEContactSection, NEContactSectionDataSource, SelectUserWithFriend } from '../model/NEContactSection'
@@ -263,6 +263,20 @@ export class ContactViewModel {
     try {
       const count = await ContactRepo.getAddApplicationUnreadCount()
       if (count > 0) {
+        return GetUnreadCountStr(count)
+      }
+      return undefined
+    } catch (err) {
+      console.log(err)
+      return undefined
+    }
+  }
+
+  // 获取入群验证消息未读数
+  async getUnreadTeamVerify() {
+    try {
+      const count = await ChatKitClient.nim.teamService?.getTeamJoinActionInfoUnreadCount()
+      if (count && count > 0) {
         return GetUnreadCountStr(count)
       }
       return undefined

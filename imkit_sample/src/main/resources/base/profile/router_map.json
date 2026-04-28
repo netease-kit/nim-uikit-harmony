@@ -33,14 +33,6 @@
       }
     },
     {
-      "name": "MessageRemindPage",
-      "pageSourceFile": "src/main/ets/mine/pages/MessageRemindPage.ets",
-      "buildFunction": "MessageRemindPageBuilder",
-      "data": {
-        "description": "this is message remind page"
-      }
-    },
-    {
       "name": "CollectionMessagePage",
       "pageSourceFile": "src/main/ets/mine/pages/CollectionMessagePage.ets",
       "buildFunction": "CollectionMessagePageBuilder",
@@ -62,6 +54,46 @@
       "buildFunction": "IMSDKConfigPageBuilder",
       "data": {
         "description": "IM SDK config page"
+      }
+    },
+    {
+      "name": "GlobalConfigPage",
+      "pageSourceFile": "src/main/ets/mine/pages/GlobalConfigPage.ets",
+      "buildFunction": "GlobalConfigPageBuilder",
+      "data": {
+        "description": "global config page"
+      }
+    },
+    {
+      "name": "NotifySettingPage",
+      "pageSourceFile": "src/main/ets/mine/pages/NotifySettingPage.ets",
+      "buildFunction": "NotifySettingPageBuilder",
+      "data": {
+        "description": "notify setting page"
+      }
+    },
+    {
+      "name": "PushConfigPage",
+      "pageSourceFile": "src/main/ets/mine/pages/PushConfigPage.ets",
+      "buildFunction": "PushConfigPageBuilder",
+      "data": {
+        "description": "push config page"
+      }
+    },
+    {
+      "name": "TranslationSettingPage",
+      "pageSourceFile": "src/main/ets/mine/pages/TranslationSettingPage.ets",
+      "buildFunction": "TranslationSettingPageBuilder",
+      "data": {
+        "description": "translation setting page"
+      }
+    },
+    {
+      "name": "TranslationLanguagePage",
+      "pageSourceFile": "src/main/ets/mine/pages/TranslationLanguagePage.ets",
+      "buildFunction": "TranslationLanguagePageBuilder",
+      "data": {
+        "description": "translation language page"
       }
     }
   ]

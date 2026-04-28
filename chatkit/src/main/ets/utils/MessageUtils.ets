@@ -21,14 +21,15 @@ export function saveLocalRevokeMessage(conversationId: string, msg: V2NIMMessage
   }
 
   revokeMsg.threadReply = msg.threadReply
-  let localExtension = {
+  const localExtension: RevokeMessageExtension = {
     revoke_message_local: true,
     revoke_message_local_time: currentTime,
     revoke_message_client_id: msg.messageClientId,
     revoke_message_local_edit: edit,
-    revoke_message_local_content: msg.text ?? ''
-
-  } as RevokeMessageExtension
+    revoke_message_local_content: msg.text ?? '',
+    // 自定义消息的 attachment 需要存储 raw JSON 字符串
+    revoke_message_attachment: msg.attachment?.raw ?? undefined
+  }
 
   revokeMsg.localExtension = JSON.stringify(localExtension)
   let createTime = msg.createTime + 10

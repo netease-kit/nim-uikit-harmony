@@ -10,7 +10,6 @@ import {
   V2NIMCollection,
   V2NIMErrorCode,
   V2NIMMessage,
-  V2NIMMessageConfig,
   V2NIMQueryDirection,
   V2NIMSendMessageParams
 } from '@nimsdk/base';
@@ -18,6 +17,7 @@ import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/Conv
 import { NIMMessageInfo } from '@nimkit/chatkit_ui/src/main/ets/model/NIMMessageInfo';
 import { CollectionMessageModel } from '../model/CollectionMessageModel';
 import { getMessageImageUrls, sendMessageFailedTips } from '@nimkit/chatkit_ui/src/main/ets/common/MessageHelper';
+import { buildSendMessageParams } from '@nimkit/chatkit_ui/src/main/ets/common/SendMessageParamsHelper';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { NECommonUtils } from '@nimkit/common';
 
@@ -123,12 +123,8 @@ export class CollectionMessageViewModel {
   }
 
   // 消息发送之前调用，用于配置消息通用参数
-  beforeSendMessage(msg: V2NIMMessage): V2NIMMessage {
-    let msgConfig: V2NIMMessageConfig = {
-      readReceiptEnabled: true
-    }
-    msg.messageConfig = msgConfig
-    return msg
+  beforeSendMessage(params?: V2NIMSendMessageParams): V2NIMSendMessageParams | undefined {
+    return buildSendMessageParams(params)
   }
 
   /**
@@ -141,7 +137,8 @@ export class CollectionMessageViewModel {
   async sendForwardMessage(msg: V2NIMMessage, conversationId: string, params?: V2NIMSendMessageParams,
     progress?: (percentage: number) => void) {
     msg.subType = undefined // 兼容其他端
-    ChatRepo.sendMessage(this.beforeSendMessage(msg), conversationId, params, progress).catch((err: BusinessError) => {
+    const mergedParams = this.beforeSendMessage(params)
+    ChatRepo.sendMessage(msg, conversationId, mergedParams, progress).catch((err: BusinessError) => {
       console.error("net ease send message error", err.code, err.message);
       sendMessageFailedTips(msg, err, conversationId)
     })
