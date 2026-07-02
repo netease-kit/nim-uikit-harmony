@@ -5,7 +5,8 @@
  *
  */
 
-import { ChatKitClient, ChatRepo, ContactRepo } from '@nimkit/chatkit'
+import { Logger } from '@nimkit/common';
+import { ChatKitClient, ChatRepo, ContactRepo, DisposableBag, FriendEventRepo } from '@nimkit/chatkit'
 import {
   V2NIMError,
   V2NIMErrorCode,
@@ -38,6 +39,7 @@ export class ValidationMessageViewModel {
    */
   private applicationQueue: V2NIMFriendAddApplication[] = []
   private isProcessingApplication: boolean = false
+  private disposableBag: DisposableBag = new DisposableBag()
 
   onFriendAddApplicationFun = async (application: V2NIMFriendAddApplication) => {
     this.applicationQueue.push(application)
@@ -59,7 +61,7 @@ export class ValidationMessageViewModel {
             this.friendAddApplications.unshift(neApplication)
           }
         } catch (err) {
-          console.log(err)
+          Logger.info('ContactKit', err)
         }
       }
     }
@@ -95,8 +97,10 @@ export class ValidationMessageViewModel {
   private context = getContext(this) as common.UIAbilityContext
 
   constructor() {
-    ChatKitClient.nim.friendService?.on('onFriendAddApplication', this.onFriendAddApplicationFun)
-    ChatKitClient.nim.friendService?.on('onFriendAddRejected', this.onFriendAddRejectedFun)
+    this.disposableBag.addAll([
+      FriendEventRepo.onFriendAddApplication(this.onFriendAddApplicationFun),
+      FriendEventRepo.onFriendAddRejected(this.onFriendAddRejectedFun)
+    ])
   }
 
   async convertToNEFriendAddApplication(item: V2NIMFriendAddApplication, move: boolean = false) {
@@ -150,7 +154,7 @@ export class ValidationMessageViewModel {
           friendAddApplication.setApplicantUserWithFriend(users[0])
         }
       } catch (err) {
-        console.log(err)
+        Logger.info('ContactKit', err)
       }
     }
 
@@ -187,7 +191,7 @@ export class ValidationMessageViewModel {
         this.getAddApplicationList()
       }
     } catch (err) {
-      console.log(err)
+      Logger.info('ContactKit', err)
     }
   }
 
@@ -205,9 +209,9 @@ export class ValidationMessageViewModel {
       const message = ChatRepo.createTextMessage(text)
       const conversationId = ChatKitClient.nim.conversationIdUtil.p2pConversationId(application.applicantAccountId)
       const result = await ChatRepo.sendMessage(message, conversationId)
-      console.log('net ease send hello message success ', result);
+      Logger.info('ContactKit', 'net ease send hello message success ', result);
     } catch (err) {
-      console.log('net ease send hello message error', err);
+      Logger.info('ContactKit', 'net ease send hello message error', err);
     }
   }
 
@@ -239,7 +243,7 @@ export class ValidationMessageViewModel {
 
       this.setApplicationStatus(application, status)
     } catch (err) {
-      console.log(err)
+      Logger.info('ContactKit', err)
       let v2Error = err as V2NIMError
       if (v2Error) {
         switch (v2Error.code) {
@@ -291,7 +295,7 @@ export class ValidationMessageViewModel {
     try {
       await ContactRepo.setAddApplicationRead()
     } catch (err) {
-      console.log(err)
+      Logger.info('ContactKit', err)
     }
   }
 
@@ -303,12 +307,11 @@ export class ValidationMessageViewModel {
       await ContactRepo.clearAllAddApplication()
       this.friendAddApplications = []
     } catch (err) {
-      console.log(err)
+      Logger.info('ContactKit', err)
     }
   }
 
   onDestroy() {
-    ChatKitClient.nim.friendService?.off('onFriendAddApplication', this.onFriendAddApplicationFun)
-    ChatKitClient.nim.friendService?.off('onFriendAddRejected', this.onFriendAddRejectedFun)
+    this.disposableBag.dispose()
   }
 }

@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  *
  */
+import { Logger } from '@nimkit/common';
 import {
   V2NIMError,
   V2NIMFriend,
@@ -17,7 +18,11 @@ import {
 import { ChatKitClient } from '../ChatKitClient';
 import { TeamMemberWithUser } from '../model/TeamMemberWithUser';
 import { NEFriendUserCache } from '../NEFriendUserCache';
+import { FriendEventRepo } from '../repo/FriendEventRepo';
 import { TeamRepo } from '../repo/TeamRepo';
+import { TeamEventRepo } from '../repo/TeamEventRepo';
+import { UserEventRepo } from '../repo/UserEventRepo';
+import { DisposableBag } from '../utils/DisposableBag';
 
 @ObservedV2
 export class TeamMemberCache {
@@ -35,6 +40,7 @@ export class TeamMemberCache {
   //是否拉完了
   isFinish = false
   private static instance: TeamMemberCache
+  private disposableBag: DisposableBag = new DisposableBag()
 
   private constructor() {
 
@@ -54,6 +60,7 @@ export class TeamMemberCache {
    */
   intTeamInfo(teamId: string, team?: V2NIMTeam) {
     if (this.teamId !== teamId) {
+      this.clearMemberChangeListener()
       this.membersMap.clear()
       this.mineTeamMember = undefined
       this.teamId = teamId
@@ -89,7 +96,7 @@ export class TeamMemberCache {
    * 好友信息变更
    * @param friend
    */
-  onFriendInfoChanged(friend: V2NIMFriend) {
+  onFriendInfoChanged = (friend: V2NIMFriend): void => {
     let member = this.membersMap.get(friend.accountId)
     if (member) {
       member.friendInfo = friend
@@ -102,7 +109,7 @@ export class TeamMemberCache {
    * 群乘以信息变更
    * @param members
    */
-  onTeamMemberInfoUpdated(members: V2NIMTeamMember[]) {
+  onTeamMemberInfoUpdated = (members: V2NIMTeamMember[]): void => {
     if (members[0].teamId === this.teamId) {
       members.forEach((m) => {
         let member = this.membersMap.get(m.accountId)
@@ -121,7 +128,7 @@ export class TeamMemberCache {
    * 离开群
    * @param members
    */
-  onTeamMemberLeft(members: V2NIMTeamMember[]) {
+  onTeamMemberLeft = (members: V2NIMTeamMember[]): void => {
     if (members[0].teamId === this.teamId) {
       let removeIds: string[] = members.map(member => member.accountId)
       removeIds.forEach((e) => {
@@ -135,7 +142,7 @@ export class TeamMemberCache {
    * @param accId
    * @param members
    */
-  onTeamMemberKicked(accId: string, members: V2NIMTeamMember[]) {
+  onTeamMemberKicked = (accId: string, members: V2NIMTeamMember[]): void => {
     if (members[0].teamId === this.teamId) {
       let removeIds: string[] = members.map(member => member.accountId)
       removeIds.forEach((e) => {
@@ -148,7 +155,7 @@ export class TeamMemberCache {
    * 成员加入
    * @param members
    */
-  onTeamMemberJoined(members: V2NIMTeamMember[]) {
+  onTeamMemberJoined = (members: V2NIMTeamMember[]): void => {
     if (members[0].teamId === this.teamId) {
       let accIds = members.map(m => m.accountId)
       TeamRepo.getTeamMembersByIds(this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
@@ -177,7 +184,7 @@ export class TeamMemberCache {
   }
 
   // 群更新
-  onTeamInfoUpdated = (team: V2NIMTeam) => {
+  onTeamInfoUpdated = (team: V2NIMTeam): void => {
     if (team.teamId === this.teamId) {
       this.team = team
     }
@@ -185,7 +192,7 @@ export class TeamMemberCache {
   /**
    * 刷新群信息
    */
-  onSyncFinished = () => {
+  onSyncFinished = (): void => {
     if (this.teamId) {
       TeamRepo.getTeamInfo(this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL)
         .then((team) => {
@@ -207,7 +214,7 @@ export class TeamMemberCache {
    * 用户信息变更
    * @param users
    */
-  onUserProfileChanged(users: V2NIMUser[]) {
+  onUserProfileChanged = (users: V2NIMUser[]): void => {
     users.forEach((user) => {
       let member = this.membersMap.get(user.accountId)
       if (member) {
@@ -222,21 +229,21 @@ export class TeamMemberCache {
    * 初始化成员信息变化回调
    */
   initMemberChangeListener() {
-    //用户信息变更
-    ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onUserProfileChanged.bind(this))
-    //好友信息变更
-    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChanged.bind(this))
-    //群成员信息变更
-    ChatKitClient.nim.teamService?.on('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated.bind(this))
-    ChatKitClient.nim.teamService?.on('onTeamMemberLeft', this.onTeamMemberLeft.bind(this))
-    ChatKitClient.nim.teamService?.on('onTeamMemberKicked', this.onTeamMemberKicked.bind(this))
-    ChatKitClient.nim.teamService?.on('onTeamMemberJoined', this.onTeamMemberJoined.bind(this))
-    //群信息变更
-    ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', this.onTeamInfoUpdated.bind(this))
+    this.clearMemberChangeListener()
+    this.disposableBag.addAll([
+      UserEventRepo.onUserProfileChanged(this.onUserProfileChanged),
+      FriendEventRepo.onFriendInfoChanged(this.onFriendInfoChanged),
+      TeamEventRepo.onTeamMemberInfoUpdated(this.onTeamMemberInfoUpdated),
+      TeamEventRepo.onTeamMemberLeft(this.onTeamMemberLeft),
+      TeamEventRepo.onTeamMemberKicked(this.onTeamMemberKicked),
+      TeamEventRepo.onTeamMemberJoined(this.onTeamMemberJoined),
+      TeamEventRepo.onTeamInfoUpdated(this.onTeamInfoUpdated),
+      TeamEventRepo.onTeamSyncFinished(this.onSyncFinished)
+    ])
+  }
 
-    //断网
-    ChatKitClient.nim.teamService?.on('onSyncFinished', this.onSyncFinished.bind(this))
-
+  clearMemberChangeListener() {
+    this.disposableBag.dispose()
   }
 
   /**
@@ -272,7 +279,7 @@ export class TeamMemberCache {
         nextToken: this.nextToken,
         direction: V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_ASC
       }).catch((e: V2NIMError) => {
-      console.debug(`${TeamMemberCache.logTag} getTeamMembers error code = ${e.code}`)
+      Logger.debug('ChatKit', `${TeamMemberCache.logTag} getTeamMembers error code = ${e.code}`)
     })
     if (result) {
       this.isFinish = result.finished
@@ -349,25 +356,13 @@ export class TeamMemberCache {
   }
 
   clear() {
+    this.clearMemberChangeListener()
     this.membersMap.clear()
     this.mineTeamMember = undefined
     this.teamId = ''
     this.team = undefined
     this.isFinish = false
     this.nextToken = ''
-    //用户信息变更
-    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onUserProfileChanged.bind(this))
-    //好友信息变更
-    ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChanged.bind(this))
-    //群成员信息变更
-    ChatKitClient.nim.teamService?.off('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated.bind(this))
-    ChatKitClient.nim.teamService?.off('onTeamMemberLeft', this.onTeamMemberLeft.bind(this))
-    ChatKitClient.nim.teamService?.off('onTeamMemberKicked', this.onTeamMemberKicked.bind(this))
-    ChatKitClient.nim.teamService?.off('onTeamMemberJoined', this.onTeamMemberJoined.bind(this))
-    //群信息变更
-    ChatKitClient.nim.teamService?.off('onTeamInfoUpdated', this.onTeamInfoUpdated.bind(this))
-    ChatKitClient.nim.teamService?.off('onSyncFinished', this.onSyncFinished.bind(this))
-
   }
 
   /**

@@ -173,9 +173,46 @@
       "value": "Privatized configuration"
     },
     {
+      "name": "login_privatized_cloud_configuration",
+      "value": "Privatized cloud environment configuration"
+    },
+    {
+      "name": "login_placeholder_account",
+      "value": "Username"
+    },
+    {
+      "name": "login_placeholder_token",
+      "value": "Password"
+    },
+    {
+      "name": "login",
+      "value": "Login"
+    },
+    {
+      "name": "login_clean_config",
+      "value": "Clear privatized configuration"
+    },
+    {
+      "name": "login_config_input_empty",
+      "value": "Please enter username and password"
+    },
+    {
+      "name": "login_failed",
+      "value": "Login failed"
+    },
+    {
+      "name": "login_config_clean_tip",
+      "value": "Are you sure you want to clear the privatized configuration?"
+    },
+    {
+      "name": "login_config_clean_success",
+      "value": "Cleared successfully. Please restart the app"
+    },
+    {
       "name": "login_by_account",
       "value": "login"
-    },    {
+    },
+    {
       "name": "chat_kit_call_blocked",
       "value": "You are in block list"
     },
@@ -190,6 +227,18 @@
     {
       "name": "chat_kit_call_camera_permission_denied",
       "value": "Camera media permission denied"
+    },
+    {
+      "name": "call_push_title",
+      "value": "Incoming Call"
+    },
+    {
+      "name": "call_push_audio_content",
+      "value": "You have an audio call"
+    },
+    {
+      "name": "call_push_video_content",
+      "value": "You have a video call"
     },
     {
       "name": "mine_setting_global_config",
@@ -222,6 +271,34 @@
     {
       "name": "mine_setting_translation",
       "value": "Translation"
+    },
+    {
+      "name": "translation_app_language",
+      "value": "Language"
+    },
+    {
+      "name": "translation_app_language_title",
+      "value": "Language"
+    },
+    {
+      "name": "translation_app_language_desc",
+      "value": "Set the display language for the app"
+    },
+    {
+      "name": "translation_app_language_follow_system",
+      "value": "Follow System"
+    },
+    {
+      "name": "translation_app_language_zh_cn",
+      "value": "Simplified Chinese"
+    },
+    {
+      "name": "translation_app_language_en_us",
+      "value": "English"
+    },
+    {
+      "name": "translation_language_switch_success",
+      "value": "Language switched successfully"
     },
     {
       "name": "translation_target_language",
@@ -358,6 +435,14 @@
     {
       "name": "push_config_save",
       "value": "Save"
+    },
+    {
+      "name": "push_config_invalid",
+      "value": "Invalid config format. Please check the JSON content"
+    },
+    {
+      "name": "push_config_save_success",
+      "value": "Saved successfully"
     }
   ]
 }

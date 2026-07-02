@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { fileShare } from '@kit.CoreFileKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 
@@ -40,15 +41,15 @@ export class FileUtils {
       };
       let policies: Array<fileShare.PolicyInfo> = [policyInfo];
       fileShare.activatePermission(policies).then(() => {
-        console.info("activatePermission successfully");
+        Logger.info('ChatKitUI', "activatePermission successfully");
 
       }).catch(async (err: BusinessError<Array<fileShare.PolicyErrorResult>>) => {
-        console.error("activatePermission failed with error message: " + err.message + ", error code: " + err.code);
+        Logger.error('ChatKitUI', "activatePermission failed with error message: " + err.message + ", error code: " + err.code);
         if (err.code == 13900001 && err.data) {
           for (let i = 0; i < err.data.length; i++) {
-            console.error("error code : " + JSON.stringify(err.data[i].code));
-            console.error("error uri : " + JSON.stringify(err.data[i].uri));
-            console.error("error reason : " + JSON.stringify(err.data[i].message));
+            Logger.error('ChatKitUI', "error code : " + JSON.stringify(err.data[i].code));
+            Logger.error('ChatKitUI', "error uri : " + JSON.stringify(err.data[i].uri));
+            Logger.error('ChatKitUI', "error reason : " + JSON.stringify(err.data[i].message));
             if (err.data[i].code == fileShare.PolicyErrorCode.PERMISSION_NOT_PERSISTED) {
               await fileShare.persistPermission(policies);
             }
@@ -57,7 +58,7 @@ export class FileUtils {
       });
     } catch (error) {
       let err: BusinessError = error as BusinessError;
-      console.error('activatePermission failed with err: ' + JSON.stringify(err));
+      Logger.error('ChatKitUI', 'activatePermission failed with err: ' + JSON.stringify(err));
     }
   }
 }

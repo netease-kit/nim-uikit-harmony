@@ -21,6 +21,14 @@
       "value": "我的数字人"
     },
     {
+      "name": "person_select_ai_users_tab",
+      "value": "数字人"
+    },
+    {
+      "name": "no_ai_user",
+      "value": "暂无数字人"
+    },
+    {
       "name": "contact_clean",
       "value": "清空"
     },
@@ -162,7 +170,7 @@
     },
     {
       "name": "select_limit_tip",
-      "value": "最多选择%d个好友"
+      "value": "最多只能选择%d个联系人"
     },
     {
       "name": "select_none_tip",
@@ -298,7 +306,7 @@
     },
     {
       "name": "no_bot",
-      "value": "暂无机器人"
+      "value": "暂无机器人，点击右上角创建"
     },
     {
       "name": "create_bot",
@@ -371,6 +379,10 @@
     {
       "name": "bot_refresh_token_success",
       "value": "Token已刷新并复制到剪贴板"
+    },
+    {
+      "name": "bot_refresh_token_fail",
+      "value": "刷新失败，请重试"
     },
     {
       "name": "bot_config",
@@ -449,6 +461,14 @@
       "value": "新建机器人"
     },
     {
+      "name": "bot_limit_select_existing",
+      "value": "选择已有机器人"
+    },
+    {
+      "name": "bot_limit_go_delete",
+      "value": "去删除机器人"
+    },
+    {
       "name": "bot_bind_select_existing",
       "value": "选择已有机器人"
     },
@@ -467,6 +487,34 @@
     {
       "name": "bot_bind_title",
       "value": "绑定机器人"
+    },
+    {
+      "name": "bot_qr_expired_title",
+      "value": "二维码已失效"
+    },
+    {
+      "name": "bot_qr_expired_message",
+      "value": "请重新生成二维码后扫描"
+    },
+    {
+      "name": "bot_qr_expired_btn",
+      "value": "知道了"
+    },
+    {
+      "name": "bot_limit_bind_title",
+      "value": "机器人数量已达上限（10个）"
+    },
+    {
+      "name": "bot_limit_bind_message",
+      "value": "您已创建10个机器人，请选择："
+    },
+    {
+      "name": "bot_info_title",
+      "value": "机器人"
+    },
+    {
+      "name": "bot_edit_name_title",
+      "value": "修改昵称"
     },
     {
       "name": "bot_token_empty_tip",

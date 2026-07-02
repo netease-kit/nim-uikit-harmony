@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatKitClient, ErrorUtils } from '@nimkit/chatkit';
 import { pasteboard } from '@kit.BasicServicesKit';
 import {
@@ -80,15 +81,15 @@ export struct BotInfoPage {
   }
 
   private handleEditBotResult(popInfo: PopInfo): void {
-    console.info('[BotInfoPage] handleEditBotResult, popInfo.result=' + JSON.stringify(popInfo.result))
+    Logger.info('ContactKit', '[BotInfoPage] handleEditBotResult, popInfo.result=' + JSON.stringify(popInfo.result))
     const result = popInfo.result as Record<string, string> | undefined
     if (result && result['name']) {
-      console.info('[BotInfoPage] updateBotLocal, name=' + result['name'] + ', icon=' + (result['icon'] ?? 'empty'))
+      Logger.info('ContactKit', '[BotInfoPage] updateBotLocal, name=' + result['name'] + ', icon=' + (result['icon'] ?? 'empty'))
       this.viewModel.updateBotLocal(result['name'], result['icon'] ?? '')
       this.shouldSyncResult = true
-      console.info('[BotInfoPage] after updateBotLocal, bot.name=' + (this.viewModel.bot?.name ?? 'undefined'))
+      Logger.info('ContactKit', '[BotInfoPage] after updateBotLocal, bot.name=' + (this.viewModel.bot?.name ?? 'undefined'))
     } else {
-      console.info('[BotInfoPage] handleEditBotResult: no valid result, skipping')
+      Logger.info('ContactKit', '[BotInfoPage] handleEditBotResult: no valid result, skipping')
     }
   }
 
@@ -191,7 +192,12 @@ export struct BotInfoPage {
           .onClick(() => {
             const conversationId =
               ChatKitClient.nim.conversationIdUtil.p2pConversationId(this.viewModel.accid)
-            this.pathStack.pushPath({ name: 'ChatP2PPage', param: conversationId })
+            const botSubSessionParams: string[] = [
+              conversationId,
+              this.viewModel.accid,
+              this.viewModel.bot?.name ?? this.viewModel.accid
+            ]
+            this.pathStack.pushPath({ name: 'ChatBotSubSessionListPage', param: botSubSessionParams })
           })
         }
         .backgroundColor(Color.White)

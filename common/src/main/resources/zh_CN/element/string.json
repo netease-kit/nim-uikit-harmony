@@ -113,6 +113,10 @@
       "value": "聊天置顶"
     },
     {
+      "name": "chat_message_set_ai_pin",
+      "value": "PIN置顶"
+    },
+    {
       "name": "chat_permission_deny_tips",
       "value": "请在设置页面添加相关权限"
     },

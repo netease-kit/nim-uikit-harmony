@@ -4,7 +4,15 @@
  * found in the LICENSE file.
  *
  */
-import { ChatKitClient, TeamMemberWithUser, TeamRepo } from '@nimkit/chatkit'
+import {
+  ChatKitClient,
+  DisposableBag,
+  FriendEventRepo,
+  TeamEventRepo,
+  TeamMemberWithUser,
+  TeamRepo,
+  UserEventRepo
+} from '@nimkit/chatkit'
 import {
   V2NIMFriend,
   V2NIMQueryDirection,
@@ -27,6 +35,7 @@ export class TeamMemberListViewModel {
   @Trace memberList: TeamMemberWithUser[] = []
   //自己的群身份
   @Trace mineTeamMember: V2NIMTeamMember | undefined = undefined
+  private disposableBag: DisposableBag = new DisposableBag()
 
   init(teamId: string) {
     this.teamId = teamId
@@ -111,15 +120,27 @@ export class TeamMemberListViewModel {
    * 初始化成员信息变化回调
    */
   initMemberChangeListener() {
-    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChanged.bind(this))
-    // 监听用户信息变化，用于更新成员头像
-    ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onUserProfileChanged.bind(this))
-    //群成员信息变更
-    ChatKitClient.nim.teamService?.on('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated.bind(this))
-    ChatKitClient.nim.teamService?.on('onTeamMemberLeft', this.onTeamMemberLeft.bind(this))
-    ChatKitClient.nim.teamService?.on('onTeamMemberKicked', this.onTeamMemberKicked.bind(this))
-
-    ChatKitClient.nim.teamService?.on('onTeamMemberJoined', this.onTeamMemberJoined.bind(this))
+    this.onDestroy()
+    this.disposableBag.addAll([
+      FriendEventRepo.onFriendInfoChanged((friend: V2NIMFriend): void => {
+        this.onFriendInfoChanged(friend)
+      }),
+      UserEventRepo.onUserProfileChanged((users: V2NIMUser[]): void => {
+        this.onUserProfileChanged(users)
+      }),
+      TeamEventRepo.onTeamMemberInfoUpdated((members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberInfoUpdated(members)
+      }),
+      TeamEventRepo.onTeamMemberLeft((members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberLeft(members)
+      }),
+      TeamEventRepo.onTeamMemberKicked((accId: string, members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberKicked(accId, members)
+      }),
+      TeamEventRepo.onTeamMemberJoined((members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberJoined(members)
+      })
+    ])
   }
 
   /**
@@ -205,13 +226,6 @@ export class TeamMemberListViewModel {
   }
 
   onDestroy() {
-    ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChanged)
-    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onUserProfileChanged)
-    //群成员信息变更
-    ChatKitClient.nim.teamService?.off('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated)
-    ChatKitClient.nim.teamService?.off('onTeamMemberLeft', this.onTeamMemberLeft)
-    ChatKitClient.nim.teamService?.off('onTeamMemberKicked', this.onTeamMemberKicked)
-
-    ChatKitClient.nim.teamService?.off('onTeamMemberJoined', this.onTeamMemberJoined)
+    this.disposableBag.dispose()
   }
 }

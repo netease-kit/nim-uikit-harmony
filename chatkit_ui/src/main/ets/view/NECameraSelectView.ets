@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { camera, cameraPicker } from '@kit.CameraKit';
@@ -23,7 +24,7 @@ export struct NECameraSelectView {
   onTakeVideoFromCamera?: () => void;
 
   aboutToAppear(): void {
-    // console.log("net ease start request permissions");
+    // Logger.info('ChatKitUI', "net ease start request permissions");
     //this.requestPermissions(["ohos.permission.CAMERA", "ohos.permission.MICROPHONE", "ohos.permission.MEDIA_LOCATION",
     //  "ohos.permission.WRITE_MEDIA", "ohos.permission.READ_MEDIA"], this.context!);
   }
@@ -46,16 +47,16 @@ export struct NECameraSelectView {
       if (this.onImageChosen && pickerResult.resultCode == 0 && pickerResult.resultUri.length > 0) {
         this.onImageChosen(pickerResult.resultUri)
       }
-      console.log("the pick pickerResult is:" + JSON.stringify(pickerResult));
+      Logger.info('ChatKitUI', "the pick pickerResult is:" + JSON.stringify(pickerResult));
     } catch (error) {
       let err = error as BusinessError;
-      console.error(`the pick call failed. error code: ${err.code}`);
+      Logger.error('ChatKitUI', `the pick call failed. error code: ${err.code}`);
     }
   }
 
   // 显示相册选择器
   async showPhotoPicker() {
-    console.log("net ease show photo picker");
+    Logger.info('ChatKitUI', "net ease show photo picker");
     const photoSelectOptions = new photoAccessHelper.PhotoSelectOptions();
     // 过滤选择媒体文件类型为IMAGE
     photoSelectOptions.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
@@ -68,9 +69,9 @@ export struct NECameraSelectView {
         if (this.onImageChosen && photoSelectResult.photoUris.length > 0) {
           this.onImageChosen(photoSelectResult.photoUris[0])
         }
-        console.info('net ease photoViewPicker.select to file succeed and uris are:' + photoSelectResult.photoUris);
+        Logger.info('ChatKitUI', 'net ease photoViewPicker.select to file succeed and uris are:' + photoSelectResult.photoUris);
       }).catch((err: BusinessError) => {
-      console.error(`net ease Invoke photoViewPicker.select failed, code is ${err.code}, message is ${err.message}`);
+      Logger.error('ChatKitUI', `net ease Invoke photoViewPicker.select failed, code is ${err.code}, message is ${err.message}`);
     })
   }
 

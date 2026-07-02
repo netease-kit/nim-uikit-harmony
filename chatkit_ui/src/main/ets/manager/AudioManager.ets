@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  *
  */
+import { Logger } from '@nimkit/common';
 import { audio } from '@kit.AudioKit';
 import { AsyncCallback, BusinessError } from '@kit.BasicServicesKit';
 import { fileIo } from '@kit.CoreFileKit';
@@ -37,7 +38,7 @@ export class AudioManager {
   file?: fileIo.File
 
   private constructor() {
-    console.log('net ease AudioManager constructor')
+    Logger.info('ChatKitUI', 'net ease AudioManager constructor')
     this.setup();
   }
 
@@ -46,10 +47,10 @@ export class AudioManager {
     // 创建Audio Capture实例
     audio.createAudioCapturer(audioCaptureOptions, (err, capture) => {
       if (err) {
-        console.error(`net ease Invoke createAudioCapture failed, code is ${err.code}, message is ${err.message}`);
+        Logger.error('ChatKitUI', `net ease Invoke createAudioCapture failed, code is ${err.code}, message is ${err.message}`);
         return;
       }
-      console.info(`net ease ${TAG}: create AudioCapture success`);
+      Logger.info('ChatKitUI', `net ease ${TAG}: create AudioCapture success`);
       audioCapture = capture;
       if (audioCapture !== undefined) {
         // (audioCapture as audio.AudioCapture).on('readData', readDataCallback);
@@ -80,16 +81,16 @@ export class AudioManager {
       let stateGroup = [audio.AudioState.STATE_PREPARED, audio.AudioState.STATE_PAUSED, audio.AudioState.STATE_STOPPED];
       if (stateGroup.indexOf((audioCapture as audio.AudioCapturer).state.valueOf()) ===
         -1) { // 当且仅当状态为STATE_PREPARED、STATE_PAUSED和STATE_STOPPED之一时才能启动采集
-        console.error(`net ease  ${TAG}: start failed`);
+        Logger.error('ChatKitUI', `net ease  ${TAG}: start failed`);
         return;
       }
 
       // 启动采集
       (audioCapture as audio.AudioCapturer).start((err: BusinessError) => {
         if (err) {
-          console.error('net ease Capture start failed.');
+          Logger.error('ChatKitUI', 'net ease Capture start failed.');
         } else {
-          console.info('net ease Capture start success.');
+          Logger.info('ChatKitUI', 'net ease Capture start success.');
         }
       });
     }
@@ -101,20 +102,20 @@ export class AudioManager {
       // 只有采集器状态为STATE_RUNNING或STATE_PAUSED的时候才可以停止
       if ((audioCapture as audio.AudioCapturer).state.valueOf() !== audio.AudioState.STATE_RUNNING &&
         (audioCapture as audio.AudioCapturer).state.valueOf() !== audio.AudioState.STATE_PAUSED) {
-        console.info('net ease Capture is not running or paused');
+        Logger.info('ChatKitUI', 'net ease Capture is not running or paused');
         return;
       }
 
       //停止采集
       (audioCapture as audio.AudioCapturer).stop((err: BusinessError) => {
         if (err) {
-          console.error('net ease Capture stop failed.');
+          Logger.error('ChatKitUI', 'net ease Capture stop failed.');
           if (callback) {
             callback(err, false);
           }
         } else {
           fileIo.close(this.file);
-          console.info('net ease Capture stop success.');
+          Logger.info('ChatKitUI', 'net ease Capture stop success.');
           if (callback) {
             callback(err, true);
           }
@@ -129,16 +130,16 @@ export class AudioManager {
       // 采集器状态不是STATE_RELEASED或STATE_NEW状态，才能release
       if ((audioCapture as audio.AudioCapturer).state.valueOf() === audio.AudioState.STATE_RELEASED ||
         (audioCapture as audio.AudioCapturer).state.valueOf() === audio.AudioState.STATE_NEW) {
-        console.info('net ease Capture already released');
+        Logger.info('ChatKitUI', 'net ease Capture already released');
         return;
       }
 
       //释放资源
       (audioCapture as audio.AudioCapturer).release((err: BusinessError) => {
         if (err) {
-          console.error('net ease Capture release failed.');
+          Logger.error('ChatKitUI', 'net ease Capture release failed.');
         } else {
-          console.info('net ease Capture release success.');
+          Logger.info('ChatKitUI', 'net ease Capture release success.');
         }
       });
     }

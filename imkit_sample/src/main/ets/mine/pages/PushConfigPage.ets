@@ -31,7 +31,7 @@ export struct PushConfigPage {
     if (this.configContent.length > 0) {
       const parsedConfig = this.pushConfigManager.parseConfig(this.configContent)
       if (!parsedConfig) {
-        NECommonUtils.showToast('配置格式错误，请检查JSON格式')
+        NECommonUtils.showToast($r('app.string.push_config_invalid'))
         return
       }
     }
@@ -43,7 +43,7 @@ export struct PushConfigPage {
     // 立即同步到 PushConfigManager 和 IMKitConfigCenter
     this.pushConfigManager.setEnabled(this.pushConfigEnabled, this.configContent)
 
-    NECommonUtils.showToast('保存成功')
+    NECommonUtils.showToast($r('app.string.push_config_save_success'))
     this.pathStack.pop()
   }
 

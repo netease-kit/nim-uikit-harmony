@@ -6,7 +6,7 @@
     },
     {
       "name": "chat_network_error_tips",
-      "value": "network error"
+      "value": "No Network"
     },
     {
       "name": "chat_pin_limit_error_tips",
@@ -79,6 +79,46 @@
     {
       "name": "createAdvancedTeamSuccess",
       "value": "Successfully created advanced team"
+    },
+    {
+      "name": "notification_new_message_title",
+      "value": "New Message"
+    },
+    {
+      "name": "notification_group_message_title",
+      "value": "Group Message"
+    },
+    {
+      "name": "notification_message_type_text",
+      "value": "[Text]"
+    },
+    {
+      "name": "notification_message_type_image",
+      "value": "[Image]"
+    },
+    {
+      "name": "notification_message_type_audio",
+      "value": "[Audio]"
+    },
+    {
+      "name": "notification_message_type_video",
+      "value": "[Video]"
+    },
+    {
+      "name": "notification_message_type_location",
+      "value": "[Location]"
+    },
+    {
+      "name": "notification_message_type_notification",
+      "value": "[Notification]"
+    },
+    {
+      "name": "notification_message_type_file",
+      "value": "[File]"
+    },
+    {
+      "name": "chat_ai_message_progressing",
+      "value": "Thinking…"
     }
   ]
 }

@@ -5,7 +5,7 @@
  *
  */
 
-import { ChatKitClient, NEFriendUserCache } from '@nimkit/chatkit';
+import { ChatKitClient, NEAIUserCache, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -113,6 +113,12 @@ export struct AIPersonInfoPage {
   async requestData(): Promise<void> {
     const accountId = this.pathStack.getParamByName('AIPersonInfoPage')[0] as string
     this.viewModel.init(accountId).then(() => {
+      const aiUser = NEAIUserCache.getAIUser(accountId)
+      if (aiUser && !this.viewModel.userWithFriend?.user) {
+        this.viewModel.userWithFriend = new NEUserWithFriend({
+          user: aiUser
+        })
+      }
       this.alias = StringIsEmpty(this.viewModel.userWithFriend?.friend?.alias) ? undefined :
         this.viewModel.userWithFriend?.friend?.alias
       this.isBlock = NEFriendUserCache.getInstance().isBlockAccount(this.viewModel.accountId)
@@ -204,7 +210,7 @@ export struct AIPersonInfoPage {
                 .onClick(() => {
                   if (
                     (item as PersonInfoArrowItem).routerUrl !== undefined) {
-                    this.pathStack.pushPath({
+                    this.pathStack.replacePath({
                       name:
                       (item as PersonInfoArrowItem).routerUrl,
                       param: new EditInfoParam(item.title, this.viewModel.userWithFriend?.friend?.alias, EditType.nick,
@@ -263,6 +269,8 @@ export struct AIPersonInfoPage {
             }
             .height(48)
             .onClick(() => {
+              this.pathStack.popToName('ChatP2PPage')
+              this.pathStack.popToName('ChatTeamPage')
               this.pathStack.pushPath({
                 name: 'ChatP2PPage',
                 param: this.p2pConversationId()
@@ -292,7 +300,7 @@ export struct AIPersonInfoPage {
     })
   }
 
-  private p2pConversationId() {
-    ChatKitClient.nim.conversationIdUtil.p2pConversationId(this.viewModel.userWithFriend?.user?.accountId)
+  private p2pConversationId(): string {
+    return ChatKitClient.nim.conversationIdUtil.p2pConversationId(this.viewModel.accountId)
   }
 }

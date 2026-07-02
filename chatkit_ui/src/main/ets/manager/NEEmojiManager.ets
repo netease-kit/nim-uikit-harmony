@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  *
  */
+import { Logger } from '@nimkit/common';
 import common from '@ohos.app.ability.common';
 import util from '@ohos.util';
 
@@ -69,7 +70,7 @@ export class NEEmojiManager {
     let context = getContext() as common.UIAbilityContext;
     context.resourceManager.getRawFileContent('emoji_en.json', (err, rawFile) => {
       if (err) {
-        console.error('net ease getRawFileContent failed, err is: ' + err)
+        Logger.error('ChatKitUI', 'net ease getRawFileContent failed, err is: ' + err)
         return
       }
       try {
@@ -87,7 +88,7 @@ export class NEEmojiManager {
           }
         })
       } catch (e) {
-        console.error('net ease get emoji list failed, err is: ' + e)
+        Logger.error('ChatKitUI', 'net ease get emoji list failed, err is: ' + e)
       }
     })
     this.fileEmojiCache.set(this.deleteEmoji.file, this.deleteEmoji);

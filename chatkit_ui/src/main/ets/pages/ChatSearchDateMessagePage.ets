@@ -20,7 +20,7 @@ import { SearchDateMessage } from '../model/SearchDateMessage'
 import { NIMMessageInfo } from '../model/NIMMessageInfo'
 import { ChatBaseViewModel } from '../viewmodel/ChatBaseViewModel'
 import { V2NIMConversationType, V2NIMMessageType } from '@nimsdk/base'
-import { DateUtil } from '@nimkit/common/src/main/ets/utils/DateUtil'
+import { DateUtil } from '@nimkit/common'
 import { memberHistoryMessageContent } from '../view/MessageComponentBuilder'
 import { ChatKitClient } from '@nimkit/chatkit'
 
@@ -345,6 +345,20 @@ export struct ChatSearchDateMessagePage {
     $r('app.string.search_date_weekday_fri'),
     $r('app.string.search_date_weekday_sat')
   ]
+  private monthNames: Resource[] = [
+    $r('app.string.search_date_month_1'),
+    $r('app.string.search_date_month_2'),
+    $r('app.string.search_date_month_3'),
+    $r('app.string.search_date_month_4'),
+    $r('app.string.search_date_month_5'),
+    $r('app.string.search_date_month_6'),
+    $r('app.string.search_date_month_7'),
+    $r('app.string.search_date_month_8'),
+    $r('app.string.search_date_month_9'),
+    $r('app.string.search_date_month_10'),
+    $r('app.string.search_date_month_11'),
+    $r('app.string.search_date_month_12')
+  ]
 
   // 长按操作对话框
   messageActionDialog?: CustomDialogController
@@ -371,6 +385,11 @@ export struct ChatSearchDateMessagePage {
         this.pathStack.pop()
       }
     }, 200)
+  }
+
+  private getCurrentYearMonthLabel(): string {
+    return getContext(this).resourceManager.getStringSync($r('app.string.search_date_year_month_format').id,
+      this.currentYear, getContext(this).resourceManager.getStringSync(this.monthNames[this.currentMonth - 1].id))
   }
 
   // 初始化数据
@@ -940,7 +959,7 @@ export struct ChatSearchDateMessagePage {
 
       // 年月显示器
       Row() {
-        Text(`${this.currentYear}年${this.currentMonth}月`)
+        Text(this.getCurrentYearMonthLabel())
           .fontSize(14)
           .fontColor('#999999')
         Image($r('sys.media.ohos_ic_public_arrow_down'))

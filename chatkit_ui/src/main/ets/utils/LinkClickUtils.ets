@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { call } from '@kit.TelephonyKit'
 import { common, Want } from '@kit.AbilityKit'
 import { promptAction } from '@kit.ArkUI'
@@ -17,6 +18,15 @@ import { LinkInfo, LinkType } from './TextLinkifyUtils'
  * 对齐 Android chatkit-ui MessageClickUtils.java
  */
 export class LinkClickUtils {
+  private static getString(context: common.UIAbilityContext, name: string, ...args: (string | number)[]): string {
+    try {
+      return context.resourceManager.getStringByNameSync(name, ...args)
+    } catch (error) {
+      // TODO: Implement error handling.
+      return 'LinkClickUtils failed'
+    }
+  }
+
   /**
    * 处理链接点击
    * @param context 上下文
@@ -43,10 +53,10 @@ export class LinkClickUtils {
    */
   static handleEmailClick(context: common.UIAbilityContext, email: string): void {
     promptAction.showActionMenu({
-      title: `向"${email}"发送邮件`,
+      title: LinkClickUtils.getString(context, 'link_click_email_action_title', email),
       buttons: [
-        { text: '使用默认邮件账户', color: '#337EFF' },
-        { text: '复制邮箱', color: '#337EFF' }
+        { text: LinkClickUtils.getString(context, 'link_click_email_send'), color: '#337EFF' },
+        { text: LinkClickUtils.getString(context, 'link_click_email_copy'), color: '#337EFF' }
       ]
     }).then((result) => {
       if (result.index === 0) {
@@ -54,13 +64,13 @@ export class LinkClickUtils {
         LinkClickUtils.openEmailApp(context, email)
       } else if (result.index === 1) {
         // 复制邮箱
-        LinkClickUtils.copyToClipboard(email)
+        LinkClickUtils.copyToClipboard(context, email)
       }
       // 取消按钮由系统自动处理，无需额外代码
     }).catch((err: BusinessError) => {
       // 用户点击取消或空白区域关闭菜单，不需要报错
       if (err.code !== 100001) { // 100001 = 用户取消
-        console.error(`[LinkClickUtils] Email action menu error: ${err.message}`)
+        Logger.error('ChatKitUI', `[LinkClickUtils] Email action menu error: ${err.message}`)
       }
     })
   }
@@ -80,26 +90,26 @@ export class LinkClickUtils {
     try {
       context.startAbility(want).catch((err: BusinessError) => {
         // startAbility 返回 Promise，需要处理 catch
-        console.error(`[LinkClickUtils] Failed to open email app: ${err.message}`)
+        Logger.error('ChatKitUI', `[LinkClickUtils] Failed to open email app: ${err.message}`)
         // 根据错误码判断是否未安装邮箱应用
         if (err.code === 16000001 || err.code === 16000002) {
           // 16000001: Ability not found, 16000002: Ability is invalid
           promptAction.showToast({
-            message: '未检测到邮箱应用',
+            message: LinkClickUtils.getString(context, 'link_click_email_app_not_found'),
             duration: 2000
           })
         } else {
           promptAction.showToast({
-            message: '无法打开邮件应用',
+            message: LinkClickUtils.getString(context, 'link_click_email_open_failed'),
             duration: 2000
           })
         }
       })
     } catch (error) {
       const err = error as BusinessError
-      console.error(`[LinkClickUtils] Failed to open email app: ${err.message}`)
+      Logger.error('ChatKitUI', `[LinkClickUtils] Failed to open email app: ${err.message}`)
       promptAction.showToast({
-        message: '未检测到邮箱应用',
+        message: LinkClickUtils.getString(context, 'link_click_email_app_not_found'),
         duration: 2000
       })
     }
@@ -126,9 +136,9 @@ export class LinkClickUtils {
       context.startAbility(want)
     } catch (error) {
       const err = error as BusinessError
-      console.error(`[LinkClickUtils] Failed to open browser: ${err.message}`)
+      Logger.error('ChatKitUI', `[LinkClickUtils] Failed to open browser: ${err.message}`)
       promptAction.showToast({
-        message: '无法打开浏览器',
+        message: LinkClickUtils.getString(context, 'link_click_browser_open_failed'),
         duration: 2000
       })
     }
@@ -141,10 +151,10 @@ export class LinkClickUtils {
    */
   static handlePhoneClick(context: common.UIAbilityContext, phoneNumber: string): void {
     promptAction.showActionMenu({
-      title: `"${phoneNumber}"可能是一个电话号码，你可以`,
+      title: LinkClickUtils.getString(context, 'link_click_phone_action_title', phoneNumber),
       buttons: [
-        { text: '呼叫', color: '#007AFF' },
-        { text: '复制', color: '#007AFF' }
+        { text: LinkClickUtils.getString(context, 'link_click_phone_call'), color: '#007AFF' },
+        { text: LinkClickUtils.getString(context, 'link_click_phone_copy'), color: '#007AFF' }
       ]
     }).then((result) => {
       if (result.index === 0) {
@@ -152,10 +162,10 @@ export class LinkClickUtils {
         LinkClickUtils.dialPhone(context, phoneNumber)
       } else if (result.index === 1) {
         // 复制号码
-        LinkClickUtils.copyToClipboard(phoneNumber)
+        LinkClickUtils.copyToClipboard(context, phoneNumber)
       }
     }).catch((err: BusinessError) => {
-      console.error(`[LinkClickUtils] Action menu error: ${err.message}`)
+      Logger.error('ChatKitUI', `[LinkClickUtils] Action menu error: ${err.message}`)
     })
   }
 
@@ -166,9 +176,9 @@ export class LinkClickUtils {
    */
   static dialPhone(context: common.UIAbilityContext, phoneNumber: string): void {
     call.makeCall(phoneNumber).then(() => {
-      console.info('[LinkClickUtils] Make call success')
+      Logger.info('ChatKitUI', '[LinkClickUtils] Make call success')
     }).catch((err: BusinessError) => {
-      console.error(`[LinkClickUtils] Make call failed: ${err.message}`)
+      Logger.error('ChatKitUI', `[LinkClickUtils] Make call failed: ${err.message}`)
       // 如果 makeCall 失败，尝试使用 startAbility
       const want: Want = {
         action: 'ohos.want.action.dial',
@@ -178,9 +188,9 @@ export class LinkClickUtils {
         context.startAbility(want)
       } catch (error) {
         const startErr = error as BusinessError
-        console.error(`[LinkClickUtils] Start dial activity failed: ${startErr.message}`)
+        Logger.error('ChatKitUI', `[LinkClickUtils] Start dial activity failed: ${startErr.message}`)
         promptAction.showToast({
-          message: '无法拨打电话',
+          message: LinkClickUtils.getString(context, 'link_click_phone_call_failed'),
           duration: 2000
         })
       }
@@ -191,17 +201,17 @@ export class LinkClickUtils {
    * 复制文本到剪贴板
    * @param text 要复制的文本
    */
-  static copyToClipboard(text: string): void {
+  static copyToClipboard(context: common.UIAbilityContext, text: string): void {
     import('@ohos.pasteboard').then((pasteboard) => {
       const pasteData = pasteboard.default.createData(pasteboard.default.MIMETYPE_TEXT_PLAIN, text)
       const systemPasteboard = pasteboard.default.getSystemPasteboard()
       systemPasteboard.setData(pasteData).then(() => {
         promptAction.showToast({
-          message: '已复制到剪贴板',
+          message: LinkClickUtils.getString(context, 'link_click_copy_success'),
           duration: 2000
         })
       }).catch((err: BusinessError) => {
-        console.error(`[LinkClickUtils] Copy to clipboard failed: ${err.message}`)
+        Logger.error('ChatKitUI', `[LinkClickUtils] Copy to clipboard failed: ${err.message}`)
       })
     })
   }

@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatKitClient, ErrorUtils } from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
@@ -233,7 +234,7 @@ export struct TeamVerifyPage {
       await this.viewModel.setVerifyRead()
       this.pathStack.pop(0)
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 
@@ -241,7 +242,7 @@ export struct TeamVerifyPage {
     try {
       await this.viewModel.getVerifyList()
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 

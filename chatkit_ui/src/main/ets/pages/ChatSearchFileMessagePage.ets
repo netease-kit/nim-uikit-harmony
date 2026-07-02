@@ -4,6 +4,7 @@
  *  found in the LICENSE file.
  */
 
+import { Logger } from '@nimkit/common';
 import { AvatarColorUntil, AvatarItem, CommonAvatar, CommonEmptyResult, NavigationBackBuilder, NECommonUtils, UserAvatarNameItem } from '@nimkit/common'
 import { ChatSearchFileMessageParams, ChatSearchFileMessageViewModel, DateGroupedMessages } from '../viewmodel/ChatSearchFileMessageViewModel'
 import { NIMMessageInfo } from '../model/NIMMessageInfo'
@@ -11,7 +12,7 @@ import { V2NIMConversationType, V2NIMTeamType, V2NIMUser } from '@nimsdk/base'
 import { ChatKitClient, conversationSelectLimitCount, ConversationSelectParam, ErrorUtils, IMKitConfigCenter, NEFriendUserCache,
   NEUserWithFriend,
   TeamMemberCache, TeamMemberWithUser, TeamRepo } from '@nimkit/chatkit'
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel'
+import { ConversationSelectModel } from '@nimkit/chatkit'
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog'
 import { ChatUserInfo } from '../model/ChatUserInfo'
 import { ChatTeamInfo } from '../model/ChatTeamInfo'
@@ -405,7 +406,7 @@ export struct ChatSearchFileMessagePage {
         }, 100)
       }
     } catch (err) {
-      console.error('ChatSearchFileMessagePage loadMessages error:', err)
+      Logger.error('ChatKitUI', 'ChatSearchFileMessagePage loadMessages error:', err)
     }
   }
 

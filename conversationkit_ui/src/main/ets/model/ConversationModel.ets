@@ -9,7 +9,15 @@
  * Copyright © 2025 Netease. All rights reserved.
  */
 
-import { ChatKitClient, NEFriendUserCache } from '@nimkit/chatkit'
+import {
+  ChatKitClient,
+  DisposableBag,
+  FriendEventRepo,
+  LoginEventRepo,
+  NEFriendUserCache,
+  TeamEventRepo,
+  UserEventRepo
+} from '@nimkit/chatkit'
 import {
   V2NIMConnectStatus,
   V2NIMFriend,
@@ -24,6 +32,35 @@ const TAG = '[ConversationModel]'
 
 export class ConversationModel {
   private readonly strategy: ConversationStrategy
+  private hasAddedEventListener: boolean = false
+  private eventDisposers: DisposableBag = new DisposableBag()
+  private onConnectStatusChanged = (status: V2NIMConnectStatus) => {
+    if (status !== V2NIMConnectStatus.V2NIM_CONNECT_STATUS_CONNECTED) {
+      this.onNetBrokenHandle(true)
+    }
+  }
+  private onLoginStatusChanged = (status: V2NIMLoginStatus) => {
+    if (status === V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED) {
+      this.onNetBrokenHandle(false)
+    }
+  }
+  private onFriendInfoChanged = (friend: V2NIMFriend) => {
+    this.onFriendInfoChangedHandler(friend.accountId)
+  }
+  private onUserProfileChanged = (users: V2NIMUser[]) => {
+    const friendUserCache = NEFriendUserCache.peekInstance()
+    users.forEach((user) => {
+      if (friendUserCache?.isFriend(user.accountId)) {
+        friendUserCache.updateFriendInfo({
+          user: user
+        })
+      }
+      if (NEFriendUserCache.isMe(user.accountId) && NEFriendUserCache.mineUserCache) {
+        NEFriendUserCache.mineUserCache.user = user
+      }
+    })
+    this.onUserProfileChangedHandler(users)
+  }
 
   public onSyncStartedHandle: () => void = () => {
   }
@@ -97,51 +134,47 @@ export class ConversationModel {
     return this.strategy.requiresNetworkForDelete()
   }
 
+  public shouldReloadInitialConversationAfterSyncWhenEmpty(): boolean {
+    return this.strategy.shouldReloadInitialConversationAfterSyncWhenEmpty()
+  }
+
   public addEventListener() {
+    if (this.hasAddedEventListener) {
+      return
+    }
     this.strategy.onSyncStarted(this.onSyncStartedHandle)
     this.strategy.onSyncFinished(this.onSyncFinishedHandle)
     this.strategy.onSyncFailed(this.onSyncFailedHandle)
-    ChatKitClient.nim.loginService?.on('onConnectStatus',
-      (status: V2NIMConnectStatus) => {
-        if (status !== V2NIMConnectStatus.V2NIM_CONNECT_STATUS_CONNECTED) {
-          this.onNetBrokenHandle(true)
-        }
-      }
-    )
-
-    ChatKitClient.nim.loginService?.on('onLoginStatus',
-      (status: V2NIMLoginStatus) => {
-        if (status === V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED) {
-          this.onNetBrokenHandle(false)
-        }
-      }
-    )
-
-    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', async (friend: V2NIMFriend) => {
-      this.onFriendInfoChangedHandler(friend.accountId)
-    })
-
-    ChatKitClient.nim.friendService?.on('onFriendDeleted', this.onFriendDeletedHandler)
-    ChatKitClient.nim.teamService?.on('onTeamDismissed', this.onTeamDismissedHandler)
-    ChatKitClient.nim.teamService?.on('onTeamLeft', this.onTeamLeftHandler)
+    this.eventDisposers.dispose()
+    this.eventDisposers.addAll([
+      LoginEventRepo.onConnectStatus(this.onConnectStatusChanged),
+      LoginEventRepo.onLoginStatus(this.onLoginStatusChanged),
+      FriendEventRepo.onFriendInfoChanged(this.onFriendInfoChanged),
+      FriendEventRepo.onFriendDeleted(this.onFriendDeletedHandler),
+      TeamEventRepo.onTeamDismissed(this.onTeamDismissedHandler),
+      TeamEventRepo.onTeamLeft(this.onTeamLeftHandler),
+      UserEventRepo.onUserProfileChanged(this.onUserProfileChanged)
+    ])
     this.strategy.onTotalUnreadCountChanged(this.onTotalUnreadCountChangedHandler)
     this.strategy.onConversationCreated(this.onConversationCreatedHandler)
     this.strategy.onConversationDeleted(this.onConversationDeletedHandler)
     this.strategy.onConversationChanged(this.onConversationChangedHandler)
-    ChatKitClient.nim.userService?.on('onUserProfileChanged', async (users: V2NIMUser[]) => {
-      users.forEach((user) => {
-        if (NEFriendUserCache.getInstance().isFriend(user.accountId)) {
-          NEFriendUserCache.getInstance().updateFriendInfo({
-            user: user
-          })
-        }
-        if (NEFriendUserCache.isMe(user.accountId) && NEFriendUserCache.mineUserCache) {
-          NEFriendUserCache.mineUserCache.user = user
-        }
-      })
-      // 通知 ViewModel 更新对应的会话
-      this.onUserProfileChangedHandler(users)
-    })
+    this.hasAddedEventListener = true
+  }
+
+  public removeEventListener(): void {
+    if (!this.hasAddedEventListener) {
+      return
+    }
+    this.strategy.offSyncStarted(this.onSyncStartedHandle)
+    this.strategy.offSyncFinished(this.onSyncFinishedHandle)
+    this.strategy.offSyncFailed(this.onSyncFailedHandle)
+    this.eventDisposers.dispose()
+    this.strategy.offTotalUnreadCountChanged(this.onTotalUnreadCountChangedHandler)
+    this.strategy.offConversationCreated(this.onConversationCreatedHandler)
+    this.strategy.offConversationDeleted(this.onConversationDeletedHandler)
+    this.strategy.offConversationChanged(this.onConversationChangedHandler)
+    this.hasAddedEventListener = false
   }
 
   public p2pConversationId(accountId: string) {

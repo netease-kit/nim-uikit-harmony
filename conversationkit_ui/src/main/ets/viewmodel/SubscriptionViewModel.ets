@@ -1,5 +1,4 @@
-import { ChatKitClient, SubscriptionRepo } from "@nimkit/chatkit"
-import { V2NIMUserStatus } from "@nimsdk/base"
+import { SubscriptionRepo } from "@nimkit/chatkit"
 
 /**
  * SubscriptionViewModel
@@ -13,10 +12,13 @@ import { V2NIMUserStatus } from "@nimsdk/base"
 @ObservedV2
 export class SubscriptionViewModel {
   @Trace onlineState: boolean = false
-  @Trace onlineStateMap: Map<string, boolean> = SubscriptionRepo.onlineStateMap
 
-  async subscribeUserStatus(accountId: string){
-    await SubscriptionRepo.subscribeUserStatus(accountId)
+  getOnlineState(accountId?: string): boolean | undefined {
+    return SubscriptionRepo.getOnlineState(accountId)
+  }
+
+  async subscribeUserStatusBatch(accountIds: string[]): Promise<void> {
+    await SubscriptionRepo.subscribeUserStatusBatch(accountIds)
   }
 
 }

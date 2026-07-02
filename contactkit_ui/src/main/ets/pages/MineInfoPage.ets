@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { V2NIMUser } from '@nimsdk/base';
 import { pasteboard } from '@kit.BasicServicesKit';
 import {
@@ -148,7 +149,7 @@ export struct MineInfoPage {
           this.mineInfoItems1[0].subIcon = filePath
         }
       } catch (err) {
-        console.error(err)
+        Logger.error('ContactKit', err)
       }
     }
   }

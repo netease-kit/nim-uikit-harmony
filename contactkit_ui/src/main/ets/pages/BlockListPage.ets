@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ErrorUtils, NEUserWithFriend, PersonSelectParam } from '@nimkit/chatkit';
 import { AvatarColorUntil, AvatarItem, CommonAvatar, NavigationBackBuilder } from '@nimkit/common';
 import { BlocklistViewModel } from '../viewmodel/BlocklistViewModel';
@@ -97,7 +98,7 @@ export struct BlockListPage {
         this.pathStack.pop()
         await this.viewModel.addUserToBlockList(selectedList)
       } catch (err) {
-        console.error(err)
+        Logger.error('ContactKit', err)
       }
     }
   }
@@ -106,7 +107,7 @@ export struct BlockListPage {
     try {
       await this.viewModel.getBlockList()
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 

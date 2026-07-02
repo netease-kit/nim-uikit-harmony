@@ -17,6 +17,10 @@
       "value": "知道了"
     },
     {
+      "name": "bot_scan_entry",
+      "value": "扫一扫"
+    },
+    {
       "name": "conversation_title",
       "value": "云信 Demo"
     },
@@ -55,6 +59,34 @@
     {
       "name": "join_team",
       "value": "加入群组"
+    },
+    {
+      "name": "conversation_have_ait",
+      "value": "[有人@我]"
+    },
+    {
+      "name": "conversation_ai_badge",
+      "value": "AI"
+    },
+    {
+      "name": "conversation_bot_sub_session_prefix",
+      "value": "[子会话] "
+    },
+    {
+      "name": "chat_ai_message_progressing",
+      "value": "大模型请求响应中..."
+    },
+    {
+      "name": "fraud_report_action",
+      "value": "点击举报"
+    },
+    {
+      "name": "fraud_report_success",
+      "value": "举报成功"
+    },
+    {
+      "name": "fraud_tip_content",
+      "value": "仅用于体验云信IM产品功能，请勿轻信汇款，中奖等涉及钱款的信息，勿轻易拨打陌生电话，谨防上当受骗。"
     }
   ]
 }

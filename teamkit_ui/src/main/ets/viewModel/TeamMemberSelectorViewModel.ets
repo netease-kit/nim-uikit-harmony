@@ -4,8 +4,8 @@
  * found in the LICENSE file.
  *
  */
-import { ChatKitClient, TeamMemberWithUser, TeamRepo } from '@nimkit/chatkit'
-import { TeamMemberSelectorMode } from '@nimkit/chatkit/src/main/ets/model/TeamMemberSelector'
+import { DisposableBag, FriendEventRepo, TeamEventRepo, TeamMemberWithUser, TeamRepo } from '@nimkit/chatkit'
+import { TeamMemberSelectorMode } from '@nimkit/chatkit'
 import {
   V2NIMFriend,
   V2NIMQueryDirection,
@@ -40,6 +40,7 @@ export class TeamMemberSelectorViewModel {
   @Trace searchResultList: TeamMemberWithUser[] = []
   // 是否正在搜索
   @Trace isSearching: boolean = false
+  private disposableBag: DisposableBag = new DisposableBag()
 
   /**
    * 初始化
@@ -185,25 +186,28 @@ export class TeamMemberSelectorViewModel {
    * 初始化成员信息变化回调
    */
   initMemberChangeListener() {
-    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChanged.bind(this))
-    //群成员信息变更
-    ChatKitClient.nim.teamService?.on('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated.bind(this))
-    //群成员离开
-    ChatKitClient.nim.teamService?.on('onTeamMemberLeft', this.onTeamMemberLeft.bind(this))
-    ChatKitClient.nim.teamService?.on('onTeamMemberKicked', this.onTeamMemberKicked.bind(this))
-
-    ChatKitClient.nim.teamService?.on('onTeamMemberJoined', this.onTeamMemberJoined.bind(this))
+    this.onDestroy()
+    this.disposableBag.addAll([
+      FriendEventRepo.onFriendInfoChanged((friend: V2NIMFriend): void => {
+        this.onFriendInfoChanged(friend)
+      }),
+      TeamEventRepo.onTeamMemberInfoUpdated((members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberInfoUpdated(members)
+      }),
+      TeamEventRepo.onTeamMemberLeft((members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberLeft(members)
+      }),
+      TeamEventRepo.onTeamMemberKicked((accId: string, members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberKicked(accId, members)
+      }),
+      TeamEventRepo.onTeamMemberJoined((members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberJoined(members)
+      })
+    ])
   }
 
   onDestroy() {
-    ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChanged)
-    //群成员信息变更
-    ChatKitClient.nim.teamService?.off('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated)
-    //群成员离开
-    ChatKitClient.nim.teamService?.off('onTeamMemberLeft', this.onTeamMemberLeft)
-    ChatKitClient.nim.teamService?.off('onTeamMemberKicked', this.onTeamMemberKicked)
-
-    ChatKitClient.nim.teamService?.off('onTeamMemberJoined', this.onTeamMemberJoined)
+    this.disposableBag.dispose()
   }
 
   /**

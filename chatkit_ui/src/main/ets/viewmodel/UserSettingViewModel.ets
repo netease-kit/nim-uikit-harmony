@@ -1,11 +1,17 @@
+import { Logger } from '@nimkit/common';
 import {
+  buildMineServerExtensionWithAIUserPin,
+  canShowAIUserPinSwitch,
   ChatKitClient,
   ConversationRepo,
+  ContactRepo,
   IMKitConfigCenter,
+  isAIUserPinnedByMine,
   LocalConversationRepo,
+  NEAIUserCache,
   SettingRepo
 } from '@nimkit/chatkit';
-import { V2NIMP2PMessageMuteMode } from '@nimsdk/base';
+import { V2NIMP2PMessageMuteMode, V2NIMUser, V2NIMUserUpdateParams } from '@nimsdk/base';
 
 @ObservedV2
 export class UserSettingViewModel {
@@ -15,13 +21,18 @@ export class UserSettingViewModel {
   @Trace isMessageNotify: boolean = false
   //是否置顶
   @Trace isStickTop: boolean = false
+  //是否显示 AI 数字人 PIN 置顶开关
+  @Trace canShowAIUserPinSwitch: boolean = false
+  //当前 AI 数字人是否展示在会话列表顶部 AI 横栏
+  @Trace isAIUserPinned: boolean = false
 
   async init(conversationId: string) {
     this.conversationId = conversationId
     this.accountId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversationId)
     await this.getConversationInfo().catch((e: Error) => {
-      console.error(e.message)
+      Logger.error('ChatKitUI', e.message)
     })
+    this.getAIUserPinInfo()
   }
 
   /**
@@ -40,7 +51,7 @@ export class UserSettingViewModel {
       }
 
     } catch (err) {
-      console.error(err)
+      Logger.error('ChatKitUI', err)
     }
   }
 
@@ -73,6 +84,48 @@ export class UserSettingViewModel {
       this.isMessageNotify = isOn
     } catch (e) {
       this.isMessageNotify = !isOn
+    }
+  }
+
+  getAIUserPinInfo() {
+    const aiUser = NEAIUserCache.getAIUser(this.accountId)
+    const mineUser = NEAIUserCache.getMineUser()
+    this.canShowAIUserPinSwitch = IMKitConfigCenter.enableAI && canShowAIUserPinSwitch(aiUser)
+    this.isAIUserPinned = this.canShowAIUserPinSwitch &&
+      isAIUserPinnedByMine(this.accountId, mineUser?.serverExtension)
+  }
+
+  async switchPinAIUser(isOpen: boolean) {
+    const mineUser = NEAIUserCache.getMineUser()
+    const nextServerExtension =
+      buildMineServerExtensionWithAIUserPin(mineUser?.serverExtension, this.accountId, isOpen)
+    try {
+      await ContactRepo.updateSelfUserProfile({
+        serverExtension: nextServerExtension
+      } as V2NIMUserUpdateParams)
+      if (mineUser) {
+        const nextMineUser: V2NIMUser = {
+          accountId: mineUser.accountId,
+          name: mineUser.name,
+          avatar: mineUser.avatar,
+          sign: mineUser.sign,
+          email: mineUser.email,
+          birthday: mineUser.birthday,
+          mobile: mineUser.mobile,
+          gender: mineUser.gender,
+          serverExtension: nextServerExtension,
+          createTime: mineUser.createTime,
+          updateTime: mineUser.updateTime
+        }
+        NEAIUserCache.setMineUser(nextMineUser)
+      }
+      const users = await ContactRepo.getUserListFromCloud([ChatKitClient.getLoginUserId()])
+      if (users.length > 0) {
+        NEAIUserCache.setMineUser(users[0])
+      }
+      this.isAIUserPinned = isOpen
+    } catch (e) {
+      this.isAIUserPinned = !isOpen
     }
   }
 }

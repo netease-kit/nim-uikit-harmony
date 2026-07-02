@@ -1,7 +1,4 @@
-import { DateUtils } from '@nimkit/chatkit_ui/src/main/ets/common/DateUtils';
-import { NIMMessageInfo } from '@nimkit/chatkit_ui/src/main/ets/model/NIMMessageInfo';
-import { pinMessageContent } from '@nimkit/chatkit_ui/src/main/ets/view/MessageComponentBuilder';
-import { MessageItemClick } from '@nimkit/chatkit_ui/src/main/ets/view/MessageItemClick';
+import { DateUtils, MessageItemClick, NIMMessageInfo, pinMessageContent } from '@nimkit/chatkit_ui';
 import { AvatarColorUntil, AvatarItem, CommonAvatar, TailString } from '@nimkit/common';
 import { V2NIMConversationType, V2NIMMessageType } from '@nimsdk/base';
 import { CollectionMessageModel } from '../model/CollectionMessageModel';

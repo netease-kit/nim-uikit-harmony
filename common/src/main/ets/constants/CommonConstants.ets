@@ -143,6 +143,10 @@ export class CommonConstants {
    * 翻译目标语言 存储 key
    */
   static readonly KEY_SETTING_TRANSLATION_TARGET_LANGUAGE: string = 'KEY_SETTING_TRANSLATION_TARGET_LANGUAGE';
+  /**
+   * 应用语言 存储 key
+   */
+  static readonly KEY_SETTING_APP_LANGUAGE: string = 'KEY_SETTING_APP_LANGUAGE';
 }
 
 export enum TranslationLanguageCode {
@@ -180,3 +184,9 @@ export const SUPPORTED_TRANSLATION_LANGUAGES: TranslationLanguageCode[] = [
   TranslationLanguageCode.TH,
   TranslationLanguageCode.ID
 ]
+
+export enum AppLanguageCode {
+  Auto = 'auto',
+  ZhCN = 'zh-CN',
+  EnUS = 'en-US'
+}

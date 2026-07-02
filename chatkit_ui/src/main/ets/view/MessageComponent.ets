@@ -8,7 +8,7 @@
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { V2NIMConversationType, V2NIMErrorCode, V2NIMMessageSendingState, V2NIMMessageType } from '@nimsdk/base';
 import { ChatInfo } from '../model/ChatInfo';
-import { getNotificationMessageContent, getPinMessagesTips } from '../common/MessageHelper';
+import { getNotificationMessageContent, getPinMessagesTips, getTipsMessageContent } from '../common/MessageHelper';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
 import { messageContent } from './MessageComponentBuilder';
 import { MessageItemClick } from './MessageItemClick';
@@ -34,6 +34,10 @@ export struct MessageComponent {
   onPinItemClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void = undefined
   @Param
   showSelect: boolean = false;
+  @Param
+  aiSearchSelectingMessageId: string = ''
+  @Param
+  aiSearchSelectingTranslation: boolean = false
 
   build() {
     if (this.message?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_NOTIFICATION) {
@@ -49,6 +53,8 @@ export struct MessageComponent {
         chatUserInfo: this.chatInfo,
         onMessageClick: this.onMessageClick,
         showRadio: this.showSelect,
+        aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
+        aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
       });
     } else {
       SenderMessageComponent({
@@ -56,6 +62,8 @@ export struct MessageComponent {
         chatUserInfo: this.chatInfo,
         onMessageClick: this.onMessageClick,
         showRadio: this.showSelect,
+        aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
+        aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
       });
     }
   }
@@ -82,6 +90,10 @@ export struct SenderMessageComponent {
   onMessageClick: MessageItemClick | undefined = undefined
   @Param
   showRadio: boolean = false
+  @Param
+  aiSearchSelectingMessageId: string = ''
+  @Param
+  aiSearchSelectingTranslation: boolean = false
   @Local
   radioOn: boolean = false
   // anchor 高亮动画透明度（0 = 透明，1 = 完全显示高亮）
@@ -152,7 +164,7 @@ export struct SenderMessageComponent {
         }
         Row() {
           if (this.showRadio) {
-            if (this.message.isRevokeMsg) {
+            if (!this.message.canOperateInMultiSelect()) {
               Text().margin({ top: (this.message?.getMessageHeight(this.getUIContext()) - 20) / 2, left: 16 })
                 .height('20')
                 .width('20')
@@ -271,7 +283,9 @@ export struct SenderMessageComponent {
               messageContent({
                 message: this.message,
                 onMessageClick: this.onMessageClick,
-                chatInfo: this.chatUserInfo
+                chatInfo: this.chatUserInfo,
+                aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
+                aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
               })
                 .backgroundColor($r('app.color.color_chat_send_message_bg'))
                 .borderRadius(6)
@@ -309,7 +323,7 @@ export struct SenderMessageComponent {
             }
           }.alignItems(HorizontalAlign.End).margin({ left: 8 }).width('75%')
           // 多选模式下的覆盖层 - 使用 TapGesture 只拦截点击，允许滑动穿透
-          if (this.showRadio && !this.message.isRevokeMsg) {
+          if (this.showRadio && this.message.canOperateInMultiSelect()) {
             Column() {}
               .width('100%')
               .height(this.message?.getMessageHeight(this.getUIContext()))
@@ -369,6 +383,10 @@ export struct ReceiveMessageComponent {
   showRadio: boolean = false
   @Param
   onMessageClick: MessageItemClick | undefined = undefined
+  @Param
+  aiSearchSelectingMessageId: string = ''
+  @Param
+  aiSearchSelectingTranslation: boolean = false
   @Local
   radioOn: boolean = false
   // anchor 高亮动画透明度（0 = 透明，1 = 完全显示高亮）
@@ -442,7 +460,7 @@ export struct ReceiveMessageComponent {
         }
         Row() {
           if (this.showRadio) {
-            if (this.message.isRevokeMsg) {
+            if (!this.message.canOperateInMultiSelect()) {
               Text().margin({ top: (this.message?.getMessageHeight(this.getUIContext()) - 20) / 2, left: 16 })
                 .height('20')
                 .width('20')
@@ -461,7 +479,7 @@ export struct ReceiveMessageComponent {
             item: new AvatarItem(this.chatUserInfo != null ?
               this.chatUserInfo?.getChatUserAvatarUrl(this.message?.message) : '',
               this.chatUserInfo?.getChatUserAvatarName(this.message?.message) ?? '',
-              AvatarColorUntil.getBackgroundColorById(this.message?.message.senderId ?? '')
+              AvatarColorUntil.getBackgroundColorById(this.message?.getDisplaySenderId() ?? '')
             ),
             longPressGesture: () => {
               this.onMessageClick?.onAvatarLongPress?.( this.message)
@@ -488,27 +506,51 @@ export struct ReceiveMessageComponent {
                 .height(25)
             }
 
-            Column() {
-              messageContent({
-                message: this.message,
-                onMessageClick: this.onMessageClick,
-                chatInfo: this.chatUserInfo
-              })
-                .backgroundColor($r('app.color.color_chat_receive_message_bg'))
-                .borderRadius(6)
-                .id("msgContainer")
-                .alignRules(this.AlignLeft)
-                .onClick((event: ClickEvent) => {
-                  if (this.showRadio) {
-                    this.radioOn = !this.radioOn
-                  }
-                  this.onMessageClick?.onItemClick?.(event, this.message)
+            Row() {
+              Column() {
+                messageContent({
+                  message: this.message,
+                  onMessageClick: this.onMessageClick,
+                  chatInfo: this.chatUserInfo,
+                  aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
+                  aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
                 })
+                  .backgroundColor($r('app.color.color_chat_receive_message_bg'))
+                  .borderRadius(6)
+                  .id("msgContainer")
+                  .alignRules(this.AlignLeft)
+              }
+              .onClick((event: ClickEvent) => {
+                if (this.showRadio) {
+                  this.radioOn = !this.radioOn
+                }
+                this.onMessageClick?.onItemClick?.(event, this.message)
+              })
+
+              // AI 回复消息控制按钮：流式中 → Stop，其他 → Refresh
+              if (this.message?.canOperateAIResponse() && !this.message?.isRevokeMsg) {
+                Column({ space: 8 }) {
+                  if (this.message.isAiStreamStreaming()) {
+                    Image($rawfile('ic_chat_ai_stop.svg'))
+                      .width(24)
+                      .height(24)
+                      .onClick((event: ClickEvent) => {
+                        this.onMessageClick?.onAIStreamStop?.(event, this.message)
+                      })
+                  } else if (this.message.isAiStreamFinished()) {
+                    Image($rawfile('ic_chat_ai_refresh.svg'))
+                      .width(24)
+                      .height(24)
+                      .onClick((event: ClickEvent) => {
+                        this.onMessageClick?.onAIStreamRefresh?.(event, this.message)
+                      })
+                  }
+                }
+                .margin({ left: 8 })
+              }
             }
+            .alignItems(VerticalAlign.Top)
             .width('100%')
-            //.height(this.message?.getMessageHeight(this.getUIContext()))
-            .alignItems(HorizontalAlign.Start)
-            .justifyContent(FlexAlign.Center)
             .gesture(LongPressGesture().onAction((event: GestureEvent) => {
               this.onMessageClick?.onItemLongClick?.(event, this.message)
             }))
@@ -528,7 +570,7 @@ export struct ReceiveMessageComponent {
           }.alignItems(HorizontalAlign.Start).margin({ left: 8, top: 6 }).width('68%')
 
           // 多选模式下的覆盖层 - 使用 TapGesture 只拦截点击，允许滑动穿透
-          if (this.showRadio && !this.message.isRevokeMsg) {
+          if (this.showRadio && this.message.canOperateInMultiSelect()) {
             Column() {}
               .width('100%')
               .height(this.message?.getMessageHeight(this.getUIContext()))
@@ -613,7 +655,7 @@ export struct TipsMessageComponent {
           }.justifyContent(FlexAlign.Center).width('100%').height(20)
         }
         Row() {
-          Text(this.message?.message.text ?? $r('app.string.chat_message_empty_tip_text'))
+          Text(getTipsMessageContent(this.message?.message))
             .lineHeight(20)
             .padding({
               left: 6,
@@ -653,6 +695,10 @@ export struct MergeDetailMessageComponent {
   chatUserInfo: ChatInfo | undefined = undefined
   @Param
   onMessageClick: MessageItemClick | undefined = undefined
+  @Param
+  aiSearchSelectingMessageId: string = ''
+  @Param
+  aiSearchSelectingTranslation: boolean = false
 
   build() {
     Column() {
@@ -694,7 +740,12 @@ export struct MergeDetailMessageComponent {
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .ellipsisMode(EllipsisMode.END)
             Column() {
-              messageContent({ message: this.message, onMessageClick: this.onMessageClick })
+              messageContent({
+                message: this.message,
+                onMessageClick: this.onMessageClick,
+                aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
+                aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
+              })
                 .backgroundColor($r('app.color.color_chat_receive_message_bg'))
                 .borderRadius(6)
                 .id("msgContainer")

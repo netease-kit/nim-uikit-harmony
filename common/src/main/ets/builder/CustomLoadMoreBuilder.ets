@@ -18,7 +18,7 @@ export function CustomLoadMoreBuilder(params: CustomLoadMoreBuilderParams) {
       .width(18)
       .height(18)
 
-    Text('加载更多中...')
+    Text($r('app.string.search_message_loading'))
       .margin({ left: 7, bottom: 1 })
       .fontSize(17)
   }

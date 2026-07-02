@@ -5,8 +5,15 @@
  *
  */
 
-import { ChatKitClient, ContactRepo, ErrorUtils, NEFriendUserCache, NEUserWithFriend, UserAIBotRepo } from '@nimkit/chatkit';
-import { V2NIMGetUserAIBotParams } from '@nimsdk/base';
+import { Logger } from '@nimkit/common';
+import {
+  ChatKitClient,
+  ContactRepo,
+  ErrorUtils,
+  NEFriendUserCache,
+  NEUserWithFriend,
+  UserAIBotManager
+} from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -33,7 +40,7 @@ export struct DeleteFriendDialog {
         try {
           await ContactRepo.deleteFriend(accountId, { deleteAlias: true })
         } catch (err) {
-          console.error(err)
+          Logger.error('ContactKit', err)
         }
       }
       this.controller?.close()
@@ -239,11 +246,10 @@ export struct PersonInfoPage {
     })
     // 判断是否为用户级 AI Bot
     try {
-      const params: V2NIMGetUserAIBotParams = { accid: accountId }
-      const bot = await UserAIBotRepo.getUserAIBot(params)
-      this.isBot = bot !== undefined || UserAIBotRepo.isDeletedUserAIBot(accountId)
+      const bot = await UserAIBotManager.getUserAIBot({ accid: accountId })
+      this.isBot = bot !== undefined || UserAIBotManager.isDeletedUserAIBot(accountId)
     } catch (e) {
-      this.isBot = UserAIBotRepo.isDeletedUserAIBot(accountId)
+      this.isBot = UserAIBotManager.isDeletedUserAIBot(accountId)
     }
   }
 
@@ -554,9 +560,11 @@ export struct PersonInfoPage {
               .onClick(() => {
                 this.pathStack.popToName('ChatP2PPage')
                 this.pathStack.popToName('ChatTeamPage')
+                const accountId = this.viewModel.userWithFriend?.user?.accountId ?? ''
+                const conversationId = ChatKitClient.nim.conversationIdUtil.p2pConversationId(accountId)
                 this.pathStack.replacePath({
                   name: 'ChatP2PPage',
-                  param: ChatKitClient.nim.conversationIdUtil.p2pConversationId(this.viewModel.userWithFriend?.user?.accountId)
+                  param: conversationId
                 })
               })
 

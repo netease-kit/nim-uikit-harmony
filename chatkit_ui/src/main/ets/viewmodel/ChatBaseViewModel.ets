@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import {
   AitModel,
   ChatKitClient,
@@ -12,9 +13,13 @@ import {
   collectionTypeOffset,
   ConversationRepo,
   createMultiLineAttachment,
+  DisposableBag,
   ErrorUtils,
   IMKitConfigCenter,
+  LoginEventRepo,
   LocalConversationRepo,
+  NEAIUserCache,
+  normalizeMultiLineTitle,
   PushConfigManager,
   StorageRepo,
   YxAitMsg
@@ -22,20 +27,23 @@ import {
 import fs from '@ohos.file.fs';
 import {
   NIMEStrAnyObj,
-  V2NIMAIModelRoleType,
   V2NIMAIUser,
   V2NIMConnectStatus,
   V2NIMDataSyncState,
   V2NIMDataSyncType,
   V2NIMError,
   V2NIMErrorCode,
+  V2NIMErrorMap,
   V2NIMLoginStatus,
   V2NIMMessage,
   V2NIMMessageAIConfigParams,
+  V2NIMMessageAIRegenOpType,
+  V2NIMMessageAIRegenParams,
   V2NIMMessageAIStatus,
   V2NIMMessageAIStreamStatus,
+  V2NIMMessageAIStreamStopOpType,
+  V2NIMMessageAIStreamStopParams,
   V2NIMMessageAudioAttachment,
-  V2NIMMessageConfig,
   V2NIMMessageDeletedNotification,
   V2NIMMessageFileAttachment,
   V2NIMMessagePinNotification,
@@ -57,9 +65,8 @@ import { image } from '@kit.ImageKit';
 import {
   saveLocalRevokeMessage,
   saveLocalRevokeMessageFormOther
-} from '@nimkit/chatkit/src/main/ets/utils/MessageUtils';
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
-import { ChatKitConfig } from '../ChatKitConfig';
+} from '@nimkit/chatkit';
+import { ConversationSelectModel } from '@nimkit/chatkit';
 import { sceneMap } from '@kit.MapKit';
 import { clearForwardAtMark, createForwardMessageListFileDetail, sendMessageFailedTips } from '../common/MessageHelper';
 import { buildSendMessageParams } from '../common/SendMessageParamsHelper';
@@ -67,6 +74,13 @@ import { instanceToPlain } from 'class-transformer';
 import { NECommonUtils } from '@nimkit/common';
 import { HashMap, JSON } from '@kit.ArkTS';
 import { buildMessageJumpPlan } from '../utils/ChatJumpUtils';
+import {
+  buildAIReplyContextMessage,
+  buildAIContextMessages,
+  getAIMessageContent,
+  resolveAIMessageContentForForward,
+  resolveAIMessageContentForSend
+} from '../common/AIChatUtils';
 
 @ObservedV2
 export class ChatBaseViewModel {
@@ -92,6 +106,7 @@ export class ChatBaseViewModel {
   isPageVisible: boolean = true
   // 流式 ing 缓存数据
   private streamingMessageMap: HashMap<string, StreamMessage> = new HashMap();
+  private loginEventDisposers: DisposableBag = new DisposableBag()
   // 发送消息
   onSendFun = async (message: V2NIMMessage): Promise<void> => {
     if (message.conversationId === this.conversationId) {
@@ -159,11 +174,12 @@ export class ChatBaseViewModel {
     ChatRepo.onMessagePinNotification(this.onPinFun)
 
     // 监听数据同步完成监听
-    ChatKitClient.nim.loginService.on('onDataSync', this.onSyncFinishedFun)
-    // 长连接状态变更
-    ChatKitClient.nim.loginService?.on('onConnectStatus', this.onConnectStatusChange)
-    // 登录状态变更
-    ChatKitClient.nim.loginService?.on('onLoginStatus', this.onLoginStatusChange)
+    this.loginEventDisposers.dispose()
+    this.loginEventDisposers.addAll([
+      LoginEventRepo.onDataSync(this.onSyncFinishedFun),
+      LoginEventRepo.onConnectStatus(this.onConnectStatusChange),
+      LoginEventRepo.onLoginStatus(this.onLoginStatusChange)
+    ])
 
     ChatBaseViewModel.currentViewModel = this
     // 清理未读数
@@ -190,6 +206,10 @@ export class ChatBaseViewModel {
   }
   // 接受消息
   onReceiveFun = (messages: V2NIMMessage[]) => {
+    this.handleReceiveMessages(messages)
+  }
+
+  handleReceiveMessages(messages: V2NIMMessage[]): void {
     if (this.hasNew) {
       // 最后一条消息判断不准的情况下，只要 conversationId 对得上的，都认为是新消息记录下来
       const messagesWhenHasNew: V2NIMMessage[] = messages.filter((msg: V2NIMMessage) => {
@@ -329,7 +349,7 @@ export class ChatBaseViewModel {
           return
         }
         this.saveRevokeClientId = revokeMsg?.message.messageServerId ?? ''
-        console.debug('netease viewmodel onRevokeFun revoke message', msg.revokeAccountId,
+        Logger.debug('ChatKitUI', 'netease viewmodel onRevokeFun revoke message', msg.revokeAccountId,
           msg.messageRefer.messageClientId)
         if (revokeMsg !== undefined && msg.messageRefer.senderId == ChatKitClient.getLoginUserId()) {
           // 文本消息和多行消息（type=102）都支持撤回重编辑
@@ -561,7 +581,7 @@ export class ChatBaseViewModel {
       } else {
         this.hasNew = false
       }
-      console.debug('netease getNewMessageList,lenght:', messageList.length, 'hasNew:', this.hasNew)
+      Logger.debug('ChatKitUI', 'netease getNewMessageList,lenght:', messageList.length, 'hasNew:', this.hasNew)
 
       if (this.chatInfo) {
         for (let index = 0; index < messageList.length; index++) {
@@ -626,7 +646,7 @@ export class ChatBaseViewModel {
       this.removeReplyInfo(msg.message.messageClientId)
     }).catch((err: BusinessError) => {
       ErrorUtils.handleErrorToast(err.code)
-      console.error(`netease Invoke startAbility failed, code is ${err.code}, message is ${err.message}`);
+      Logger.error('ChatKitUI', `netease Invoke startAbility failed, code is ${err.code}, message is ${err.message}`);
     });
   }
 
@@ -722,9 +742,8 @@ export class ChatBaseViewModel {
   }
 
   // 发送消息并设置发送进度
-  sendMessageAndSetProgress(message: V2NIMMessage) {
-    const mergedParams = this.beforeSendMessage()
-    this.sendMessage(message, mergedParams, (percentage: number) => {
+  sendMessageAndSetProgress(message: V2NIMMessage, params?: V2NIMSendMessageParams) {
+    this.sendMessage(message, params, (percentage: number) => {
       let msgInfo = this.chatInfo?.getMessage(message.messageClientId)
       if (msgInfo) {
         let progress = percentage * 100
@@ -737,7 +756,8 @@ export class ChatBaseViewModel {
   }
 
   // 发送文本消息
-  async sendTextMessage(text: string, replyMsg?: NIMMessageInfo, aitModel?: AitModel, pushList?: string[]) {
+  async sendTextMessage(text: string, replyMsg?: NIMMessageInfo, aitModel?: AitModel, pushList?: string[],
+    aiAgentAccountId?: string) {
     const message = ChatRepo.createTextMessage(text)
     //设置Ait
     if (aitModel && aitModel.aitBlocks.size > 0) {
@@ -759,47 +779,13 @@ export class ChatBaseViewModel {
       }
     }
 
+    params = this.buildAIConfigForReplyContext(message, params, aiAgentAccountId, replyMsg) ??
+      this.appendAIConfig(message, params, aiAgentAccountId)
+
     // 回复
     if (replyMsg) {
       this.replyMessage(message, replyMsg.message, params)
       return
-    }
-
-    // 设置 AI 配置
-    const enableAIStream: boolean = false
-    if (enableAIStream) {
-      const text: string = message.text ?? '你是谁'
-      const aiUsers: V2NIMAIUser[] = await ChatKitClient.nim.aiService!.getAIUserList()
-      const ollamaaitest20AIUser: V2NIMAIUser | undefined =
-        aiUsers.find((aiUser) => aiUser.accountId === 'ollamaaitest9')
-
-      const aiParams: V2NIMMessageAIConfigParams = {
-        accountId: ollamaaitest20AIUser ? ollamaaitest20AIUser.accountId : (aiUsers.length > 0 ? aiUsers[0].accountId : ''),
-        content: {
-          msg: text,
-          type: 0
-        },
-        messages: [
-          {
-            role: V2NIMAIModelRoleType.V2NIM_AI_MODEL_ROLE_TYPE_ASSISTANT,
-            msg: text,
-            type: 0
-          }
-        ],
-        promptVariables: undefined,
-        modelConfigParams: {
-          prompt: undefined,
-          maxTokens: undefined,
-          topP: undefined,
-          temperature: undefined
-        },
-        aiStream: true // open aiStream
-      }
-
-      if (typeof params === 'undefined') {
-        params = {}
-      }
-      params.aiConfig = aiParams
     }
     this.sendMessage(message, params)
   }
@@ -808,7 +794,8 @@ export class ChatBaseViewModel {
   async sendLocationMessage(data: sceneMap.LocationChoosingResult) {
     const message = ChatRepo.createLocationMessage(data.location.latitude, data.location.longitude, data.address)
     message.text = data.name
-    this.sendMessage(message)
+    const params = this.buildAIConfigForCurrentConversation(message)
+    this.sendMessage(message, params)
   }
 
   /**
@@ -819,11 +806,13 @@ export class ChatBaseViewModel {
    * @param aitModel @ 信息（可选）
    * @param pushList 推送列表（可选）
    */
-  async sendMultiLineMessage(title: string, body: string, replyMsg?: NIMMessageInfo, aitModel?: AitModel, pushList?: string[]) {
-    const attachment = createMultiLineAttachment(title, body)
+  async sendMultiLineMessage(title: string, body: string, replyMsg?: NIMMessageInfo, aitModel?: AitModel,
+    pushList?: string[], aiAgentAccountId?: string) {
+    const normalizedTitle = normalizeMultiLineTitle(title)
+    const attachment = createMultiLineAttachment(normalizedTitle, body)
     // 将标题和正文拼接为 text 字段，用于 FTS 全文搜索
     // 格式：标题在前，正文在后，中间用空格分隔
-    const searchText = `${title}\n${body}`
+    const searchText = `${normalizedTitle}\n${body}`
     const message = ChatRepo.createCustomMessage(searchText, attachment)
 
     // 设置 Ait
@@ -846,6 +835,9 @@ export class ChatBaseViewModel {
       }
     }
 
+    params = this.buildAIConfigForReplyContext(message, params, aiAgentAccountId, replyMsg, getAIMessageContent(message)) ??
+      this.appendAIConfig(message, params, aiAgentAccountId, getAIMessageContent(message))
+
     // 回复
     if (replyMsg) {
       this.replyMessage(message, replyMsg.message, params)
@@ -853,6 +845,60 @@ export class ChatBaseViewModel {
     }
 
     this.sendMessage(message, params)
+  }
+
+  private appendAIConfig(message: V2NIMMessage, params?: V2NIMSendMessageParams,
+    aiAgentAccountId?: string, content?: string, includeContext: boolean = true,
+    resolveContent: boolean = true): V2NIMSendMessageParams | undefined {
+    const accountId = aiAgentAccountId ?? this.targetId
+    const aiUser: V2NIMAIUser | undefined = NEAIUserCache.getAIUser(accountId)
+    if (!aiUser) {
+      return params
+    }
+
+    const aiParams: V2NIMMessageAIConfigParams = {
+      accountId: aiUser.accountId,
+      aiStream: IMKitConfigCenter.enableAIStream
+    }
+    const aiContent = resolveContent ? resolveAIMessageContentForSend(message, content) : content
+    if (aiContent !== undefined) {
+      aiParams.content = {
+        msg: aiContent,
+        type: 0
+      }
+    }
+    if (includeContext && aiContent !== undefined) {
+      const contextMessages = buildAIContextMessages(
+        this.chatInfo?.msgList.getMessageList().map((messageInfo: NIMMessageInfo) => messageInfo.message) ?? []
+      )
+      if (contextMessages.length > 0) {
+        aiParams.messages = contextMessages
+      }
+    }
+    if (!params) {
+      params = {}
+    }
+    params.aiConfig = aiParams
+    return params
+  }
+
+  private buildAIConfigForReplyContext(message: V2NIMMessage, params: V2NIMSendMessageParams | undefined,
+    aiAgentAccountId: string | undefined, replyMsg: NIMMessageInfo | undefined,
+    content?: string): V2NIMSendMessageParams | undefined {
+    if (!replyMsg) {
+      return undefined
+    }
+    const result = this.appendAIConfig(message, params, aiAgentAccountId, content, false)
+    const replyContext = buildAIReplyContextMessage(replyMsg.message)
+    if (result?.aiConfig && replyContext) {
+      result.aiConfig.messages = [replyContext]
+    }
+    return result
+  }
+
+  private isAIConversationByConversationId(conversationId: string): boolean {
+    const targetId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversationId)
+    return NEAIUserCache.getAIUser(targetId) !== undefined
   }
 
   /**
@@ -883,14 +929,14 @@ export class ChatBaseViewModel {
         const message = await ChatRepo.createImageMessage(copyFilePath, file.name, undefined, imageInfo?.size.width,
           imageInfo?.size.height);
         const fn: Function = () => {
-          this.sendMessageAndSetProgress(message)
+          this.sendMessageAndSetProgress(message, this.buildAIConfigForCurrentConversation(message))
         }
         ChatKitClient.runAfterLoggedIn(fn)
 
         await fs.close(file)
       }
     } catch (err) {
-      console.log('net ease send image error', err);
+      Logger.info('ChatKitUI', 'net ease send image error', err);
     }
   }
 
@@ -921,13 +967,13 @@ export class ChatBaseViewModel {
       await fs.copyFile(file.fd, copyFilePath)
       const message = await ChatRepo.createVideoMessage(copyFilePath, file.name, undefined, duration, width, height);
       const fn: Function = () => {
-        this.sendMessageAndSetProgress(message)
+        this.sendMessageAndSetProgress(message, this.buildAIConfigForCurrentConversation(message))
       }
       ChatKitClient.runAfterLoggedIn(fn)
 
       await fs.close(file)
     } catch (err) {
-      console.log('net ease send video error', err);
+      Logger.info('ChatKitUI', 'net ease send video error', err);
     }
   }
 
@@ -954,7 +1000,8 @@ export class ChatBaseViewModel {
       }
       await fs.copyFile(file.fd, copyFilePath)
       const message = await ChatRepo.createFileMessage(copyFilePath, file.name);
-      this.sendMessage(message, undefined, (percentage: number) => {
+      const params = this.buildAIConfigForCurrentConversation(message)
+      this.sendMessage(message, params, (percentage: number) => {
         let msgInfo = this.chatInfo?.getMessage(message.messageClientId)
         if (msgInfo !== undefined) {
           let progress = percentage * 100
@@ -967,7 +1014,7 @@ export class ChatBaseViewModel {
 
       await fs.close(file)
     } catch (err) {
-      console.log('net ease send file error', err);
+      Logger.info('ChatKitUI', 'net ease send file error', err);
     }
   }
 
@@ -979,9 +1026,10 @@ export class ChatBaseViewModel {
   async sendAudioMessage(uri: string, duration: number) {
     try {
       const message = await ChatRepo.createAudioMessage(uri, undefined, undefined, duration * 1000);
-      this.sendMessage(message)
+      const params = this.buildAIConfigForCurrentConversation(message)
+      this.sendMessage(message, params)
     } catch (err) {
-      console.error('net ease send audio message error', err.code, err.message)
+      Logger.error('ChatKitUI', 'net ease send audio message error', err.code, err.message)
     }
   }
 
@@ -1001,8 +1049,13 @@ export class ChatBaseViewModel {
         this.modifyAndSendTip(result)
       }
 
+      // AI 消息发送成功后提示
+      if (result && result.message.aiConfig) {
+        NECommonUtils.showToast($r('app.string.chat_ai_message_progressing'))
+      }
+
     } catch (err) {
-      console.error('netease send message error', err.code, err.message);
+      Logger.error('ChatKitUI', 'netease send message error', err.code, err.message);
       sendMessageFailedTips(msg, err, this.conversationId!)
     }
   }
@@ -1019,9 +1072,54 @@ export class ChatBaseViewModel {
     const mergedParams = this.beforeSendMessage(params)
     ChatRepo.replyMessage(msg, replyMsg, mergedParams, progress)
       .catch((err: BusinessError) => {
-        console.error('net ease reply message error', err.code, err.message);
+        Logger.error('ChatKitUI', 'net ease reply message error', err.code, err.message);
         sendMessageFailedTips(msg, err, this.conversationId!)
       })
+  }
+
+  /**
+   * 停止 AI 流式消息输出
+   *
+   * @param messageInfo 需要停止的 AI 消息
+   */
+  public async stopAIStream(messageInfo: NIMMessageInfo): Promise<void> {
+    if (!messageInfo.canOperateAIResponse()) {
+      return
+    }
+    const params: V2NIMMessageAIStreamStopParams = {
+      operationType: V2NIMMessageAIStreamStopOpType.V2NIM_MESSAGE_AI_STREAM_STOP_OP_DEFAULT
+    }
+    try {
+      await ChatRepo.stopAIStreamMessage(messageInfo.message, params)
+    } catch (err) {
+      Logger.error('ChatKitUI', 'netease stopAIStream error', err.code, err.message)
+      NECommonUtils.showToast($r('app.string.chat_ai_search_error'))
+    }
+  }
+
+  /**
+   * 重新生成 AI 消息回答
+   *
+   * @param messageInfo 需要重新生成的 AI 消息
+   */
+  public async regenAIMessage(messageInfo: NIMMessageInfo): Promise<void> {
+    if (!messageInfo.canOperateAIResponse()) {
+      return
+    }
+    const params: V2NIMMessageAIRegenParams = {
+      operationType: V2NIMMessageAIRegenOpType.V2NIM_MESSAGE_AI_REGEN_OP_NEW
+    }
+    try {
+      await ChatRepo.regenAIMessage(messageInfo.message, params)
+      NECommonUtils.showToast($r('app.string.chat_ai_message_progressing'))
+    } catch (err) {
+      Logger.error('ChatKitUI', 'netease regenAIMessage error', err.code, err.message)
+      if (err.code === V2NIMErrorMap.V2NIM_ERROR_CODE_MESSAGE_NOT_EXIST.code) {
+        NECommonUtils.showToast($r('app.string.chat_message_removed_tip'))
+      } else {
+        NECommonUtils.showToast($r('app.string.chat_ai_search_error'))
+      }
+    }
   }
 
   /**
@@ -1036,9 +1134,23 @@ export class ChatBaseViewModel {
     const mergedParams = this.beforeSendMessage(params)
     ChatRepo.sendMessage(msg, conversationId, mergedParams, progress)
       .catch((err: BusinessError) => {
-        console.error('net ease send message error', err.code, err.message);
+        Logger.error('ChatKitUI', 'net ease send message error', err.code, err.message);
         sendMessageFailedTips(msg, err, conversationId)
       })
+  }
+
+  private buildAIConfigForConversation(message: V2NIMMessage, conversationId: string, content?: string,
+    includeContext: boolean = false, resolveContent: boolean = true): V2NIMSendMessageParams | undefined {
+    if (!this.isAIConversationByConversationId(conversationId)) {
+      return undefined
+    }
+    const targetId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversationId)
+    return this.appendAIConfig(message, undefined, targetId, content, includeContext, resolveContent)
+  }
+
+  private buildAIConfigForCurrentConversation(message: V2NIMMessage,
+    includeContext: boolean = true): V2NIMSendMessageParams | undefined {
+    return this.buildAIConfigForConversation(message, this.conversationId, getAIMessageContent(message), includeContext)
   }
 
   // 消息附件下载
@@ -1062,7 +1174,7 @@ export class ChatBaseViewModel {
           }
           )
         } catch (err) {
-          console.log('netease downloadAttachment', err)
+          Logger.info('ChatKitUI', 'netease downloadAttachment', err)
           msg.setDownloadProgress(-1)
         }
       }
@@ -1085,10 +1197,17 @@ export class ChatBaseViewModel {
           try {
             if (forwardMsg && conversation.conversationId) {
               clearForwardAtMark(forwardMsg)
-              this.sendForwardMessage(forwardMsg, conversation.conversationId)
+              const aiParams = this.buildAIConfigForConversation(
+                forwardMsg,
+                conversation.conversationId,
+                resolveAIMessageContentForForward(forwardMsg),
+                false,
+                false
+              )
+              this.sendForwardMessage(forwardMsg, conversation.conversationId, aiParams)
             }
           } catch (err) {
-            console.error(err)
+            Logger.error('ChatKitUI', err)
           }
         })
 
@@ -1097,10 +1216,12 @@ export class ChatBaseViewModel {
           const leaveMsg = ChatRepo.createTextMessage(leaveText)
           if (leaveMsg && conversation.conversationId) {
             setTimeout(() => {
-              const mergedParams = this.beforeSendMessage()
+              const aiParams = this.buildAIConfigForConversation(leaveMsg, conversation.conversationId!, leaveText, false,
+                false)
+              const mergedParams = this.beforeSendMessage(aiParams)
               ChatRepo.sendMessage(leaveMsg, conversation.conversationId!, mergedParams)
                 .catch((err: BusinessError) => {
-                  console.error('net ease send message error', err.code, err.message);
+                  Logger.error('ChatKitUI', 'net ease send message error', err.code, err.message);
                   sendMessageFailedTips(leaveMsg, err, conversation.conversationId!)
                 })
             }, 200)
@@ -1134,7 +1255,7 @@ export class ChatBaseViewModel {
         try {
           return await createForwardMessageListFileDetail(rawMessages, this.chatInfo, depth)
         } catch (err) {
-          console.error(err)
+          Logger.error('ChatKitUI', err)
         }
       }
     }
@@ -1163,6 +1284,9 @@ export class ChatBaseViewModel {
 
   // 多选数据，添加新的选中消息
   addSelectMessage(msg: NIMMessageInfo) {
+    if (!msg.canOperateInMultiSelect()) {
+      return
+    }
     this.selectMsgMap.set(msg.getMessageClientId(), msg)
     this.chatInfo?.getMessage(msg.getMessageClientId())?.setSelected(true)
     this.selectMsgCount = this.selectMsgMap.size
@@ -1197,7 +1321,7 @@ export class ChatBaseViewModel {
   isSelect(msgClientId: string) {
     let result = this.selectMsgMap.has(msgClientId)
     let msg = this.chatInfo?.getMessage(msgClientId)
-    console.debug('netease isSelect', msgClientId, result, ',content:', msg?.message.text)
+    Logger.debug('ChatKitUI', 'netease isSelect', msgClientId, result, ',content:', msg?.message.text)
     return result
   }
 
@@ -1258,7 +1382,7 @@ export class ChatBaseViewModel {
       }
     }
 
-    console.error('netease send message antispam label', label)
+    Logger.error('ChatKitUI', 'netease send message antispam label', label)
 
     // 分类信息，100：色情，200：广告，260：广告法，300：暴恐，400：违禁，500：涉政，600：谩骂，700：灌水，900：其他，1100：涉价值观
     let labelResource: Resource = $r('app.string.chat_message_other_tip_label')
@@ -1395,7 +1519,7 @@ export class ChatBaseViewModel {
       }
       // SDK 返回空字符串时不做任何处理（实际场景中 SDK 会返回失败而非空字符串）
     } catch (err) {
-      console.error('netease voiceToText error', err.code, err.message)
+      Logger.error('ChatKitUI', 'netease voiceToText error', err.code, err.message)
       // 网络错误显示特定提示
       if (err.code === V2NIMErrorCode.V2NIM_ERROR_CODE_ILLEGAL_STATE) {
         NECommonUtils.showToast($r('app.string.chat_network_error_tips'))
@@ -1418,11 +1542,7 @@ export class ChatBaseViewModel {
     ChatRepo.offDeleteMessage(this.onDeleteFun)
     ChatRepo.offRevokeMessage(this.onRevokeFun)
     ChatRepo.offMessagePinNotification(this.onPinFun)
-    ChatKitClient.nim.loginService.off('onDataSync', this.onSyncFinishedFun)
-    // 长连接状态变更
-    ChatKitClient.nim.loginService?.off('onConnectStatus', this.onConnectStatusChange)
-    // 登录状态变更
-    ChatKitClient.nim.loginService?.off('onLoginStatus', this.onLoginStatusChange)
+    this.loginEventDisposers.dispose()
     // 清理未读数
     this.clearUnreadCount()
     // 设置当前聊天账号

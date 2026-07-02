@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatKitClient, ErrorUtils, IMKitConfigCenter } from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
@@ -391,7 +392,7 @@ export struct ValidationMessagePage {
       }
       this.pathStack.pop(0)
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 
@@ -402,7 +403,7 @@ export struct ValidationMessagePage {
         await this.teamViewModel.getVerifyList()
       }
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 
@@ -458,6 +459,31 @@ export struct ValidationMessagePage {
     if (ErrorUtils.checkNetworkAndToast()) {
       this.teamViewModel.clearAll()
     }
+  }
+
+  @Builder
+  tabBuilder(index: number, name: ResourceStr) {
+    Column() {
+      Text(name)
+        .height(16)
+        .fontColor(this.currentTabIndex === index ? '#337EFF' : '#333333')
+        .font({
+          size: 14,
+          weight: this.currentTabIndex === index ? 500 : 400
+        })
+        .margin({
+          top: 10,
+          bottom: 10
+        })
+
+      Divider()
+        .strokeWidth(2)
+        .color('#337EFF')
+        .opacity(this.currentTabIndex === index ? 1 : 0)
+    }
+    .width('100%')
+    .height(40)
+    .backgroundColor(Color.White)
   }
 
   build() {
@@ -520,7 +546,7 @@ export struct ValidationMessagePage {
               .height('100%')
               .backgroundColor(Color.White)
             }
-            .tabBar($r('app.string.verify_tab_friend'))
+            .tabBar(this.tabBuilder(0, $r('app.string.verify_tab_friend')))
 
             // 群 Tab
             TabContent() {
@@ -558,11 +584,13 @@ export struct ValidationMessagePage {
               .height('100%')
               .backgroundColor(Color.White)
             }
-            .tabBar($r('app.string.verify_tab_team'))
+            .tabBar(this.tabBuilder(1, $r('app.string.verify_tab_team')))
           }
           .width('100%')
           .layoutWeight(1)
           .barMode(BarMode.Fixed)
+          .barHeight(40)
+          .backgroundColor(Color.White)
           .onChange((index: number) => {
             this.currentTabIndex = index
           })

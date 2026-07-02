@@ -1,4 +1,4 @@
-import { NIMMessageInfo } from '@nimkit/chatkit_ui/src/main/ets/model/NIMMessageInfo';
+import { NIMMessageInfo } from '@nimkit/chatkit_ui';
 import { V2NIMCollection } from '@nimsdk/base';
 
 export class CollectionMessageModel {

@@ -11,6 +11,7 @@ import { NIMMessageInfo } from '../model/NIMMessageInfo'
 import { AudioPlayerManager } from '../manager/AudioPlayerManager'
 import { ChatConst } from '../constants/ChatConst'
 import { MessageItemClick } from './MessageItemClick'
+import { shouldStopAudioPlaybackOnMessageItemDisappear } from '../common/AudioPlaybackPolicy'
 
 @ComponentV2
 export struct MessageAudioItemView {
@@ -39,7 +40,10 @@ export struct MessageAudioItemView {
   intervalId?: number
 
   aboutToDisappear(): void {
-    AudioPlayerManager.instance.stopPlayAll()
+    clearInterval(this.intervalId)
+    if (shouldStopAudioPlaybackOnMessageItemDisappear()) {
+      AudioPlayerManager.instance.stopPlayAll()
+    }
   }
 
   onPlayStart: () => void = () => {

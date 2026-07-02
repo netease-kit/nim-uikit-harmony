@@ -4,7 +4,7 @@
  * found in the LICENSE file.
  *
  */
-import { AitSegment } from '@nimkit/chatkit/src/main/ets/model/ait/AitSegment';
+import { AitSegment } from '@nimkit/chatkit';
 
 export interface ChatAitNode {
   //文本

@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import {
   V2NIMMessage,
   V2NIMMessageAttachment,
@@ -26,10 +27,50 @@ import { fileUri } from '@kit.CoreFileKit'
 import { ChatConst } from '../constants/ChatConst'
 import { JSONUtil } from '@nimkit/common'
 import { BusinessError, systemDateTime } from '@kit.BasicServicesKit'
-import { NIMEStrAnyObj, V2NIMGetMediaResourceInfoResult, V2NIMMessageAIStreamStatus, V2NIMMessagePin } from '@nimsdk/base'
+import {
+  NIMEStrAnyObj,
+  V2NIMGetMediaResourceInfoResult,
+  V2NIMMessageAIStatus,
+  V2NIMMessageAIStreamStatus,
+  V2NIMMessagePin,
+  V2NIMMessageSendingState
+} from '@nimsdk/base'
 import { ChatKitConfig } from '../ChatKitConfig'
 import { getMergedMessageContent, measureMessageHeight } from '../common/MessageHelper'
 import fs from '@ohos.file.fs'
+
+export function getAIResponseRequesterId(message: V2NIMMessage | undefined): string {
+  if (!message) {
+    return ''
+  }
+
+  const threadSenderId = message.threadReply?.senderId
+  if (threadSenderId) {
+    return threadSenderId
+  }
+
+  const remoteExt = message.serverExtension
+  if (!remoteExt) {
+    return ''
+  }
+  try {
+    const remoteDic = JSON.parse(remoteExt) as object
+    const msgReplyDic = remoteDic[keyReplyMsgKey] as object
+    if (msgReplyDic) {
+      return msgReplyDic['from'] as string
+    }
+  } catch (err) {
+    Logger.debug('ChatKitUI', 'netease getAIResponseRequesterId', err)
+  }
+  return ''
+}
+
+export function canOperateAIResponseMessage(message: V2NIMMessage | undefined, loginUserId: string): boolean {
+  const requesterId = getAIResponseRequesterId(message)
+  return message?.aiConfig?.aiStatus === V2NIMMessageAIStatus.V2NIM_MESSAGE_AI_STATUS_RESPONSE &&
+    requesterId.length > 0 &&
+    requesterId === loginUserId
+}
 
 @ObservedV2
 export class NIMMessageInfo {
@@ -145,6 +186,11 @@ export class NIMMessageInfo {
     this.isReplyMsg = reply
   }
 
+  clearReplyInfo(): void {
+    this.isReplyMsg = false
+    this.replyMsg = undefined
+  }
+
   async parseReply(message: V2NIMMessage) {
     // 优先使用 thread 方案
     if (message.threadReply) {
@@ -155,7 +201,7 @@ export class NIMMessageInfo {
           this.replyMsg = new NIMMessageInfo(messages[0])
         }
       } catch (err) {
-        console.error(err)
+        Logger.error('ChatKitUI', err)
       }
       return
     }
@@ -178,18 +224,18 @@ export class NIMMessageInfo {
               receiverId: msgReplyDic['receiverId'] as string,
               conversationType: msgReplyDic['scene'] as number,
             }]).catch((err: BusinessError) => {
-              console.debug('netease parseReply', err.message)
+              Logger.debug('ChatKitUI', 'netease parseReply', err.message)
             })
 
             if (messages && messages.length > 0) {
               this.replyMsg = new NIMMessageInfo(messages[0])
             }
           } catch (err) {
-            console.error(err)
+            Logger.error('ChatKitUI', err)
           }
         }
       } catch (err) {
-        console.error(err)
+        Logger.error('ChatKitUI', err)
       }
     }
   }
@@ -281,10 +327,12 @@ export class NIMMessageInfo {
   getAvatarName(): string {
     let result = ''
     if (this.message != null && this.message != null) {
-      result = this.message.senderId.substring(this.message.senderId.length - 2, this.message.senderId.length)
+      let senderId = this.getDisplaySenderId()
+      result = senderId.substring(senderId.length - 2, senderId.length)
     }
     if (this.message != null && this.message.senderId != null) {
-      result = this.message.senderId.substring(this.message.senderId.length - 2, this.message.senderId.length)
+      let senderId = this.getDisplaySenderId()
+      result = senderId.substring(senderId.length - 2, senderId.length)
     }
     return result
   }
@@ -297,14 +345,59 @@ export class NIMMessageInfo {
     return this.message.aiConfig?.aiStream ?? false
   }
 
-  isFinishedAiStream(): boolean {
-    return (this.message.aiConfig?.aiStreamStatus ??
-    V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_GENERATED) >
-    V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_PLACEHOLDER
+  /**
+   * 是否为 AI 回复消息。对齐 Android isAIResponseMsg()
+   */
+  isAIResponseMsg(): boolean {
+    return this.message.aiConfig?.aiStatus === V2NIMMessageAIStatus.V2NIM_MESSAGE_AI_STATUS_RESPONSE
+  }
+
+  isAIResponseFromAIUser(): boolean {
+    return this.isAIResponseMsg() && !!this.message.aiConfig?.accountId
+  }
+
+  canOperateAIResponse(): boolean {
+    return canOperateAIResponseMessage(this.message, ChatKitClient.getLoginUserId())
+  }
+
+  getDisplaySenderId(): string {
+    const aiAccountId = this.message.aiConfig?.accountId
+    if (this.isAIResponseMsg() && aiAccountId) {
+      return aiAccountId
+    }
+    return this.message.senderId
+  }
+
+  isAiStreamStreaming(): boolean {
+    const status = this.message.aiConfig?.aiStreamStatus ??
+      V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_GENERATED
+    return status === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_PLACEHOLDER ||
+      status === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_STREAMING
+  }
+
+  isAIStreamInProgress(): boolean {
+    return this.isAIResponseMsg() && !this.isAiStreamFinished()
+  }
+
+  canOperateInMultiSelect(): boolean {
+    return !this.isRevokeMsg &&
+      this.message.sendingState !== V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED &&
+      this.message.sendingState !== V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SENDING &&
+      !this.isAIStreamInProgress()
+  }
+
+  isAiStreamFinished(): boolean {
+    const status = this.message.aiConfig?.aiStreamStatus ??
+      V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_GENERATED
+    return status === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_NONE ||
+      status === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_STOPPED ||
+      status === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_UPDATED ||
+      status === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_GENERATED ||
+      status === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_ABORTED
   }
 
   isReceiveMessage(): boolean {
-    return this.isReceiveMsg
+    return this.isReceiveMsg || this.isAIResponseFromAIUser()
   }
 
   isPinMessage(): boolean {

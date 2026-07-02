@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatKitClient, ErrorUtils, MergedMessageAttachment, multiForwardFileName, StorageRepo } from '@nimkit/chatkit';
 import { V2NIMMessage, V2NIMMessageCallAttachment, V2NIMMessageType } from '@nimsdk/base';
 import Hash from '@ohos.file.hash';
@@ -77,7 +78,7 @@ export class MergeMessageDetailViewModel {
         NECommonUtils.showToast($r('app.string.file_md5_check_failed'))
       }
     } catch (err) {
-      console.log(err)
+      Logger.info('ChatKitUI', err)
     }
   }
 
@@ -87,7 +88,7 @@ export class MergeMessageDetailViewModel {
 
       })
     } catch (err) {
-      console.error(err)
+      Logger.error('ChatKitUI', err)
     }
   }
 

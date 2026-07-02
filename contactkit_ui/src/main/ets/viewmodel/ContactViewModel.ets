@@ -5,9 +5,10 @@
  *
  */
 
-import { ChatKitClient, ContactRepo, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit'
+import { Logger } from '@nimkit/common';
+import { ContactRepo, NEAIUserCache, NEFriendUserCache, NEUserWithFriend, TeamRepo } from '@nimkit/chatkit'
 import { GetUnreadCountStr, initalLetter } from '@nimkit/common'
-import { V2NIMFriend, V2NIMUser } from '@nimsdk/base'
+import { V2NIMAIUser, V2NIMFriend, V2NIMUser } from '@nimsdk/base'
 import { NEContactSection, NEContactSectionDataSource, SelectUserWithFriend } from '../model/NEContactSection'
 import { systemDateTime } from '@kit.BasicServicesKit'
 
@@ -17,6 +18,7 @@ const azRegular = /[A-Z]/
 @ObservedV2
 export class ContactViewModel {
   @Trace friendList: NEUserWithFriend[] = []
+  @Trace aiUserList: NEUserWithFriend[] = []
   @Trace friendSection: NEContactSectionDataSource = new NEContactSectionDataSource()
   @Trace initalList: string[] = []
 
@@ -76,11 +78,32 @@ export class ContactViewModel {
     ContactRepo.listener.on('removeBlockAccount', this.removeBlockAccountFun)
   }
 
+  async getAIUserList(filterList: string[] = []): Promise<NEUserWithFriend[]> {
+    try {
+      await NEAIUserCache.getInstance().load()
+      const aiUsers: V2NIMAIUser[] = NEAIUserCache.getAIUserList()
+      this.aiUserList = aiUsers
+        .filter((aiUser: V2NIMAIUser) => {
+          return !!aiUser.accountId && !filterList.includes(aiUser.accountId)
+        })
+        .map((aiUser: V2NIMAIUser) => {
+          return new NEUserWithFriend({
+            user: aiUser
+          })
+        })
+      return this.aiUserList
+    } catch (err) {
+      Logger.error('ContactKit', err)
+    }
+    return []
+  }
+
   // 获取好友列表
   async getFriendList(filterList: string[] = []): Promise<NEContactSection[] | undefined> {
     try {
       let friendList: NEUserWithFriend[] = []
       if (NEFriendUserCache.getInstance().isEmpty()) {
+        await ContactRepo.getBlockList()
         await ContactRepo.getFriendList()
       }
 
@@ -92,7 +115,7 @@ export class ContactViewModel {
         return contactList
       }
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
     return undefined
   }
@@ -267,7 +290,7 @@ export class ContactViewModel {
       }
       return undefined
     } catch (err) {
-      console.log(err)
+      Logger.info('ContactKit', err)
       return undefined
     }
   }
@@ -275,13 +298,13 @@ export class ContactViewModel {
   // 获取入群验证消息未读数
   async getUnreadTeamVerify() {
     try {
-      const count = await ChatKitClient.nim.teamService?.getTeamJoinActionInfoUnreadCount()
+      const count = await TeamRepo.getTeamJoinActionInfoUnreadCount()
       if (count && count > 0) {
         return GetUnreadCountStr(count)
       }
       return undefined
     } catch (err) {
-      console.log(err)
+      Logger.info('ContactKit', err)
       return undefined
     }
   }

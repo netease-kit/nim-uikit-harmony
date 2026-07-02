@@ -5,7 +5,7 @@
  *
  */
 
-import { ChatKitClient, NEFriendUserCache } from '@nimkit/chatkit';
+import { ChatKitClient, NEAIUserCache, NEFriendUserCache } from '@nimkit/chatkit';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { V2NIMFriend, V2NIMMessage, V2NIMP2PMessageReadReceipt, V2NIMUser } from '@nimsdk/base';
 import { ChatInfo } from './ChatInfo';
@@ -15,6 +15,7 @@ export class ChatUserInfo extends ChatInfo {
   @Trace currentUser: V2NIMUser | undefined = undefined;
   @Trace chatUser: V2NIMUser | undefined = undefined;
   @Trace chatFriend: V2NIMFriend | undefined = undefined;
+  @Trace extraUserMap = new Map<string, V2NIMUser>();
   readReceipt: V2NIMP2PMessageReadReceipt | undefined = undefined;
   readReceiptMsg: NIMMessageInfo | undefined = undefined;
 
@@ -38,6 +39,20 @@ export class ChatUserInfo extends ChatInfo {
 
   setChatFriend(friend: V2NIMFriend | undefined) {
     this.chatFriend = friend;
+  }
+
+  addExtraUsers(userList: V2NIMUser[]) {
+    userList.forEach((user) => {
+      this.extraUserMap.set(user.accountId, user)
+    })
+  }
+
+  updateExtraUser(user: V2NIMUser): boolean {
+    if (!this.extraUserMap.has(user.accountId)) {
+      return false
+    }
+    this.extraUserMap.set(user.accountId, user)
+    return true
   }
 
   updateConversationName() {
@@ -71,19 +86,20 @@ export class ChatUserInfo extends ChatInfo {
   }
 
   getChatUserAvatarName(param?: string | V2NIMMessage): string {
-    let accountId: string = ""
-    if ((param as V2NIMMessage).senderId) {
-      accountId = (param as V2NIMMessage).senderId
-    } else {
-      accountId = param as string;
-    }
+    let accountId: string = this.getAccountId(param)
 
     if (accountId === ChatKitClient.getLoginUserId()) {
       return this.getCurrentUserAvatarName()
     }
 
+    const aiUser = NEAIUserCache.getAIUser(accountId)
+    if (aiUser) {
+      let aiName = aiUser.name ?? aiUser.accountId
+      return aiName.length > 2 ? aiName.substring(aiName.length - 2, aiName.length) : aiName
+    }
+
     let name = '';
-    if (this.chatFriend) {
+    if (this.chatFriend && this.chatFriend.accountId === accountId) {
       name = this.chatFriend?.alias ?? '';
     }
     if (name === '' && NEFriendUserCache.getInstance().getFriendById(accountId)) {
@@ -92,8 +108,11 @@ export class ChatUserInfo extends ChatInfo {
         name = friendInfo.showName()
       }
     }
-    if (name === '' && this.chatUser !== undefined) {
+    if (name === '' && this.chatUser !== undefined && this.chatUser.accountId === accountId) {
       name = this.chatUser?.name ?? '';
+    }
+    if (name === '' && this.extraUserMap.has(accountId)) {
+      name = this.extraUserMap.get(accountId)?.name ?? ''
     }
     if (name === '') {
       name = accountId;
@@ -111,6 +130,9 @@ export class ChatUserInfo extends ChatInfo {
     if (this.currentUser !== undefined) {
       name = this.currentUser?.name ?? '';
     }
+    if (name === '' && NEFriendUserCache.mineUserCache?.user) {
+      name = NEFriendUserCache.mineUserCache.user.name ?? ''
+    }
     if (name === '') {
       name = accountId;
     }
@@ -121,15 +143,15 @@ export class ChatUserInfo extends ChatInfo {
   }
 
   getChatUserShowName(param?: string | V2NIMMessage, alias: boolean = true, teamNick: boolean = true): string {
-    let accountId: string = ""
-    if ((param as V2NIMMessage).senderId) {
-      accountId = (param as V2NIMMessage).senderId
-    } else {
-      accountId = param as string;
-    }
+    let accountId: string = this.getAccountId(param)
 
     if (accountId === ChatKitClient.getLoginUserId()) {
       return this.getCurrentUserShowName()
+    }
+
+    const aiUser = NEAIUserCache.getAIUser(accountId)
+    if (aiUser) {
+      return aiUser.name ?? aiUser.accountId
     }
 
     let name = '';
@@ -137,8 +159,11 @@ export class ChatUserInfo extends ChatInfo {
     if (friendInfo !== undefined) {
       name = friendInfo.showName(alias)
     }
-    if (name === '' && this.chatUser !== undefined) {
+    if (name === '' && this.chatUser !== undefined && this.chatUser.accountId === accountId) {
       name = this.chatUser?.name ?? '';
+    }
+    if (name === '' && this.extraUserMap.has(accountId)) {
+      name = this.extraUserMap.get(accountId)?.name ?? ''
     }
 
     if (name === '') {
@@ -152,6 +177,9 @@ export class ChatUserInfo extends ChatInfo {
     if (name === '' && this.currentUser !== undefined) {
       name = this.currentUser?.name ?? '';
     }
+    if (name === '' && NEFriendUserCache.mineUserCache?.user) {
+      name = NEFriendUserCache.mineUserCache.user.name ?? ''
+    }
     if (name === '') {
       name = ChatKitClient.getLoginUserId();
     }
@@ -159,20 +187,23 @@ export class ChatUserInfo extends ChatInfo {
   }
 
   getChatUserAvatarUrl(param?: string | V2NIMMessage): string {
-    let accountId: string = ""
-    if ((param as V2NIMMessage).senderId) {
-      accountId = (param as V2NIMMessage).senderId
-    } else {
-      accountId = param as string;
-    }
+    let accountId: string = this.getAccountId(param)
 
     if (accountId === ChatKitClient.getLoginUserId()) {
       return this.getCurrentUserAvatarUrl()
     }
 
+    const aiUser = NEAIUserCache.getAIUser(accountId)
+    if (aiUser) {
+      return aiUser.avatar ?? ''
+    }
+
     let result: string = '';
-    if (this.chatUser !== undefined) {
+    if (this.chatUser !== undefined && this.chatUser.accountId === accountId) {
       result = this.chatUser?.avatar ? this.chatUser?.avatar : '';
+    }
+    if ((result == null || result.trim() === '') && this.extraUserMap.has(accountId)) {
+      result = this.extraUserMap.get(accountId)?.avatar ?? ''
     }
     if (result == null || result.trim() === '') {
       result = '';
@@ -186,6 +217,9 @@ export class ChatUserInfo extends ChatInfo {
     if (this.currentUser !== undefined) {
       result = this.currentUser?.avatar ? this.currentUser?.avatar : '';
     }
+    if ((result == null || result.trim() === '') && NEFriendUserCache.mineUserCache?.user) {
+      result = NEFriendUserCache.mineUserCache.user.avatar ?? ''
+    }
     if (result == null || result.trim() === '') {
       result = '';
     }
@@ -197,6 +231,9 @@ export class ChatUserInfo extends ChatInfo {
     let friendInfo = NEFriendUserCache.getInstance().getFriendById(this.targetId)
     if (friendInfo !== undefined) {
       result = friendInfo.showName(true)
+    } else if (NEAIUserCache.getAIUser(this.targetId)) {
+      const aiUser = NEAIUserCache.getAIUser(this.targetId)
+      result = aiUser?.name ?? aiUser?.accountId ?? this.targetId
     } else if (this.chatUser !== undefined) {
       result = this.chatUser?.name !== null ? this.chatUser?.name : this.chatUser?.accountId;
     }

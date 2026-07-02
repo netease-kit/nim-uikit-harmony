@@ -6,9 +6,11 @@
  */
 import {
   ChatKitClient,
+  DisposableBag,
   ErrorUtils,
   getTopStickyPermissionMode,
   keyExtensionAtAll,
+  TeamEventRepo,
   TeamRepo,
   typeExtensionAllowAll
 } from '@nimkit/chatkit'
@@ -60,6 +62,7 @@ export class TeamManageViewModel {
   joinModeValue?: V2NIMTeamJoinMode = undefined
   //管理员
   managerList: V2NIMTeamMember[] = []
+  private disposableBag: DisposableBag = new DisposableBag()
 
   init(teamInfo?: V2NIMTeam) {
     this.applyTeamInfo(teamInfo)
@@ -247,14 +250,21 @@ export class TeamManageViewModel {
    * 初始化监听
    */
   initTeamListener() {
-    ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', this.onTeamInfoUpdated.bind(this))
-    ChatKitClient.nim.teamService?.on('onSyncFinished', this.onSyncFinished.bind(this))
-    ChatKitClient.nim?.teamService?.on('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated.bind(this))
+    this.destroy()
+    this.disposableBag.addAll([
+      TeamEventRepo.onTeamInfoUpdated((team: V2NIMTeam): void => {
+        this.onTeamInfoUpdated(team)
+      }),
+      TeamEventRepo.onTeamSyncFinished((): void => {
+        this.onSyncFinished()
+      }),
+      TeamEventRepo.onTeamMemberInfoUpdated((members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberInfoUpdated(members)
+      })
+    ])
   }
 
   destroy() {
-    ChatKitClient.nim.teamService?.off('onTeamInfoUpdated', this.onTeamInfoUpdated)
-    ChatKitClient.nim.teamService?.off('onSyncFinished', this.onSyncFinished)
-    ChatKitClient.nim?.teamService?.off('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated)
+    this.disposableBag.dispose()
   }
 }

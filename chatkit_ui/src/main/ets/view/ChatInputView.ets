@@ -4,13 +4,14 @@
  * found in the LICENSE file.
  *
  */
+import { Logger } from '@nimkit/common';
 import { NEImageButton } from './NEImageButton';
 import { NEChatMoreOperationData, NEChatMoreOperationType } from '../model/NEChatMoreOperationData';
 import { NEEmojiManager, NEEmojiParseResult } from '../manager/NEEmojiManager';
 import { inputMethod } from '@kit.IMEKit';
-import { V2NIMTeam } from '@nimsdk/base';
+import { V2NIMAIUser, V2NIMTeam } from '@nimsdk/base';
 import { ChatAitDialog } from './ChatAitDialog';
-import { TeamMemberCache } from '@nimkit/chatkit/src/main/ets/cache/TeamMemberCache';
+import { TeamMemberCache } from '@nimkit/chatkit';
 import { accountAll, ChatKitClient, ContactRepo, IMKitConfigCenter, TeamMemberWithUser } from '@nimkit/chatkit';
 import { AitManager } from '../manager/ait/AitManager';
 import { getReplyMessageText, getReplyMessageTitle, parseMessageText, sliceMessageText } from '../common/MessageHelper';
@@ -18,6 +19,7 @@ import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { ChatInfo } from '../model/ChatInfo';
 import {
   collectRichInputTransferNodes,
+  restoreMultiLineContent,
   RichInputTransferNode,
   splitSingleLineTransferNodes
 } from '../common/InputTransferUtils';
@@ -33,6 +35,8 @@ export enum InputStyleType {
   More = 4,
   // 多行输入模式（换行消息）
   Multiline = 5,
+  // AI 助聊面板
+  AiHelper = 6,
 }
 
 @ComponentV2
@@ -53,6 +57,11 @@ export struct NEChatInputView {
   onDidClickMore?: () => void;
   @Param @Require
   onDidClickCloseReply?: () => void;
+  // AI 助聊按钮点击
+  @Param
+  onDidClickAIHelper: () => void = () => {}
+  @Param
+  enableAIHelper: boolean = true
   /**
    * 输入框内容变化回调（用于"正在输入"功能）
    * @param hasText true 表示输入框有内容，false 表示输入框为空
@@ -72,6 +81,14 @@ export struct NEChatInputView {
   //群
   @Param
   team?: V2NIMTeam = undefined
+  @Param
+  showAitAll: boolean = true
+  @Param
+  showAIUserAit: boolean = false
+  @Param
+  showTeamMemberAit: boolean = true
+  @Param
+  aiUsers: V2NIMAIUser[] = []
   //空格符
   blank: string = ' ';
   @Param
@@ -112,7 +129,7 @@ export struct NEChatInputView {
    * 页面收到回调后设置自己的 multiLineTitle 和 multiLineBody
    */
   @Param
-  onRestoreMultiLineContent?: (title: string, body: string) => void = undefined
+  onRestoreMultiLineContent?: (title: string, body: string, bodyNodes: RichInputTransferNode[]) => void = undefined
   /**
    * 撤回重编辑时恢复的多行内容（外部传入）
    * 格式: { title: string, body: string } 的 JSON 字符串
@@ -134,8 +151,13 @@ export struct NEChatInputView {
     builder: ChatAitDialog({
       teamId: this.teamId,
       team: this.team,
+      showAitAll: this.showAitAll,
+      showAIUser: this.showAIUserAit,
+      showTeamMember: this.showTeamMemberAit,
+      aiUsers: this.aiUsers,
       onSelectedAll: this.onSelectedAll.bind(this),
-      onMemberSelected: this.onTeamMemberSelected.bind(this)
+      onMemberSelected: this.onTeamMemberSelected.bind(this),
+      onAIUserSelected: this.onAIUserSelected.bind(this)
     }),
     openAnimation: {
       curve: Curve.Linear,
@@ -161,6 +183,26 @@ export struct NEChatInputView {
     }
   }
 
+  private canShowAIHelperButton(): boolean {
+    return this.enableAIHelper && IMKitConfigCenter.enableAIChatHelper && !this.mute &&
+      this.inputStyle !== InputStyleType.Multiline
+  }
+
+  private canShowRichTextButton(): boolean {
+    return IMKitConfigCenter.enableRichTextMessage && !this.mute && this.inputStyle !== InputStyleType.Multiline
+  }
+
+  private getInputRightPadding(): number {
+    let padding = 12
+    if (this.canShowAIHelperButton()) {
+      padding += 34
+    }
+    if (this.canShowRichTextButton()) {
+      padding += 30
+    }
+    return padding
+  }
+
   // 初始化数据
   initData() {
     const videoOperationData = new NEChatMoreOperationData();
@@ -184,28 +226,7 @@ export struct NEChatInputView {
     let aitValue = getContext().resourceManager.getStringByNameSync('chat_team_ait_all') + this.blank
 
     //输入框添加@信息
-    if (this.controller) {
-      const controller = this.controller;
-      const offset = controller.getCaretOffset();
-      const range: RichEditorRange = { start: offset - 1, end: offset };
-      controller.deleteSpans(range);
-      const spanOffset = offset - 1
-      controller.addBuilderSpan(() => this.AtSpan(aitValue), {
-        offset: spanOffset
-      });
-      let aitSpan: AitEditorSpan = {
-        spanIndex: spanOffset,
-        accountId: accountAll,
-        value: '@' + aitValue
-      }
-      let index = this.builderSpans.findIndex((e) => e.spanIndex >= spanOffset)
-      if (index < 0) {
-        this.builderSpans.push(...[aitSpan])
-      } else {
-        this.builderSpans.splice(index, 0, aitSpan)
-      }
-
-    }
+    this.addAitSpan(accountAll, aitValue)
   }
 
   /**
@@ -215,6 +236,15 @@ export struct NEChatInputView {
   onTeamMemberSelected(member: TeamMemberWithUser) {
     //输入框添加@信息
     let aitValue = member.getAitName() + this.blank
+    this.addAitSpan(member.getAccId(), aitValue)
+  }
+
+  onAIUserSelected(aiUser: V2NIMAIUser) {
+    let aitValue = (aiUser.name ?? aiUser.accountId) + this.blank
+    this.addAitSpan(aiUser.accountId, aitValue)
+  }
+
+  private addAitSpan(accountId: string, aitValue: string) {
     if (this.controller) {
       const controller = this.controller;
       const offset = controller.getCaretOffset();
@@ -226,7 +256,7 @@ export struct NEChatInputView {
       });
       let aitSpan: AitEditorSpan = {
         spanIndex: spanOffset,
-        accountId: member.getAccId(),
+        accountId: accountId,
         value: '@' + aitValue,
       }
       let index = this.builderSpans.findIndex((e) => e.spanIndex >= spanOffset)
@@ -248,13 +278,19 @@ export struct NEChatInputView {
    * 显示@的弹框
    */
   async showAitDialog() {
-    let teamMemberCache = TeamMemberCache.getInstance()
-    if (teamMemberCache.needFetchMember()) {
-      await teamMemberCache.getMemberList()
+    if (this.showTeamMemberAit && this.teamId && this.teamId.length > 0) {
+      let teamMemberCache = TeamMemberCache.getInstance()
+      if (teamMemberCache.needFetchMember()) {
+        await teamMemberCache.getMemberList()
+      }
+      // 检查是否有成员缺失userInfo，如果有则从云端获取
+      await this.ensureMemberUserInfo(teamMemberCache)
     }
-    // 检查是否有成员缺失userInfo，如果有则从云端获取
-    await this.ensureMemberUserInfo(teamMemberCache)
     this.chatAitDialogController.open()
+  }
+
+  private canShowAitDialog(): boolean {
+    return (this.teamId !== undefined && this.teamId.length > 0) || (this.showAIUserAit && this.aiUsers.length > 0)
   }
 
   /**
@@ -275,7 +311,7 @@ export struct NEChatInputView {
         // 更新到 TeamMemberCache
         teamMemberCache.onUserProfileChanged(userList)
       } catch (e) {
-        console.error(`ensureMemberUserInfo failed: ${e}`)
+        Logger.error('ChatKitUI', `ensureMemberUserInfo failed: ${e}`)
       }
     }
   }
@@ -423,18 +459,20 @@ export struct NEChatInputView {
       try {
         const title = JSON.parse(this.revokeMultiLineContent)['title'] as string ?? ''
         const body = JSON.parse(this.revokeMultiLineContent)['body'] as string ?? ''
+        const bodyNodes = JSON.parse(this.revokeMultiLineContent)['bodyNodes'] as RichInputTransferNode[] | undefined
+        const restoredContent = restoreMultiLineContent(title, body, bodyNodes)
         // 关闭软键盘
         inputMethod.getController().stopInputSession()
         // 通过回调通知页面恢复内容并切换到多行模式
         if (title && title.length > 0) {
-          this.onRestoreMultiLineContent?.(title, body)
-          this.onMultilineModeChange?.(true, title, body)
+          this.onRestoreMultiLineContent?.(restoredContent.title, restoredContent.body, restoredContent.bodyNodes)
+          this.onMultilineModeChange?.(true, restoredContent.title, restoredContent.body, restoredContent.bodyNodes)
         } else {
           // 仅有 body，设置到单行输入框
-          this.controller?.addTextSpan(body)
+          this.controller?.addTextSpan(restoredContent.body)
         }
       } catch (e) {
-        console.error('onRevokeMultiLineChanged parse error:', e)
+        Logger.error('ChatKitUI', 'onRevokeMultiLineChanged parse error:', e)
       }
     }
   }
@@ -509,15 +547,16 @@ export struct NEChatInputView {
             .backgroundColor(this.mute ? $r('app.color.color_chat_mute_bg') : $r('app.color.color_chat_page_bg'))
             .height(40)
             .width('100%')
+            .padding({ right: this.getInputRightPadding() })
             .placeholder(this.mute ? $r('app.string.chat_team_all_mute') :
             $r('app.string.chat_send_tips', this.placeHolder))
             .onWillChange((value: RichEditorChangeValue) => {
-              console.debug(`ChatInputView onWillChange before: ${value.rangeBefore}`)
+              Logger.debug('ChatKitUI', `ChatInputView onWillChange before: ${value.rangeBefore}`)
               return true
             })
             .aboutToDelete(this.aboutToDelete)
             .onDidChange((rangeBefore: TextRange, rangeAfter: TextRange) => {
-              console.debug(`ChatInputView onDidChange before ${rangeBefore.start} ~ ${rangeBefore.end} after ${rangeAfter.start} ~ ${rangeAfter.end}`)
+              Logger.debug('ChatKitUI', `ChatInputView onDidChange before ${rangeBefore.start} ~ ${rangeBefore.end} after ${rangeAfter.start} ~ ${rangeAfter.end}`)
               this.inputSpans = this.controller?.getSpans() ?? []
               // 通知输入状态变化（用于"正在输入"功能）
               if (this.onInputTextChange) {
@@ -526,7 +565,7 @@ export struct NEChatInputView {
               }
             })
             .onSelectionChange((range: RichEditorRange) => {
-              console.debug(`ChatInputView onSelectionChange ${range.start} ~ ${range.end}`)
+              Logger.debug('ChatKitUI', `ChatInputView onSelectionChange ${range.start} ~ ${range.end}`)
             })
             .onIMEInputComplete((result: RichEditorTextSpanResult) => {
               //记录输入内容
@@ -535,8 +574,8 @@ export struct NEChatInputView {
               let indexStart: number = result.offsetInSpan[0]
               //span长度
               let spanLen = result.offsetInSpan[1] - result.offsetInSpan[0]
-              console.debug(` onIMEInputComplete value = ${value} index = ${indexStart} len = ${spanLen}}`)
-              if (this.teamId && this.teamId.length > 0) {
+              Logger.debug('ChatKitUI', ` onIMEInputComplete value = ${value} index = ${indexStart} len = ${spanLen}}`)
+              if (this.canShowAitDialog()) {
                 //判断span 长度，解决复制粘贴问题
                 if (spanLen === 1 && value.charAt(indexStart) === "@") {
                   //输入@
@@ -556,28 +595,41 @@ export struct NEChatInputView {
             })
             .enterKeyType(EnterKeyType.Send)
 
-          // 扩展按钮（仅在开关开启且非静音且非多行模式时显示）
-          if (IMKitConfigCenter.enableRichTextMessage && !this.mute && this.inputStyle !== InputStyleType.Multiline) {
-            Image($r('app.media.ic_chat_input_expand'))
-              .width(20)
-              .height(20)
-              .margin({ right: 8, top: 10 })
-              .onClick(() => {
-                this.switchToMultilineMode()
-              })
+          // 右侧按钮组（AI助聊 + 多行扩展）
+          Row({ space: 10 }) {
+            // AI 助聊按钮
+            if (this.canShowAIHelperButton()) {
+              Image(this.inputStyle === InputStyleType.AiHelper ?
+                $rawfile('ai_icon_highlight.png') : $rawfile('ic_chat_ai_helper.svg'))
+                .width(24)
+                .height(24)
+                .onClick(() => {
+                  this.onDidClickAIHelper?.()
+                })
+            }
+            // 扩展按钮
+            if (this.canShowRichTextButton()) {
+              Image($r('app.media.ic_chat_input_expand'))
+                .width(20)
+                .height(20)
+                .onClick(() => {
+                  this.switchToMultilineMode()
+                })
+            }
           }
+          .margin({ right: 8, top: 8 })
         }
         .width('100%')
         .height(40)
         .visibility(this.inputStyle === InputStyleType.Multiline ? Visibility.None : Visibility.Visible)
 
-        // 底部工具栏（多行模式下隐藏）
-        if (this.inputStyle !== InputStyleType.Multiline) {
+        // 底部工具栏（多行模式 / AI 助聊模式下隐藏）
+        if (this.inputStyle !== InputStyleType.Multiline && this.inputStyle !== InputStyleType.AiHelper) {
           Row({ space: 0 }) {
             if (this.inputStyle === InputStyleType.Record) {
               NEImageButton({
                 image: $r('app.media.ic_public_chat_speaker_select'), onDidClick: (): void => {
-                  console.log("net ease click speaker");
+                  Logger.info('ChatKitUI', "net ease click speaker");
                   if (this.onDidClickAudio) {
                     inputMethod.getController().stopInputSession();
                     this.onDidClickAudio()
@@ -589,7 +641,7 @@ export struct NEChatInputView {
 
               NEImageButton({
                 image: $r("app.media.ic_public_chat_emoji"), onDidClick: (): void => {
-                  console.log("net ease click emoji");
+                  Logger.info('ChatKitUI', "net ease click emoji");
                   if (this.onDidClickEmoji) {
                     inputMethod.getController().stopInputSession();
                     this.onDidClickEmoji()
@@ -601,7 +653,7 @@ export struct NEChatInputView {
 
               NEImageButton({
                 image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
-                  console.log("net ease click image");
+                  Logger.info('ChatKitUI', "net ease click image");
                   if (this.onDidClickImage) {
                     this.onDidClickImage()
                   }
@@ -612,7 +664,7 @@ export struct NEChatInputView {
 
               NEImageButton({
                 image: $r("app.media.ic_public_chat_more"), onDidClick: (): void => {
-                  console.log("net ease click more");
+                  Logger.info('ChatKitUI', "net ease click more");
                   if (this.onDidClickMore) {
                     inputMethod.getController().stopInputSession();
                     this.onDidClickMore()
@@ -624,7 +676,7 @@ export struct NEChatInputView {
             } else if (this.inputStyle === InputStyleType.More) {
               NEImageButton({
                 image: $r('app.media.ic_public_chat_speaker'), onDidClick: (): void => {
-                  console.log("net ease click speaker");
+                  Logger.info('ChatKitUI', "net ease click speaker");
                   if (this.onDidClickAudio) {
                     inputMethod.getController().stopInputSession();
                     this.onDidClickAudio()
@@ -636,7 +688,7 @@ export struct NEChatInputView {
 
               NEImageButton({
                 image: $r("app.media.ic_public_chat_emoji"), onDidClick: (): void => {
-                  console.log("net ease click emoji");
+                  Logger.info('ChatKitUI', "net ease click emoji");
                   if (this.onDidClickEmoji) {
                     inputMethod.getController().stopInputSession();
                     this.onDidClickEmoji()
@@ -648,7 +700,7 @@ export struct NEChatInputView {
 
               NEImageButton({
                 image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
-                  console.log("net ease click image");
+                  Logger.info('ChatKitUI', "net ease click image");
                   if (this.onDidClickImage) {
                     this.onDidClickImage()
                   }
@@ -659,7 +711,7 @@ export struct NEChatInputView {
 
               NEImageButton({
                 image: $r("app.media.ic_public_chat_more_select"), onDidClick: (): void => {
-                  console.log("net ease click more");
+                  Logger.info('ChatKitUI', "net ease click more");
                   if (this.onDidClickMore) {
                     inputMethod.getController().stopInputSession();
                     this.onDidClickMore()
@@ -671,7 +723,7 @@ export struct NEChatInputView {
             } else if (this.inputStyle === InputStyleType.Emoji) {
             NEImageButton({
               image: $r('app.media.ic_public_chat_speaker'), onDidClick: (): void => {
-                console.log("net ease click speaker");
+                Logger.info('ChatKitUI', "net ease click speaker");
                 if (this.onDidClickAudio) {
                   inputMethod.getController().stopInputSession();
                   this.onDidClickAudio()
@@ -683,7 +735,7 @@ export struct NEChatInputView {
 
             NEImageButton({
               image: $r("app.media.ic_public_chat_emoji_select"), onDidClick: (): void => {
-                console.log("net ease click emoji");
+                Logger.info('ChatKitUI', "net ease click emoji");
                 if (this.onDidClickEmoji) {
                   inputMethod.getController().stopInputSession();
                   this.onDidClickEmoji()
@@ -695,7 +747,7 @@ export struct NEChatInputView {
 
               NEImageButton({
                 image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
-                  console.log("net ease click image");
+                  Logger.info('ChatKitUI', "net ease click image");
                   if (this.onDidClickImage) {
                     this.onDidClickImage()
                   }
@@ -706,7 +758,7 @@ export struct NEChatInputView {
 
               NEImageButton({
                 image: $r("app.media.ic_public_chat_more"), onDidClick: (): void => {
-                  console.log("net ease click more");
+                  Logger.info('ChatKitUI', "net ease click more");
                   if (this.onDidClickMore) {
                     inputMethod.getController().stopInputSession();
                     this.onDidClickMore()
@@ -718,7 +770,7 @@ export struct NEChatInputView {
             } else if (this.inputStyle === InputStyleType.None) {
               NEImageButton({
                 image: $r('app.media.ic_public_chat_speaker'), onDidClick: (): void => {
-                  console.log("net ease click speaker");
+                  Logger.info('ChatKitUI', "net ease click speaker");
                   if (this.onDidClickAudio) {
                     inputMethod.getController().stopInputSession();
                     this.onDidClickAudio()
@@ -730,7 +782,7 @@ export struct NEChatInputView {
 
               NEImageButton({
                 image: $r("app.media.ic_public_chat_emoji"), onDidClick: (): void => {
-                  console.log("net ease click emoji");
+                  Logger.info('ChatKitUI', "net ease click emoji");
                   if (this.onDidClickEmoji) {
                     inputMethod.getController().stopInputSession();
                     this.onDidClickEmoji()
@@ -742,7 +794,7 @@ export struct NEChatInputView {
 
               NEImageButton({
                 image: $r("app.media.ic_public_chat_image"), onDidClick: (): void => {
-                  console.log("net ease click image");
+                  Logger.info('ChatKitUI', "net ease click image");
                   if (this.onDidClickImage) {
                     this.onDidClickImage()
                   }
@@ -753,7 +805,7 @@ export struct NEChatInputView {
 
               NEImageButton({
                 image: $r("app.media.ic_public_chat_more"), onDidClick: (): void => {
-                  console.log("net ease click more");
+                  Logger.info('ChatKitUI', "net ease click more");
                   if (this.onDidClickMore) {
                     inputMethod.getController().stopInputSession();
                     this.onDidClickMore()

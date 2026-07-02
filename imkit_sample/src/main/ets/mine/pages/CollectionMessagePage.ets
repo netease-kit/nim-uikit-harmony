@@ -16,9 +16,9 @@ import {
 } from '@nimkit/common';
 import { V2NIMMessageType } from '@nimsdk/base';
 import pasteboard from '@ohos.pasteboard';
-import { ConversationSelectParam } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectParam';
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
 import {
+  ConversationSelectModel,
+  ConversationSelectParam,
   conversationSelectLimitCount,
   CustomMessageUtils,
   ErrorUtils,
@@ -28,21 +28,22 @@ import {
   MergedMessageAttachment,
   mergedMessageCustomType
 } from '@nimkit/chatkit';
-import { ForwardMessageDialog } from '@nimkit/chatkit_ui/src/main/ets/view/ForwardMessageDialog';
-import { NIMMessageInfo } from '@nimkit/chatkit_ui/src/main/ets/model/NIMMessageInfo';
-import { NEEmojiManager, TextMessageDetailDialog } from '@nimkit/chatkit_ui';
-import { DeviceUtils } from '@nimkit/chatkit_ui/src/main/ets/common/DeviceUtils';
-import { AudioPlayerManager } from '@nimkit/chatkit_ui/src/main/ets/manager/AudioPlayerManager';
 import {
+  AudioPlayerManager,
+  DeviceUtils,
   downLoadAndOpenFile,
+  ForwardMessageDialog,
   getMessageVideoRatio,
-  getMessageVideoUrl
-} from '@nimkit/chatkit_ui/src/main/ets/common/MessageHelper';
+  getMessageVideoUrl,
+  NEEmojiManager,
+  NIMMessageInfo,
+  showLocationDetail,
+  TextMessageDetailDialog
+} from '@nimkit/chatkit_ui';
 import { CollectionMessageViewModel } from '../viewmodel/CollectionMessageViewModel';
 import { CollectionMessageModel } from '../model/CollectionMessageModel';
 import { CollectionMessageComponent } from '../view/CollectionMessageComponent';
 import { common } from '@kit.AbilityKit';
-import { showLocationDetail } from '@nimkit/chatkit_ui/src/main/ets/common/ChatUtils';
 
 @CustomDialog
 export struct CollectionMoreActionDialog {

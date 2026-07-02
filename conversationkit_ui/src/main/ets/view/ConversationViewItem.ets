@@ -7,7 +7,7 @@
 
 import { ChatKitClient, CustomMessageUtils, getMultiLinePreviewFromAttachment, IMKitConfigCenter, mergedMessageCustomType, multiLineMessageCustomType } from '@nimkit/chatkit';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
-import { DateUtil } from '@nimkit/common/src/main/ets/utils/DateUtil';
+import { DateUtil } from '@nimkit/common';
 import { V2NIMConversationType, V2NIMMessageCallAttachment, V2NIMMessageType } from '@nimsdk/base';
 import { ConversationItem } from '../strategy/ConversationStrategy';
 
@@ -15,6 +15,8 @@ import { ConversationItem } from '../strategy/ConversationStrategy';
 export struct ConversationViewItem {
   @Param conversationInfo: ConversationItem | null = null
   @Param haveBeanAit: boolean = false
+  @Param isUserAIBot: boolean = false
+  @Param isAIUser: boolean = false
   @Param onItemClick?: () => void | undefined = undefined
   @Param onlineState: boolean = false
 
@@ -55,7 +57,9 @@ export struct ConversationViewItem {
             }
             //在线状态
             if (this.conversationInfo.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P &&
-            IMKitConfigCenter.enableShownOnlineState) {
+              !this.isUserAIBot &&
+              !this.isAIUser &&
+              IMKitConfigCenter.enableShownOnlineState) {
               Column()
                 .width(8)
                 .height(8)
@@ -74,18 +78,39 @@ export struct ConversationViewItem {
 
         Column() {
           //item 显示名称
-          Text(this.conversationInfo.name)
-            .fontSize(16)
-            .fontColor("#ff333333")
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .maxLines(1)
-            .margin({
-              bottom: 8
-            })
+          Row() {
+            Text(this.conversationInfo.name)
+              .fontSize(16)
+              .fontColor("#ff333333")
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .maxLines(1)
+              .flexShrink(1)
+
+            if (this.isUserAIBot) {
+              Text($r('app.string.conversation_ai_badge'))
+                .fontSize(11)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Color.White)
+                .textAlign(TextAlign.Center)
+                .height(16)
+                .width(22)
+                .linearGradient({
+                  angle: 90,
+                  colors: [['#FF9EFD', 0.0], ['#65ADFF', 1.0]]
+                })
+                .borderRadius(4)
+                .margin({ left: 4 })
+                .flexShrink(0)
+            }
+          }
+          .width('100%')
+          .margin({
+            bottom: 8
+          })
 
           Row() {
             if (this.haveBeanAit && this.conversationInfo.unreadCount > 0) {
-              Text('[有人@我]')
+              Text($r('app.string.conversation_have_ait'))
                 .fontSize(13)
                 .maxLines(1)
                 .fontColor("#fff24957")
@@ -195,34 +220,35 @@ export struct ConversationViewItem {
     if (!item.lastMessage) {
       return ''
     }
+    const prefix = this.getBotSubSessionPrefix()
 
     switch (item.lastMessage?.messageType) {
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT:
         // 只返回第一行文本，避免多行文本导致会话列表显示省略号
         const text = item.lastMessage.text ?? ''
         const firstLineEnd = text.indexOf('\n')
-        return firstLineEnd === -1 ? text : text.substring(0, firstLineEnd)
+        return prefix + (firstLineEnd === -1 ? text : text.substring(0, firstLineEnd))
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE:
-        return $r('app.string.imageMessageType')
+        return this.withBotSubSessionPrefix($r('app.string.imageMessageType'))
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO:
-        return $r('app.string.audioMessageType')
+        return this.withBotSubSessionPrefix($r('app.string.audioMessageType'))
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO:
-        return $r('app.string.videoMessageType')
+        return this.withBotSubSessionPrefix($r('app.string.videoMessageType'))
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION:
-        return $r('app.string.locationMessageType')
+        return this.withBotSubSessionPrefix($r('app.string.locationMessageType'))
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE:
-        return $r('app.string.fileMessageType')
+        return this.withBotSubSessionPrefix($r('app.string.fileMessageType'))
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_NOTIFICATION:
-        return $r('app.string.notificationMessageType')
+        return this.withBotSubSessionPrefix($r('app.string.notificationMessageType'))
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_TIPS:
-        return $r('app.string.tipMessageType')
+        return this.withBotSubSessionPrefix($r('app.string.tipMessageType'))
       case V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL:
         if (item.lastMessage?.attachment) {
           const messageAttachment = item.lastMessage.attachment as V2NIMMessageCallAttachment
           if (messageAttachment.type == 1) {
-            return $r('app.string.msg_type_rtc_audio')
+            return this.withBotSubSessionPrefix($r('app.string.msg_type_rtc_audio'))
           } else {
-            return $r('app.string.msg_type_rtc_video')
+            return this.withBotSubSessionPrefix($r('app.string.msg_type_rtc_video'))
           }
         }
         break
@@ -230,14 +256,28 @@ export struct ConversationViewItem {
         if (item.lastMessage?.attachment) {
           const customType = CustomMessageUtils.typeOfCustomMessage(item.lastMessage.attachment)
           if (customType === mergedMessageCustomType) {
-            return $r('app.string.chat_merge_history')
+            return this.withBotSubSessionPrefix($r('app.string.chat_merge_history'))
           }
           if (customType === multiLineMessageCustomType) {
-            return getMultiLinePreviewFromAttachment(item.lastMessage?.attachment)
+            return prefix + getMultiLinePreviewFromAttachment(item.lastMessage?.attachment)
           }
         }
         break
     }
-    return item.lastMessage?.text ?? $r('app.string.chatMessageNonsupportType')
+    return item.lastMessage?.text ? prefix + item.lastMessage.text : this.withBotSubSessionPrefix($r('app.string.chatMessageNonsupportType'))
+  }
+
+  private withBotSubSessionPrefix(resource: Resource): string | Resource {
+    if (!this.isUserAIBot) {
+      return resource
+    }
+    return this.getBotSubSessionPrefix() + getContext().resourceManager.getStringSync(resource.id)
+  }
+
+  private getBotSubSessionPrefix(): string {
+    if (!this.isUserAIBot) {
+      return ''
+    }
+    return getContext().resourceManager.getStringSync($r('app.string.conversation_bot_sub_session_prefix').id)
   }
 }

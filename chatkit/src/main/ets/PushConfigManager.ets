@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { V2NIMMessagePushConfig } from '@nimsdk/base'
 import { IMKitConfigCenter } from './IMKitConfigCenter'
 
@@ -44,7 +45,7 @@ export class PushConfigManager {
     } else {
       IMKitConfigCenter.pushConfig = undefined
     }
-    console.info(`PushConfigManager | initConfig | enabled: ${enabled}`)
+    Logger.info('ChatKit', `PushConfigManager | initConfig | enabled: ${enabled}`)
   }
 
   /**
@@ -59,7 +60,7 @@ export class PushConfigManager {
     } else {
       IMKitConfigCenter.pushConfig = undefined
     }
-    console.info(`PushConfigManager | setEnabled | enabled: ${enabled}`)
+    Logger.info('ChatKit', `PushConfigManager | setEnabled | enabled: ${enabled}`)
   }
 
   /**
@@ -81,7 +82,7 @@ export class PushConfigManager {
     if (IMKitConfigCenter.enablePushConfig) {
       IMKitConfigCenter.pushConfig = parsedConfig
     }
-    console.info(`PushConfigManager | updateConfig | success`)
+    Logger.info('ChatKit', `PushConfigManager | updateConfig | success`)
     return true
   }
 
@@ -142,7 +143,7 @@ export class PushConfigManager {
 
       return pushConfig
     } catch (err) {
-      console.error(`PushConfigManager | parseConfig error: ${err}`)
+      Logger.error('ChatKit', `PushConfigManager | parseConfig error: ${err}`)
       return undefined
     }
   }

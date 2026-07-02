@@ -5,7 +5,8 @@
  *
  */
 
-import { ChatKitClient, TeamRepo, IMKitConfigCenter } from '@nimkit/chatkit'
+import { Logger } from '@nimkit/common';
+import { ChatKitClient, NEAIUserCache, TeamRepo, IMKitConfigCenter } from '@nimkit/chatkit'
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -15,10 +16,10 @@ import {
   NavigationBackBuilder,
   NECommonUtils
 } from '@nimkit/common'
-import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
+import { TeamMemberWithUser } from '@nimkit/chatkit'
 import { V2NIMTeamMemberRole, V2NIMTeamType } from '@nimsdk/base'
 import { TeamMangerListViewModel } from '../viewModel/TeamManagerListViewModel'
-import { ManagerSelectorParams, TeamMemberSelectorMode } from '@nimkit/chatkit/src/main/ets/model/TeamMemberSelector'
+import { ManagerSelectorParams, TeamMemberSelectorMode } from '@nimkit/chatkit'
 
 /**
  * 群管理员列表
@@ -43,6 +44,38 @@ struct TeamManagerListPage {
   })
   //移除管理员Id
   removeManagerId?: string
+
+  private async isAIUser(accountId: string): Promise<boolean> {
+    if (!IMKitConfigCenter.enableAI) {
+      return false
+    }
+    if (NEAIUserCache.getAIUser(accountId)) {
+      return true
+    }
+    try {
+      await NEAIUserCache.getInstance().load()
+    } catch (err) {
+      Logger.error('TeamKit', err)
+    }
+    return NEAIUserCache.getAIUser(accountId) !== undefined
+  }
+
+  private async openMemberInfo(accountId?: string): Promise<void> {
+    if (!accountId) {
+      return
+    }
+    if (accountId === ChatKitClient.getLoginUserId()) {
+      this.pathStack.pushPath({
+        name: 'MineInfoPage'
+      })
+      return
+    }
+    if (await this.isAIUser(accountId)) {
+      this.pathStack.pushPath({ name: 'AIPersonInfoPage', param: accountId })
+      return
+    }
+    this.pathStack.pushPath({ name: 'PersonInfoPage', param: accountId })
+  }
 
   build() {
     NavDestination() {
@@ -82,10 +115,11 @@ struct TeamManagerListPage {
         // 获取管理员人数上限配置
         const maxCount = IMKitConfigCenter.teamManagerMaxCount
         const currentCount = this.viewModel.managerList.length
+        const resourceManager = getContext(this).resourceManager
         
         // 用例 213: 配置为 0 时，禁止添加管理员
         if (maxCount === 0) {
-          NECommonUtils.showToast('管理员人数上限为0，无法添加管理员')
+          NECommonUtils.showToast($r('app.string.team_manager_limit_zero_tip'))
           return
         }
         
@@ -95,7 +129,7 @@ struct TeamManagerListPage {
         
         // 如果已达上限（maxCount > 0 且当前数量 >= 上限）
         if (maxCount > 0 && currentCount >= maxCount) {
-          NECommonUtils.showToast(`管理员人数已达上限（${maxCount}人）`)
+          NECommonUtils.showToast(resourceManager.getStringByNameSync('team_manager_limit_reached_tip', maxCount))
           return
         }
         
@@ -178,13 +212,7 @@ struct TeamManagerListPage {
                   bottom: 10
                 })
                 .onClick(() => {
-                  if (member.teamMember.accountId === ChatKitClient.getLoginUserId()) {
-                    this.pathStack.pushPath({
-                      name: 'MineInfoPage'
-                    })
-                  } else {
-                    this.pathStack.pushPath({ name: 'PersonInfoPage', param: member.teamMember.accountId })
-                  }
+                  this.openMemberInfo(member.teamMember.accountId)
                 })
               }
             })

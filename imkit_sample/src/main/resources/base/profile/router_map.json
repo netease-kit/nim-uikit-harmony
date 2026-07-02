@@ -95,6 +95,14 @@
       "data": {
         "description": "translation language page"
       }
+    },
+    {
+      "name": "AppLanguagePage",
+      "pageSourceFile": "src/main/ets/mine/pages/AppLanguagePage.ets",
+      "buildFunction": "AppLanguagePageBuilder",
+      "data": {
+        "description": "app language page"
+      }
     }
   ]
 }

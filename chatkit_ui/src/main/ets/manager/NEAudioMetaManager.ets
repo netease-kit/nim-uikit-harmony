@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { media } from '@kit.MediaKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { AsyncCallback } from '@kit.BasicServicesKit';
@@ -27,16 +28,16 @@ export class NEAudioMetaManager {
       // 获取元数据（callback模式）
       avMetadataExtractor.fetchMetadata((error, metadata) => {
         if (error) {
-          console.error(TAG, `fetchMetadata callback failed, err = ${JSON.stringify(error)}`)
+          Logger.error('ChatKitUI', TAG, `fetchMetadata callback failed, err = ${JSON.stringify(error)}`)
           return
         }
-        console.info(TAG, `fetchMetadata callback success, genre: ${metadata.genre}`)
+        Logger.info('ChatKitUI', TAG, `fetchMetadata callback success, genre: ${metadata.genre}`)
       })
 
       //获取专辑封面（callback模式）
       avMetadataExtractor.fetchAlbumCover((err, pixelMap) => {
         if (err) {
-          console.error(TAG, `fetchAlbumCover callback failed, err = ${JSON.stringify(err)}`)
+          Logger.error('ChatKitUI', TAG, `fetchAlbumCover callback failed, err = ${JSON.stringify(err)}`)
           return
         }
         if (callback) {
@@ -46,10 +47,10 @@ export class NEAudioMetaManager {
         // 释放资源（callback模式）
         avMetadataExtractor.release((error) => {
           if (error) {
-            console.error(TAG, `release failed, err = ${JSON.stringify(error)}`)
+            Logger.error('ChatKitUI', TAG, `release failed, err = ${JSON.stringify(error)}`)
             return
           }
-          console.info(TAG, `release success.`)
+          Logger.info('ChatKitUI', TAG, `release success.`)
         })
       })
     }
@@ -65,7 +66,7 @@ export class NEAudioMetaManager {
       fileSize: fileSize,
       callback: (buffer, len, pos) => {
         if (buffer == undefined || len == undefined || pos == undefined) {
-          console.error(TAG, `dataSrc callback param invalid`)
+          Logger.error('ChatKitUI', TAG, `dataSrc callback param invalid`)
           return -1
         }
 
@@ -77,7 +78,7 @@ export class NEAudioMetaManager {
 
         let options = new Option();
         let num = fileIo.readSync(fd, buffer, options)
-        console.info(TAG, 'readAt end, num: ' + num)
+        Logger.info('ChatKitUI', TAG, 'readAt end, num: ' + num)
         if (num > 0 && fileSize >= pos) {
           return num;
         }
@@ -93,7 +94,7 @@ export class NEAudioMetaManager {
 
       // 获取元数据（promise模式）
       let metadata = await avMetadataExtractor.fetchMetadata()
-      console.info(TAG, `get meta data, mimeType: ${metadata.mimeType}`)
+      Logger.info('ChatKitUI', TAG, `get meta data, mimeType: ${metadata.mimeType}`)
 
       // 获取专辑封面（promise模式）
       if (callback) {
@@ -102,7 +103,7 @@ export class NEAudioMetaManager {
 
       // 释放资源（promise模式）
       avMetadataExtractor.release()
-      console.info(TAG, `release data source success.`)
+      Logger.info('ChatKitUI', TAG, `release data source success.`)
     }
   }
 }

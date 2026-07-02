@@ -11,6 +11,8 @@ import {
   V2NIMCollectionOption,
   V2NIMCustomNotification,
   V2NIMMessage,
+  V2NIMMessageAIRegenParams,
+  V2NIMMessageAIStreamStopParams,
   V2NIMMessageDeletedNotification,
   V2NIMMessageListOption,
   V2NIMMessageListResult,
@@ -311,6 +313,26 @@ export class ChatRepo {
 
     const res = await ChatKitClient.nim.messageService?.replyMessage(msgFinal, replyMessage, paramFinal, progress);
     return res;
+  }
+
+  /**
+   * 停止 AI 流式消息输出
+   *
+   * @param message 需要停止的 AI 消息
+   * @param params 停止参数
+   */
+  static async stopAIStreamMessage(message: V2NIMMessage, params: V2NIMMessageAIStreamStopParams): Promise<void> {
+    return ChatKitClient.nim.messageService?.stopAIStreamMessage(message, params);
+  }
+
+  /**
+   * 重新生成 AI 消息回答
+   *
+   * @param message 需要重新生成的 AI 消息
+   * @param params 重新生成参数
+   */
+  static async regenAIMessage(message: V2NIMMessage, params: V2NIMMessageAIRegenParams): Promise<void> {
+    return ChatKitClient.nim.messageService?.regenAIMessage(message, params);
   }
 
   /**

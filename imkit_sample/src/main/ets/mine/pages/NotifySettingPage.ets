@@ -5,7 +5,7 @@
  *
  */
 
-import { ViewItemSwitch } from '@nimkit/common/src/main/ets/model/ViewItemSwitch';
+import { ViewItemSwitch } from '@nimkit/common';
 import {
   CommonConstants,
   NavigationBackBuilder,

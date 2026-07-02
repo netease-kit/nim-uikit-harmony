@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -21,13 +22,14 @@ import {
   V2NIMTeamMemberRole,
   V2NIMTeamType
 } from '@nimsdk/base'
-import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
+import { TeamMemberWithUser } from '@nimkit/chatkit'
 import { TeamSettingViewModel } from '../viewModel/TeamViewModel'
 import {
   ChatKitClient,
   ConversationRepo,
   IMKitConfigCenter,
   LocalConversationRepo,
+  NEAIUserCache,
   NEUserWithFriend,
   PersonSelectParam,
   TeamRepo,
@@ -205,13 +207,7 @@ export struct TeamSettingPage {
                   }).width(32)
                     .height(32)
                     .onClick(() => {
-                      if (teamMember.teamMember.accountId === ChatKitClient.getLoginUserId()) {
-                        this.pathStack.pushPath({
-                          name: 'MineInfoPage'
-                        })
-                      } else {
-                        this.pathStack.pushPath({ name: 'PersonInfoPage', param: teamMember.teamMember.accountId })
-                      }
+                      this.openMemberInfo(teamMember.teamMember.accountId)
                     })
                 }
               })
@@ -528,6 +524,38 @@ export struct TeamSettingPage {
     })
   }
 
+  private async isAIUser(accountId: string): Promise<boolean> {
+    if (!IMKitConfigCenter.enableAI) {
+      return false
+    }
+    if (NEAIUserCache.getAIUser(accountId)) {
+      return true
+    }
+    try {
+      await NEAIUserCache.getInstance().load()
+    } catch (err) {
+      Logger.error('TeamKit', err)
+    }
+    return NEAIUserCache.getAIUser(accountId) !== undefined
+  }
+
+  private async openMemberInfo(accountId?: string): Promise<void> {
+    if (!accountId) {
+      return
+    }
+    if (accountId === ChatKitClient.getLoginUserId()) {
+      this.pathStack.pushPath({
+        name: 'MineInfoPage'
+      })
+      return
+    }
+    if (await this.isAIUser(accountId)) {
+      this.pathStack.pushPath({ name: 'AIPersonInfoPage', param: accountId })
+      return
+    }
+    this.pathStack.pushPath({ name: 'PersonInfoPage', param: accountId })
+  }
+
   aboutToDisappear(): void {
     this.dialogLeaveTeamController.close()
     this.dialogLeaveGroupTeamDialogController.close()
@@ -544,19 +572,25 @@ export struct TeamSettingPage {
   async leftGroupTeam() {
     ChatKitClient.selfLeaveTeam = true
     try {
-      //如果只有一个人了直接解散
-      if (this.teamViewModel?.team?.memberCount !== undefined &&
-        this.teamViewModel?.team?.memberCount <= 1) {
+      // 如果只剩一个非数字人成员，讨论组退出时直接解散，避免把群主转让给数字人。
+      if (this.isLastNonAIGroupMember()) {
         this.dismissTeam()
+        return
       }
-      //如果是群主，先转让群,否则，直接退出
+      // 如果是群主，先转让群，否则直接退出
       if (this.teamViewModel?.mineTeamMember?.memberRole ===
       V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_OWNER) {
+        const nextOwnerId = this.teamViewModel?.teamMemberList.find(member =>
+        member.teamMember.accountId !== ChatKitClient.getLoginUserId() &&
+          !NEAIUserCache.getAIUser(member.teamMember.accountId))?.getAccId()
+        if (!nextOwnerId) {
+          this.dismissTeam()
+          return
+        }
         await TeamRepo.transferTeamOwner(
           this.teamId,
           V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
-          this.teamViewModel?.teamMemberList.find(member => member.teamMember.accountId !==
-          ChatKitClient.getLoginUserId())?.getAccId() ?? '',
+          nextOwnerId,
           true
         )
         this.pathStack.clear()
@@ -566,6 +600,15 @@ export struct TeamSettingPage {
     } catch (e) {
 
     }
+  }
+
+  private isLastNonAIGroupMember(): boolean {
+    const teamMemberList = this.teamViewModel?.teamMemberList
+    if (!teamMemberList || teamMemberList.length <= 0) {
+      return this.teamViewModel?.team?.memberCount !== undefined &&
+        this.teamViewModel.team.memberCount <= 1
+    }
+    return teamMemberList.filter(member => !NEAIUserCache.getAIUser(member.teamMember.accountId)).length <= 1
   }
 
   //弹框解散群组
@@ -692,7 +735,8 @@ export struct TeamSettingPage {
       name: "PersonSelectPage",
       param: new PersonSelectParam(this.teamSelectorCallback,
         this.teamViewModel?.teamMemberList.map(member => member.getAccId()),
-        this.getMemberInviteCountLimit()
+        this.getMemberInviteCountLimit(),
+        true
       )
     })
   }

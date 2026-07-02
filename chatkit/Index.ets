@@ -9,9 +9,45 @@ export { ChatKitClient, currentConversationChanged } from './src/main/ets/ChatKi
 
 export { ChatRepo } from './src/main/ets/repo/ChatRepo'
 
+export { TopicRepo } from './src/main/ets/repo/TopicRepo'
+
 export { ContactRepo } from './src/main/ets/repo/ContactRepo'
 
 export { TeamRepo } from './src/main/ets/repo/TeamRepo'
+
+export { TeamEventRepo } from './src/main/ets/repo/TeamEventRepo'
+
+export type { TeamEventDisposer } from './src/main/ets/repo/TeamEventRepo'
+
+export { FriendEventRepo } from './src/main/ets/repo/FriendEventRepo'
+
+export type { FriendEventDisposer } from './src/main/ets/repo/FriendEventRepo'
+
+export { UserEventRepo } from './src/main/ets/repo/UserEventRepo'
+
+export type { UserEventDisposer } from './src/main/ets/repo/UserEventRepo'
+
+export { LoginEventRepo } from './src/main/ets/repo/LoginEventRepo'
+
+export type { LoginEventDisposer } from './src/main/ets/repo/LoginEventRepo'
+
+export { ConversationEventRepo } from './src/main/ets/repo/ConversationEventRepo'
+
+export {
+  CloudConversationStrategy,
+  ConversationMode,
+  LocalConversationStrategy
+} from './src/main/ets/strategy/ConversationStrategy'
+
+export type {
+  ConversationItem,
+  ConversationResult,
+  ConversationStrategy
+} from './src/main/ets/strategy/ConversationStrategy'
+
+export { DisposableBag } from './src/main/ets/utils/DisposableBag'
+
+export type { EventDisposer } from './src/main/ets/utils/DisposableBag'
 
 export { SettingRepo } from './src/main/ets/repo/SettingRepo'
 
@@ -31,7 +67,7 @@ export { ConversationIdUtilRepo } from './src/main/ets/repo/ConversationIdUtilRe
 
 export { AIRepo } from './src/main/ets/repo/AIRepo'
 
-export { UserAIBotRepo } from './src/main/ets/repo/UserAIBotRepo'
+export { UserAIBotManager } from './src/main/ets/manager/UserAIBotManager'
 
 export { LocalConversationRepo } from './src/main/ets/repo/LocalConversationRepo'
 
@@ -49,9 +85,20 @@ export {
   isDiscussionTeamByServerExtension
 } from './src/main/ets/utils/TopStickyPermissionUtils'
 
+export {
+  buildMineServerExtensionWithAIUserPin,
+  canShowAIUserPinSwitch,
+  filterPinnedAIUsers,
+  getUnpinAIUserList,
+  isAIUserPinnedByMine,
+  isPinDefaultAIUser
+} from './src/main/ets/utils/AIUserExtensionUtils'
+
 export { PersonSelectParam } from './src/main/ets/model/PersonSelectParam'
 
 export { ConversationSelectParam } from './src/main/ets/model/ConversationSelectParam'
+
+export { ConversationSelectModel } from './src/main/ets/model/ConversationSelectModel'
 
 export { ConversationSelectedParam } from './src/main/ets/model/ConversationSelectedParam'
 
@@ -96,8 +143,10 @@ export { mergedMessageNickKey,
 export {
   MultiLineAttachment,
   MultiLineAttachmentData,
+  MULTI_LINE_TITLE_MAX_LENGTH,
   parseMultiLineAttachment,
   createMultiLineAttachment,
+  normalizeMultiLineTitle,
   isMultiLineMessage,
   getMultiLineTitle,
   getMultiLineBody,
@@ -115,7 +164,11 @@ export { AitSegment } from './src/main/ets/model/ait/AitSegment'
 
 export { AitAllPermission } from './src/main/ets/model/ait/AitAllPermission'
 
+export { AIUserAgentProvider, AIUserManager } from './src/main/ets/manager/AIUserManager'
+
 export { KitLogger as Logger } from './src/main/ets/logger/AppLogger'
+
+export { AIErrorCode } from './src/main/ets/utils/AIErrorCode'
 
 export { IMKitConfigCenter } from './src/main/ets/IMKitConfigCenter'
 
@@ -126,6 +179,11 @@ export { TeamSettingParam } from './src/main/ets/model/TeamSettingParam'
 export { ManagerSelectorParams, TeamMemberSelectorMode } from './src/main/ets/model/TeamMemberSelector'
 
 export { MessageCallback, MessageSendParams } from './src/main/ets/listener/MessageCallback'
+
+export {
+  saveLocalRevokeMessage,
+  saveLocalRevokeMessageFormOther
+} from './src/main/ets/utils/MessageUtils'
 
 export { IMKitCustomFactory } from './src/main/ets/IMKitCustomFactory'
 

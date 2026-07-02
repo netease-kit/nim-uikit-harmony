@@ -5,7 +5,8 @@
  *
  */
 
-import { ErrorUtils, StorageRepo, UserAIBotRepo } from '@nimkit/chatkit';
+import { Logger } from '@nimkit/common';
+import { ErrorUtils, StorageRepo, UserAIBotManager } from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -51,7 +52,7 @@ export struct EditBotPage {
           }
         }
       } catch (err) {
-        console.error('upload avatar error: ' + JSON.stringify(err))
+        Logger.error('ContactKit', 'upload avatar error: ' + JSON.stringify(err))
       }
     }
   }
@@ -83,9 +84,9 @@ export struct EditBotPage {
         name: this.botName.trim(),
         icon: this.avatarUrl.length > 0 ? this.avatarUrl : undefined
       }
-      console.info('[EditBotPage] doSave start, accid=' + this.accid + ', name=' + this.botName.trim() + ', icon=' + (this.avatarUrl.length > 0 ? 'has' : 'empty'))
-      await UserAIBotRepo.updateUserAIBot(params)
-      console.info('[EditBotPage] doSave updateUserAIBot success')
+      Logger.info('ContactKit', '[EditBotPage] doSave start, accid=' + this.accid + ', name=' + this.botName.trim() + ', icon=' + (this.avatarUrl.length > 0 ? 'has' : 'empty'))
+      await UserAIBotManager.updateUserAIBot(params)
+      Logger.info('ContactKit', '[EditBotPage] doSave updateUserAIBot success')
       NECommonUtils.showToast($r('app.string.bot_update_success'))
       // 把更新后的 name 和 icon 带回去，避免依赖列表接口缓存
       const result: Record<string, string> = {
@@ -93,10 +94,10 @@ export struct EditBotPage {
         'name': this.botName.trim(),
         'icon': this.avatarUrl
       }
-      console.info('[EditBotPage] doSave pop with result, name=' + result['name'])
+      Logger.info('ContactKit', '[EditBotPage] doSave pop with result, name=' + result['name'])
       this.pathStack.pop(result)
     } catch (err) {
-      console.error('[EditBotPage] doSave updateUserAIBot error: ' + JSON.stringify(err))
+      Logger.error('ContactKit', '[EditBotPage] doSave updateUserAIBot error: ' + JSON.stringify(err))
       NECommonUtils.showToast($r('app.string.bot_create_fail'))
     } finally {
       this.isSubmitting = false
@@ -225,7 +226,7 @@ export struct EditBotPage {
       if (typeof param === 'string') {
         // 兼容旧的 accid 字符串方式
         this.accid = param
-        UserAIBotRepo.getUserAIBot({ accid: this.accid }).then((bot) => {
+        UserAIBotManager.getUserAIBot({ accid: this.accid }).then((bot) => {
           if (bot) {
             this.botName = bot.name ?? ''
             this.avatarUrl = bot.icon ?? ''
@@ -237,6 +238,7 @@ export struct EditBotPage {
         this.accid = bot.accid ?? ''
         this.botName = bot.name ?? ''
         this.avatarUrl = bot.icon ?? ''
+        UserAIBotManager.mergeLocalUserAIBot(bot)
       }
       this.originalName = this.botName
       this.originalIcon = this.avatarUrl

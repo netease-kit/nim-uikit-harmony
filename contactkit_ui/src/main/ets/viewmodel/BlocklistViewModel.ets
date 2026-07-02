@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ContactRepo, NEFriendUserCache, NEUserWithFriend } from '@nimkit/chatkit'
 import { V2NIMFriend, V2NIMUser } from '@nimsdk/base'
 
@@ -60,7 +61,7 @@ export class BlocklistViewModel {
       const userWithFriends = await ContactRepo.getUserWithFriendByIds(blockList)
       this.blockList = userWithFriends
     } catch (err) {
-      console.log(err)
+      Logger.info('ContactKit', err)
     }
   }
 
@@ -79,7 +80,7 @@ export class BlocklistViewModel {
         }
       }
     } catch (err) {
-      console.log(err)
+      Logger.info('ContactKit', err)
     }
   }
 
@@ -96,7 +97,7 @@ export class BlocklistViewModel {
         }
       }
     } catch (err) {
-      console.log(err)
+      Logger.info('ContactKit', err)
     }
   }
 

@@ -7,15 +7,21 @@
 
 import {
   ChatKitClient,
+  CloudConversationStrategy,
   ContactRepo,
-  ConversationRepo,
+  ConversationIdUtilRepo,
+  ConversationItem,
+  ConversationStrategy,
+  DisposableBag,
+  FriendEventRepo,
   IMKitConfigCenter,
-  LocalConversationRepo,
+  LocalConversationStrategy,
   SettingRepo,
-  TeamRepo
+  TeamEventRepo,
+  TeamRepo,
+  UserEventRepo
 } from '@nimkit/chatkit';
 import {
-  V2NIMConversation,
   V2NIMConversationType,
   V2NIMError,
   V2NIMFriend,
@@ -28,7 +34,7 @@ import {
   V2NIMUpdateSelfMemberInfoParams,
   V2NIMUser
 } from '@nimsdk/base';
-import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser';
+import { TeamMemberWithUser } from '@nimkit/chatkit';
 
 @ObservedV2
 export class TeamSettingViewModel {
@@ -43,6 +49,9 @@ export class TeamSettingViewModel {
   @Trace isStickTop: boolean = false
   limit: number = 100
   isSyncing: boolean = false
+  private disposableBag: DisposableBag = new DisposableBag()
+  private readonly cloudConversationStrategy: CloudConversationStrategy = new CloudConversationStrategy()
+  private readonly localConversationStrategy: LocalConversationStrategy = new LocalConversationStrategy()
 
   constructor(teamId: string) {
     this.teamId = teamId
@@ -151,10 +160,10 @@ export class TeamSettingViewModel {
     }
   }
 
-  onConversationChanged(updateList: V2NIMConversation[]) {
+  onConversationChanged(updateList: ConversationItem[]) {
     updateList.forEach((conversation) => {
       if (conversation.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM &&
-        conversation.conversationId === ChatKitClient.nim.conversationIdUtil.teamConversationId(this.teamId)) {
+        conversation.conversationId === ConversationIdUtilRepo.teamConversationId(this.teamId)) {
         this.isMessageNotify = !(conversation.mute ?? false)
         this.isStickTop = conversation.stickTop
       }
@@ -199,20 +208,36 @@ export class TeamSettingViewModel {
     this.getTeamInfo();
     this.getConversationInfo();
     this.getTeamMember();
-    ChatKitClient.nim.teamService?.on('onSyncFinished', this.onSyncFinished.bind(this))
-    ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', this.onTeamInfoUpdated.bind(this))
-    ChatKitClient.nim.teamService?.on('onTeamMemberJoined', this.onTeamMemberJoined.bind(this))
-
-    ChatKitClient.nim.teamService?.on('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated.bind(this))
-
-    ChatKitClient.nim.teamService?.on('onTeamMemberKicked', this.onTeamMemberKicked.bind(this))
-    ChatKitClient.nim.teamService?.on('onTeamMemberLeft', this.onTeamMemberLeft.bind(this))
-
-    ChatKitClient.nim.conversationService?.on('onConversationChanged', this.onConversationChanged.bind(this))
-    // 监听好友信息变化，用于更新成员头像（如备注变化导致默认头像变化）
-    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChanged.bind(this))
-    // 监听用户信息变化，用于更新成员头像（如用户修改了自定义头像）
-    ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onUserProfileChanged.bind(this))
+    this.destroy()
+    this.disposableBag.addAll([
+      TeamEventRepo.onTeamSyncFinished((): void => {
+        this.onSyncFinished()
+      }),
+      TeamEventRepo.onTeamInfoUpdated((team: V2NIMTeam): void => {
+        this.onTeamInfoUpdated(team)
+      }),
+      TeamEventRepo.onTeamMemberJoined((members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberJoined(members)
+      }),
+      TeamEventRepo.onTeamMemberInfoUpdated((members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberInfoUpdated(members)
+      }),
+      TeamEventRepo.onTeamMemberKicked((accId: string, members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberKicked(accId, members)
+      }),
+      TeamEventRepo.onTeamMemberLeft((members: V2NIMTeamMember[]): void => {
+        this.onTeamMemberLeft(members)
+      }),
+      this.registerConversationChanged((updateList: ConversationItem[]): void => {
+        this.onConversationChanged(updateList)
+      }),
+      FriendEventRepo.onFriendInfoChanged((friend: V2NIMFriend): void => {
+        this.onFriendInfoChanged(friend)
+      }),
+      UserEventRepo.onUserProfileChanged((users: V2NIMUser[]): void => {
+        this.onUserProfileChanged(users)
+      })
+    ])
   }
 
   /**
@@ -230,19 +255,11 @@ export class TeamSettingViewModel {
    * 获取是否置顶和通知
    */
   getConversationInfo() {
-    if (IMKitConfigCenter.enableLocalConversation) {
-      LocalConversationRepo.getConversation(ChatKitClient.nim.conversationIdUtil.teamConversationId(this.teamId))
-        .then((conversation) => {
-          this.isStickTop = conversation?.stickTop ?? false
-          this.isMessageNotify = !(conversation?.mute ?? false)
-        })
-    } else {
-      ConversationRepo.getConversation(ChatKitClient.nim.conversationIdUtil
-        .teamConversationId(this.teamId)).then((conversation) => {
+    this.getConversationStrategy().getConversation(ConversationIdUtilRepo.teamConversationId(this.teamId))
+      .then((conversation) => {
         this.isStickTop = conversation?.stickTop ?? false
         this.isMessageNotify = !(conversation?.mute ?? false)
       })
-    }
   }
 
   /**
@@ -251,13 +268,8 @@ export class TeamSettingViewModel {
    */
   stickTopConversation(stickTop: boolean) {
     try {
-      if (IMKitConfigCenter.enableLocalConversation) {
-        LocalConversationRepo.stickTopConversation(ChatKitClient.nim.conversationIdUtil.teamConversationId(this.teamId),
-          stickTop)
-      } else {
-        ConversationRepo.stickTopConversation(ChatKitClient.nim.conversationIdUtil
-          .teamConversationId(this.teamId), stickTop)
-      }
+      this.getConversationStrategy().stickTopConversation(ConversationIdUtilRepo.teamConversationId(this.teamId),
+        stickTop)
       this.isStickTop = stickTop
     } catch (error) {
       this.isStickTop = !stickTop
@@ -315,19 +327,18 @@ export class TeamSettingViewModel {
   }
 
   destroy() {
-    ChatKitClient.nim.teamService?.off('onSyncFinished', this.onSyncFinished)
-    ChatKitClient.nim.teamService?.off('onTeamInfoUpdated', this.onTeamInfoUpdated)
-    ChatKitClient.nim.teamService?.off('onTeamMemberJoined', this.onTeamMemberJoined)
+    this.disposableBag.dispose()
+  }
 
-    ChatKitClient.nim.teamService?.off('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdated)
+  private registerConversationChanged(callback: (updateList: ConversationItem[]) => void): () => void {
+    const strategy = this.getConversationStrategy()
+    strategy.onConversationChanged(callback)
+    return (): void => {
+      strategy.offConversationChanged(callback)
+    }
+  }
 
-    ChatKitClient.nim.teamService?.off('onTeamMemberKicked', this.onTeamMemberKicked)
-    ChatKitClient.nim.teamService?.off('onTeamMemberLeft', this.onTeamMemberLeft)
-
-    ChatKitClient.nim.conversationService?.off('onConversationChanged', this.onConversationChanged)
-    // 取消监听好友信息变化
-    ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChanged)
-    // 取消监听用户信息变化
-    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onUserProfileChanged)
+  private getConversationStrategy(): ConversationStrategy {
+    return IMKitConfigCenter.enableLocalConversation ? this.localConversationStrategy : this.cloudConversationStrategy
   }
 }

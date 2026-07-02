@@ -1,3 +1,4 @@
+import { Logger } from '@nimkit/common';
 import { ConversationItem } from '../strategy/ConversationStrategy'
 
 @ObservedV2
@@ -7,7 +8,7 @@ export default class ConversationData<T extends ConversationItem = ConversationI
 
   registerDataChangeListener(listener: DataChangeListener): void {
     if (this.listeners.indexOf(listener) < 0) {
-      console.info('add listener')
+      Logger.info('ConversationKit', 'add listener')
       this.listeners.push(listener)
     }
   }
@@ -15,7 +16,7 @@ export default class ConversationData<T extends ConversationItem = ConversationI
   unregisterDataChangeListener(listener: DataChangeListener): void {
     const pos = this.listeners.indexOf(listener)
     if (pos >= 0) {
-      console.info('remove listener')
+      Logger.info('ConversationKit', 'remove listener')
       this.listeners.splice(pos, 1)
     }
   }

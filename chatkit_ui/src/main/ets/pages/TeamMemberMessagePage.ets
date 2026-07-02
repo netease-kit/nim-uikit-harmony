@@ -4,6 +4,7 @@
  *  found in the LICENSE file.
  */
 
+import { Logger } from '@nimkit/common';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -14,7 +15,7 @@ import { TeamMemberMessageParams, TeamMemberMessageViewModel } from '../viewmode
 import { MemberHistoryMessageComponent } from '../view/MemberHistoryMessageComponent'
 import { NIMMessageInfo } from '../model/NIMMessageInfo'
 import { V2NIMConversationType } from '@nimsdk/base'
-import { ChatKitClient, IMKitConfigCenter, TeamMemberCache } from '@nimkit/chatkit'
+import { ChatKitClient, IMKitConfigCenter, NEAIUserCache, TeamMemberCache } from '@nimkit/chatkit'
 import { ChatBaseViewModel } from '../viewmodel/ChatBaseViewModel'
 
 // 跳转页面入口函数
@@ -58,7 +59,7 @@ export struct TeamMemberMessagePage {
       if (this.conversationId && this.senderId) {
         // 初始化 viewModel 并注册监听
         this.viewModel.init(this.conversationId, this.senderId)
-        this.getNameAvatarItem();
+        await this.getNameAvatarItem();
         await this.loadMessages()
       }
     } else {
@@ -82,7 +83,7 @@ export struct TeamMemberMessagePage {
       await this.viewModel.searchMessages()
       this.convertToMessageInfoList()
     } catch (err) {
-      console.error('TeamMemberMessagePage loadMessages error:', err)
+      Logger.error('ChatKitUI', 'TeamMemberMessagePage loadMessages error:', err)
     } finally {
       this.viewModel.isLoading = false
     }
@@ -116,6 +117,31 @@ export struct TeamMemberMessagePage {
     }
   }
 
+  getMessageAvatarNameItem(item: NIMMessageInfo): UserAvatarNameItem {
+    const displaySenderId = item.getDisplaySenderId()
+    const aiUser = NEAIUserCache.getAIUser(displaySenderId)
+    if (aiUser) {
+      const aiName = aiUser.name ?? aiUser.accountId
+      return {
+        avatar: new AvatarItem(
+          aiUser.avatar,
+          aiName.length > 2 ? aiName.substring(aiName.length - 2, aiName.length) : aiName,
+          AvatarColorUntil.getBackgroundColorById(displaySenderId)
+        ),
+        name: aiName
+      }
+    }
+    return this.avatarNameInfo ?? {
+      avatar: new AvatarItem(
+        undefined,
+        displaySenderId.length > 2 ? displaySenderId.substring(displaySenderId.length - 2, displaySenderId.length) :
+        displaySenderId,
+        AvatarColorUntil.getBackgroundColorById(displaySenderId)
+      ),
+      name: displaySenderId
+    }
+  }
+
   build() {
     NavDestination() {
       Column() {
@@ -143,7 +169,7 @@ export struct TeamMemberMessagePage {
               ListItem() {
                 MemberHistoryMessageComponent({
                   message: item,
-                  userAvatarName: this.avatarNameInfo,
+                  userAvatarName: this.getMessageAvatarNameItem(item),
                   onMessageClick: {
                     onItemClick: () => {
                       if (ChatBaseViewModel.currentViewModel) {

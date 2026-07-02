@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -38,15 +39,15 @@ export struct AIUsersPage {
       this.isEmpty =
         value.length > 0 && this.viewModel.searchAIUsersData.length === 0
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 
   async requestData(): Promise<void> {
     try {
-      this.viewModel.loadAIUserCache()
+      this.viewModel.loadAIUsers()
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 

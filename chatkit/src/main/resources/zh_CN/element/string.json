@@ -79,6 +79,46 @@
     {
       "name": "createAdvancedTeamSuccess",
       "value": "成功创建高级群"
+    },
+    {
+      "name": "notification_new_message_title",
+      "value": "新消息"
+    },
+    {
+      "name": "notification_group_message_title",
+      "value": "群消息"
+    },
+    {
+      "name": "notification_message_type_text",
+      "value": "[消息]"
+    },
+    {
+      "name": "notification_message_type_image",
+      "value": "[图片]"
+    },
+    {
+      "name": "notification_message_type_audio",
+      "value": "[语音]"
+    },
+    {
+      "name": "notification_message_type_video",
+      "value": "[视频]"
+    },
+    {
+      "name": "notification_message_type_location",
+      "value": "[位置]"
+    },
+    {
+      "name": "notification_message_type_notification",
+      "value": "[通知]"
+    },
+    {
+      "name": "notification_message_type_file",
+      "value": "[文件]"
+    },
+    {
+      "name": "chat_ai_message_progressing",
+      "value": "大模型请求响应中..."
     }
   ]
 }

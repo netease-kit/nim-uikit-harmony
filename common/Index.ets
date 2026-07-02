@@ -51,11 +51,26 @@ export { PermissionsUtils } from './src/main/ets/utils/PermissionsUtils';
 
 export { PermissionsRequestResult } from './src/main/ets/utils/PermissionsUtils';
 
-export { CommonConstants, TranslationLanguageCode, SUPPORTED_TRANSLATION_LANGUAGES } from './src/main/ets/constants/CommonConstants';
+export {
+  AppLanguageCode,
+  CommonConstants,
+  TranslationLanguageCode,
+  SUPPORTED_TRANSLATION_LANGUAGES
+} from './src/main/ets/constants/CommonConstants';
+export {
+  getCurrentSystemLanguage,
+  getEffectiveAppLanguage,
+  getStoredAppLanguage,
+  isEnglishSystemLanguage,
+  normalizeAppLanguage,
+  resolveEffectiveAppLanguage
+} from './src/main/ets/utils/AppLanguageUtils'
 
 export { TextEditParams, TextEditPage } from './src/main/ets/pages/TextEditPage'
 
 export { DateConst } from './src/main/ets/constants/DateConst';
+
+export { DateUtil } from './src/main/ets/utils/DateUtil';
 
 export { ChooseAvatarDialog } from './src/main/ets/view/ChooseAvatarDialog';
 

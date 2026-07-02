@@ -8,6 +8,9 @@
 import { OperationItem } from './OperationItemLayout';
 import { NEChatMoreOperationData } from '../model/NEChatMoreOperationData';
 
+const OPERATION_ITEM_VISUAL_HEIGHT = 50
+const OPERATION_ITEM_REAL_HEIGHT = 74
+
 @ComponentV2
 export struct NEChatMoreOperation {
   // 面板回调
@@ -18,7 +21,7 @@ export struct NEChatMoreOperation {
     GridRow({
       columns: 12
     }) {
-      ForEach(this.dataList, (data: NEChatMoreOperationData) => {
+      ForEach(this.dataList, (data: NEChatMoreOperationData, index: number) => {
         GridCol({ span: 3 }) {
           Row() {
             OperationItem({
@@ -28,7 +31,12 @@ export struct NEChatMoreOperation {
                 }
               }
             }).backgroundColor("rgba(255, 255, 255, 0)")
-          }.width("100%").height('50vp')
+              .height(OPERATION_ITEM_VISUAL_HEIGHT)
+          }
+          .width("100%")
+          .height(OPERATION_ITEM_REAL_HEIGHT)
+          .alignItems(VerticalAlign.Top)
+          .margin({ bottom: 10 })
         }.backgroundColor('#E9EFF5')
       })
     }

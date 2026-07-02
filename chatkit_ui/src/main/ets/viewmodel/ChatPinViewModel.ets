@@ -5,8 +5,18 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatTeamInfo } from '../model/ChatTeamInfo';
-import { ChatKitClient, ChatRepo, ContactRepo, NEFriendUserCache, TeamRepo } from '@nimkit/chatkit';
+import {
+  ChatKitClient,
+  ChatRepo,
+  ContactRepo,
+  DisposableBag,
+  LoginEventRepo,
+  NEFriendUserCache,
+  TeamEventRepo,
+  TeamRepo
+} from '@nimkit/chatkit';
 import {
   V2NIMConnectStatus,
   V2NIMConversationType,
@@ -25,7 +35,7 @@ import {
 } from '@nimsdk/base';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { HashSet } from '@kit.ArkTS';
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
+import { ConversationSelectModel } from '@nimkit/chatkit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { clearForwardAtMark, sendMessageFailedTips } from '../common/MessageHelper';
 import { buildSendMessageParams } from '../common/SendMessageParamsHelper';
@@ -37,6 +47,7 @@ export class ChatPinViewModel {
   @Trace chatTeamInfo?: ChatTeamInfo;
   @Trace topInsert = false
   networkBroken = false
+  private eventDisposers: DisposableBag = new DisposableBag()
   onMessagePinNotification = async (notification: V2NIMMessagePinNotification) => {
     switch (notification.pinState) {
       case V2NIMMessagePinState.V2NIM_MESSAGE_PIN_STATE_NOT_PINNED:
@@ -80,7 +91,7 @@ export class ChatPinViewModel {
       try {
         await this.getPinMessageList()
       } catch (err) {
-        console.error(err)
+        Logger.error('ChatKitUI', err)
       }
     }
   }
@@ -89,11 +100,12 @@ export class ChatPinViewModel {
   init(conversationId: string, chatInfo: ChatTeamInfo): void {
     this.chatTeamInfo = chatInfo;
     this.conversationId = conversationId
-    ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', this.teamUpdateFun)
-    // 长连接状态变更
-    ChatKitClient.nim.loginService?.on('onConnectStatus', this.onConnectStatusFun)
-    // 登录状态变更
-    ChatKitClient.nim.loginService?.on('onLoginStatus', this.onLoginStatusFun)
+    this.eventDisposers.dispose()
+    this.eventDisposers.addAll([
+      TeamEventRepo.onTeamInfoUpdated(this.teamUpdateFun),
+      LoginEventRepo.onConnectStatus(this.onConnectStatusFun),
+      LoginEventRepo.onLoginStatus(this.onLoginStatusFun)
+    ])
 
     ChatRepo.onMessagePinNotification(this.onMessagePinNotification)
     ChatRepo.onDeleteMessage(this.onDeleteFun)
@@ -159,7 +171,7 @@ export class ChatPinViewModel {
       }
       return msgList;
     } catch (err) {
-      console.log(err)
+      Logger.info('ChatKitUI', err)
       return msgList;
     }
   }
@@ -223,7 +235,7 @@ export class ChatPinViewModel {
     progress?: (percentage: number) => void) {
     const mergedParams = this.beforeSendMessage(params)
     ChatRepo.sendMessage(msg, conversationId, mergedParams, progress).catch((err: BusinessError) => {
-      console.error("net ease send message error", err.code, err.message);
+      Logger.error('ChatKitUI', "net ease send message error", err.code, err.message);
       sendMessageFailedTips(msg, err, conversationId)
     })
   }
@@ -245,7 +257,7 @@ export class ChatPinViewModel {
             this.sendForwardMessage(forwardMsg, conversation.conversationId)
           }
         } catch (err) {
-          console.error(err)
+          Logger.error('ChatKitUI', err)
         }
       })
 
@@ -256,7 +268,7 @@ export class ChatPinViewModel {
           setTimeout(() => {
             ChatRepo.sendMessage(leaveMsg, conversation.conversationId!)
               .catch((err: BusinessError) => {
-                console.error("net ease send message error", err.code, err.message);
+                Logger.error('ChatKitUI', "net ease send message error", err.code, err.message);
                 sendMessageFailedTips(leaveMsg, err, conversation.conversationId!)
               })
           }, 200)
@@ -266,11 +278,7 @@ export class ChatPinViewModel {
   }
 
   onDestroy(): void {
-    ChatKitClient.nim.teamService?.off('onTeamInfoUpdated', this.teamUpdateFun)
-    // 长连接状态变更
-    ChatKitClient.nim.loginService?.off('onConnectStatus', this.onConnectStatusFun)
-    // 登录状态变更
-    ChatKitClient.nim.loginService?.off('onLoginStatus', this.onLoginStatusFun)
+    this.eventDisposers.dispose()
     ChatRepo.offMessagePinNotification(this.onMessagePinNotification)
     ChatRepo.offDeleteMessage(this.onDeleteFun)
   }

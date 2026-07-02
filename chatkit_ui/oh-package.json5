@@ -9,14 +9,14 @@
     "@nimkit/common": "file:../common",
     "@nimkit/chatkit": "file:../chatkit",
     "@nimkit/corekit": "file:../corekit",
-    "@nimsdk/base": "10.9.82",
-    "@nimsdk/nim": "10.9.82",
-    "@nimsdk/user": "10.9.82",
-    "@nimsdk/signalling": "10.9.82",
-    "@nimsdk/search": "10.9.82",
+    "@nimsdk/base": "10.10.1",
+    "@nimsdk/nim": "10.10.0",
+    "@nimsdk/user": "10.10.0",
+    "@nimsdk/signalling": "10.10.0",
+    "@nimsdk/search": "10.10.0",
     "class-transformer": "^0.5.1",
     "reflect-metadata": "^0.1.13",
-    '@nimkit/markdown': "1.1.0",
+    '@nimkit/markdown': "1.2.0",
     // 用于嵌套对象@Type反射
   }
 }

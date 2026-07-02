@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { NEUserWithFriend } from '@nimkit/chatkit';
 
 @ObservedV2
@@ -83,7 +84,7 @@ export class SelectUserWithFriendDataSource implements IDataSource {
   // 该方法为框架侧调用，为LazyForEach组件向其数据源处添加listener监听
   registerDataChangeListener(listener: DataChangeListener): void {
     if (this.listeners.indexOf(listener) < 0) {
-      console.info('add listener');
+      Logger.info('ContactKit', 'add listener');
       this.listeners.push(listener);
     }
   }
@@ -92,7 +93,7 @@ export class SelectUserWithFriendDataSource implements IDataSource {
   unregisterDataChangeListener(listener: DataChangeListener): void {
     const pos = this.listeners.indexOf(listener);
     if (pos >= 0) {
-      console.info('remove listener');
+      Logger.info('ContactKit', 'remove listener');
       this.listeners.splice(pos, 1);
     }
   }

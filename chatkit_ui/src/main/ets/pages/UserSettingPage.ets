@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import {
   ChatKitClient,
   ContactRepo,
@@ -25,14 +26,19 @@ import {
   ViewItemSwitch
 } from '@nimkit/common'
 import { UserSettingViewModel } from '../viewmodel/UserSettingViewModel'
+import { ChatBotSubSessionSettingParam } from '../model/ChatBotSubSessionParam'
 
 @ComponentV2
 export struct UserSettingPage {
   pathStack: NavPathStack = new NavPathStack()
   accountId?: string
+  @Local fromBotSubSession: boolean = false
   @Local userWithFriend?: NEUserWithFriend
   viewModel: UserSettingViewModel = new UserSettingViewModel()
   getFirstItems(): ViewItemArrow[] {
+    if (this.fromBotSubSession) {
+      return []
+    }
     const firstItems: ViewItemArrow[] = [
       {
         title: $r('app.string.search_chat_history'),
@@ -57,7 +63,7 @@ export struct UserSettingPage {
       try {
         await this.viewModel?.setP2PNotify(isOpen)
       } catch (err) {
-        console.log(err)
+        Logger.info('ChatKitUI', err)
       }
     }
   }
@@ -67,7 +73,18 @@ export struct UserSettingPage {
       try {
         await this.viewModel?.stickTopConversation(isOpen)
       } catch (err) {
-        console.log(err)
+        Logger.info('ChatKitUI', err)
+      }
+    }
+  }
+  // 设置 AI 数字人是否展示在会话列表顶部 AI 横栏
+  switchPinAIUser = async (isOpen: boolean) => {
+    if (ErrorUtils.checkNetworkAndToast()) {
+      try {
+        await this.viewModel?.switchPinAIUser(isOpen)
+        this.updateSecondItems()
+      } catch (err) {
+        Logger.info('ChatKitUI', err)
       }
     }
   }
@@ -95,7 +112,7 @@ export struct UserSettingPage {
             ChatKitClient.nim.conversationIdUtil.teamConversationId(createTeamResult.team.teamId))
         }
       } catch (err) {
-        console.log(err)
+        Logger.info('ChatKitUI', err)
       }
     }
   }
@@ -106,29 +123,49 @@ export struct UserSettingPage {
       name: 'PersonSelectPage',
       param: new PersonSelectParam(this.createDiscussion,
         [this.viewModel?.accountId],
-        10)
+        10,
+        true)
     })
   }
 
   updateSecondItems() {
-    this.secondItems = [
+    const items: ViewItemSwitch[] = [
       {
         title: $r('app.string.setting_message_notify'),
         itemHeight: 48,
         isOpen: this.viewModel.isMessageNotify,
         switchChange: this.setP2PNotify
-      },
-      {
-        title: $r('app.string.setting_message_stick_top'),
-        itemHeight: 48,
-        isOpen: this.viewModel.isStickTop,
-        switchChange: this.stickTopConversation
       }
     ]
+    items.push({
+      title: $r('app.string.setting_message_stick_top'),
+      itemHeight: 48,
+      isOpen: this.viewModel.isStickTop,
+      switchChange: this.stickTopConversation
+    })
+    if (!this.fromBotSubSession && this.viewModel.canShowAIUserPinSwitch) {
+      items.push({
+        title: $r('app.string.chat_message_set_ai_pin'),
+        itemHeight: 48,
+        isOpen: this.viewModel.isAIUserPinned,
+        switchChange: this.switchPinAIUser
+      })
+    }
+    this.secondItems = items
   }
 
   async requestData() {
-    const conversationId = this.pathStack.getParamByName('UserSettingPage')[0] as string
+    const routeParams = this.pathStack.getParamByName('UserSettingPage') as Array<string | ChatBotSubSessionSettingParam>
+    const pageParam: string | ChatBotSubSessionSettingParam = routeParams[0]
+    let conversationId = ''
+    if (typeof pageParam === 'string') {
+      conversationId = pageParam
+      this.fromBotSubSession = false
+    } else {
+      const settingParam = pageParam as ChatBotSubSessionSettingParam
+      conversationId = settingParam.conversationId
+      this.fromBotSubSession = settingParam.fromBotSubSession
+    }
     this.viewModel.init(conversationId).then(() => {
       this.updateSecondItems()
     })
@@ -143,7 +180,7 @@ export struct UserSettingPage {
           this.userWithFriend = users[0]
         }
       } catch (err) {
-        console.log(err)
+        Logger.info('ChatKitUI', err)
       }
     }
   }
@@ -187,7 +224,7 @@ export struct UserSettingPage {
             .width(42)
             .height(80)
 
-            if (IMKitConfigCenter.enableTeam) {
+            if (IMKitConfigCenter.enableTeam && !this.fromBotSubSession) {
               Image($r('app.media.team_invite'))
                 .width(42)
                 .height(42)

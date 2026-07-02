@@ -10,6 +10,7 @@ interface NavigationBackBuilderParams {
   title?: ResourceStr;
   titleSuffix?: ResourceStr; // 标题后缀，如 "(在线)" / "(离线)"，始终完整显示
   titleSuffixIcon?: Resource; // 标题后缀图标，如听筒图标
+  subtitle?: ResourceStr; // 标题下方副标题
   leftButtonTitle?: ResourceStr;
   leftButtonColor?: ResourceColor;
   leftButtonIcon?: Resource;
@@ -98,8 +99,15 @@ export function NavigationBackBuilder(params?: NavigationBackBuilderParams) {
         }
         .justifyContent(FlexAlign.Center)
 
-        // 第二行：正在输入提示（始终占位，visibility 控制显隐）
-        if (params?.enableTypingIndicator && params?.typingIndicatorText !== undefined) {
+        if (params?.subtitle !== undefined) {
+          Text(params.subtitle)
+            .fontSize(11)
+            .fontColor('#999999')
+            .padding({ top: 2, bottom: 2 })
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        } else if (params?.enableTypingIndicator && params?.typingIndicatorText !== undefined) {
+          // 第二行：正在输入提示（始终占位，visibility 控制显隐）
           Text(params.typingIndicatorText)
             .fontSize(11)
             .fontColor('#999999')

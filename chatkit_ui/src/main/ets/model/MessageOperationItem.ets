@@ -35,7 +35,9 @@ export enum MessageOperationType {
   // 翻译
   Translate = 14,
   // 隐藏翻译
-  HideTranslation = 15
+  HideTranslation = 15,
+  // AI 划词搜
+  AISearch = 16
 }
 
 export class MessageOperationItem {

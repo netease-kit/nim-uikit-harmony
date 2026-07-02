@@ -5,7 +5,7 @@
  *
  */
 
-import { ChatKitClient, ChatRepo, ErrorUtils } from '@nimkit/chatkit';
+import { ChatKitClient, ChatRepo, ConversationSelectModel, ErrorUtils } from '@nimkit/chatkit';
 import {
   V2NIMCollection,
   V2NIMErrorCode,
@@ -13,11 +13,13 @@ import {
   V2NIMQueryDirection,
   V2NIMSendMessageParams
 } from '@nimsdk/base';
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
-import { NIMMessageInfo } from '@nimkit/chatkit_ui/src/main/ets/model/NIMMessageInfo';
+import {
+  buildSendMessageParams,
+  getMessageImageUrls,
+  NIMMessageInfo,
+  sendMessageFailedTips
+} from '@nimkit/chatkit_ui';
 import { CollectionMessageModel } from '../model/CollectionMessageModel';
-import { getMessageImageUrls, sendMessageFailedTips } from '@nimkit/chatkit_ui/src/main/ets/common/MessageHelper';
-import { buildSendMessageParams } from '@nimkit/chatkit_ui/src/main/ets/common/SendMessageParamsHelper';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { NECommonUtils } from '@nimkit/common';
 

@@ -7,7 +7,13 @@
 
 import { V2NIMUser } from '@nimsdk/base';
 import { AvatarColorUntil, AvatarItem, CommonAvatar, ViewItemBuilder } from '@nimkit/common';
-import { ChatKitClient, IMKitConfigCenter, NEFriendUserCache } from '@nimkit/chatkit';
+import { ChatKitClient, ContactRepo, IMKitConfigCenter, NEFriendUserCache } from '@nimkit/chatkit';
+import {
+  resolveMineAvatarName,
+  resolveMineDisplayAccountId,
+  resolveMineDisplayName,
+  resolveMineUser
+} from '../viewmodel/MineProfileUtils';
 
 // 跳转页面入口函数
 @Builder
@@ -18,28 +24,48 @@ function MinePageBuilder() {
 @ComponentV2
 export struct MinePage {
   @Param pathStack: NavPathStack = new NavPathStack()
-  @Local myUser?: V2NIMUser = NEFriendUserCache.mineUserCache?.user;
+  @Local myUser?: V2NIMUser = resolveMineUser(NEFriendUserCache.mineUserCache?.user, ChatKitClient.getLoginUserId());
 
   getAvatarName(): string {
-    let user = NEFriendUserCache.mineUserCache?.user
-    let avatarName = ChatKitClient.getLoginUserId()
-    if (user && user.name.length > 0) {
-      if (user.name.length > 2) {
-        avatarName = user.name.substring(user.name.length - 2, user.name.length)
-      } else {
-        avatarName = user.name
-      }
-    }
-    return avatarName
+    return resolveMineAvatarName(this.myUser, ChatKitClient.getLoginUserId())
   }
 
   aboutToAppear(): void {
-    ChatKitClient.nim.userService?.on('onUserProfileChanged', (users: V2NIMUser[])=>{
-      const user = users.pop()
-      if (user?.accountId === NEFriendUserCache.mineUserCache?.user?.accountId && NEFriendUserCache.mineUserCache?.user) {
-        NEFriendUserCache.mineUserCache.user = user
+    this.refreshMineUserFromCache()
+    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onUserProfileChanged)
+    ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onUserProfileChanged)
+    this.loadMineUser()
+  }
+
+  aboutToDisappear(): void {
+    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onUserProfileChanged)
+  }
+
+  private refreshMineUserFromCache(): void {
+    const loginUserId = ChatKitClient.getLoginUserId()
+    this.myUser = resolveMineUser(NEFriendUserCache.mineUserCache?.user, loginUserId)
+  }
+
+  private async loadMineUser(): Promise<void> {
+    try {
+      const users = await ContactRepo.getUserListFromCloud([ChatKitClient.getLoginUserId()])
+      if (users.length > 0 && users[0].accountId === ChatKitClient.getLoginUserId()) {
+        this.myUser = users[0]
       }
-    })
+    } catch (e) {
+      console.error(`MinePage loadMineUser failed: ${e}`)
+    }
+  }
+
+  private onUserProfileChanged = (users: V2NIMUser[]) => {
+    const loginUserId = ChatKitClient.getLoginUserId()
+    const mineUser = users.find((user: V2NIMUser) => user.accountId === loginUserId)
+    if (mineUser) {
+      if (NEFriendUserCache.mineUserCache) {
+        NEFriendUserCache.mineUserCache.user = mineUser
+      }
+      this.myUser = mineUser
+    }
   }
 
   build() {
@@ -47,9 +73,9 @@ export struct MinePage {
       Column({ space: 6 }) {
         Row() {
           CommonAvatar({
-            item: new AvatarItem(NEFriendUserCache.mineUserCache?.user?.avatar,
+            item: new AvatarItem(this.myUser?.avatar,
               this.getAvatarName(),
-              AvatarColorUntil.getBackgroundColorById(NEFriendUserCache.mineUserCache?.user?.accountId ?? "")),
+              AvatarColorUntil.getBackgroundColorById(resolveMineDisplayAccountId(this.myUser, ChatKitClient.getLoginUserId()))),
             roundRadius: 30,
             textSize: 22
           })
@@ -60,13 +86,13 @@ export struct MinePage {
 
           Column({ space: 8 }) {
 
-            Text(NEFriendUserCache.mineUserCache?.user?.name)
+            Text(resolveMineDisplayName(this.myUser, ChatKitClient.getLoginUserId()))
               .fontSize(22)
               .fontWeight(FontWeight.Bold)
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-            Text($r("app.string.mine_account_id_tip", NEFriendUserCache.mineUserCache?.user?.accountId))
+            Text($r("app.string.mine_account_id_tip", resolveMineDisplayAccountId(this.myUser, ChatKitClient.getLoginUserId())))
               .fontSize(16)
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })

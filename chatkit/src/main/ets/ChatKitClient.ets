@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { CoreKitClient } from '@nimkit/corekit';
 import {
   IM_SDK_VERSION,
@@ -19,18 +20,23 @@ import {
   V2NIMMessage,
   V2NIMMessageRevokeNotification
 } from '@nimsdk/base';
-import { ContactRepo, IMKitConfigCenter, LocalConversationRepo, SubscriptionRepo } from '../../../Index';
+import { IMKitConfigCenter, LocalConversationRepo, SubscriptionRepo } from '../../../Index';
 import { KitLogger } from './logger/AppLogger';
 import { LoggerKitImpl } from './logger/LoggerKitImpl';
 import { ChatRepo } from './repo/ChatRepo';
+import { DeferredStartupTask } from './utils/DeferredStartupTask';
 import { saveLocalRevokeMessageFormOther } from './utils/MessageUtils';
 import { NotificationHelper } from './utils/NotificationHelper';
 
 export const currentConversationChanged: string = 'CurrentConversationChanged'
+const DEFAULT_DEFERRED_STARTUP_DELAY_MS: number = 500
+
+export type ChatKitStartupPerfMarker = (stage: string, detail?: string) => void
 
 export class ChatKitClient {
   declare static nim: NIMInterface
   static appKey: string = ''
+  static accountToken: string = ''
   static haveSyncedConversation: boolean = false
   //是否主动离开群
   static selfLeaveTeam = false
@@ -38,22 +44,57 @@ export class ChatKitClient {
   static currentConversationId: string = ''
   static networkAvailable: boolean = true
   static logger: KitLogger | undefined = undefined
+  private static loggerCacheDir: string = ''
+  private static enableKitLogger: boolean = false
+  private static loggerStartupTask: DeferredStartupTask | undefined = undefined
+  private static coreReportStartupTask: DeferredStartupTask | undefined = undefined
 
-  static init(nimSdk: NIMInterface, appKey: string, disableLog?: boolean) {
+  static init(nimSdk: NIMInterface, appKey: string, disableLog?: boolean,
+    autoScheduleDeferredStartup: boolean = true, startupPerfMarker?: ChatKitStartupPerfMarker): void {
+    ChatKitClient.markStartupPerf(startupPerfMarker, 'chatkit.client_assign.start')
+    if (ChatKitClient.hasInitListener) {
+      ChatKitClient.onDestroy()
+    }
     ChatKitClient.nim = nimSdk
     ChatKitClient.appKey = appKey
-    if (disableLog !== true) {
-      if (nimSdk instanceof NIM) {
-        let logger = new LoggerKitImpl(nimSdk.context.cacheDir)
-        ChatKitClient.logger = new KitLogger(logger)
-      }
-    }
+    ChatKitClient.logger = undefined
+    ChatKitClient.enableKitLogger = disableLog !== true && nimSdk instanceof NIM
+    ChatKitClient.loggerCacheDir = ChatKitClient.enableKitLogger && nimSdk instanceof NIM ? nimSdk.context.cacheDir : ''
+    ChatKitClient.resetDeferredStartupTasks()
+    ChatKitClient.markStartupPerf(startupPerfMarker, 'chatkit.client_assign.end',
+      `loggerEnabled=${ChatKitClient.enableKitLogger}`)
     ChatKitClient.haveSyncedConversation = false
+    // 新登录边界必须清理在线状态订阅缓存，避免切账号后复用上个账号的订阅结果。
+    SubscriptionRepo.resetSubscriptionState()
+    ChatKitClient.markStartupPerf(startupPerfMarker, 'chatkit.listener_init.start')
     ChatKitClient.initListener()
-    CoreKitClient.init({
-      appKey: appKey,
-      imVersion: IM_SDK_VERSION,
-    })
+    ChatKitClient.markStartupPerf(startupPerfMarker, 'chatkit.listener_init.end')
+    if (autoScheduleDeferredStartup) {
+      ChatKitClient.markStartupPerf(startupPerfMarker, 'chatkit.deferred_startup.auto_schedule.start')
+      ChatKitClient.scheduleDeferredStartup(DEFAULT_DEFERRED_STARTUP_DELAY_MS, startupPerfMarker)
+      ChatKitClient.markStartupPerf(startupPerfMarker, 'chatkit.deferred_startup.auto_schedule.end')
+    }
+  }
+
+  static saveAccountToken(token: string): void {
+    ChatKitClient.accountToken = token
+  }
+
+  static scheduleDeferredStartup(delayMs: number = DEFAULT_DEFERRED_STARTUP_DELAY_MS,
+    startupPerfMarker?: ChatKitStartupPerfMarker): void {
+    ChatKitClient.ensureDeferredStartupTasks()
+    ChatKitClient.scheduleDeferredTask(
+      ChatKitClient.loggerStartupTask,
+      'chatkit.logger_lazy_init',
+      delayMs,
+      startupPerfMarker
+    )
+    ChatKitClient.scheduleDeferredTask(
+      ChatKitClient.coreReportStartupTask,
+      'chatkit.core_report',
+      delayMs,
+      startupPerfMarker
+    )
   }
 
   /**
@@ -151,10 +192,16 @@ export class ChatKitClient {
     ChatKitClient.haveSyncedConversation = false
     ChatKitClient.selfLeaveTeam = false
     ChatKitClient.currentConversationId = ''
+    ChatKitClient.logger = undefined
+    ChatKitClient.loggerCacheDir = ''
+    ChatKitClient.enableKitLogger = false
+    ChatKitClient.resetDeferredStartupTasks()
     ChatRepo.offRevokeMessage(ChatKitClient.onRevokeFun)
     ChatRepo.offReceiverMessage(ChatKitClient.onReceiveMessageFun)
     ChatKitClient.nim.conversationService?.off('onSyncFinished', ChatKitClient.onSyncFinishedFun)
+    ChatKitClient.nim.localConversationService?.off('onSyncFinished', ChatKitClient.onSyncFinishedFun)
     ChatKitClient.nim.loginService.off('onDataSync', ChatKitClient.dataSyncFun)
+    SubscriptionRepo.removeListener()
 
   }
 
@@ -165,33 +212,28 @@ export class ChatKitClient {
     if (ChatKitClient.hasInitListener) {
       return
     }
-    console.info("netease ChatKitClient initListener ");
+    Logger.info('ChatKit', "netease ChatKitClient initListener ");
     // 数据同步监听
     ChatKitClient.nim.conversationService?.on('onSyncFinished', ChatKitClient.onSyncFinishedFun)
+    ChatKitClient.nim.localConversationService?.on('onSyncFinished', ChatKitClient.onSyncFinishedFun)
     ChatKitClient.nim.loginService.on('onDataSync', ChatKitClient.dataSyncFun)
+    if (IMKitConfigCenter.enableShownOnlineState) {
+      SubscriptionRepo.addListener()
+    }
     // 消息撤回监听，消息撤回后，会收到通知
     ChatRepo.onRevokeMessage(ChatKitClient.onRevokeFun)
     // 消息接收监听，用于触发响铃和震动
     ChatRepo.onReceiverMessage(ChatKitClient.onReceiveMessageFun)
-    // 显示在线状态
-    if(IMKitConfigCenter.enableShownOnlineState){
-      SubscriptionRepo.addListener()
-    }
     ChatKitClient.hasInitListener = true
 
   }
 
   private static onSyncFinishedFun = () => {
-    console.debug(`Performance Test onSyncFinishedFun`)
     ChatKitClient.haveSyncedConversation = true
   }
 
   private static dataSyncFun = (type: V2NIMDataSyncType, state: V2NIMDataSyncState, error?: V2NIMError) => {
-    if (state === V2NIMDataSyncState.V2NIM_DATA_SYNC_STATE_COMPLETED) {
-      // 主数据同步完成后，刷新好友列表、黑名单列表
-      ContactRepo.getFriendList()
-      ContactRepo.getBlockList()
-    }
+    // 会话 SDK 已按当前会话目标补齐昵称、头像和免打扰状态；好友/黑名单全量缓存由联系人页按需加载。
   }
 
   private static onRevokeFun = (messages: V2NIMMessageRevokeNotification[]) => {
@@ -223,6 +265,68 @@ export class ChatKitClient {
         // off
         LocalConversationRepo.setCurrentConversation(undefined)
       }
+    }
+  }
+
+  private static resetDeferredStartupTasks(): void {
+    ChatKitClient.loggerStartupTask?.reset()
+    ChatKitClient.coreReportStartupTask?.reset()
+    ChatKitClient.loggerStartupTask = new DeferredStartupTask((): void => {
+      ChatKitClient.initLogger()
+    })
+    ChatKitClient.coreReportStartupTask = new DeferredStartupTask((): void => {
+      ChatKitClient.reportCoreKitInit()
+    })
+  }
+
+  private static ensureDeferredStartupTasks(): void {
+    if (!ChatKitClient.loggerStartupTask || !ChatKitClient.coreReportStartupTask) {
+      ChatKitClient.resetDeferredStartupTasks()
+    }
+  }
+
+  private static scheduleDeferredTask(task: DeferredStartupTask | undefined, stage: string, delayMs: number,
+    startupPerfMarker?: ChatKitStartupPerfMarker): void {
+    if (!task) {
+      return
+    }
+    const didSchedule = task.schedule((runner: () => void): void => {
+      setTimeout((): void => {
+        ChatKitClient.markStartupPerf(startupPerfMarker, `${stage}.start`)
+        runner()
+        ChatKitClient.markStartupPerf(startupPerfMarker, `${stage}.end`)
+      }, delayMs)
+    })
+    ChatKitClient.markStartupPerf(startupPerfMarker, `${stage}.${didSchedule ? 'schedule' : 'skip'}`,
+      `delay=${delayMs}`)
+  }
+
+  private static initLogger(): void {
+    if (!ChatKitClient.enableKitLogger || !ChatKitClient.loggerCacheDir || ChatKitClient.logger) {
+      return
+    }
+    try {
+      const logger = new LoggerKitImpl(ChatKitClient.loggerCacheDir)
+      ChatKitClient.logger = new KitLogger(logger)
+    } catch (e) {
+      Logger.error('ChatKit', 'ChatKitClient initLogger failed', JSON.stringify(e))
+    }
+  }
+
+  private static reportCoreKitInit(): void {
+    if (!ChatKitClient.appKey) {
+      return
+    }
+    CoreKitClient.init({
+      appKey: ChatKitClient.appKey,
+      imVersion: IM_SDK_VERSION,
+    })
+  }
+
+  private static markStartupPerf(startupPerfMarker: ChatKitStartupPerfMarker | undefined, stage: string,
+    detail?: string): void {
+    if (startupPerfMarker) {
+      startupPerfMarker(stage, detail)
     }
   }
 }

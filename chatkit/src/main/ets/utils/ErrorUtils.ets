@@ -1,3 +1,4 @@
+import { Logger } from '@nimkit/common';
 import { promptAction } from '@kit.ArkUI';
 import { V2NIMErrorCode } from '@nimsdk/base';
 import { ChatKitClient } from '../ChatKitClient';
@@ -30,7 +31,7 @@ export class ErrorUtils {
         alignment: Alignment.Bottom
       })
     } catch (error) {
-      console.error(`showToast args error code is ${error.code}, message is ${error.message}`);
+      Logger.error('ChatKit', `showToast args error code is ${error.code}, message is ${error.message}`);
     }
   }
 
@@ -48,7 +49,7 @@ export class ErrorUtils {
         alignment: Alignment.Bottom
       })
     } catch (error) {
-      console.error(`showToast args error code is ${error.code}, message is ${error.message}`);
+      Logger.error('ChatKit', `showToast args error code is ${error.code}, message is ${error.message}`);
     }
   }
 }

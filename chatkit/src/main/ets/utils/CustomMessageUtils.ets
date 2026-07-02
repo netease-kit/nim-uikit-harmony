@@ -1,3 +1,4 @@
+import { Logger } from '@nimkit/common';
 import { V2NIMMessageAttachment } from '@nimsdk/base';
 import { mergedMessageCustomType } from '../constant/Constant';
 import { MergedMessageAttachment } from '../model/CustomMessageAttachment';
@@ -9,7 +10,7 @@ export class CustomMessageUtils {
         let attachmentObject = JSON.parse(attachment.raw) as object
         return attachmentObject
       } catch (err) {
-        console.error(err)
+        Logger.error('ChatKit', err)
         return undefined
       }
     }

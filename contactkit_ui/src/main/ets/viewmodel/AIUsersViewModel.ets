@@ -142,6 +142,10 @@ export class AIUsersViewModel {
     this.onDataLoaded()
   }
 
+  public loadAIUsers(): void {
+    NEAIUserCache.load()
+  }
+
   constructor() {
     AIRepo.listener.on('onLoadAIUserComplete', this.onDataLoaded)
   }

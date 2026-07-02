@@ -3,8 +3,9 @@
  *  Use of this source code is governed by a MIT license that can be
  *  found in the LICENSE file.
  */
+import { Logger } from '@nimkit/common';
 import { ChatRepo, IMKitConfigCenter } from '@nimkit/chatkit'
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel'
+import { ConversationSelectModel } from '@nimkit/chatkit'
 import {
   V2NIMMessage,
   V2NIMMessageDeletedNotification,
@@ -112,7 +113,7 @@ export class ChatSearchVideoMessageViewModel {
       // 将消息转换为 NIMMessageInfo
       this.convertToMessageInfoList()
     } catch (err) {
-      console.error('ChatSearchVideoMessageViewModel searchMessages error:', err)
+      Logger.error('ChatKitUI', 'ChatSearchVideoMessageViewModel searchMessages error:', err)
       // throw err
     } finally {
       this.isLoading = false
@@ -209,7 +210,7 @@ export class ChatSearchVideoMessageViewModel {
     progress?: (percentage: number) => void) {
     const mergedParams = this.beforeSendMessage(params)
     ChatRepo.sendMessage(msg, conversationId, mergedParams, progress).catch((err: BusinessError) => {
-      console.error("net ease send message error", err.code, err.message);
+      Logger.error('ChatKitUI', "net ease send message error", err.code, err.message);
       sendMessageFailedTips(msg, err, conversationId)
     })
   }
@@ -230,7 +231,7 @@ export class ChatSearchVideoMessageViewModel {
             this.sendForwardMessage(forwardMsg, conversation.conversationId)
           }
         } catch (err) {
-          console.error(err)
+          Logger.error('ChatKitUI', err)
         }
       })
 
@@ -241,7 +242,7 @@ export class ChatSearchVideoMessageViewModel {
           setTimeout(() => {
             ChatRepo.sendMessage(leaveMsg, conversation.conversationId!)
               .catch((err: BusinessError) => {
-                console.error("net ease send message error", err.code, err.message);
+                Logger.error('ChatKitUI', "net ease send message error", err.code, err.message);
                 sendMessageFailedTips(leaveMsg, err, conversation.conversationId!)
               })
           }, 200)

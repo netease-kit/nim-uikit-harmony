@@ -43,22 +43,22 @@ export struct FraudTipView {
         alignItems: ItemAlign.Center // 换行后仍垂直居中
       }) {
         Text() {
-          Span('仅用于体验云信IM产品功能，请勿轻信汇款，中奖等涉及钱款的信息，勿轻易拨打陌生电话，谨防上当受骗。')
+          Span($r('app.string.fraud_tip_content'))
             .fontSize(12)
             .fontColor('#101010')
             .lineHeight(17) // 保证换行后行高均匀
           if (this.canReport) {
-            Span('点击举报')
+            Span($r('app.string.fraud_report_action'))
               .fontSize(12)
               .fontColor('#7AA2DB')
               .lineHeight(17) // 保证换行后行高均匀
               .onClick(() => {
-                NECommonUtils.showToast('举报成功');
+                NECommonUtils.showToast($r('app.string.fraud_report_success'));
 
                 let params: ReportWebParams = {
                   src: 'https://yunxin.163.com/survey/report',
                   // title: getContext(this).resourceManager.getStringSync($r('app.string.privacy_title_tips').id)
-                  title: '点击举报'
+                  title: getContext(this).resourceManager.getStringSync($r('app.string.fraud_report_action').id)
                 }
                 this.pathStack.pushPath({
                   name: 'ReportWebPage',

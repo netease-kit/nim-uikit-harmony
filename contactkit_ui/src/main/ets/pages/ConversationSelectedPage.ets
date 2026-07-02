@@ -6,7 +6,7 @@
  */
 
 import { ConversationSelectedParam } from '@nimkit/chatkit';
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
+import { ConversationSelectModel } from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
   AvatarItem,

@@ -9,7 +9,8 @@ export enum NEChatMoreOperationType {
   Video = 1,
   File = 2,
   Location = 3,
-  Call = 4
+  Call = 4,
+  Translate = 5
 }
 
 export class NEChatMoreOperationData {

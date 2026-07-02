@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import {
   ChatKitClient,
   ChatRepo,
@@ -197,7 +198,7 @@ export class ChatSearchDateMessageViewModel {
       })
 
     } catch (err) {
-      console.error('searchMessagesByDate error:', err)
+      Logger.error('ChatKitUI', 'searchMessagesByDate error:', err)
     }
   }
 
@@ -220,7 +221,7 @@ export class ChatSearchDateMessageViewModel {
       const newList: NEUserWithFriend[] = await ContactRepo.getUserWithFriendByIds(fetchAccountIds)
       this.userWithFriendList.push(...newList)
     } catch (err) {
-      console.error('getUserWithFriendByIds error:', err)
+      Logger.error('ChatKitUI', 'getUserWithFriendByIds error:', err)
     }
   }
 
@@ -243,7 +244,7 @@ export class ChatSearchDateMessageViewModel {
       const teamMemberList = await TeamRepo.getTeamMembersByIds(this.teamId, this.teamType, fetchAccountIds)
       this.teamMemberList.push(...teamMemberList)
     } catch (err) {
-      console.error('getTeamMemberByIds error:', err)
+      Logger.error('ChatKitUI', 'getTeamMemberByIds error:', err)
     }
   }
 
@@ -262,7 +263,7 @@ export class ChatSearchDateMessageViewModel {
         return userList[0]
       }
     } catch (err) {
-      console.error('getTeamUser error:', err)
+      Logger.error('ChatKitUI', 'getTeamUser error:', err)
     }
     return undefined
   }
@@ -401,7 +402,7 @@ export class ChatSearchDateMessageViewModel {
         group.messages.push(searchDateMessage)
       }
     } catch (err) {
-      console.error('searchAnchorMessageDesc error:', err)
+      Logger.error('ChatKitUI', 'searchAnchorMessageDesc error:', err)
     }
   }
 

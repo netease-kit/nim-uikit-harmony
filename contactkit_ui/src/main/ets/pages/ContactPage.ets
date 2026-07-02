@@ -5,8 +5,15 @@
  *
  */
 
-import { ChatKitClient, ContactRepo, IMKitConfigCenter, NEAIUserCache, NEUserWithFriend,
-  SubscriptionRepo } from '@nimkit/chatkit';
+import { Logger } from '@nimkit/common';
+import {
+  ContactRepo,
+  DisposableBag,
+  FriendEventRepo,
+  IMKitConfigCenter,
+  NEUserWithFriend,
+  TeamEventRepo
+} from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -72,7 +79,7 @@ export function ContactItemBuilder(params: NEContactItem) {
       Image($r('app.media.arrow_right'))
         .width(4.92)
         .height(9.54)
-        .margin({ right: 20 })
+        .margin({ right: 30 })
 
     }
     .alignSelf(ItemAlign.Center)
@@ -102,30 +109,29 @@ export struct ContactPage {
       await this.viewModel.getFriendList()
       await this.loadCombinedUnreadCount()
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
   // List组件的scroller控制器：listScroller，用于控制联系人列表的滑动位置
   private listScroller: Scroller = new Scroller()
+  private disposableBag: DisposableBag = new DisposableBag()
+  private onFriendAddApplicationChanged = (application: V2NIMFriendAddApplication) => {
+    this.loadCombinedUnreadCount()
+  }
+  private onTeamJoinActionInfoChanged = (actionInfo: V2NIMTeamJoinActionInfo) => {
+    this.loadCombinedUnreadCount()
+  }
+  private onLoadFriendCache = () => {
+    this.isFinishedInit = true;
+  }
 
   async aboutToAppear(): Promise<void> {
-    // 监听好友申请
-    ChatKitClient.nim.friendService?.on('onFriendAddApplication', async (application: V2NIMFriendAddApplication) => {
-      await this.loadCombinedUnreadCount()
-    })
-
-    // 监听群验证消息
-    ChatKitClient.nim.teamService?.on('onReceiveTeamJoinActionInfo', async (actionInfo: V2NIMTeamJoinActionInfo) => {
-      await this.loadCombinedUnreadCount()
-    })
-
-    ContactRepo.listener.on('loadFriendCache', () => {
-      this.isFinishedInit = true;
-    })
-
-    if (IMKitConfigCenter.enableLocalConversation) {
-      NEAIUserCache.load()
-    }
+    this.disposeEventListeners()
+    this.disposableBag.addAll([
+      FriendEventRepo.onFriendAddApplication(this.onFriendAddApplicationChanged),
+      TeamEventRepo.onReceiveTeamJoinActionInfo(this.onTeamJoinActionInfoChanged)
+    ])
+    ContactRepo.listener.on('loadFriendCache', this.onLoadFriendCache)
 
     this.loadData()
   }
@@ -192,17 +198,17 @@ export struct ContactPage {
                       titleFontSize: 14,
                       onlineState:
                       (IMKitConfigCenter.enableShownOnlineState ?
-                        (this.subscriptViewModel.onlineStateMap.get(item.user!.accountId) ? true : false) : undefined)
+                        (this.subscriptViewModel.getOnlineState(item.user?.accountId) ? true : false) : undefined)
                     })
                   }
                   .onAppear(() => {
                     if (IMKitConfigCenter.enableShownOnlineState) {
-                      this.subscriptViewModel.subscribeUserStatus(item.user?.accountId ?? '')
+                      this.subscriptViewModel.subscribeUserStatusBatch([item.user?.accountId ?? ''])
                     }
                   })
                   .onDisAppear(() => {
                     if (IMKitConfigCenter.enableShownOnlineState &&
-                      SubscriptionRepo.subscriptionArray.length >= 3000) {
+                      this.subscriptViewModel.hasReachedSubscriptionLimit()) {
                       this.subscriptViewModel.unsubscribeUserStatus([item.user?.accountId ?? ''])
                     }
                   })
@@ -252,7 +258,7 @@ export struct ContactPage {
             y:
             (this.viewModel.initalList.length * 16 - 48) / 2
           })
-          .margin({ right: 10 })
+          .margin({ right: 0 })
           .itemSize(16)
           .font({ size: 10 })// 指定字母导航的选择项为selectedIndex，完成跟联系人列表的同步
           .selected(this.selectedIndex)// 获取选中字母的索引值，通过listScroller控制列表滑动到对应索引位置
@@ -270,7 +276,12 @@ export struct ContactPage {
 
   aboutToDisappear(): void {
     this.viewModel.onDestroy()
-    ContactRepo.listener.off('loadFriendCache', this.loadData)
+    this.disposeEventListeners()
+  }
+
+  private disposeEventListeners(): void {
+    this.disposableBag.dispose()
+    ContactRepo.listener.off('loadFriendCache', this.onLoadFriendCache)
   }
 
   private getContactHeaderItems(): NEContactItem[] {
@@ -287,14 +298,14 @@ export struct ContactPage {
         new NEContactItem($r('app.media.contact_my_teams'), $r('app.string.contact_my_teams'), 'MyTeamsPage'),
       )
     }
+    items.push(
+      new NEContactItem($r('app.media.contact_my_bots'), $r('app.string.contact_my_bots'), 'MyBotsPage')
+    )
     if (IMKitConfigCenter.enableAI) {
       items.push(
         new NEContactItem($r('app.media.contact_ai_users'), $r('app.string.contact_ai_users'), 'AIUsersPage')
       )
     }
-    items.push(
-      new NEContactItem($r('app.media.contact_my_bots'), $r('app.string.contact_my_bots'), 'MyBotsPage')
-    )
     return items
   }
 
@@ -319,7 +330,7 @@ export struct ContactPage {
         this.onUnreadApplicationChange(totalUnreadStr)
       }
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 }

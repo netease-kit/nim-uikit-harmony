@@ -7,24 +7,44 @@
 
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
+const DOMAIN: number = 0xFF00;
+
+type LogArg = string | Error | number | boolean | Object | undefined | null;
+
+/**
+ * nimkit 统一日志工具。
+ */
 export class Logger {
-  static PREFIX: string = 'testTag';
-  static DOMAIN: number = 0xFF00;
-  static FORMAT: string = '%{public}s, %{public}s';
 
-  static debug(...args: string[]): void {
-    hilog.debug(Logger.DOMAIN, Logger.PREFIX, Logger.FORMAT, args);
+  static debug(tag: string, ...args: LogArg[]): void {
+    hilog.debug(DOMAIN, tag, '%{public}s', Logger.format(args));
   }
 
-  static info(...args: string[]): void {
-    hilog.info(Logger.DOMAIN, Logger.PREFIX, Logger.FORMAT, args);
+  static info(tag: string, ...args: LogArg[]): void {
+    hilog.info(DOMAIN, tag, '%{public}s', Logger.format(args));
   }
 
-  static warn(...args: string[]): void {
-    hilog.warn(Logger.DOMAIN, Logger.PREFIX, Logger.FORMAT, args);
+  static warn(tag: string, ...args: LogArg[]): void {
+    hilog.warn(DOMAIN, tag, '%{public}s', Logger.format(args));
   }
 
-  static error(...args: string[]): void {
-    hilog.error(Logger.DOMAIN, Logger.PREFIX, Logger.FORMAT, args);
+  static error(tag: string, ...args: LogArg[]): void {
+    hilog.error(DOMAIN, tag, '%{public}s', Logger.format(args));
+  }
+
+  private static format(args: LogArg[]): string {
+    let result = '';
+    for (let i = 0; i < args.length; i++) {
+      if (i > 0) { result += ' '; }
+      const arg = args[i];
+      if (typeof arg === 'string') {
+        result += arg;
+      } else if (typeof arg === 'number' || typeof arg === 'boolean') {
+        result += String(arg);
+      } else {
+        result += JSON.stringify(arg);
+      }
+    }
+    return result;
   }
 }

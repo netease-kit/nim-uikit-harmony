@@ -5,7 +5,7 @@
  *
  */
 import { accountAll, AitMessage } from '@nimkit/chatkit';
-import { AitModel } from '@nimkit/chatkit/src/main/ets/model/ait/AitModel';
+import { AitModel } from '@nimkit/chatkit';
 
 export class AitManager {
   aitModel: AitModel = new AitModel()
@@ -95,6 +95,28 @@ export class AitManager {
     return undefined
   }
 
+  getFirstAccount(accounts: string[]): string | undefined {
+    let firstAccount: string | undefined = undefined
+    let firstStart = Number.MAX_SAFE_INTEGER
+    for (const key of this.aitModel.aitBlocks.keys()) {
+      if (!accounts.includes(key)) {
+        continue
+      }
+      const aitMessage = this.aitModel.aitBlocks.get(key)
+      aitMessage?.segments.forEach((segment) => {
+        if (!segment.broken && segment.start < firstStart) {
+          firstStart = segment.start
+          firstAccount = key
+        }
+      })
+    }
+    return firstAccount
+  }
+
+  getFirstAIChatAccount(aiChatAccounts: string[]): string | undefined {
+    return this.getFirstAccount(aiChatAccounts)
+  }
+
   // 是否已经在@列表中
   haveBeAit(account: string): boolean {
     return this.aitModel.aitBlocks.has(account)
@@ -102,7 +124,7 @@ export class AitManager {
 
   // 是否有@成员
   haveAitMember(): boolean {
-    return Object.keys(this.aitModel.aitBlocks).length > 0;
+    return this.aitModel.aitBlocks.size > 0;
   }
 
   // 光标移动到@后自动到后面
@@ -117,5 +139,4 @@ export class AitManager {
     return baseIndex;
   }
 }
-
 

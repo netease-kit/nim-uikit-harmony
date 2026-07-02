@@ -5,9 +5,10 @@
  *
  */
 
-import { ChatKitClient } from '@nimkit/chatkit'
+import { Logger } from '@nimkit/common';
+import { ChatKitClient, IMKitConfigCenter, NEAIUserCache } from '@nimkit/chatkit'
 import { AvatarColorUntil, AvatarItem, CommonAvatar, CommonConfirmDialog, NavigationBackBuilder } from '@nimkit/common'
-import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
+import { TeamMemberWithUser } from '@nimkit/chatkit'
 import { TeamMemberListViewModel } from '../viewModel/TeamMemberListViewModel'
 import { V2NIMTeamMemberRole } from '@nimsdk/base'
 
@@ -38,6 +39,38 @@ struct TeamMemberListPage {
   })
   //要踢的成员Id
   kickMemberId?: string
+
+  private async isAIUser(accountId: string): Promise<boolean> {
+    if (!IMKitConfigCenter.enableAI) {
+      return false
+    }
+    if (NEAIUserCache.getAIUser(accountId)) {
+      return true
+    }
+    try {
+      await NEAIUserCache.getInstance().load()
+    } catch (err) {
+      Logger.error('TeamKit', err)
+    }
+    return NEAIUserCache.getAIUser(accountId) !== undefined
+  }
+
+  private async openMemberInfo(accountId?: string): Promise<void> {
+    if (!accountId) {
+      return
+    }
+    if (accountId === ChatKitClient.getLoginUserId()) {
+      this.pathStack.pushPath({
+        name: 'MineInfoPage'
+      })
+      return
+    }
+    if (await this.isAIUser(accountId)) {
+      this.pathStack.pushPath({ name: 'AIPersonInfoPage', param: accountId })
+      return
+    }
+    this.pathStack.pushPath({ name: 'PersonInfoPage', param: accountId })
+  }
 
   build() {
     NavDestination() {
@@ -137,13 +170,7 @@ struct TeamMemberListPage {
               bottom: 10
             })
             .onClick(() => {
-              if (member.teamMember.accountId === ChatKitClient.getLoginUserId()) {
-                this.pathStack.pushPath({
-                  name: 'MineInfoPage'
-                })
-              } else {
-                this.pathStack.pushPath({ name: 'PersonInfoPage', param: member.teamMember.accountId })
-              }
+              this.openMemberInfo(member.teamMember.accountId)
             })
           }
         })

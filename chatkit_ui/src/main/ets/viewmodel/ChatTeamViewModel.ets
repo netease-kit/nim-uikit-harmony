@@ -5,19 +5,25 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatTeamInfo } from '../model/ChatTeamInfo';
 import { ChatBaseViewModel } from './ChatBaseViewModel';
 import {
   ChatKitClient,
   ChatRepo,
   ContactRepo,
+  DisposableBag,
+  FriendEventRepo,
+  AIUserManager,
   ErrorUtils,
   IMKitConfigCenter,
   keyExtensionLastOptType,
   keyExtensionSticky,
   keyExtensionTopSticky,
+  TeamEventRepo,
   TeamMemberCache,
   TeamRepo,
+  UserEventRepo,
   typeExtensionStickyAdd,
   typeExtensionStickyRemove
 } from '@nimkit/chatkit';
@@ -46,6 +52,7 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { ChatKitConfig } from '../ChatKitConfig';
 import { TopStickyMessage } from '../model/TopStickyMessage';
 import { havePermissionForTopSticky } from '../common/ChatUtils';
+import { extractAitAccountIds } from '../common/MessageHelper';
 import { isTopMessageDeleted, isTopMessageRevoked } from '../utils/TopMessageBarUtils';
 import { NECommonUtils } from '@nimkit/common';
 
@@ -69,6 +76,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
   @Trace shouldShowTeamExitWarning: boolean = false
   dialogToExit?: () => void
   private needUserMessageList: NIMMessageInfo[] = []
+  private eventDisposers: DisposableBag = new DisposableBag()
   //拉取全量成员的阈值
   private static allMemberLimit = 500
 
@@ -97,17 +105,17 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
     this.chatTeamInfo = chatInfo;
     ChatRepo.onDeleteMessage(this.onTopMessageDeleteFun)
     ChatRepo.onRevokeMessage(this.onTopMessageRevokeFun)
-    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChangedFun)
-    ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onUserProfileChangedFun)
-    ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', this.teamUpdateFun)
-    ChatKitClient.nim.teamService?.on('onTeamMemberJoined', this.onTeamMemberJoinedFun)
-    ChatKitClient.nim.teamService?.on('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdatedFun)
-    //群解散
-    ChatKitClient.nim.teamService?.on('onTeamDismissed', this.onTeamDismissedFun)
-    //退出群
-    ChatKitClient.nim.teamService?.on('onTeamLeft', this.onTeamLeftFun)
-
-    ChatKitClient.nim.teamService?.on('onSyncFinished', this.onTeamSyncFinishedFun)
+    this.eventDisposers.dispose()
+    this.eventDisposers.addAll([
+      FriendEventRepo.onFriendInfoChanged(this.onFriendInfoChangedFun),
+      UserEventRepo.onUserProfileChanged(this.onUserProfileChangedFun),
+      TeamEventRepo.onTeamInfoUpdated(this.teamUpdateFun),
+      TeamEventRepo.onTeamMemberJoined(this.onTeamMemberJoinedFun),
+      TeamEventRepo.onTeamMemberInfoUpdated(this.onTeamMemberInfoUpdatedFun),
+      TeamEventRepo.onTeamDismissed(this.onTeamDismissedFun),
+      TeamEventRepo.onTeamLeft(this.onTeamLeftFun),
+      TeamEventRepo.onTeamSyncFinished(this.onTeamSyncFinishedFun)
+    ])
     //群消息已读回执
     if (ChatKitConfig.messageReadState) {
       ChatRepo.onReceiveTeamMessageReadReceipts(this.onReceiveMessageReadReceiptFun)
@@ -129,7 +137,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
   onUserProfileChangedFun = (user: V2NIMUser[]) => {
     let updateUser: V2NIMUser[] = []
     user.forEach((item) => {
-      if (this.chatTeamInfo?.teamUserMap.has(item.accountId)) {
+      if (item.accountId == ChatKitClient.getLoginUserId() || this.chatTeamInfo?.teamUserMap.has(item.accountId)) {
         updateUser.push(item)
       }
     })
@@ -335,7 +343,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
             }
           })
           .catch((error: Error) => {
-            console.error(error.name)
+            Logger.error('ChatKitUI', error.name)
           })
       }
 
@@ -392,7 +400,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
       const refreshedTeam = await TeamRepo.getTeamInfoFromCloud(teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL)
       return new InvalidTeamResolution(refreshedTeam ?? teamInfo, false)
     } catch (err) {
-      console.error('ChatTeamViewModel resolveInvalidTeam getTeamInfoFromCloud error', err)
+      Logger.error('ChatKitUI', 'ChatTeamViewModel resolveInvalidTeam getTeamInfoFromCloud error', err)
       return new InvalidTeamResolution(teamInfo, false)
     }
   }
@@ -404,7 +412,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
         [ChatKitClient.getLoginUserId()])
       return teamMembers.some(member => member.inTeam !== false)
     } catch (err) {
-      console.error('ChatTeamViewModel isCurrentUserStillInTeam error', err)
+      Logger.error('ChatKitUI', 'ChatTeamViewModel isCurrentUserStillInTeam error', err)
       return false
     }
   }
@@ -417,13 +425,13 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
         this.updateTopPermission()
       })
       .catch((error: Error) => {
-        console.error('netease getTeamMemberListInfo:getUserList ', error.name)
+        Logger.error('ChatKitUI', 'netease getTeamMemberListInfo:getUserList ', error.name)
       });
     ContactRepo.getUserList(accountList).then((users) => {
       this.chatTeamInfo?.addTeamUser(users)
 
     }).catch((error: Error) => {
-      console.error('netease getTeamMemberListInfo:getUserList ', error.name)
+      Logger.error('ChatKitUI', 'netease getTeamMemberListInfo:getUserList ', error.name)
     });
   }
 
@@ -454,14 +462,17 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
         })
 
       }
+      extractAitAccountIds(item.message.serverExtension).forEach((accountId) => {
+        senderList.add(accountId)
+      })
     })
     let requestAccountList: string[] = [];
     let requestUserAccountList: string[] = [];
     senderList.forEach(account => {
-      if (account !== undefined && !this.chatTeamInfo?.teamMemberMap.has(account)) {
+      if (account !== undefined && !AIUserManager.isAIUser(account) && !this.chatTeamInfo?.teamMemberMap.has(account)) {
         requestAccountList.push(account)
       }
-      if (account !== undefined && !this.chatTeamInfo?.teamUserMap.has(account)) {
+      if (account !== undefined && !AIUserManager.isAIUser(account) && !this.chatTeamInfo?.teamUserMap.has(account)) {
         requestUserAccountList.push(account)
       }
     })
@@ -473,7 +484,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
           }
         })
         .catch((error: Error) => {
-          console.error('netease getTeamMemberInfoWithMessage:getTeamMemberListByIds', error.name)
+          Logger.error('ChatKitUI', 'netease getTeamMemberInfoWithMessage:getTeamMemberListByIds', error.name)
         });
     }
     if (requestUserAccountList.length > 0) {
@@ -481,7 +492,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
       ContactRepo.getUserListFromCloud(requestUserAccountList).then((teamUserInfo: V2NIMUser[]) => {
         this.chatTeamInfo?.addTeamUser(teamUserInfo)
       }).catch((error: Error) => {
-        console.error('netease getTeamMemberInfoWithMessage:getUserListFromCloud ', error.name)
+        Logger.error('ChatKitUI', 'netease getTeamMemberInfoWithMessage:getUserListFromCloud ', error.name)
       })
     }
   }
@@ -673,14 +684,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
     super.onDestroy()
     ChatRepo.offDeleteMessage(this.onTopMessageDeleteFun)
     ChatRepo.offRevokeMessage(this.onTopMessageRevokeFun)
-    ChatKitClient.nim.teamService?.off('onTeamInfoUpdated', this.teamUpdateFun)
-    ChatKitClient.nim.teamService?.off('onTeamMemberJoined', this.onTeamMemberJoinedFun)
-    ChatKitClient.nim.teamService?.off('onTeamMemberInfoUpdated', this.onTeamMemberInfoUpdatedFun)
-    ChatKitClient.nim.teamService?.off('onTeamDismissed', this.onTeamDismissedFun)
-    ChatKitClient.nim.teamService?.off('onTeamLeft', this.onTeamLeftFun)
-    ChatKitClient.nim.teamService?.off('onSyncFinished', this.onTeamSyncFinishedFun)
-    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onUserProfileChangedFun)
-    ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChangedFun)
+    this.eventDisposers.dispose()
 
     if (ChatKitConfig.messageReadState) {
       ChatRepo.offReceiveTeamMessageReadReceipts(this.onReceiveMessageReadReceiptFun)

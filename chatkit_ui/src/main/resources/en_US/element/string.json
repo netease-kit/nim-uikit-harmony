@@ -81,8 +81,20 @@
       "value": "forward"
     },
     {
+      "name": "chat_operation_reply",
+      "value": "Reply "
+    },
+    {
+      "name": "chat_input_reply_text",
+      "value": "Reply | "
+    },
+    {
       "name": "chat_operation_translate",
       "value": "translate"
+    },
+    {
+      "name": "chat_operation_multi_select",
+      "value": "Multi Select"
     },
     {
       "name": "chat_operation_multi_forward",
@@ -145,6 +157,62 @@
       "value": "Favorite"
     },
     {
+      "name": "fraud_report_action",
+      "value": "Report"
+    },
+    {
+      "name": "fraud_report_success",
+      "value": "Reported successfully"
+    },
+    {
+      "name": "fraud_tip_content",
+      "value": "For Yunxin IM feature experience only. Do not trust remittance, prize, or other money-related messages. Avoid calling unknown numbers and stay alert for scams."
+    },
+    {
+      "name": "link_click_email_action_title",
+      "value": "Send email to \"%s\""
+    },
+    {
+      "name": "link_click_email_send",
+      "value": "Use default mail account"
+    },
+    {
+      "name": "link_click_email_copy",
+      "value": "Copy email"
+    },
+    {
+      "name": "link_click_email_app_not_found",
+      "value": "No email app detected"
+    },
+    {
+      "name": "link_click_email_open_failed",
+      "value": "Unable to open the email app"
+    },
+    {
+      "name": "link_click_browser_open_failed",
+      "value": "Unable to open the browser"
+    },
+    {
+      "name": "link_click_phone_action_title",
+      "value": "\"%s\" may be a phone number. You can"
+    },
+    {
+      "name": "link_click_phone_call",
+      "value": "Call"
+    },
+    {
+      "name": "link_click_phone_copy",
+      "value": "Copy"
+    },
+    {
+      "name": "link_click_phone_call_failed",
+      "value": "Unable to place the call"
+    },
+    {
+      "name": "link_click_copy_success",
+      "value": "Copied to clipboard"
+    },
+    {
       "name": "chat_msg_undo_tips",
       "value": "This message has been recalled"
     },
@@ -205,6 +273,14 @@
       "value": "You have been removed from the group chat or the group chat has been dissolved."
     },
     {
+      "name": "chat_team_error_tip_title",
+      "value": "Prompt"
+    },
+    {
+      "name": "chat_msg_download_tips",
+      "value": "Message is downloading..."
+    },
+    {
       "name": "chat_setting",
       "value": "Settings"
     },
@@ -259,6 +335,22 @@
     {
       "name": "chat_team_full_mute",
       "value": "Mute everyone"
+    },
+    {
+      "name": "chat_team_agree_mode_on",
+      "value": "Enabled invitation acceptance requirement"
+    },
+    {
+      "name": "chat_team_agree_mode_off",
+      "value": "Disabled invitation acceptance requirement"
+    },
+    {
+      "name": "chat_team_join_mode_on",
+      "value": "Enabled join approval"
+    },
+    {
+      "name": "chat_team_join_mode_off",
+      "value": "Disabled join approval"
     },
     {
       "name": "chat_permission_camera_desc",
@@ -318,7 +410,7 @@
     },
     {
       "name": "chat_network_error_tips",
-      "value": "Network Error"
+      "value": "No Network"
     },
     {
       "name": "chat_pin_limit_error_tips",
@@ -649,6 +741,14 @@
       "value": "Typing..."
     },
     {
+      "name": "chat_title_status_online",
+      "value": "(Online)"
+    },
+    {
+      "name": "chat_title_status_offline",
+      "value": "(Offline)"
+    },
+    {
       "name": "chat_not_friend_call_tip",
       "value": "Non-friend calls are not supported"
     },
@@ -711,6 +811,282 @@
     {
       "name": "chat_message_voice_too_long",
       "value": "Voice too long, cannot convert."
+    },
+    {
+      "name": "chat_ai_message_progressing",
+      "value": "Thinking…"
+    },
+    {
+      "name": "chat_ai_unsupported_format_tip",
+      "value": "This format is not supported"
+    },
+    {
+      "name": "chat_ai_error",
+      "value": "The server is busy, please try again later."
+    },
+    {
+      "name": "chat_ai_search_error",
+      "value": "AI error"
+    },
+    {
+      "name": "chat_ai_error_failed_request_to_the_llm",
+      "value": "Failed request to the language model"
+    },
+    {
+      "name": "chat_ai_error_ai_messages_function_disabled",
+      "value": "AI messaging function not enabled"
+    },
+    {
+      "name": "chat_ai_error_not_an_ai_account",
+      "value": "Not an AI account"
+    },
+    {
+      "name": "chat_ai_error_cannot_blocklist_an_ai_account",
+      "value": "Cannot blocklist an AI account"
+    },
+    {
+      "name": "chat_ai_error_parameter",
+      "value": "Parameter error"
+    },
+    {
+      "name": "chat_ai_error_user_not_exist",
+      "value": "User does not exist"
+    },
+    {
+      "name": "chat_ai_error_user_banned",
+      "value": "User banned"
+    },
+    {
+      "name": "chat_ai_error_user_chat_banned",
+      "value": "User chat banned"
+    },
+    {
+      "name": "chat_ai_error_message_hit_antispam",
+      "value": "Message hit anti-spam"
+    },
+    {
+      "name": "chat_ai_error_team_member_not_exist",
+      "value": "Team member does not exist"
+    },
+    {
+      "name": "chat_ai_error_team_normal_member_chat_banned",
+      "value": "Team normal member chat banned"
+    },
+    {
+      "name": "chat_ai_error_team_member_chat_banned",
+      "value": "Team member chat banned"
+    },
+    {
+      "name": "chat_ai_error_rate_limit_exceeded",
+      "value": "Rate limit exceeded"
+    },
+    {
+      "name": "chat_message_removed_tip",
+      "value": "The message was removed."
+    },
+    {
+      "name": "chat_ai_stream_stop",
+      "value": "Stop"
+    },
+    {
+      "name": "chat_ai_stream_refresh",
+      "value": "Refresh"
+    },
+    {
+      "name": "chat_ai_helper_title",
+      "value": "Reply Inspiration"
+    },
+    {
+      "name": "chat_ai_helper_error_title",
+      "value": "Failed to get inspiration"
+    },
+    {
+      "name": "chat_ai_helper_error_try",
+      "value": "Tap to retry"
+    },
+    {
+      "name": "chat_ai_translate",
+      "value": "AI"
+    },
+    {
+      "name": "chat_ai_translate_action",
+      "value": "Translate"
+    },
+    {
+      "name": "chat_ai_translate_tips",
+      "value": "Translate to..."
+    },
+    {
+      "name": "chat_ai_translate_target_language",
+      "value": "Target Language"
+    },
+    {
+      "name": "chat_ai_translate_language_title",
+      "value": "Translate input to"
+    },
+    {
+      "name": "chat_use_ai_translate",
+      "value": "To use"
+    },
+    {
+      "name": "chat_ai_search",
+      "value": "AI Search"
+    },
+    {
+      "name": "chat_ai_search_cancel",
+      "value": "Cancel"
+    },
+    {
+      "name": "chat_ai_searching",
+      "value": "Searching..."
+    },
+    {
+      "name": "chat_ai_search_more_info",
+      "value": "More info"
+    },
+    {
+      "name": "chat_ai_search_hint",
+      "value": "Add more content"
+    },
+    {
+      "name": "chat_ai_search_network_error",
+      "value": "No Network"
+    },
+    {
+      "name": "chat_ai_search_send",
+      "value": "Confirm"
+    },
+    {
+      "name": "chat_bot_sub_session_title",
+      "value": "Topics"
+    },
+    {
+      "name": "chat_bot_sub_session_search_hint",
+      "value": "Search sub-session name"
+    },
+    {
+      "name": "chat_bot_sub_session_empty",
+      "value": "No topics yet. Send a message to start one."
+    },
+    {
+      "name": "chat_bot_sub_session_search_empty",
+      "value": "No related sub-sessions found"
+    },
+    {
+      "name": "chat_bot_sub_session_no_message",
+      "value": "No messages"
+    },
+    {
+      "name": "chat_bot_sub_session_untitled",
+      "value": "New topic"
+    },
+    {
+      "name": "chat_bot_sub_session_new",
+      "value": "New"
+    },
+    {
+      "name": "chat_bot_sub_session_create_conversation",
+      "value": "Create conversation"
+    },
+    {
+      "name": "chat_bot_sub_session_rename",
+      "value": "Rename"
+    },
+    {
+      "name": "chat_bot_sub_session_rename_conversation",
+      "value": "Rename conversation"
+    },
+    {
+      "name": "chat_bot_sub_session_delete",
+      "value": "Delete"
+    },
+    {
+      "name": "chat_bot_sub_session_save",
+      "value": "Save"
+    },
+    {
+      "name": "chat_bot_sub_session_setting",
+      "value": "Settings"
+    },
+    {
+      "name": "chat_bot_sub_session_delete_confirm",
+      "value": "Delete this topic?"
+    },
+    {
+      "name": "chat_bot_sub_session_delete_title",
+      "value": "Topic deletion"
+    },
+    {
+      "name": "chat_bot_sub_session_delete_topic",
+      "value": "Delete topic \"%s\"?"
+    },
+    {
+      "name": "chat_bot_sub_session_input_name",
+      "value": "Enter topic name"
+    },
+    {
+      "name": "chat_bot_sub_session_load_error",
+      "value": "Failed to load topics"
+    },
+    {
+      "name": "chat_bot_sub_session_load_failed",
+      "value": "Load failed"
+    },
+    {
+      "name": "chat_bot_sub_session_load_more_failed",
+      "value": "Data request failed. Please try again later"
+    },
+    {
+      "name": "chat_bot_sub_session_retry",
+      "value": "Tap to retry"
+    },
+    {
+      "name": "chat_bot_sub_session_offline_create",
+      "value": "You are offline. Cannot create a conversation now"
+    },
+    {
+      "name": "chat_bot_sub_session_rename_failed",
+      "value": "Failed to rename. Please try again"
+    },
+    {
+      "name": "chat_bot_sub_session_delete_failed",
+      "value": "Failed to delete. Please try again"
+    },
+    {
+      "name": "chat_bot_sub_session_removed",
+      "value": "This topic was removed"
+    },
+    {
+      "name": "chat_bot_sub_session_guide",
+      "value": "Start chatting with %s"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_image",
+      "value": "[Photo]"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_file",
+      "value": "[File]"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_file_with_name",
+      "value": "[File] %s"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_audio",
+      "value": "[Voice]"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_video",
+      "value": "[Video]"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_message",
+      "value": "[Message]"
+    },
+    {
+      "name": "chat_bot_sub_session_action_after_send",
+      "value": "Send a message before managing the topic"
     }
   ]
 }

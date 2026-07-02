@@ -5,10 +5,9 @@
  *
  */
 
-import { V2NIMSendMessageParams } from '@nimsdk/base'
+import { assign, V2NIMSendMessageParams } from '@nimsdk/base'
 import { PushConfigManager } from '@nimkit/chatkit'
 import { ChatKitConfig } from '../ChatKitConfig'
-import { assign } from '@nimsdk/vendor'
 
 /**
  * 构建消息发送参数，用于配置消息通用参数

@@ -313,6 +313,18 @@
       "value": "相机被禁用"
     },
     {
+      "name": "call_push_title",
+      "value": "来电提醒"
+    },
+    {
+      "name": "call_push_audio_content",
+      "value": "您有一个音频通话"
+    },
+    {
+      "name": "call_push_video_content",
+      "value": "您有一个视频通话"
+    },
+    {
       "name": "mine_setting_global_config",
       "value": "全局配置"
     },
@@ -343,6 +355,34 @@
     {
       "name": "mine_setting_translation",
       "value": "翻译"
+    },
+    {
+      "name": "translation_app_language",
+      "value": "语言"
+    },
+    {
+      "name": "translation_app_language_title",
+      "value": "语言"
+    },
+    {
+      "name": "translation_app_language_desc",
+      "value": "设置应用展示语言"
+    },
+    {
+      "name": "translation_app_language_follow_system",
+      "value": "跟随系统"
+    },
+    {
+      "name": "translation_app_language_zh_cn",
+      "value": "简体中文"
+    },
+    {
+      "name": "translation_app_language_en_us",
+      "value": "English"
+    },
+    {
+      "name": "translation_language_switch_success",
+      "value": "语言切换成功"
     },
     {
       "name": "translation_target_language",
@@ -463,6 +503,14 @@
     {
       "name": "push_config_save",
       "value": "保存配置"
+    },
+    {
+      "name": "push_config_invalid",
+      "value": "配置格式错误，请检查 JSON 格式"
+    },
+    {
+      "name": "push_config_save_success",
+      "value": "保存成功"
     }
   ]
 }

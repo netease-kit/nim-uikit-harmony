@@ -5,7 +5,8 @@
  *
  */
 
-import { ChatKitClient, ConversationRepo, ErrorUtils, IMKitConfigCenter, LocalConversationRepo, UserAIBotRepo } from '@nimkit/chatkit';
+import { Logger } from '@nimkit/common';
+import { ChatKitClient, ConversationRepo, ErrorUtils, IMKitConfigCenter, LocalConversationRepo, UserAIBotManager } from '@nimkit/chatkit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { V2NIMGetUserAIBotListParams, V2NIMGetUserAIBotListResult, V2NIMUserAIBot } from '@nimsdk/base';
 import {
@@ -63,7 +64,7 @@ export struct BindBotPage {
         const params: V2NIMGetUserAIBotListParams = nextToken
           ? { pageToken: nextToken, limit: 100 }
           : { limit: 100 }
-        const result: V2NIMGetUserAIBotListResult | undefined = await UserAIBotRepo.getUserAIBotList(params)
+        const result: V2NIMGetUserAIBotListResult | undefined = await UserAIBotManager.getUserAIBotList(params)
         if (result && result.bots) {
           for (const bot of result.bots) {
             allBots.push(bot)
@@ -81,7 +82,7 @@ export struct BindBotPage {
         this.limitDialogController.open()
       }
     } catch (err) {
-      console.error('loadBotList error: ' + JSON.stringify(err))
+      Logger.error('ContactKit', 'loadBotList error: ' + JSON.stringify(err))
     } finally {
       this.isLoading = false
     }
@@ -115,7 +116,7 @@ export struct BindBotPage {
         await ConversationRepo.createConversation(conversationId)
       }
     } catch (err) {
-      console.error('ensureConversationCreated error: ' + JSON.stringify(err))
+      Logger.error('ContactKit', 'ensureConversationCreated error: ' + JSON.stringify(err))
     }
   }
 
@@ -125,10 +126,10 @@ export struct BindBotPage {
     this.isBinding = true
     try {
       // 先从 getUserAIBot 读 token，若为空再 fallback 到 refreshUserAIBotToken
-      const botDetail = await UserAIBotRepo.getUserAIBot({ accid: bot.accid })
+      const botDetail = await UserAIBotManager.getUserAIBot({ accid: bot.accid })
       let token = botDetail?.token ?? ''
       if (token.length === 0) {
-        const refreshResult = await UserAIBotRepo.refreshUserAIBotToken({ accid: bot.accid })
+        const refreshResult = await UserAIBotManager.refreshUserAIBotToken({ accid: bot.accid })
         token = refreshResult?.token ?? ''
       }
       if (token.length === 0) {
@@ -137,7 +138,7 @@ export struct BindBotPage {
       }
 
       // 通过 SDK 协议 37-7 发起绑定
-      await UserAIBotRepo.bindUserAIBotToQrCode({
+      await UserAIBotManager.bindUserAIBotToQrCode({
         accid: bot.accid,
         token: token,
         qrCode: this.qrcode
@@ -148,9 +149,9 @@ export struct BindBotPage {
 
       NECommonUtils.showToast($r('app.string.bot_bind_success'))
       // pop 回调用方，由调用方跳转 BotInfoPage
-      this.pathStack.pop(bot)
+      this.pathStack.pop(botDetail ?? bot)
     } catch (err) {
-      console.error('doConfirmBind error: ' + JSON.stringify(err))
+      Logger.error('ContactKit', 'doConfirmBind error: ' + JSON.stringify(err))
       // 网络异常优先判断
       if (!ErrorUtils.checkNetworkAndToast()) {
         // checkNetworkAndToast 内部已弹网络异常 Toast，无需再弹
@@ -217,7 +218,7 @@ export struct BindBotPage {
                   if (typeof result === 'string') {
                     // 兼容旧版：只有 accid，需要再查列表
                     const newAccid = result
-                    UserAIBotRepo.getUserAIBotList({ limit: 100 }).then((listResult) => {
+                    UserAIBotManager.getUserAIBotList({ limit: 100 }).then((listResult) => {
                       if (listResult && listResult.bots) {
                         for (const bot of listResult.bots) {
                           if (bot.accid === newAccid) {

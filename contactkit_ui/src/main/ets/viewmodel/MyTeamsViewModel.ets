@@ -5,12 +5,15 @@
  *
  */
 
-import { ChatKitClient, TeamRepo } from '@nimkit/chatkit'
+import { Logger } from '@nimkit/common';
+import { DisposableBag, TeamEventRepo, TeamRepo } from '@nimkit/chatkit'
 import { V2NIMTeam, V2NIMTeamType } from '@nimsdk/base'
 
 @ObservedV2
 export class MyTeamsViewModel {
   @Trace teamList: V2NIMTeam[] = []
+  private disposableBag: DisposableBag = new DisposableBag()
+
   onTeamCreatedFun = (team: V2NIMTeam) => {
     if (team.isValidTeam) {
       this.teamList.unshift(team)
@@ -46,11 +49,18 @@ export class MyTeamsViewModel {
   }
 
   constructor() {
-    ChatKitClient.nim.teamService?.on('onTeamCreated', this.onTeamCreatedFun)
-    ChatKitClient.nim.teamService?.on('onTeamDismissed', this.onTeamDismissedFun)
-    ChatKitClient.nim.teamService?.on('onTeamJoined', this.onTeamJoinedFun)
-    ChatKitClient.nim.teamService?.on('onTeamLeft', this.onTeamLeftFun)
-    ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', this.onTeamInfoUpdatedFun)
+    this.initEventListeners()
+  }
+
+  initEventListeners(): void {
+    this.onDestroy()
+    this.disposableBag.addAll([
+      TeamEventRepo.onTeamCreated(this.onTeamCreatedFun),
+      TeamEventRepo.onTeamDismissed(this.onTeamDismissedFun),
+      TeamEventRepo.onTeamJoined(this.onTeamJoinedFun),
+      TeamEventRepo.onTeamLeft(this.onTeamLeftFun),
+      TeamEventRepo.onTeamInfoUpdated(this.onTeamInfoUpdatedFun)
+    ])
   }
 
   async getJoinedTeamList() {
@@ -68,15 +78,11 @@ export class MyTeamsViewModel {
         })
       }
     } catch (err) {
-      console.log(err)
+      Logger.info('ContactKit', err)
     }
   }
 
   onDestroy() {
-    ChatKitClient.nim.teamService?.off('onTeamCreated', this.onTeamCreatedFun)
-    ChatKitClient.nim.teamService?.off('onTeamDismissed', this.onTeamDismissedFun)
-    ChatKitClient.nim.teamService?.off('onTeamJoined', this.onTeamJoinedFun)
-    ChatKitClient.nim.teamService?.off('onTeamLeft', this.onTeamLeftFun)
-    ChatKitClient.nim.teamService?.off('onTeamInfoUpdated', this.onTeamInfoUpdatedFun)
+    this.disposableBag.dispose()
   }
 }

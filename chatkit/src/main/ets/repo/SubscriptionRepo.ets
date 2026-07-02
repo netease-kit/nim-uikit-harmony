@@ -19,6 +19,7 @@ export class SubscriptionRepo {
   @Trace static onlineStateMap: Map<string, boolean> = new Map();
   static subscriptionArray: string[] = [];
   static subscriptionInFlightSet: Set<string> = new Set();
+  private static hasAddedListener: boolean = false;
 
   /**
    * 订阅用户状态，包括在线状态，或自定义状态
@@ -39,6 +40,7 @@ export class SubscriptionRepo {
 
     SubscriptionRepo.subscriptionInFlightSet.add(accountId);
     try {
+      SubscriptionRepo.addListener();
       const failedSubscribeUsers = await ChatKitClient.nim.subscriptionService?.subscribeUserStatus({
         accountIds: [accountId],
         duration: subscriptionOnlineStateDuration,
@@ -55,6 +57,45 @@ export class SubscriptionRepo {
     }
   }
 
+  static async subscribeUserStatusBatch(accountIds: string[]): Promise<string[]> {
+    const uniqueAccountIds: string[] = SubscriptionRepo.filterSubscribableAccountIds(accountIds);
+    if (uniqueAccountIds.length <= 0) {
+      return [];
+    }
+
+    uniqueAccountIds.forEach((accountId: string): void => {
+      SubscriptionRepo.subscriptionInFlightSet.add(accountId);
+    });
+    try {
+      SubscriptionRepo.addListener();
+      const failedSubscribeUsers: string[] = [];
+      const chunkSize: number = 100;
+      for (let i = 0; i < uniqueAccountIds.length; i += chunkSize) {
+        const chunk: string[] = uniqueAccountIds.slice(i, i + chunkSize);
+        const failedChunkUsers = await ChatKitClient.nim.subscriptionService?.subscribeUserStatus({
+          accountIds: chunk,
+          duration: subscriptionOnlineStateDuration,
+          immediateSync: true
+        }) ?? [];
+        failedChunkUsers.forEach((accountId: string): void => {
+          failedSubscribeUsers.push(accountId);
+        });
+      }
+
+      uniqueAccountIds.forEach((accountId: string): void => {
+        if (!failedSubscribeUsers.includes(accountId) &&
+          !SubscriptionRepo.subscriptionArray.includes(accountId)) {
+          SubscriptionRepo.subscriptionArray.push(accountId);
+        }
+      });
+      return failedSubscribeUsers;
+    } finally {
+      uniqueAccountIds.forEach((accountId: string): void => {
+        SubscriptionRepo.subscriptionInFlightSet.delete(accountId);
+      });
+    }
+  }
+
   /**
    * 取消订阅用户状态。返回值为取消订阅失败的用户列表
    *
@@ -64,10 +105,25 @@ export class SubscriptionRepo {
   static async unsubscribeUserStatus(accountIds?: string[]): Promise<string[]> {
     const unsubscribeFailedUsers = await ChatKitClient.nim.subscriptionService?.unsubscribeUserStatus({
       accountIds: accountIds ?? []
-    });
+    }) ?? [];
     const unsubscribeUsers = accountIds?.filter(accountId => !unsubscribeFailedUsers.includes(accountId));
-    unsubscribeUsers?.forEach(accountId => SubscriptionRepo.onlineStateMap.delete(accountId));
+    unsubscribeUsers?.forEach((accountId: string): void => {
+      SubscriptionRepo.onlineStateMap.delete(accountId);
+      SubscriptionRepo.removeSubscribedAccount(accountId);
+      SubscriptionRepo.subscriptionInFlightSet.delete(accountId);
+    });
     return unsubscribeFailedUsers;
+  }
+
+  static getOnlineState(accountId?: string): boolean | undefined {
+    if (!accountId) {
+      return undefined;
+    }
+    return SubscriptionRepo.onlineStateMap.get(accountId);
+  }
+
+  static hasReachedSubscriptionLimit(limit: number = 3000): boolean {
+    return SubscriptionRepo.subscriptionArray.length >= limit;
   }
 
   /**
@@ -84,17 +140,14 @@ export class SubscriptionRepo {
   static async onLoginStatusFun(status: V2NIMLoginStatus): Promise<void> {
     switch (status) {
       case V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGOUT:
-        SubscriptionRepo.onlineStateMap.clear();
-        SubscriptionRepo.subscriptionArray = [];
-        SubscriptionRepo.subscriptionInFlightSet.clear();
+        SubscriptionRepo.resetSubscriptionState();
         break;
       case V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED:
         //SubscriptionRepo.resubscribe();
         break;
       case V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINING:
       case V2NIMLoginStatus.V2NIM_LOGIN_STATUS_UNLOGIN:
-        // 断网或者状态错误还原在线状态
-        SubscriptionRepo.onlineStateMap.clear();
+        // 临时断线或重连中保留最近一次状态快照，避免会话页把已在线好友瞬间显示为离线。
         SubscriptionRepo.subscriptionInFlightSet.clear();
         break;
       default:
@@ -103,15 +156,45 @@ export class SubscriptionRepo {
     }
   }
 
-  static addListener() {
-    ChatKitClient.nim.subscriptionService.on('onUserStatusChanged', (userStatusList: V2NIMUserStatus[]) => {
-      userStatusList.forEach((value: V2NIMUserStatus, index: number, array: V2NIMUserStatus[]) => {
-        console.info('xxxx onUserStatusChanged', value.accountId, value.statusType === 1)
-        SubscriptionRepo.onlineStateMap.set(value.accountId, value.statusType === 1);
-      })
-    })
+  static resetSubscriptionState(): void {
+    SubscriptionRepo.onlineStateMap.clear();
+    SubscriptionRepo.subscriptionArray = [];
+    SubscriptionRepo.subscriptionInFlightSet.clear();
+  }
 
+  private static onUserStatusChangedFun = (userStatusList: V2NIMUserStatus[]): void => {
+    userStatusList.forEach((value: V2NIMUserStatus, index: number, array: V2NIMUserStatus[]) => {
+      SubscriptionRepo.onlineStateMap.set(value.accountId, value.statusType === 1);
+    })
+  }
+
+  static addListener() {
+    if (SubscriptionRepo.hasAddedListener) {
+      return;
+    }
+    ChatKitClient.nim.subscriptionService?.on('onUserStatusChanged', SubscriptionRepo.onUserStatusChangedFun)
     ChatKitClient.nim.loginService.on('onLoginStatus', SubscriptionRepo.onLoginStatusFun);
+    SubscriptionRepo.hasAddedListener = true;
+  }
+
+  private static filterSubscribableAccountIds(accountIds: string[]): string[] {
+    const uniqueAccountIds: string[] = [];
+    accountIds.forEach((accountId: string): void => {
+      if (accountId &&
+        !uniqueAccountIds.includes(accountId) &&
+        !SubscriptionRepo.subscriptionArray.includes(accountId) &&
+        !SubscriptionRepo.subscriptionInFlightSet.has(accountId)) {
+        uniqueAccountIds.push(accountId);
+      }
+    });
+    return uniqueAccountIds;
+  }
+
+  private static removeSubscribedAccount(accountId: string): void {
+    const index = SubscriptionRepo.subscriptionArray.indexOf(accountId);
+    if (index > -1) {
+      SubscriptionRepo.subscriptionArray.splice(index, 1);
+    }
   }
 
   static async resubscribe() {
@@ -138,7 +221,11 @@ export class SubscriptionRepo {
   }
 
   static removeListener() {
-    ChatKitClient.nim.subscriptionService.off('onUserStatusChanged', (userStatusList: V2NIMUserStatus[]) => {
-    });
+    if (!SubscriptionRepo.hasAddedListener) {
+      return;
+    }
+    ChatKitClient.nim.subscriptionService?.off('onUserStatusChanged', SubscriptionRepo.onUserStatusChangedFun);
+    ChatKitClient.nim.loginService.off('onLoginStatus', SubscriptionRepo.onLoginStatusFun);
+    SubscriptionRepo.hasAddedListener = false;
   }
 }

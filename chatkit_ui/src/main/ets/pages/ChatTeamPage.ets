@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatTeamInfo } from '../model/ChatTeamInfo';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { MessageComponent } from '../view/MessageComponent';
@@ -15,6 +16,9 @@ import { NEChatEmojiView } from '../view/NEChatEmojiView';
 import { NEEmojiManager, NEEmojiParseResult, NIMEmoticonType } from '../manager/NEEmojiManager';
 import { NEChatMoreOperation } from '../view/ChatMoreOperationLayout';
 import { NEChatMoreOperationData, NEChatMoreOperationType } from '../model/NEChatMoreOperationData';
+import { AITranslateView } from '../view/ai/AITranslateView';
+import { AISearchPanel } from '../aisearchkit/AISearchPanel';
+import { AISearchSelectionState, getMultiLineAISearchText } from '../aisearchkit/AISearchMenuUtils';
 import { NEAudioRecordView } from '../view/NEAudioRecordView';
 import {
   DoubleAlertDialog,
@@ -57,6 +61,7 @@ import {
   ErrorUtils,
   getMultiLineBody,
   getMultiLineTitle,
+  AIUserManager,
   IMKitConfigCenter,
   MergedMessageAttachment,
   mergedMessageCustomType,
@@ -71,7 +76,7 @@ import {
 } from '@nimkit/chatkit';
 import { TeamExitDialogParam, TeamExitWarningDialog } from '../view/TeamExitWarningDialog';
 import { AudioPlayerManager } from '../manager/AudioPlayerManager';
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
+import { ConversationSelectModel } from '@nimkit/chatkit';
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import {
@@ -86,8 +91,11 @@ import {
   parseMessageText
 } from '../common/MessageHelper';
 import {
-  computeOperateViewHeight,
-  computeOperateViewWidth,
+  canShowAISearchForMessage,
+  computeOperateViewHeightByCount,
+  computeOperateViewWidthByCount,
+  getOperateMenu,
+  getSelectedTextOperateMenu,
   getTranslationOperateMenu,
   setupMoreOperationData
 } from '../common/ChatUtils';
@@ -102,9 +110,16 @@ import { IsReceiveMsgOperation } from '../model/IsReceiveMsg';
 import { shouldShowTopMessageBar } from '../utils/TopMessageBarUtils';
 import { MessageTranslationService } from '../service/translation/MessageTranslationService';
 import {
+  collectRichInputTransferNodes,
   RichInputTransferNode,
-  RichInputTransferNodeType
+  RichInputTransferNodeType,
+  restoreMultiLineContent
 } from '../common/InputTransferUtils';
+import {
+  AitInsertTarget,
+  resolveAvatarLongPressAitAccountId,
+  resolveAvatarLongPressAitTarget
+} from '../common/AitRoutingUtils';
 
 @ComponentV2
 export struct ChatTeamPage {
@@ -117,6 +132,8 @@ export struct ChatTeamPage {
   operationMoreDataList: Array<NEChatMoreOperationData> = Array();
   @Local showMultiSelect: boolean = false;
   @Local multiSelectCount: number = 0;
+  @Local showTranslateView: boolean = false
+  @Local translateResetKey: number = 0
   @Local hideInput: boolean = false;
   @Local scrollHeight: number = 0;
   @Local showOperationView: boolean = false;
@@ -129,6 +146,11 @@ export struct ChatTeamPage {
   @Local translatedActionMsg: NIMMessageInfo | undefined = undefined;
   @Local translationOperationMode: boolean = false;
   @Local operationMenuItems: Array<MessageOperationItem> | undefined = undefined;
+  @Local selectedOperationText: string = ''
+  @Local showAISearchPanel: boolean = false
+  @Local aiSearchKeyword: string = ''
+  @Local aiSearchSelectionState: AISearchSelectionState = new AISearchSelectionState()
+  @Local aiSearchSelectingMessageId: string = ''
   @Local replyMsg: NIMMessageInfo | undefined = undefined;
   // 撤回重编辑的富文本内容
   @Local revokeMultiLineContent: string = ''
@@ -147,6 +169,11 @@ export struct ChatTeamPage {
   navBarHeight: number = 80;
   // 底部输入框以及固定按钮操作栏高度
   @Local bottomHeight: number = 105;
+  @Local translatePanelHeight: number = 80
+  @Local translateResult: string = ''
+  @Local translateIsLoading: boolean = false
+  @Local translateIsResultMode: boolean = false
+  @Local translateInputText: string = ''
   bottomMargin: number = 100;
   bottomWithReplyHeight: number = 135;
   controller: RichEditorController = new RichEditorController()
@@ -433,7 +460,7 @@ export struct ChatTeamPage {
         this.expandHeight = 0
         this.inputStyle = InputStyleType.None
         this.bottomHeight = 105
-        this.scrollHeight = this.screenHeight - this.bottomHeight
+        this.computeScrollHeight()
       }
     }
   }
@@ -582,12 +609,13 @@ export struct ChatTeamPage {
   }
 
   computeScrollHeight() {
+    const translateHeight = this.getTranslatePanelHeight()
     if ((this.inputStyle === InputStyleType.Emoji || this.inputStyle === InputStyleType.Record ||
       this.inputStyle === InputStyleType.More) && this.keyboardHeight <= 0) {
-      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight - this.expandHeight
+      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight - this.expandHeight - translateHeight
     } else if (this.inputStyle === InputStyleType.Multiline) {
       // 多行模式：bottomHeight = 0，需要考虑 expandHeight
-      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.expandHeight
+      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.expandHeight - translateHeight
       // 键盘弹出时滚动到底部
       if (this.keyboardHeight > 10) {
         setTimeout(() => {
@@ -597,7 +625,7 @@ export struct ChatTeamPage {
         }, 20)
       }
     } else {
-      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight
+      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight - translateHeight
       if (this.keyboardHeight > 10) {
         this.expandHeight = 0
         this.inputStyle = InputStyleType.None;
@@ -610,6 +638,324 @@ export struct ChatTeamPage {
         }, 20)
       }
     }
+  }
+
+  private getTranslatePanelHeight(): number {
+    return this.showTranslateView && !this.showMultiSelect ? this.translatePanelHeight : 0
+  }
+
+  private getChatInputContainerHeight(): number {
+    if (this.showTranslateView && !this.showMultiSelect) {
+      return this.bottomHeight + this.translatePanelHeight
+    }
+    return this.bottomHeight
+  }
+
+  private getSingleLineInputHeight(): number {
+    return this.replyMsg ? this.bottomWithReplyHeight : 105
+  }
+
+  private getInputExpandContainerHeight(): number {
+    return this.expandHeight
+  }
+
+  private getTranslateInputText(): string {
+    if (this.inputStyle === InputStyleType.Multiline) {
+      return this.multiLineInputViewInstance?.getMultiLineBodyText() ?? this.multiLineBody
+    }
+    return this.getMessageText()
+  }
+
+  private syncTranslateInputText() {
+    this.translateInputText = this.getTranslateInputText()
+  }
+
+  private setTranslateInputText(text: string) {
+    if (this.inputStyle === InputStyleType.Multiline) {
+      this.multiLineInputViewInstance?.setBodyText(text)
+      this.multiLineBody = text
+      this.multiLineBodyNodes = []
+      this.aitManager.cleanAit()
+      return
+    }
+    this.controller.deleteSpans()
+    this.builderSpans.splice(0, this.builderSpans.length)
+    this.aitManager.cleanAit()
+    if (text.length > 0) {
+      this.controller.addTextSpan(text, { offset: 0 })
+    }
+  }
+
+  private showAITranslateView() {
+    if (!IMKitConfigCenter.enableAI || !AIUserManager.getAITranslateUser()) {
+      return
+    }
+    this.showTranslateView = true
+    if (this.inputStyle === InputStyleType.More) {
+      this.inputStyle = InputStyleType.None
+      this.expandHeight = 0
+    }
+    this.computeScrollHeight()
+  }
+
+  private hideAITranslateView() {
+    this.showTranslateView = false
+    this.clearAITranslateState()
+    this.computeScrollHeight()
+  }
+
+  private resetAITranslateView() {
+    if (this.showTranslateView) {
+      this.translateResetKey += 1
+    }
+    this.clearAITranslateState()
+  }
+
+  private clearAITranslateState() {
+    this.translateResult = ''
+    this.translateIsLoading = false
+    this.translateIsResultMode = false
+  }
+
+  private getAIChatUsers() {
+    return IMKitConfigCenter.enableAI ? AIUserManager.getAIChatUserList() : []
+  }
+
+  private canAitAIUser(): boolean {
+    return IMKitConfigCenter.enableAI && this.getAIChatUsers().length > 0
+  }
+
+  private getAitPushList(): string[] | undefined {
+    return this.aitManager.getPushList()
+  }
+
+  private getFirstAitAIUserAccount(): string | undefined {
+    if (!IMKitConfigCenter.enableAI) {
+      return undefined
+    }
+    return this.aitManager.getFirstAccount(NEAIUserCache.getAIUserList().map(aiUser => aiUser.accountId))
+  }
+
+  private getOperationText(): string {
+    if (!this.operationMsg) {
+      return ''
+    }
+    if (this.selectedOperationText.length > 0) {
+      return this.selectedOperationText
+    }
+    if (this.translationOperationMode) {
+      return MessageTranslationService.instance.getTranslatedDisplayText(this.operationMsg)
+    }
+    if (this.operationMsg.isMultiLineMsg) {
+      const title = getMultiLineTitle(this.operationMsg.message)
+      const body = getMultiLineBody(this.operationMsg.message)
+      return title && body ? `${title}\n${body}` : (title || body)
+    }
+    return this.operationMsg.message.text ?? ''
+  }
+
+  private getAISearchOperationText(): string {
+    if (!this.operationMsg) {
+      return ''
+    }
+    if (this.selectedOperationText.length > 0) {
+      return this.selectedOperationText
+    }
+    if (this.translationOperationMode) {
+      return MessageTranslationService.instance.getTranslatedDisplayText(this.operationMsg)
+    }
+    if (this.operationMsg.isMultiLineMsg) {
+      return getMultiLineAISearchText(getMultiLineBody(this.operationMsg.message))
+    }
+    return this.operationMsg.message.text ?? ''
+  }
+
+  private getMessageAISearchText(msg: NIMMessageInfo | undefined): string {
+    if (!msg) {
+      return ''
+    }
+    if (msg.isMultiLineMsg) {
+      return getMultiLineAISearchText(getMultiLineBody(msg.message))
+    }
+    if (msg.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+      return msg.message.text ?? ''
+    }
+    return ''
+  }
+
+  private getSelectionOperationMenuItems(): MessageOperationItem[] {
+    if (this.translationOperationMode && this.aiSearchSelectionState.isAllSelected()) {
+      return getTranslationOperateMenu()
+    }
+    if (!this.aiSearchSelectionState.active || this.aiSearchSelectionState.isAllSelected()) {
+      return getOperateMenu(this.operationMsg, this.chatViewModel.topMessage)
+    }
+    return getSelectedTextOperateMenu(this.aiSearchSelectionState.selectedText())
+  }
+
+  private updateSelectionOperationMenu(): void {
+    if (!this.aiSearchSelectionState.active) {
+      return
+    }
+    this.selectedOperationText = this.aiSearchSelectionState.isAllSelected() ? '' :
+    this.aiSearchSelectionState.selectedText()
+    this.operationMenuItems = this.getSelectionOperationMenuItems()
+    const itemCount = this.operationMenuItems.length
+    const opMenuWidth = computeOperateViewWidthByCount(itemCount)
+    const opMenuHeight = computeOperateViewHeightByCount(itemCount)
+    this.operationRect.x = this.aiSearchSelectionState.rectX +
+      (this.aiSearchSelectionState.rectWidth - opMenuWidth) / 2
+    if (this.operationRect.x < this.operationViewMargin) {
+      this.operationRect.x = this.operationViewMargin
+    }
+    if (this.operationRect.x + opMenuWidth + this.operationViewMargin > this.screenWidth) {
+      this.operationRect.x = this.screenWidth - opMenuWidth - this.operationViewMargin
+    }
+    this.operationRect.y = this.aiSearchSelectionState.rectY - opMenuHeight - this.operationViewMargin
+    if (this.operationRect.y < 0) {
+      this.operationRect.y = this.aiSearchSelectionState.rectY + this.aiSearchSelectionState.rectHeight +
+        this.operationViewMargin
+    }
+    this.showOperationView = itemCount > 0
+  }
+
+  private closeAISearchSelection(): void {
+    this.aiSearchSelectionState.close()
+    this.aiSearchSelectingMessageId = ''
+  }
+
+  private openAISearchSelection(event: GestureEvent, msg: NIMMessageInfo | undefined): boolean {
+    if (!canShowAISearchForMessage(msg)) {
+      return false
+    }
+    const text = this.getMessageAISearchText(msg).trim()
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] Team openAISearchSelection msgId=${msg?.getMessageClientId()} textLength=${text.length} type=${msg?.getMessageType()} aiResponse=${msg?.isAIResponseMsg()} aiStream=${msg?.isAiStreamMessage()}`)
+    return this.openTextSelection(event, msg, text, false)
+  }
+
+  private openTranslationSelection(event: GestureEvent, msg: NIMMessageInfo | undefined): boolean {
+    const text = msg ? MessageTranslationService.instance.getTranslatedDisplayText(msg).trim() : ''
+    return this.openTextSelection(event, msg, text, true)
+  }
+
+  private openTextSelection(event: GestureEvent, msg: NIMMessageInfo | undefined, text: string,
+    isTranslation: boolean): boolean {
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] Team openTextSelection msgId=${msg?.getMessageClientId()} textLength=${text.length} isTranslation=${isTranslation} hasX=${event.target.area.globalPosition.x !== undefined} hasY=${event.target.area.globalPosition.y !== undefined}`)
+    if (text.length === 0 || event.target.area.globalPosition.x === undefined ||
+      event.target.area.globalPosition.y === undefined) {
+      this.closeAISearchSelection()
+      Logger.info('ChatKitUI', `[AISearchMarkdownSelect] Team openTextSelection close msgId=${msg?.getMessageClientId()}`)
+      return false
+    }
+    this.aiSearchSelectionState.open(text,
+      Number(event.target.area.globalPosition.x),
+      Number(event.target.area.globalPosition.y) - this.navBarHeight,
+      Number(event.target.area.width),
+      Number(event.target.area.height))
+    this.operationMsg = msg
+    this.translatedActionMsg = isTranslation ? msg : undefined
+    this.translationOperationMode = isTranslation
+    this.aiSearchSelectingMessageId = msg?.getMessageClientId() ?? ''
+    this.selectedOperationText = ''
+    this.operationMenuItems = this.getSelectionOperationMenuItems()
+    this.updateSelectionOperationMenu()
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] Team setSelectingMessageId id=${this.aiSearchSelectingMessageId}`)
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] Team openTextSelection opened msgId=${msg?.getMessageClientId()} active=${this.aiSearchSelectionState.active} rect=${this.aiSearchSelectionState.rectX},${this.aiSearchSelectionState.rectY},${this.aiSearchSelectionState.rectWidth},${this.aiSearchSelectionState.rectHeight}`)
+    return true
+  }
+
+  private showOperationMenu(event: GestureEvent, msg: NIMMessageInfo | undefined,
+    operationItems?: Array<MessageOperationItem>, selectedText: string = ''): void {
+    if (selectedText.length === 0) {
+      this.closeAISearchSelection()
+    }
+    this.operationMsg = msg
+    this.translationOperationMode = false
+    this.operationMenuItems = operationItems
+    this.selectedOperationText = selectedText
+    const itemCount = operationItems ? operationItems.length : getOperateMenu(msg, this.chatViewModel.topMessage).length
+    let opMenuWidth = computeOperateViewWidthByCount(itemCount)
+    let opMenuHeight = computeOperateViewHeightByCount(itemCount)
+    let marginSize = this.operationViewMargin
+    if (event.target.area.position.x !== undefined) {
+      let xPoint = Number(event.target.area.globalPosition.x) +
+        (Number(event.target.area.width) - opMenuWidth) / 2
+      if (xPoint < marginSize) {
+        xPoint = marginSize
+      }
+      if (xPoint + opMenuWidth + marginSize > this.screenWidth) {
+        xPoint = this.screenWidth - opMenuWidth - marginSize
+      }
+      this.operationRect.x = xPoint;
+    }
+    if (event.target.area.position.y !== undefined) {
+      let yPoint =
+        Number(event.target.area.globalPosition.y) - this.navBarHeight +
+        Number(event.target.area.height)
+      if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
+        yPoint =
+          yPoint - opMenuHeight - marginSize * 2 - Number(event.target.area.height);
+      }
+      if (yPoint < 0) {
+        yPoint = this.scrollHeight / 2;
+      }
+      this.operationRect.y = yPoint
+    }
+    this.showOperationView = itemCount > 0
+  }
+
+  private updateTextSelection(msg: NIMMessageInfo | undefined, text: string, start: number, end: number,
+    isTranslation: boolean): void {
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] Team updateTextSelection enter msgId=${msg?.getMessageClientId()} active=${this.aiSearchSelectionState.active} operationSame=${this.operationMsg === msg} mode=${this.translationOperationMode} isTranslation=${isTranslation} start=${start} end=${end} textLength=${text.length}`)
+    if (!this.aiSearchSelectionState.active || this.operationMsg !== msg ||
+      this.translationOperationMode !== isTranslation) {
+      return
+    }
+    this.aiSearchSelectionState.text = text
+    this.aiSearchSelectionState.updateRange(start, end)
+    this.translatedActionMsg = isTranslation ? msg : undefined
+    this.selectedOperationText = this.aiSearchSelectionState.isAllSelected() ? '' :
+    this.aiSearchSelectionState.selectedText()
+    this.updateSelectionOperationMenu()
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] Team updateTextSelection updated allSelected=${this.aiSearchSelectionState.isAllSelected()} selectedLength=${this.selectedOperationText.length}`)
+  }
+
+  @Builder
+  AITranslatePanel() {
+    AITranslateView({
+      inputText: this.translateInputText,
+      translateAccountId: AIUserManager.getAITranslateUser()?.accountId ?? '',
+      loginAccountId: ChatKitClient.getLoginUserId(),
+      languages: AIUserManager.getAITranslateLanguages(),
+      resetKey: this.translateResetKey,
+      initialTranslateResult: this.translateResult,
+      initialIsLoading: this.translateIsLoading,
+      initialIsResultMode: this.translateIsResultMode,
+      onTranslateClick: () => {
+        return this.getTranslateInputText()
+      },
+      onResultClick: (text: string) => {
+        this.setTranslateInputText(text)
+        this.computeScrollHeight()
+      },
+      onStateChange: (translateResult: string, isResultMode: boolean, isLoading: boolean) => {
+        this.translateResult = translateResult
+        this.translateIsResultMode = isResultMode
+        this.translateIsLoading = isLoading
+      },
+      onCloseClick: () => {
+        this.hideAITranslateView()
+      },
+      onHeightChange: (height: number) => {
+        if (height !== this.translatePanelHeight) {
+          this.translatePanelHeight = height
+          this.computeScrollHeight()
+        }
+      }
+    })
+      .width('100%')
+      .height(this.translatePanelHeight)
+      .backgroundColor('#F5F5F5')
   }
 
   /**
@@ -627,35 +973,15 @@ export struct ChatTeamPage {
    * @returns
    */
   getMessageText(): string {
-    let text = '';
-    let builderSpanIndex = 0;
-    if (this.controller) {
-      this.controller.getSpans().forEach((span) => {
-        const textSpan = span as RichEditorTextSpanResult;
-        const imageSpan = span as RichEditorImageSpanResult;
-        if (textSpan.value) {
-          text += textSpan.value;
-        } else if (this.isAitEditorSpan(span) && builderSpanIndex < this.builderSpans.length) {
-          let aitSpan: AitEditorSpan = this.builderSpans[builderSpanIndex]
-          let contentText = aitSpan.value
-          this.aitManager.addAitWithText(aitSpan.accountId, contentText, text.length)
-          text += contentText
-          builderSpanIndex += 1;
-        } else {
-          let resourcePath = imageSpan.valueResourceStr;
-          if (resourcePath != null && resourcePath.toString().length > 0) {
-            let path = resourcePath.toString();
-            let splits = path.split("/")
-            let fileName = splits[splits.length - 1];
-            let emoji = NEEmojiManager.instance.getEmojiByName(String(fileName));
-            if (emoji?.tag != null) {
-              text += emoji.tag;
-            }
-          }
-        }
-      });
-    }
-
+    this.aitManager.cleanAit()
+    const nodes = collectRichInputTransferNodes(this.controller?.getSpans(), this.builderSpans)
+    let text = ''
+    nodes.forEach((node) => {
+      if (node.type === RichInputTransferNodeType.Ait) {
+        this.aitManager.addAitWithText(node.accountId ?? '', node.text, text.length)
+      }
+      text += node.text
+    })
     return text
   }
 
@@ -749,7 +1075,7 @@ export struct ChatTeamPage {
       this.chatViewModel.isPageVisible = false
       this.imageViewerDialog.open()
     } catch (err) {
-      console.error(err)
+      Logger.error('ChatKitUI', err)
     }
   }
 
@@ -793,6 +1119,40 @@ export struct ChatTeamPage {
         value: aitValue,
       }
       this.builderSpans.push(...[aitSpan])
+      return
+    }
+
+    const aiUser = NEAIUserCache.getAIUser(senderId)
+    if (aiUser && this.controller) {
+      const controller = this.controller
+      let aitValue = '@' + (aiUser.name ?? aiUser.accountId) + ' '
+      const offset = controller.getCaretOffset()
+      controller.addBuilderSpan(() => this.AtSpan(aitValue), {
+        offset: offset
+      })
+      let aitSpan: AitEditorSpan = {
+        spanIndex: offset,
+        accountId: aiUser.accountId,
+        value: aitValue,
+      }
+      this.builderSpans.push(...[aitSpan])
+    }
+  }
+
+  private async handleAvatarLongPressAit(senderId: string) {
+    const target = resolveAvatarLongPressAitTarget(
+      this.inputStyle,
+      !!this.controller,
+      !!this.multiLineInputViewInstance
+    )
+    if (target === AitInsertTarget.MultiLine) {
+      await this.multiLineInputViewInstance?.addAitUserById(senderId)
+      this.scheduleMultiLineFocus()
+      return
+    }
+    if (target === AitInsertTarget.SingleLine) {
+      await this.addAitUserById(senderId)
+      this.scheduleSingleLineFocus()
     }
   }
 
@@ -814,32 +1174,35 @@ export struct ChatTeamPage {
     };
     // 拉起地点详情页
     sceneMap.queryLocation(getContext(this) as common.UIAbilityContext, queryLocationOptions).then(() => {
-      console.info("netease QueryLocation", "Succeeded in querying location.");
+      Logger.info('ChatKitUI', "netease QueryLocation", "Succeeded in querying location.");
     }).catch((err: BusinessError) => {
-      console.error("netease QueryLocation", `Failed to query Location, code: ${err.code}, message: ${err.message}`);
+      Logger.error('ChatKitUI', "netease QueryLocation", `Failed to query Location, code: ${err.code}, message: ${err.message}`);
     });
   }
 
   @Builder
   build() {
     NavDestination() {
-      NavigationBackBuilder({
-        title: this.chatTeamInfo.conversationName,
-        // 听筒模式时显示听筒图标
-        titleSuffixIcon: IMKitConfigCenter.enableEarphoneMode
-          ? $r('app.media.ic_chat_audio_earphone')
-          : undefined,
-        leftButtonAction: () => {
-          this.pathStack.pop()
-        },
-        rightButtonIcon: this.showMultiSelect ? undefined : $r('app.media.ic_public_more_dot'),
-        rightButtonTitle: this.showMultiSelect ? $r('app.string.chat_msg_dialog_cancel') : undefined,
+      Stack() {
+        Column() {
+          NavigationBackBuilder({
+            title: this.chatTeamInfo.conversationName,
+            // 听筒模式时显示听筒图标
+            titleSuffixIcon: IMKitConfigCenter.enableEarphoneMode
+              ? $r('app.media.ic_chat_audio_earphone')
+              : undefined,
+            leftButtonAction: () => {
+              this.pathStack.pop()
+            },
+            rightButtonIcon: this.showMultiSelect ? undefined : $r('app.media.ic_public_more_dot'),
+            rightButtonTitle: this.showMultiSelect ? $r('app.string.chat_msg_dialog_cancel') : undefined,
 
-        rightButtonAction: () => {
-          this.goToTeamSettingPage(this.pathStack)
-        }
-      })
-      RelativeContainer() {
+            rightButtonAction: () => {
+              this.goToTeamSettingPage(this.pathStack)
+            }
+          })
+
+          RelativeContainer() {
         // 防诈条和断网条 - 放在顶部
         Column() {
           // 防诈条
@@ -887,18 +1250,20 @@ export struct ChatTeamPage {
                   message: msg,
                   chatInfo: this.chatTeamInfo,
                   showSelect: this.showMultiSelect,
+                  aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
+                  aiSearchSelectingTranslation: this.translationOperationMode,
                   onMessageClick: {
                     onAvatarClick: (msg: NIMMessageInfo | undefined) => {
                       if (this.showMultiSelect) {
                         return
                       }
                       if (msg != null) {
-                        if (msg?.message.senderId == ChatKitClient.getLoginUserId()) {
+                        const senderId = msg.getDisplaySenderId()
+                        if (senderId == ChatKitClient.getLoginUserId()) {
                           this.pathStack.pushPath({
                             name: 'MineInfoPage'
                           })
                         } else {
-                          const senderId = msg?.message.senderId
                           if (senderId && NEAIUserCache.getAIUser(senderId)) {
                             this.pathStack.pushPath({ name: 'AIPersonInfoPage', param: senderId })
                           } else {
@@ -912,8 +1277,10 @@ export struct ChatTeamPage {
                         return
                       }
                       if (msg != null) {
-                        if (msg?.message.senderId && msg?.message.senderId !== ChatKitClient.getLoginUserId()) {
-                          this.addAitUserById(msg.message.senderId)
+                        const accountId = resolveAvatarLongPressAitAccountId(msg.getDisplaySenderId(),
+                          ChatKitClient.getLoginUserId())
+                        if (accountId) {
+                          this.handleAvatarLongPressAit(accountId)
                         }
                       }
                     },
@@ -921,42 +1288,20 @@ export struct ChatTeamPage {
                       if (this.showMultiSelect) {
                         return
                       }
-                      this.operationMsg = msg
-                      this.translationOperationMode = false
-                      this.operationMenuItems = undefined
-                      let opMenuWidth = computeOperateViewWidth(msg)
-                      let opMenuHeight = computeOperateViewHeight(msg)
-                      let marginSize = this.operationViewMargin
-                      if (event.target.area.position.x !== undefined) {
-                        let xPoint = Number(event.target.area.globalPosition.x) +
-                          (Number(event.target.area.width) - opMenuWidth) / 2
-                        if (xPoint < marginSize) {
-                          xPoint = marginSize
-                        }
-                        if (xPoint + opMenuWidth + marginSize > this.screenWidth) {
-                          xPoint = this.screenWidth - opMenuWidth - marginSize
-                        }
-                        this.operationRect.x = xPoint;
+                      if (msg?.isRevokeMsg) {
+                        return
                       }
-                      if (event.target.area.position.y !== undefined) {
-                        let yPoint =
-                          Number(event.target.area.globalPosition.y) - this.navBarHeight +
-                          Number(event.target.area.height)
-                        if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
-                          yPoint =
-                            yPoint - opMenuHeight - marginSize * 2 - Number(event.target.area.height);
-                        }
-                        if (yPoint < 0) {
-                          yPoint = this.scrollHeight / 2;
-
-                        }
-                        this.operationRect.y = yPoint
+                      if (msg?.isAIStreamInProgress()) {
+                        return
                       }
-                      this.showOperationView = true
+                      if (this.openAISearchSelection(event, msg)) {
+                        return
+                      }
+                      this.showOperationMenu(event, msg, getOperateMenu(msg, this.chatViewModel.topMessage))
                     },
                     onItemClick: (event: ClickEvent, msg: NIMMessageInfo | undefined) => {
                       if (this.showMultiSelect) {
-                        if (msg && !msg.isRevokeMsg) {
+                        if (msg?.canOperateInMultiSelect()) {
                           if (!msg?.isSelectedMsg) {
                             this.chatViewModel.addSelectMessage(msg)
                           } else {
@@ -984,9 +1329,37 @@ export struct ChatTeamPage {
                         }
 
                         if (multiLine) {
+                          const bodyNodes: RichInputTransferNode[] = []
+                          parseMessageText(multiLine.data.body)?.forEach((item: NEEmojiParseResult) => {
+                            if (item.text) {
+                              getAitNodes(item.startIndex, item.text, msg.message.serverExtension)
+                                .forEach((node: ChatAitNode) => {
+                                  if (node.segment) {
+                                    bodyNodes.push({
+                                      type: RichInputTransferNodeType.Ait,
+                                      text: node.text,
+                                      accountId: node.account ?? ''
+                                    })
+                                  } else if (node.text.length > 0) {
+                                    bodyNodes.push({
+                                      type: RichInputTransferNodeType.Text,
+                                      text: node.text
+                                    })
+                                  }
+                                })
+                            } else if (item.emoji) {
+                              bodyNodes.push({
+                                type: RichInputTransferNodeType.Emoji,
+                                text: item.emoji.tag ?? '',
+                                emojiFile: item.emoji.file
+                              })
+                            }
+                          })
+
                           this.revokeMultiLineContent = JSON.stringify({
                             title: multiLine.data.title,
                             body: multiLine.data.body,
+                            bodyNodes: bodyNodes,
                             _ts: Date.now()
                           })
                           return
@@ -1060,34 +1433,31 @@ export struct ChatTeamPage {
                     },
                     onTranslatedAreaLongClick: (event: GestureEvent, msg: NIMMessageInfo | undefined) => {
                       if (msg) {
+                        if (this.openTranslationSelection(event, msg)) {
+                          return
+                        }
                         this.operationMsg = msg
                         this.translatedActionMsg = msg
                         this.translationOperationMode = true
                         this.operationMenuItems = getTranslationOperateMenu()
-                        const itemCount = this.operationMenuItems.length
-                        const opMenuWidth = ChatConst.menuItemWidth * Math.min(itemCount, ChatConst.menuItemColumnNum)
-                        const opMenuHeight =
-                          ChatConst.menuItemHeight * (Math.ceil(itemCount / ChatConst.menuItemColumnNum))
-                        let marginSize = this.operationViewMargin
-                        let xPoint = Number(event.target.area.globalPosition.x) +
-                          (Number(event.target.area.width) - opMenuWidth) / 2
-                        if (xPoint < marginSize) {
-                          xPoint = marginSize
-                        }
-                        if (xPoint + opMenuWidth + marginSize > this.screenWidth) {
-                          xPoint = this.screenWidth - opMenuWidth - marginSize
-                        }
-                        this.operationRect.x = xPoint
-                        let yPoint = Number(event.target.area.globalPosition.y) - this.navBarHeight +
-                          Number(event.target.area.height)
-                        if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
-                          yPoint = yPoint - opMenuHeight - marginSize * 2 - Number(event.target.area.height)
-                        }
-                        if (yPoint < 0) {
-                          yPoint = this.scrollHeight / 2
-                        }
-                        this.operationRect.y = yPoint
-                        this.showOperationView = true
+                        this.showOperationMenu(event, msg, this.operationMenuItems)
+                        this.translationOperationMode = true
+                      }
+                    },
+                    onTextSelectionChange: (msg: NIMMessageInfo | undefined, text: string, start: number,
+                      end: number, isTranslation: boolean) => {
+                      this.updateTextSelection(msg, text, start, end, isTranslation)
+                    },
+                    // AI 流式消息 - 停止输出
+                    onAIStreamStop: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                      if (msg) {
+                        this.chatViewModel.stopAIStream(msg)
+                      }
+                    },
+                    // AI 流式消息 - 重新生成
+                    onAIStreamRefresh: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                      if (msg) {
+                        this.chatViewModel.regenAIMessage(msg)
                       }
                     },
                   }
@@ -1127,7 +1497,7 @@ export struct ChatTeamPage {
             this.checkIfAtBottom()
           })
           .onScrollStop(() => {
-            console.debug('netease to scroll stop:', this.toScroll)
+            Logger.debug('ChatKitUI', 'netease to scroll stop:', this.toScroll)
             if (this.toScroll) {
               this.toScroll = false
             }
@@ -1142,25 +1512,31 @@ export struct ChatTeamPage {
           .height(this.scrollHeight - this.bottomMargin - this.tipBannerHeight)
           .onScrollStart(() => {
             this.showOperationView = false
+            this.closeAISearchSelection()
           })
           .onTouch((event) => {
             if (event.type == TouchType.Down) {
               this.showOperationView = false
+              this.closeAISearchSelection()
               this.getUIContext().getFocusController().clearFocus();
               // 多行模式下点击消息列表不切换模式，只收起键盘
               if (this.inputStyle === InputStyleType.Multiline) {
                 return
               }
               // 非多行模式：收起 emoji/more/record 面板
-              this.bottomHeight = 105
-              this.scrollHeight = this.defaultInputViewHeight;
+              this.bottomHeight = this.getSingleLineInputHeight()
               this.expandHeight = 0;
               this.inputStyle = InputStyleType.None
+              this.computeScrollHeight()
             }
           })
 
-          Column()
-            .height(this.bottomHeight)
+          Column() {
+            if (this.showTranslateView && !this.showMultiSelect) {
+              this.AITranslatePanel()
+            }
+          }
+            .height(this.getChatInputContainerHeight())
             .backgroundColor(Color.Transparent)
             .backgroundColor($r('app.color.chat_input_background'))
             .id("chat_input")
@@ -1181,18 +1557,23 @@ export struct ChatTeamPage {
               replyMsg: this.replyMsg,
               chatInfo: this.chatTeamInfo,
               revokeMultiLineContent: this.revokeMultiLineContent,
-              onRestoreMultiLineContent: (title: string, body: string) => {
+              onRestoreMultiLineContent: (title: string, body: string, bodyNodes: RichInputTransferNode[]) => {
+                const restoredContent = restoreMultiLineContent(title, body, bodyNodes)
                 // 恢复撤回重编辑的多行内容
-                this.multiLineTitle = title
-                this.multiLineBody = body
-                this.multiLineBodyNodes = []
+                this.multiLineTitle = restoredContent.title
+                this.multiLineBody = restoredContent.body
+                this.multiLineBodyNodes = restoredContent.bodyNodes
                 // 如果当前已经在多行模式，需要直接更新 MultiLineInputView 的内容
                 if (this.inputStyle === InputStyleType.Multiline && this.multiLineInputViewInstance) {
-                  this.multiLineInputViewInstance.setContent(title, body)
+                  this.multiLineInputViewInstance.setContent(restoredContent.title, restoredContent.body,
+                    restoredContent.bodyNodes)
                 }
               },
               onDidClickCloseReply: () => {
                 this.clearInput(false)
+              },
+              onInputTextChange: (_hasText: boolean) => {
+                this.syncTranslateInputText()
               },
               onDidClickImage: () => {
                 this.showOperationView = false
@@ -1217,11 +1598,11 @@ export struct ChatTeamPage {
                     if (this.inputStyle == InputStyleType.Record) {
                       this.expandHeight = 0
                       this.inputStyle = InputStyleType.None;
-                      this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                      this.computeScrollHeight()
                     } else {
                       this.inputStyle = InputStyleType.Record
                       this.expandHeight = ChatConst.messageInputAreaHeight
-                      this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                      this.computeScrollHeight()
                     }
 
                   } else {
@@ -1235,11 +1616,11 @@ export struct ChatTeamPage {
                 if (this.inputStyle == InputStyleType.Emoji) {
                   this.expandHeight = 0
                   this.inputStyle = InputStyleType.None;
-                  this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                  this.computeScrollHeight()
                 } else {
                   this.inputStyle = InputStyleType.Emoji
                   this.expandHeight = ChatConst.messageInputAreaHeight
-                  this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                  this.computeScrollHeight()
                 }
               },
               onDidClickMore: () => {
@@ -1247,11 +1628,11 @@ export struct ChatTeamPage {
                 if (this.inputStyle == InputStyleType.More) {
                   this.expandHeight = 0
                   this.inputStyle = InputStyleType.None;
-                  this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                  this.computeScrollHeight()
                 } else {
                   this.inputStyle = InputStyleType.More
                   this.expandHeight = ChatConst.messageInputAreaHeight
-                  this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                  this.computeScrollHeight()
                 }
               },
               onSendTextMessage: () => {
@@ -1266,16 +1647,19 @@ export struct ChatTeamPage {
                   textSend = text
                 }
                 this.chatViewModel.sendTextMessage(textSend, this.replyMsg, this.aitManager.aitModel,
-                  this.aitManager.getPushList())
+                  this.getAitPushList(), this.getFirstAitAIUserAccount())
                 this.clearInput(true)
                 this.aitManager.cleanAit()
                 this.builderSpans.splice(0, this.builderSpans.length)
+                this.resetAITranslateView()
               },
               onSendMultiLineMessage: (title: string, body: string) => {
                 this.showOperationView = false
                 // ChatInputView 的多行模式（撤回重编辑），也传递 @ 信息
-                this.chatViewModel.sendMultiLineMessage(title, body, this.replyMsg, this.aitManager.aitModel, this.aitManager.getPushList())
+                this.chatViewModel.sendMultiLineMessage(title, body, this.replyMsg, this.aitManager.aitModel,
+                  this.getAitPushList(), this.getFirstAitAIUserAccount())
                 this.clearInput(true)
+                this.resetAITranslateView()
                 // 发送后滚动到最新消息
                 this.scrollToNewMessage()
               },
@@ -1292,7 +1676,7 @@ export struct ChatTeamPage {
                   this.bottomHeight = 0
                   // 有回复时高度增加 36（32px 回复预览 + 4px margin）
                   this.expandHeight = this.replyMsg ? 186 : 150
-                  this.scrollHeight = this.screenHeight - this.bottomHeight - this.expandHeight
+                  this.computeScrollHeight()
                   // 单行 → 多行转换：
                   // - 单行第一行 → 多行标题
                   // - 单行第二行起 → 多行正文
@@ -1302,9 +1686,9 @@ export struct ChatTeamPage {
                   this.scrollToNewMessage()
                 } else {
                   this.inputStyle = InputStyleType.None
-                  this.bottomHeight = this.replyMsg ? this.bottomWithReplyHeight : 105
+                  this.bottomHeight = this.getSingleLineInputHeight()
                   this.expandHeight = 0
-                  this.scrollHeight = this.screenHeight - this.bottomHeight
+                  this.computeScrollHeight()
                   this.restoreSingleLineTransferNodes(transferTitle ?? '', transferBody ?? '', transferBodyNodes ?? [])
                   this.multiLineBodyNodes = []
                 }
@@ -1312,14 +1696,19 @@ export struct ChatTeamPage {
               conversationName: this.chatTeamInfo.team?.name ?? '',
               inputStyle: this.inputStyle,
               mute: this.chatViewModel.isMuteModel,
+              enableAIHelper: false,
               teamId: this.chatTeamInfo.team?.teamId,
-              team: this.chatTeamInfo.team
+              team: this.chatTeamInfo.team,
+              showAitAll: true,
+              showAIUserAit: this.canAitAIUser(),
+              showTeamMemberAit: true,
+              aiUsers: this.getAIChatUsers()
             }).alignRules({
               left: { anchor: "chat_input", align: HorizontalAlign.Start },
               right: { anchor: "chat_input", align: HorizontalAlign.End },
               bottom: { anchor: "chat_input", align: VerticalAlign.Bottom },
-              top: { anchor: "chat_input", align: VerticalAlign.Top },
-            }).backgroundColor(this.chatViewModel.isMuteModel ? '#ffE9EFF5' : $r('app.color.chat_input_background'))
+            }).height(this.bottomHeight)
+              .backgroundColor(this.chatViewModel.isMuteModel ? '#ffE9EFF5' : $r('app.color.chat_input_background'))
               .visibility(this.showMultiSelect ? Visibility.None : Visibility.Visible)
           }
 
@@ -1354,7 +1743,6 @@ export struct ChatTeamPage {
                 left: { anchor: "chat_input", align: HorizontalAlign.Start },
                 right: { anchor: "chat_input", align: HorizontalAlign.End },
                 bottom: { anchor: "chat_input", align: VerticalAlign.Bottom },
-                top: { anchor: "chat_input", align: VerticalAlign.Top },
               }).backgroundColor($r('app.color.chat_input_background'))
           }
 
@@ -1362,7 +1750,7 @@ export struct ChatTeamPage {
             if (this.inputStyle === InputStyleType.Record) {
               NEAudioRecordView({
                 onRecordAudio: (filepath, duration) => {
-                  console.log("net ease record audio " + filepath);
+                  Logger.info('ChatKitUI', "net ease record audio " + filepath);
                   this.chatViewModel.sendAudioMessage(filepath, duration)
 
                 },
@@ -1393,7 +1781,7 @@ export struct ChatTeamPage {
                       }
                     })
                   } else if (data.type == NEChatMoreOperationType.File) {
-                    console.log("net ease click file")
+                    Logger.info('ChatKitUI', "net ease click file")
                     MediaUtils.showFilePicker().then((result) => {
                       if (result.errorMsg == null && result.uri) {
                         this.chatViewModel.sendFileMessage(result.uri);
@@ -1413,10 +1801,10 @@ export struct ChatTeamPage {
                         sceneMap.chooseLocation(getContext(this) as common.UIAbilityContext, locationChoosingOptions)
                           .then((data) => {
                             this.chatViewModel.sendLocationMessage(data)
-                            console.info("ChooseLocation", "Succeeded in choosing location.");
+                            Logger.info('ChatKitUI', "ChooseLocation", "Succeeded in choosing location.");
                           })
                           .catch((err: BusinessError) => {
-                            console.error("ChooseLocation",
+                            Logger.error('ChatKitUI', "ChooseLocation",
                               `Failed to choose location, code: ${err.code}, message: ${err.message}`);
                             // NECommonUtils.showToast(`code: ${err.code}, message: ${err.message}`)
                           });
@@ -1424,6 +1812,8 @@ export struct ChatTeamPage {
                         NECommonUtils.showToast($r('app.string.chat_permission_deny_tips'))
                       }
                     })
+                  } else if (data.type == NEChatMoreOperationType.Translate) {
+                    this.showAITranslateView()
                   }
 
                 }
@@ -1438,7 +1828,7 @@ export struct ChatTeamPage {
             } else if (this.inputStyle === InputStyleType.Emoji) {
               NEChatEmojiView({
                 onDidClick: (emoji) => {
-                  console.log("net ease click emoji", emoji);
+                  Logger.info('ChatKitUI', "net ease click emoji", emoji);
                   if (emoji.type === NIMEmoticonType.file) {
                     this.controller.addImageSpan($rawfile(`emoji/${emoji.file}`),
                       {
@@ -1468,10 +1858,11 @@ export struct ChatTeamPage {
                     textSend = text
                   }
                   this.chatViewModel.sendTextMessage(textSend, this.replyMsg, this.aitManager.aitModel,
-                    this.aitManager.getPushList())
+                    this.getAitPushList(), this.getFirstAitAIUserAccount())
                   this.clearInput(true)
                   this.aitManager.cleanAit()
                   this.builderSpans.splice(0, this.builderSpans.length)
+                  this.resetAITranslateView()
                 }
               }).padding({ top: 0 })
                 .width('100%')
@@ -1483,9 +1874,14 @@ export struct ChatTeamPage {
                 })
             } else if (this.inputStyle === InputStyleType.Multiline) {
               // 多行输入模式面板：使用 visibility 控制显隐，避免组件销毁导致内容丢失
-              MultiLineInputView({
+              Column() {
+                MultiLineInputView({
                 teamId: this.chatTeamInfo.team?.teamId,
                 team: this.chatTeamInfo.team,
+                showAitAll: true,
+                showAIUserAit: this.canAitAIUser(),
+                showTeamMemberAit: true,
+                aiUsers: this.getAIChatUsers(),
                 conversationName: this.chatTeamInfo.conversationName ?? '',
                 initialTitle: this.multiLineTitle,
                 initialBody: this.multiLineBody,
@@ -1494,6 +1890,7 @@ export struct ChatTeamPage {
                 replyMsg: this.replyMsg,
                 chatInfo: this.chatTeamInfo,
                 onInputTextChange: (hasText: boolean) => {
+                  this.syncTranslateInputText()
                   // 群聊暂不支持"正在输入"功能，此回调预留
                   // 如果未来需要支持，可以在此调用 ViewModel 方法
                 },
@@ -1505,27 +1902,31 @@ export struct ChatTeamPage {
                   this.replyMsg = undefined
                   // 恢复到无回复时的高度（保持键盘状态）
                   this.expandHeight = 150
-                  this.scrollHeight = this.screenHeight - this.keyboardHeight - this.expandHeight
+                  this.computeScrollHeight()
                 },
                 onSendMultiLineMessage: (title: string, body: string) => {
                   // 发送消息
                   if (title.length > 0) {
                     // 有标题，发送多行消息（传递 @ 信息）
-                    this.chatViewModel.sendMultiLineMessage(title, body, this.replyMsg, this.aitManager.aitModel, this.aitManager.getPushList())
+                    this.chatViewModel.sendMultiLineMessage(title, body, this.replyMsg, this.aitManager.aitModel,
+                      this.getAitPushList(), this.getFirstAitAIUserAccount())
                   } else {
                     // 无标题，仅有正文，发送普通文本消息
-                    this.chatViewModel.sendTextMessage(body, this.replyMsg, this.aitManager.aitModel, this.aitManager.getPushList())
+                    this.chatViewModel.sendTextMessage(body, this.replyMsg, this.aitManager.aitModel,
+                      this.getAitPushList(), this.getFirstAitAIUserAccount())
                   }
+                  this.aitManager.cleanAit()
                   // 清空 Page 层的缓存
                   this.multiLineTitle = ''
                   this.multiLineBody = ''
                   this.multiLineBodyNodes = []
+                  this.resetAITranslateView()
                   // 清除回复消息（但保持多行模式和键盘状态）
                   if (this.replyMsg) {
                     this.replyMsg = undefined
                     // 恢复到无回复时的高度（保持多行模式和键盘）
                     this.expandHeight = 150
-                    this.scrollHeight = this.screenHeight - this.keyboardHeight - this.expandHeight
+                    this.computeScrollHeight()
                   }
                   this.scrollToNewMessage()
                 },
@@ -1536,16 +1937,18 @@ export struct ChatTeamPage {
                   this.multiLineBodyNodes = []
                   // 切换回单行模式
                   this.inputStyle = InputStyleType.None
-                  this.bottomHeight = this.replyMsg ? this.bottomWithReplyHeight : 105
+                  this.bottomHeight = this.getSingleLineInputHeight()
                   this.expandHeight = 0
-                  this.scrollHeight = this.screenHeight - this.bottomHeight
+                  this.computeScrollHeight()
                   this.restoreSingleLineTransferNodes(title, bodyText, bodyNodes)
                 }
               })
-                .visibility(this.showMultiSelect ? Visibility.None : Visibility.Visible)
+              }
+              .width('100%')
+              .visibility(this.showMultiSelect ? Visibility.None : Visibility.Visible)
             }
           }
-          .height(this.expandHeight)
+          .height(this.getInputExpandContainerHeight())
           .width('100%')
           .alignRules({
             left: { anchor: "__container__", align: HorizontalAlign.Start },
@@ -1602,7 +2005,7 @@ export struct ChatTeamPage {
               operationItems: this.operationMenuItems,
               topMessage: this.chatViewModel.topMessage,
               didClickItem: (item: MessageOperationItem) => {
-                console.log('net ease click operation item event')
+                Logger.info('ChatKitUI', 'net ease click operation item event')
                 this.showOperationView = false
                 if (this.operationMsg == undefined) {
                   return;
@@ -1610,15 +2013,7 @@ export struct ChatTeamPage {
 
                 if (item.operationType == MessageOperationType.Copy) {
                   // 获取要复制的文本内容
-                  let copyText = this.translationOperationMode ?
-                    MessageTranslationService.instance.getTranslatedDisplayText(this.operationMsg!) :
-                    (this.operationMsg.message.text ?? '')
-                  // 多行消息：复制 标题 + 换行 + 正文
-                  if (!this.translationOperationMode && this.operationMsg.isMultiLineMsg) {
-                    const title = getMultiLineTitle(this.operationMsg.message)
-                    const body = getMultiLineBody(this.operationMsg.message)
-                    copyText = title && body ? `${title}\n${body}` : (title || body)
-                  }
+                  let copyText = this.getOperationText()
                   const pasteboardData =
                     pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, copyText)
                   pasteboard.getSystemPasteboard().setDataSync(pasteboardData)
@@ -1707,9 +2102,25 @@ export struct ChatTeamPage {
                   MessageTranslationService.instance.translate(this.operationMsg)
                 } else if (item.operationType == MessageOperationType.HideTranslation) {
                   MessageTranslationService.instance.hideTranslation(this.operationMsg)
+                } else if (item.operationType == MessageOperationType.AISearch) {
+                  const keyword = this.getAISearchOperationText().trim()
+                  if (keyword.length > 0) {
+                    if (ChatKitClient.connectBroken()) {
+                      NECommonUtils.showToast($r('app.string.chat_ai_search_network_error'))
+                      this.translationOperationMode = false
+                      this.operationMenuItems = undefined
+                      this.selectedOperationText = ''
+                      this.closeAISearchSelection()
+                      return
+                    }
+                    this.aiSearchKeyword = keyword
+                    this.showAISearchPanel = true
+                  }
                 }
                 this.translationOperationMode = false
                 this.operationMenuItems = undefined
+                this.selectedOperationText = ''
+                this.closeAISearchSelection()
               }
             })
               .position({ x: this.operationRect.x, y: this.operationRect.y })
@@ -1717,9 +2128,39 @@ export struct ChatTeamPage {
               .shadow(ShadowStyle.OUTER_DEFAULT_MD)
 
           }
-        }
+
+          }
       .margin({ bottom: this.bottomMargin })
       .expandSafeArea([SafeAreaType.KEYBOARD])
+      .layoutWeight(1)
+      .width('100%')
+      .height('100%')
+        }
+        .width('100%')
+        .height('100%')
+
+        if (this.showAISearchPanel) {
+          Column()
+            .width('100%')
+            .height(220)
+            .backgroundColor(Color.White)
+            .position({ x: 0, y: '100%' })
+            .offset({ y: -1 })
+            .zIndex(99)
+
+          AISearchPanel({
+            keyword: this.aiSearchKeyword,
+            onClose: () => {
+              this.showAISearchPanel = false
+              this.aiSearchKeyword = ''
+            }
+          })
+            .position({ x: 0, y: 0 })
+            .zIndex(100)
+        }
+      }
+      .width('100%')
+      .height('100%')
     }
     .hideTitleBar(true)
     .onReady((context: NavDestinationContext) => {
@@ -1752,7 +2193,7 @@ export struct ChatTeamPage {
       this.controller.deleteSpans()
     }
     this.replyMsg = undefined
-    this.bottomHeight = 105
+    this.bottomHeight = this.getSingleLineInputHeight()
     this.computeScrollHeight()
   }
 
@@ -1770,7 +2211,7 @@ export struct ChatTeamPage {
     if (this.inputStyle === InputStyleType.Multiline) {
       this.inputStyle = InputStyleType.None
       this.expandHeight = 0
-      this.bottomHeight = 105
+      this.bottomHeight = this.getSingleLineInputHeight()
       this.computeScrollHeight()
     }
   }
@@ -1802,7 +2243,7 @@ export struct ChatTeamPage {
       try {
         this.getUIContext().getFocusController().requestFocus("chat_edit_input")
       } catch (e) {
-        console.warn(`ChatTeamPage scheduleSingleLineFocus failed: ${e}`)
+        Logger.warn('ChatKitUI', `ChatTeamPage scheduleSingleLineFocus failed: ${e}`)
       }
     }, 100)
   }
@@ -1819,7 +2260,7 @@ export struct ChatTeamPage {
       try {
         this.getUIContext().getFocusController().requestFocus("multiline_body_input")
       } catch (e) {
-        console.warn(`ChatTeamPage scheduleMultiLineFocus failed: ${e}`)
+        Logger.warn('ChatKitUI', `ChatTeamPage scheduleMultiLineFocus failed: ${e}`)
       }
     }, 100)
   }
@@ -1846,7 +2287,7 @@ export struct ChatTeamPage {
     // 多行模式下调整 expandHeight
     if (this.inputStyle === InputStyleType.Multiline) {
       this.expandHeight = 186
-      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.expandHeight
+      this.computeScrollHeight()
       
       // 多行模式下添加 @（需要等待组件实例准备好）
       if (needAit && this.replyMsg.message.senderId !== ChatKitClient.getLoginUserId()) {
@@ -1856,7 +2297,8 @@ export struct ChatTeamPage {
       this.scheduleMultiLineFocus()
       return
     }
-    this.bottomHeight = 135
+    this.bottomHeight = this.getSingleLineInputHeight()
+    this.computeScrollHeight()
     if (needAit && this.replyMsg.message.senderId !== ChatKitClient.getLoginUserId()) {
       this.addAitUserById(this.replyMsg.message.senderId)
     }
@@ -2135,7 +2577,7 @@ export struct ChatTeamPage {
         primaryButton: {
           value: $r('app.string.chat_msg_dialog_cancel'),
           action: () => {
-            console.info('Callback when the first button is clicked')
+            Logger.info('ChatKitUI', 'Callback when the first button is clicked')
           }
         },
         secondaryButton: {
@@ -2144,7 +2586,7 @@ export struct ChatTeamPage {
           style: DialogButtonStyle.HIGHLIGHT,
           value: $r('app.string.chat_msg_dialog_sure'),
           action: () => {
-            console.info('Callback when the second button is clicked')
+            Logger.info('ChatKitUI', 'Callback when the second button is clicked')
             this.chatViewModel.revokeMessage(message)
           }
         }

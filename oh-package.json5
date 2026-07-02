@@ -14,10 +14,10 @@
     // 本地存在"foo"的源码目录，如项目根目录下的foo目录
     // "foo": "file:./foo"
     // 本地存在"foo"的HAR文件，如项目根目录下的libs目录中的foo.har
-    "@nimsdk/base": "10.9.82",
-    "@nimsdk/nim": "10.9.82",
-    "@nimsdk/user": "10.9.82",
-    "@nimsdk/signalling": "10.9.82",
+    "@nimsdk/base": "10.10.1",
+    "@nimsdk/nim": "10.10.0",
+    "@nimsdk/user": "10.10.0",
+    "@nimsdk/signalling": "10.10.0",
     //    "@yunxin/callkit": "4.0.2",
     //    "@yunxin/callkit_ui": "4.0.3",
     //    "@nertc/nertc_sdk": "5.9.11"

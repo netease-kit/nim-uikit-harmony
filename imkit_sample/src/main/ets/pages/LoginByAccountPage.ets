@@ -4,11 +4,15 @@
  * found in the LICENSE file.
  *
  */
-import { DoubleAlertDialog, NavigationBackBuilder, NECommonUtils } from '@nimkit/common'
+import { CommonConstants, DoubleAlertDialog, NavigationBackBuilder, NECommonUtils } from '@nimkit/common'
+import { IMKitConfigCenter } from '@nimkit/chatkit'
 import { NimRepository } from '../ability/NimRepository'
 import { AppConfig } from '../constants/AppConfig'
 import { IMSDKConfigManager } from '../manager/IMSDKConfigManager'
+import { resolveLocalConversationEnabled } from '../manager/GlobalConfigStorage'
+import { StartupPerfDebugTimer } from '../uitrace/StartupPerfDebugTimer'
 import { cryptoFramework } from '@kit.CryptoArchitectureKit'
+import { preferences } from '@kit.ArkData'
 
 
 @Entry
@@ -37,6 +41,14 @@ struct LoginByAccountPage {
     return this.uint8ArrayToHex((await md5.digest()).data)
   }
 
+  private syncConversationModeConfig(): void {
+    const options: preferences.Options = { name: 'imkit_data' }
+    const dataPreferences = preferences.getPreferencesSync(getContext(this), options)
+    IMKitConfigCenter.enableLocalConversation = resolveLocalConversationEnabled(
+      dataPreferences.getSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, undefined) as boolean | undefined
+    )
+  }
+
   loginAction = async () => {
     if (this.accountId.length === 0 || this.accountIdToken.length === 0) {
       NECommonUtils.showToast($r('app.string.login_config_input_empty'))
@@ -45,13 +57,16 @@ struct LoginByAccountPage {
 
     if (!this.isLogin) {
       this.isLogin = true
+      StartupPerfDebugTimer.start('account.login_click')
       try {
+        this.syncConversationModeConfig()
         const nimRepository = NimRepository.getInstance(getContext(this))
-        const appkey = AppConfig.appKey
+        const appkey = IMSDKConfigManager.configModel?.configOptions?.databaseServiceConfig?.appKey ?? AppConfig.appKey
         const token = await this.md5(this.accountIdToken)
         await nimRepository.login(this.accountId, token, appkey)
         this.isLogin = false
       } catch (err) {
+        StartupPerfDebugTimer.fail('account.login_failed')
         this.isLogin = false
         const tips = getContext(this).resourceManager.getStringSync($r('app.string.login_failed').id)
         NECommonUtils.showToast(tips + err)

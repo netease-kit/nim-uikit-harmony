@@ -5,7 +5,9 @@
  *
  */
 
-import { NEEmojiManager } from '../manager/NEEmojiManager';
+import { NEEmojiManager, NEEmojiParseResult } from '../manager/NEEmojiManager';
+import { ChatAitNode } from '../model/ChatAitNode';
+import { getAitNodes, parseMessageText } from './MessageHelper';
 
 export enum RichInputTransferNodeType {
   Text = 1,
@@ -32,6 +34,12 @@ export interface MultilineTransferPayload {
   bodyNodes: RichInputTransferNode[]
 }
 
+export interface RestoredMultiLineContent {
+  title: string
+  body: string
+  bodyNodes: RichInputTransferNode[]
+}
+
 interface PendingTransferNode {
   node: RichInputTransferNode
   offset: number
@@ -48,13 +56,15 @@ function cloneTransferNode(node: RichInputTransferNode): RichInputTransferNode {
 }
 
 export function collectRichInputTransferNodes(
-  spans: Array<RichEditorImageSpanResult | RichEditorTextSpanResult>,
-  builderSpans: InputTransferAitSpan[]
+  spans: Array<RichEditorImageSpanResult | RichEditorTextSpanResult> | undefined,
+  builderSpans: InputTransferAitSpan[] | undefined
 ): RichInputTransferNode[] {
   const pendingNodes: PendingTransferNode[] = []
   const usedBuilderSpanIndex: Set<number> = new Set()
   let nextBuilderSpanIndex = 0
-  spans.forEach((span, spanOrder) => {
+  const safeSpans = spans ?? []
+  const safeBuilderSpans = builderSpans ?? []
+  safeSpans.forEach((span, spanOrder) => {
     const textSpan = span as RichEditorTextSpanResult
     const spanRange = textSpan.spanPosition?.spanRange
     const spanOffset = spanRange ? spanRange[0] : spanOrder
@@ -90,20 +100,20 @@ export function collectRichInputTransferNodes(
       return
     }
 
-    const builderSpanIndex = builderSpans.findIndex((builderSpan, index) =>
+    const builderSpanIndex = safeBuilderSpans.findIndex((builderSpan, index) =>
       !usedBuilderSpanIndex.has(index) && builderSpan.spanIndex === spanOffset)
     let matchedBuilderSpanIndex = builderSpanIndex
-    if (matchedBuilderSpanIndex < 0) {
-      while (nextBuilderSpanIndex < builderSpans.length && usedBuilderSpanIndex.has(nextBuilderSpanIndex)) {
+    if (matchedBuilderSpanIndex < 0 && !spanRange) {
+      while (nextBuilderSpanIndex < safeBuilderSpans.length && usedBuilderSpanIndex.has(nextBuilderSpanIndex)) {
         nextBuilderSpanIndex += 1
       }
-      if (nextBuilderSpanIndex < builderSpans.length) {
+      if (nextBuilderSpanIndex < safeBuilderSpans.length) {
         matchedBuilderSpanIndex = nextBuilderSpanIndex
       }
     }
 
     if (matchedBuilderSpanIndex >= 0) {
-      const builderSpan = builderSpans[matchedBuilderSpanIndex]
+      const builderSpan = safeBuilderSpans[matchedBuilderSpanIndex]
       pendingNodes.push({
         offset: spanOffset,
         order: spanOrder,
@@ -120,11 +130,11 @@ export function collectRichInputTransferNodes(
     }
   })
 
-  builderSpans.forEach((builderSpan, index) => {
+  safeBuilderSpans.forEach((builderSpan, index) => {
     if (!usedBuilderSpanIndex.has(index)) {
       pendingNodes.push({
         offset: builderSpan.spanIndex,
-        order: spans.length + index,
+        order: safeSpans.length + index,
         node: {
           type: RichInputTransferNodeType.Ait,
           text: builderSpan.value,
@@ -198,5 +208,61 @@ export function splitSingleLineTransferNodes(nodes: RichInputTransferNode[]): Mu
     title: title,
     bodyText: getRichInputTransferText(bodyNodes),
     bodyNodes: bodyNodes
+  }
+}
+
+export function restoreAitTransferNodesFromMessageText(text?: string, extension?: string): RichInputTransferNode[] {
+  const nodes: RichInputTransferNode[] = []
+  parseMessageText(text)?.forEach((item: NEEmojiParseResult) => {
+    if (item.text) {
+      getAitNodes(item.startIndex, item.text, extension)
+        .forEach((node: ChatAitNode) => {
+          if (node.segment) {
+            nodes.push({
+              type: RichInputTransferNodeType.Ait,
+              text: node.text,
+              accountId: node.account ?? ''
+            })
+          } else if (node.text.length > 0) {
+            nodes.push({
+              type: RichInputTransferNodeType.Text,
+              text: node.text
+            })
+          }
+        })
+      return
+    }
+
+    if (item.emoji) {
+      nodes.push({
+        type: RichInputTransferNodeType.Emoji,
+        text: item.emoji.tag ?? '',
+        emojiFile: item.emoji.file
+      })
+    }
+  })
+  return nodes
+}
+
+export function restoreMultiLineContent(title: string, body: string, bodyNodes?: RichInputTransferNode[]): RestoredMultiLineContent {
+  const restoredNodes = bodyNodes && bodyNodes.length > 0
+    ? bodyNodes.map((node) => cloneTransferNode(node))
+    : [{
+      type: RichInputTransferNodeType.Text,
+      text: body
+    } as RichInputTransferNode]
+
+  if ((!body || body.length === 0) && (!bodyNodes || bodyNodes.length === 0)) {
+    return {
+      title: title,
+      body: '',
+      bodyNodes: []
+    }
+  }
+
+  return {
+    title: title,
+    body: body,
+    bodyNodes: restoredNodes
   }
 }

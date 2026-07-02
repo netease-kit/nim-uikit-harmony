@@ -7,7 +7,7 @@
 
 import { ChatKitClient, CustomMessageUtils, getMultiLinePreviewFromAttachment, multiLineMessageCustomType } from '@nimkit/chatkit';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
-import { DateUtil } from '@nimkit/common/src/main/ets/utils/DateUtil';
+import { DateUtil } from '@nimkit/common';
 import { V2NIMAIUser, V2NIMLocalConversation, V2NIMMessageCallAttachment, V2NIMMessageType } from '@nimsdk/base';
 
 @ComponentV2

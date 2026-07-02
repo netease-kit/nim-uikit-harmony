@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatKitClient, ContactRepo, ErrorUtils } from '@nimkit/chatkit';
 import { NavigationBackBuilder, NECommonUtils } from '@nimkit/common';
 import { EditType } from '../model/MineInfoItem';
@@ -123,7 +124,7 @@ export struct EditInfoPage {
         NECommonUtils.showToast($r('app.string.mine_info_save_ok'))
         this.pathStack.pop(this.content)
       } catch (err) {
-        console.error(err)
+        Logger.error('ContactKit', err)
       }
     }
   }

@@ -4,8 +4,14 @@
  * found in the LICENSE file.
  *
  */
-import { ChatRepo, getAitModelFromJson } from '@nimkit/chatkit';
-import { ChatKitClient, currentConversationChanged } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
+import {
+  ChatRepo,
+  CloudConversationStrategy,
+  ConversationStrategy,
+  getAitModelFromJson,
+  LocalConversationStrategy
+} from '@nimkit/chatkit';
+import { ChatKitClient, currentConversationChanged } from '@nimkit/chatkit';
 import { V2NIMConversationType, V2NIMMessage, V2NIMMessageRevokeNotification } from '@nimsdk/base';
 import { ConversationItem, ConversationMode } from '../../strategy/ConversationStrategy';
 import { AitDatabase } from './AitDatabaseHelper';
@@ -32,6 +38,9 @@ export class AitServer {
   private _currentSessionId: string | null = null;
   private commonListenerInitialized: boolean = false
   private unreadListenerModes: Set<ConversationMode> = new Set()
+  private readonly cloudConversationStrategy: CloudConversationStrategy = new CloudConversationStrategy()
+  private readonly localConversationStrategy: LocalConversationStrategy = new LocalConversationStrategy()
+  private unreadListenerDisposers: Map<ConversationMode, () => void> = new Map()
 
   public init(mode: ConversationMode = ConversationMode.CLOUD) {
     this.initListener(mode)
@@ -62,16 +71,19 @@ export class AitServer {
     }
 
     this.unreadListenerModes.add(mode)
-    if (mode === ConversationMode.LOCAL) {
-      ChatKitClient.nim.localConversationService?.on('onConversationChanged', (updateList: ConversationItem[]) => {
-        this.handleConversationUnreadChanged(updateList)
-      })
-      return
-    }
-
-    ChatKitClient.nim.conversationService?.on('onConversationChanged', (updateList: ConversationItem[]) => {
-      this.handleConversationUnreadChanged(updateList)
+    const strategy = this.getConversationStrategy(mode)
+    strategy.onConversationChanged(this.onConversationChanged)
+    this.unreadListenerDisposers.set(mode, (): void => {
+      strategy.offConversationChanged(this.onConversationChanged)
     })
+  }
+
+  private onConversationChanged = (updateList: ConversationItem[]): void => {
+    this.handleConversationUnreadChanged(updateList)
+  }
+
+  private getConversationStrategy(mode: ConversationMode): ConversationStrategy {
+    return mode === ConversationMode.LOCAL ? this.localConversationStrategy : this.cloudConversationStrategy
   }
 
   /**

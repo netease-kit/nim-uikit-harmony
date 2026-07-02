@@ -6,12 +6,14 @@
  */
 
 import { ChatKitClient, ContactRepo, ConversationIdUtilRepo, ConversationRepo, IMKitConfigCenter,
-  LocalConversationRepo } from '@nimkit/chatkit';
-import { ChatKitConfig } from '@nimkit/chatkit_ui/src/main/ets/ChatKitConfig';
+  LocalConversationRepo, NEFriendUserCache } from '@nimkit/chatkit';
+import { ChatKitConfig } from '@nimkit/chatkit_ui';
 import { ContactPage } from '@nimkit/contactkit_ui';
 import { ConversationPage, LocalConversationPage } from '@nimkit/conversationkit_ui';
-import { V2NIMConversationType, V2NIMFriendAddApplication, V2NIMTeamJoinActionInfo } from '@nimsdk/base';
+import { V2NIMConversationType, V2NIMFriendAddApplication, V2NIMTeamJoinActionInfo, V2NIMUser } from '@nimsdk/base';
 import { MinePage } from '../mine/pages/MinePage';
+import { resolveMineAvatarPreloadUrl, resolveMineUser } from '../mine/viewmodel/MineProfileUtils';
+import { StartupPerfDebugTimer } from '../uitrace/StartupPerfDebugTimer';
 
 @ObservedV2
 class TabBarItem {
@@ -36,6 +38,10 @@ class TabBarItem {
 struct TabIndex {
   pathStack: NavPathStack = new NavPathStack()
   @Local currentIndex: number = 0;
+  @Local hasVisitedContactTab: boolean = false;
+  @Local hasVisitedMineTab: boolean = false;
+  @Local mineAvatarPreloadUrl: string = '';
+  @Local mineAvatarPreloadFinished: boolean = false;
   @Local tabs: Array<TabBarItem> = [
     new TabBarItem($r('app.string.tab_conversation'), 0, $r('app.media.tab_conversation'),
       $r('app.media.tab_conversation_light')),
@@ -67,8 +73,23 @@ struct TabIndex {
   onUreadMessageChange = (unreadCount?: number) => {
     this.tabs[0].showRedPoint = (unreadCount ?? 0) > 0
   }
+  onConversationFirstReady = (count: number) => {
+    this.logPerf('tab.conversation.first_ready_callback', `count=${count}`)
+    StartupPerfDebugTimer.finish('conversation.first_ready', count)
+  }
+  onConversationFirstStable = (count: number) => {
+    this.logPerf('tab.conversation.first_stable_callback', `count=${count}`)
+  }
+  onMineUserProfileChanged = (users: V2NIMUser[]) => {
+    const loginUserId = ChatKitClient.getLoginUserId()
+    const mineUser = users.find((user: V2NIMUser) => user.accountId === loginUserId)
+    if (mineUser) {
+      this.updateMineAvatarPreloadUrl(mineUser)
+    }
+  }
   //获取会话列表未读数
   loadUnreadMessageCount = () => {
+    this.logPerf('tab.unread_message_count.start', `local=${this.useLocalConversation}`)
      let unreadCount = 0
     if (this.useLocalConversation) {
        unreadCount = LocalConversationRepo.getTotalUnreadCount() ?? 0
@@ -79,6 +100,7 @@ struct TabIndex {
     if (unreadCount) {
       this.tabs[0].showRedPoint = unreadCount > 0
     }
+    this.logPerf('tab.unread_message_count.end', `unread=${unreadCount}`)
   }
   // 加载配置信息
   loadConfig = () => {
@@ -142,6 +164,12 @@ struct TabIndex {
   }
 
   async aboutToAppear(): Promise<void> {
+    StartupPerfDebugTimer.mark('tab_index.appear')
+    this.logPerf('tab.appear.start', `local=${this.useLocalConversation}`)
+    this.refreshMineAvatarPreloadUrl()
+    this.preloadMineTab()
+    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onMineUserProfileChanged)
+    ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onMineUserProfileChanged)
     // 监听好友申请
     ChatKitClient.nim.friendService?.on('onFriendAddApplication', async (application: V2NIMFriendAddApplication) => {
       await this.loadUnreadApplication()
@@ -151,8 +179,11 @@ struct TabIndex {
       await this.loadUnreadApplication()
     })
     try {
+      this.logPerf('tab.load_unread_application.start')
       await this.loadUnreadApplication()
+      this.logPerf('tab.load_unread_application.end')
     } catch (err) {
+      this.logPerf('tab.load_unread_application.failed', `${err}`)
       console.log(err)
     }
     this.loadConfig()
@@ -160,6 +191,7 @@ struct TabIndex {
 
     // 检查是否有通知点击跳转
     this.checkPendingNotification()
+    this.logPerf('tab.appear.end')
   }
 
   /**
@@ -167,6 +199,10 @@ struct TabIndex {
    */
   onPageShow(): void {
     this.checkPendingNotification()
+  }
+
+  aboutToDisappear(): void {
+    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onMineUserProfileChanged)
   }
 
   @Builder
@@ -199,46 +235,122 @@ struct TabIndex {
 
   build() {
     Navigation(this.pathStack) {
-      Tabs({ barPosition: BarPosition.End, index: 0 }) {
-        ForEach(this.tabs, (item: TabBarItem) => {
-          TabContent() {
-            if (item.targetIndex == 0) {
-              if (this.useLocalConversation) {
-                LocalConversationPage({
+      Stack() {
+        Tabs({ barPosition: BarPosition.End, index: 0 }) {
+          ForEach(this.tabs, (item: TabBarItem) => {
+            TabContent() {
+              if (!this.shouldBuildTab(item.targetIndex)) {
+                Column()
+                  .width('100%')
+                  .height('100%')
+                  .backgroundColor('#F6F8FA')
+              } else if (item.targetIndex == 0) {
+                if (this.useLocalConversation) {
+                  LocalConversationPage({
+                    pathStack: this.pathStack,
+                    onUreadMessageChange: this.onUreadMessageChange,
+                    onConversationFirstReady: this.onConversationFirstReady,
+                    onConversationFirstStable: this.onConversationFirstStable
+                  })
+                } else {
+                  ConversationPage({
+                    pathStack: this.pathStack,
+                    onUreadMessageChange: this.onUreadMessageChange,
+                    onConversationFirstReady: this.onConversationFirstReady,
+                    onConversationFirstStable: this.onConversationFirstStable
+                  })
+                }
+
+              } else if (item.targetIndex == 1) {
+                ContactPage({
                   pathStack: this.pathStack,
-                  onUreadMessageChange: this.onUreadMessageChange
+                  onUnreadApplicationChange: this.onUnreadApplicationChange
                 })
-              } else {
-                ConversationPage({
-                  pathStack: this.pathStack,
-                  onUreadMessageChange: this.onUreadMessageChange
+              } else if (item.targetIndex == 2) {
+                MinePage({
+                  pathStack: this.pathStack
                 })
               }
-
-            } else if (item.targetIndex == 1) {
-              ContactPage({
-                pathStack: this.pathStack,
-                onUnreadApplicationChange: this.onUnreadApplicationChange
-              })
-            } else if (item.targetIndex == 2) {
-              MinePage({
-                pathStack: this.pathStack
-              })
             }
-          }
-          .tabBar(this.TabBarBuilder(item))
+            .tabBar(this.TabBarBuilder(item))
+          })
+        }
+        .barHeight(60)
+        .backgroundColor('#F6F8FA')
+        .barPosition(BarPosition.End)
+        .onChange((index: number) => {
+          this.currentIndex = index
+          this.markTabVisited(index)
+          this.logPerf('tab.change', `index=${index}`)
         })
+        .scrollable(false)
+
+        this.MineAvatarPreloadBuilder()
       }
-      .barHeight(60)
-      .backgroundColor('#F6F8FA')
-      .barPosition(BarPosition.End)
-      .onChange((index: number) => {
-        this.currentIndex = index
-      })
-      .scrollable(false)
     }
     .backgroundColor(Color.Transparent)
     .mode(NavigationMode.Auto)
     .hideTitleBar(true)
+  }
+
+  @Builder
+  MineAvatarPreloadBuilder() {
+    if (this.mineAvatarPreloadUrl.length > 0 && !this.mineAvatarPreloadFinished) {
+      Image(this.mineAvatarPreloadUrl)
+        .width(1)
+        .height(1)
+        .objectFit(ImageFit.Cover)
+        .syncLoad(false)
+        .opacity(0)
+        .onComplete(() => {
+          this.mineAvatarPreloadFinished = true
+        })
+        .onError(() => {
+          this.mineAvatarPreloadFinished = true
+        })
+        .hitTestBehavior(HitTestMode.None)
+    }
+  }
+
+  private logPerf(_stage: string, _detail: string = ''): void {
+  }
+
+  private markTabVisited(index: number): void {
+    if (index === 1) {
+      this.hasVisitedContactTab = true
+    } else if (index === 2) {
+      this.hasVisitedMineTab = true
+    }
+  }
+
+  private shouldBuildTab(index: number): boolean {
+    if (index === 0 || index === this.currentIndex) {
+      return true
+    }
+    if (index === 1) {
+      return this.hasVisitedContactTab
+    }
+    if (index === 2) {
+      return this.hasVisitedMineTab
+    }
+    return false
+  }
+
+  private refreshMineAvatarPreloadUrl(): void {
+    const loginUserId = ChatKitClient.getLoginUserId()
+    this.updateMineAvatarPreloadUrl(resolveMineUser(NEFriendUserCache.mineUserCache?.user, loginUserId))
+  }
+
+  private updateMineAvatarPreloadUrl(user: V2NIMUser | undefined): void {
+    const loginUserId = ChatKitClient.getLoginUserId()
+    const avatarUrl = resolveMineAvatarPreloadUrl(user, loginUserId)
+    if (avatarUrl !== this.mineAvatarPreloadUrl) {
+      this.mineAvatarPreloadUrl = avatarUrl
+      this.mineAvatarPreloadFinished = false
+    }
+  }
+
+  private preloadMineTab(): void {
+    this.hasVisitedMineTab = true
   }
 }

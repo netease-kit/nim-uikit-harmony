@@ -5,7 +5,8 @@
  *
  */
 
-import { ChatKitClient, ContactRepo, ErrorUtils, TeamRepo } from '@nimkit/chatkit';
+import { Logger } from '@nimkit/common';
+import { ChatKitClient, ContactRepo, DisposableBag, ErrorUtils, TeamEventRepo, TeamRepo } from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -34,6 +35,7 @@ export struct TeamProfilePage {
   @Local ownerName: string = ''
   @Local isGroupTeam: boolean = false
   @Local isMember: boolean = false
+  private disposableBag: DisposableBag = new DisposableBag()
 
   onTeamJoinedFun = (team: V2NIMTeam) => {
     if (this.team && team.teamId === this.team.teamId) {
@@ -61,7 +63,7 @@ export struct TeamProfilePage {
       }
       user = users[0]
     } catch (err) {
-      console.error('TeamProfilePage loadOwnerInfo getUserList error', err)
+      Logger.error('ContactKit', 'TeamProfilePage loadOwnerInfo getUserList error', err)
       return
     }
 
@@ -70,7 +72,7 @@ export struct TeamProfilePage {
       const friends = await ContactRepo.getFriendByIds([this.team.ownerAccountId])
       friendAlias = friends.length > 0 ? friends[0].alias : undefined
     } catch (err) {
-      console.error('TeamProfilePage loadOwnerInfo getFriendByIds error', err)
+      Logger.error('ContactKit', 'TeamProfilePage loadOwnerInfo getFriendByIds error', err)
     }
 
     // 3. 查询群成员昵称（失败不影响后续逻辑）
@@ -82,7 +84,7 @@ export struct TeamProfilePage {
       )
       teamNick = members.length > 0 ? members[0].teamNick : undefined
     } catch (err) {
-      console.error('TeamProfilePage loadOwnerInfo getTeamMemberListByIds error', err)
+      Logger.error('ContactKit', 'TeamProfilePage loadOwnerInfo getTeamMemberListByIds error', err)
     }
 
     // 4. 按优先级返回：好友备注 > 群昵称 > 个人昵称 > accountId
@@ -149,7 +151,7 @@ export struct TeamProfilePage {
         }
       }
     } catch (err) {
-      console.error('TeamProfilePage applyJoinTeam error', err)
+      Logger.error('ContactKit', 'TeamProfilePage applyJoinTeam error', err)
       const error = err as V2NIMError
       if (error?.code === TEAM_MEMBER_LIMIT_ERROR_CODE) {
         NECommonUtils.showToast($r('app.string.team_member_limit_tip'))
@@ -264,11 +266,16 @@ export struct TeamProfilePage {
         }
         this.checkMembership()
       }
-      ChatKitClient.nim.teamService?.on('onTeamJoined', this.onTeamJoinedFun)
+      this.disposeEventListeners()
+      this.disposableBag.add(TeamEventRepo.onTeamJoined(this.onTeamJoinedFun))
     })
     .onDisAppear(() => {
-      ChatKitClient.nim.teamService?.off('onTeamJoined', this.onTeamJoinedFun)
+      this.disposeEventListeners()
     })
+  }
+
+  private disposeEventListeners(): void {
+    this.disposableBag.dispose()
   }
 
   @Builder

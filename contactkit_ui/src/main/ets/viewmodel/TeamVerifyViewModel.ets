@@ -5,7 +5,8 @@
  *
  */
 
-import { ChatKitClient, ContactRepo, TeamRepo } from '@nimkit/chatkit'
+import { Logger } from '@nimkit/common';
+import { ChatKitClient, ContactRepo, DisposableBag, TeamEventRepo, TeamRepo } from '@nimkit/chatkit'
 import {
   V2NIMError,
   V2NIMErrorCode,
@@ -124,6 +125,7 @@ export class TeamVerifyViewModel {
   limit: number = 100
   finished: boolean = false
   @Trace verifyList: TeamVerifyInfoBean[] = []
+  private disposableBag: DisposableBag = new DisposableBag()
 
   onReceiveTeamJoinActionInfoFun = async (actionInfo: V2NIMTeamJoinActionInfo) => {
     try {
@@ -132,12 +134,14 @@ export class TeamVerifyViewModel {
         this.verifyList.unshift(bean)
       }
     } catch (err) {
-      console.error('TeamVerifyViewModel onReceiveTeamJoinActionInfo error', err)
+      Logger.error('ContactKit', 'TeamVerifyViewModel onReceiveTeamJoinActionInfo error', err)
     }
   }
 
   constructor() {
-    ChatKitClient.nim.teamService?.on('onReceiveTeamJoinActionInfo', this.onReceiveTeamJoinActionInfoFun)
+    this.disposableBag.add(
+      TeamEventRepo.onReceiveTeamJoinActionInfo(this.onReceiveTeamJoinActionInfoFun)
+    )
   }
 
   async convertToVerifyInfoBean(actionInfo: V2NIMTeamJoinActionInfo,
@@ -172,7 +176,7 @@ export class TeamVerifyViewModel {
           bean.setOperatorUser(users[0])
         }
       } catch (err) {
-        console.error('TeamVerifyViewModel getUserInfo error', err)
+        Logger.error('ContactKit', 'TeamVerifyViewModel getUserInfo error', err)
       }
     }
 
@@ -184,7 +188,7 @@ export class TeamVerifyViewModel {
         bean.setJoinTeam(team)
       }
     } catch (err) {
-      console.error('TeamVerifyViewModel getTeamInfo error', err)
+      Logger.error('ContactKit', 'TeamVerifyViewModel getTeamInfo error', err)
     }
 
     return bean
@@ -222,7 +226,7 @@ export class TeamVerifyViewModel {
         }
       }
     } catch (err) {
-      console.error('TeamVerifyViewModel getVerifyList error', err)
+      Logger.error('ContactKit', 'TeamVerifyViewModel getVerifyList error', err)
     }
   }
 
@@ -234,7 +238,7 @@ export class TeamVerifyViewModel {
       await TeamRepo.acceptJoinApplication(actionInfo)
       this.setActionStatus(actionInfo, V2NIMTeamJoinActionStatus.V2NIM_TEAM_JOIN_ACTION_STATUS_AGREED)
     } catch (err) {
-      console.error('TeamVerifyViewModel acceptApplication error', err)
+      Logger.error('ContactKit', 'TeamVerifyViewModel acceptApplication error', err)
       await this.handleActionError(actionInfo, err)
     }
   }
@@ -247,7 +251,7 @@ export class TeamVerifyViewModel {
       await TeamRepo.rejectJoinApplication(actionInfo)
       this.setActionStatus(actionInfo, V2NIMTeamJoinActionStatus.V2NIM_TEAM_JOIN_ACTION_STATUS_REJECTED)
     } catch (err) {
-      console.error('TeamVerifyViewModel rejectApplication error', err)
+      Logger.error('ContactKit', 'TeamVerifyViewModel rejectApplication error', err)
       await this.handleActionError(actionInfo, err)
     }
   }
@@ -260,7 +264,7 @@ export class TeamVerifyViewModel {
       await TeamRepo.acceptInvitation(actionInfo)
       this.setActionStatus(actionInfo, V2NIMTeamJoinActionStatus.V2NIM_TEAM_JOIN_ACTION_STATUS_AGREED)
     } catch (err) {
-      console.error('TeamVerifyViewModel acceptInvitation error', err)
+      Logger.error('ContactKit', 'TeamVerifyViewModel acceptInvitation error', err)
       await this.handleActionError(actionInfo, err)
     }
   }
@@ -273,7 +277,7 @@ export class TeamVerifyViewModel {
       await TeamRepo.rejectInvitation(actionInfo)
       this.setActionStatus(actionInfo, V2NIMTeamJoinActionStatus.V2NIM_TEAM_JOIN_ACTION_STATUS_REJECTED)
     } catch (err) {
-      console.error('TeamVerifyViewModel rejectInvitation error', err)
+      Logger.error('ContactKit', 'TeamVerifyViewModel rejectInvitation error', err)
       await this.handleActionError(actionInfo, err)
     }
   }
@@ -302,7 +306,7 @@ export class TeamVerifyViewModel {
         const alreadyInTeam = members.some(member => member.teamMember.inTeam)
         result = refineTeamVerifyActionErrorResult(result, { alreadyInTeam })
       } catch (err) {
-        console.error('TeamVerifyViewModel refineActionErrorResult alreadyInTeam error', err)
+        Logger.error('ContactKit', 'TeamVerifyViewModel refineActionErrorResult alreadyInTeam error', err)
       }
     }
 
@@ -323,7 +327,7 @@ export class TeamVerifyViewModel {
         operatorMember?.teamMember.memberRole)
       return refineTeamVerifyActionErrorResult(result, { noPermission })
     } catch (err) {
-      console.error('TeamVerifyViewModel refineActionErrorResult permission error', err)
+      Logger.error('ContactKit', 'TeamVerifyViewModel refineActionErrorResult permission error', err)
       return result
     }
   }
@@ -418,9 +422,9 @@ export class TeamVerifyViewModel {
    */
   async setVerifyRead() {
     try {
-      await ChatKitClient.nim.teamService?.setTeamJoinActionInfoRead()
+      await TeamRepo.setTeamJoinActionInfoRead()
     } catch (err) {
-      console.error('TeamVerifyViewModel setVerifyRead error', err)
+      Logger.error('ContactKit', 'TeamVerifyViewModel setVerifyRead error', err)
     }
   }
 
@@ -432,14 +436,14 @@ export class TeamVerifyViewModel {
       return
     }
     try {
-      await ChatKitClient.nim.teamService?.clearAllTeamJoinActionInfo()
+      await TeamRepo.clearAllTeamJoinActionInfo()
       this.verifyList = []
     } catch (err) {
-      console.error('TeamVerifyViewModel clearAll error', err)
+      Logger.error('ContactKit', 'TeamVerifyViewModel clearAll error', err)
     }
   }
 
   onDestroy() {
-    ChatKitClient.nim.teamService?.off('onReceiveTeamJoinActionInfo', this.onReceiveTeamJoinActionInfoFun)
+    this.disposableBag.dispose()
   }
 }

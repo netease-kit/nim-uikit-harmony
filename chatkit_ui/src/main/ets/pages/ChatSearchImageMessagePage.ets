@@ -4,6 +4,7 @@
  *  found in the LICENSE file.
  */
 
+import { Logger } from '@nimkit/common';
 import { CommonEmptyResult, ImagesIndexModel, ImageViewDialog, NavigationBackBuilder, NECommonUtils, } from '@nimkit/common'
 import { ChatSearchImageMessageParams, ChatSearchImageMessageViewModel, DateGroupedMessages } from '../viewmodel/ChatSearchImageMessageViewModel'
 import { NIMMessageInfo } from '../model/NIMMessageInfo'
@@ -12,7 +13,7 @@ import { MessageItemClick } from '../view/MessageItemClick'
 import { ChatBaseViewModel } from '../viewmodel/ChatBaseViewModel'
 import { V2NIMConversationType, V2NIMTeamType } from '@nimsdk/base'
 import { ChatKitClient, conversationSelectLimitCount, ConversationSelectParam, ErrorUtils, IMKitConfigCenter, TeamRepo } from '@nimkit/chatkit'
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel'
+import { ConversationSelectModel } from '@nimkit/chatkit'
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog'
 import { ChatUserInfo } from '../model/ChatUserInfo'
 import { ChatTeamInfo } from '../model/ChatTeamInfo'
@@ -280,7 +281,7 @@ export struct ChatSearchImageMessagePage {
         }
       }
     } catch (err) {
-      console.error('ChatSearchImageMessagePage loadMessages error:', err)
+      Logger.error('ChatKitUI', 'ChatSearchImageMessagePage loadMessages error:', err)
     }
   }
 
@@ -302,7 +303,7 @@ export struct ChatSearchImageMessagePage {
       this.imagesIndexModel = imageModel
       this.imageViewerDialog.open()
     } catch (err) {
-      console.error('ChatSearchImageMessagePage showImageDetail error:', err)
+      Logger.error('ChatKitUI', 'ChatSearchImageMessagePage showImageDetail error:', err)
     }
   }
 

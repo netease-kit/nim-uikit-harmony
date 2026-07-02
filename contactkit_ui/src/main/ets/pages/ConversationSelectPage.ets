@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -18,7 +19,7 @@ import {
 import { ChatKitClient, ConversationSelectedParam, ConversationSelectParam, ErrorUtils } from '@nimkit/chatkit';
 import { ConversationSelectViewModel } from '../viewmodel/ConversationSelectViewModel';
 import { NEContactSection, SelectUserWithFriend } from '../model/NEContactSection';
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
+import { ConversationSelectModel } from '@nimkit/chatkit';
 
 // 跳转页面入口函数
 @Builder
@@ -55,7 +56,7 @@ export struct ConversationSelectPage {
     try {
       await this.viewModel.loadData(this.filterList)
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 

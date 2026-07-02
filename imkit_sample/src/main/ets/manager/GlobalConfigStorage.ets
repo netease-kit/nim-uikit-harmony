@@ -25,3 +25,11 @@ export function resolveTeamJoinAgreeModeEnabled(teamJoinAgreeModeSetting?: boole
 
   return true
 }
+
+export function resolveLocalConversationEnabled(localConversationSetting?: boolean): boolean {
+  if (typeof localConversationSetting === 'boolean') {
+    return localConversationSetting
+  }
+
+  return true
+}

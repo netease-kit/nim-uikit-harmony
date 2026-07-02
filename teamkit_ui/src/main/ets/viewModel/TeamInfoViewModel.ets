@@ -4,7 +4,7 @@
  * found in the LICENSE file.
  *
  */
-import { ChatKitClient, TeamRepo } from '@nimkit/chatkit'
+import { ChatKitClient, DisposableBag, TeamEventRepo, TeamRepo } from '@nimkit/chatkit'
 import { V2NIMTeam, V2NIMTeamMember } from '@nimsdk/base'
 
 @ObservedV2
@@ -12,6 +12,7 @@ export class TeamInfoViewModel {
   @Trace teamInfo?: V2NIMTeam
   //本人的群成员身份
   @Trace mineTeamMember?: V2NIMTeamMember
+  private disposableBag: DisposableBag = new DisposableBag()
 
   onTeamInfoUpdated(team: V2NIMTeam) {
     if (team.teamId === this.teamInfo?.teamId) {
@@ -20,9 +21,13 @@ export class TeamInfoViewModel {
   }
 
   initTeamData(teamInfo?: V2NIMTeam) {
+    this.destroy()
     this.teamInfo = teamInfo
-    ChatKitClient.nim.teamService?.on('onTeamInfoUpdated', this.onTeamInfoUpdated.bind(this))
-    TeamRepo
+    this.disposableBag.add(
+      TeamEventRepo.onTeamInfoUpdated((team: V2NIMTeam): void => {
+        this.onTeamInfoUpdated(team)
+      })
+    )
   }
 
   getMineTeamMember() {
@@ -38,6 +43,6 @@ export class TeamInfoViewModel {
   }
 
   destroy() {
-    ChatKitClient.nim.teamService?.off('onTeamInfoUpdated', this.onTeamInfoUpdated.bind(this))
+    this.disposableBag.dispose()
   }
 }

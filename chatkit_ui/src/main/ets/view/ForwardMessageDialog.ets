@@ -4,7 +4,7 @@
  * found in the LICENSE file.
  *
  */
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel'
+import { ConversationSelectModel } from '@nimkit/chatkit'
 import { AvatarColorUntil, AvatarItem, CommonAvatar, NECommonUtils } from '@nimkit/common'
 
 /**

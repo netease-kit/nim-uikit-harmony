@@ -5,7 +5,8 @@
  *
  */
 
-import { ErrorUtils, StorageRepo, UserAIBotRepo } from '@nimkit/chatkit';
+import { Logger } from '@nimkit/common';
+import { ErrorUtils, StorageRepo, UserAIBotManager } from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -41,7 +42,7 @@ export struct CreateBotPage {
 
     // 拉取当前机器人列表，找 Bot_X 最大序号，生成默认昵称 Bot_(max+1)
     try {
-      const result = await UserAIBotRepo.getUserAIBotList({ limit: 100 })
+      const result = await UserAIBotManager.getUserAIBotList({ limit: 100 })
       const bots = result?.bots ?? []
       let maxIndex = 0
       for (const bot of bots) {
@@ -80,7 +81,7 @@ export struct CreateBotPage {
           }
         }
       } catch (err) {
-        console.error('upload avatar error: ' + JSON.stringify(err))
+        Logger.error('ContactKit', 'upload avatar error: ' + JSON.stringify(err))
       }
     }
   }
@@ -107,14 +108,14 @@ export struct CreateBotPage {
     }
     this.isSubmitting = true
     try {
-      await UserAIBotRepo.createUserAIBot({
+      await UserAIBotManager.createUserAIBot({
         accid: this.accid,
         name: this.botName.trim(),
         icon: this.avatarUrl.length > 0 ? this.avatarUrl : undefined
       })
       NECommonUtils.showToast($r('app.string.bot_create_success'))
       // 创建后拉取列表，把最新 bot 对象完整带回，避免 BotInfoPage 再次查找
-      const listResult = await UserAIBotRepo.getUserAIBotList({ limit: 100 })
+      const listResult = await UserAIBotManager.getUserAIBotList({ limit: 100 })
       let newBot: V2NIMUserAIBot | undefined = undefined
       if (listResult && listResult.bots && listResult.bots.length > 0) {
         // 按 createTime 降序取最新的
@@ -126,10 +127,18 @@ export struct CreateBotPage {
         }
         newBot = latestBot
       }
+      if (!newBot) {
+        newBot = {
+          accid: this.accid,
+          name: this.botName.trim(),
+          icon: this.avatarUrl.length > 0 ? this.avatarUrl : undefined
+        }
+        UserAIBotManager.mergeLocalUserAIBot(newBot)
+      }
       this.pathStack.pop(newBot ?? this.accid)
     } catch (err) {
       NECommonUtils.showToast($r('app.string.bot_create_fail'))
-      console.error('createUserAIBot error: ' + JSON.stringify(err))
+      Logger.error('ContactKit', 'createUserAIBot error: ' + JSON.stringify(err))
     } finally {
       this.isSubmitting = false
     }

@@ -15,9 +15,9 @@ import {
   NavigationBackBuilder,
   NECommonUtils
 } from '@nimkit/common'
-import { TeamMemberWithUser } from '@nimkit/chatkit/src/main/ets/model/TeamMemberWithUser'
+import { TeamMemberWithUser } from '@nimkit/chatkit'
 import { TeamMemberSelectorViewModel } from '../viewModel/TeamMemberSelectorViewModel'
-import { ManagerSelectorParams } from '@nimkit/chatkit/src/main/ets/model/TeamMemberSelector'
+import { ManagerSelectorParams } from '@nimkit/chatkit'
 
 
 /**

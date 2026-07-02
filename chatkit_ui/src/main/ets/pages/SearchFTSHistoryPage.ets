@@ -4,17 +4,18 @@
  *  found in the LICENSE file.
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatKitClient, getMultiLineBody, getMultiLineTitle, IMKitConfigCenter, isMultiLineMessage } from '@nimkit/chatkit';
 import { ChatBaseViewModel } from '../viewmodel/ChatBaseViewModel';
 import { AvatarColorUntil, AvatarItem, CommonAvatar, CommonEmptyResult, CommonTextInput, NavigationBackBuilder, NECommonUtils, TailString } from '@nimkit/common';
 import { EmojiParseType, NEEmojiManager, NEEmojiParseResult, NIMInputEmoticon } from '../manager/NEEmojiManager';
 import { memberHistoryMessageContent } from '../view/MessageComponentBuilder';
-import { DateUtil } from '@nimkit/common/src/main/ets/utils/DateUtil';
+import { DateUtil } from '@nimkit/common';
 import { SearchFTSHistoryViewModel } from '../viewmodel/SearchFTSHistoryViewModel';
 import { V2NIMConversationType, V2NIMMessageType } from '@nimsdk/base';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { CommonQuickSearchButton } from '../view/CommonQuickSearchButton';
-import { ManagerSelectorParams, TeamMemberSelectorMode } from '@nimkit/chatkit/src/main/ets/model/TeamMemberSelector';
+import { ManagerSelectorParams, TeamMemberSelectorMode } from '@nimkit/chatkit';
 import { TeamMemberMessageParams } from '../viewmodel/TeamMemberMessageViewModel';
 import { ChatSearchImageMessageParams } from '../viewmodel/ChatSearchImageMessageViewModel';
 import { ChatSearchVideoMessageParams } from '../viewmodel/ChatSearchVideoMessageViewModel';
@@ -57,7 +58,7 @@ export struct SearchFTSHistoryPage {
         await this.viewModel?.searchHistoryMessages(event.text, true)
         this.isEmpty = (this.viewModel?.historyList.length ?? 0) <= 0
       } catch (err) {
-        console.error(err)
+        Logger.error('ChatKitUI', err)
         this.isEmpty = true
       } finally {
         this.isLoading = false
@@ -78,7 +79,7 @@ export struct SearchFTSHistoryPage {
     try {
       await this.viewModel?.searchHistoryMessages(this.searchText, false)
     } catch (err) {
-      console.error('加载更多消息失败:', err)
+      Logger.error('ChatKitUI', '加载更多消息失败:', err)
     } finally {
       this.isLoadingMore = false
     }

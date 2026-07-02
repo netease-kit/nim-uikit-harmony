@@ -5,14 +5,19 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import {
   ChatKitClient,
   ChatRepo,
   ContactRepo,
   ConversationRepo,
+  DisposableBag,
+  FriendEventRepo,
+  AIUserManager,
   IMKitConfigCenter,
   LocalConversationRepo,
-  SettingRepo
+  SettingRepo,
+  UserEventRepo
 } from '@nimkit/chatkit';
 import {
   V2NIMConversationType,
@@ -29,6 +34,7 @@ import { ChatUserInfo } from '../model/ChatUserInfo';
 import { ChatBaseViewModel } from './ChatBaseViewModel';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { ChatKitConfig } from '../ChatKitConfig';
+import { extractAitAccountIds } from '../common/MessageHelper';
 
 // 正在输入状态通知内容常量（与 Android 端对齐）
 const TYPING_CONTENT_START = '{"typing":1}'
@@ -52,18 +58,21 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
   private typingTimeoutId: number | undefined = undefined
   // 上一次发送"正在输入"通知的时间戳（用于节流）
   private lastTypingSentTime: number = 0
+  private isInsertingAIWelcomeMessage: boolean = false
+  private hasCheckedAIWelcomeMessage: boolean = false
+  private eventDisposers: DisposableBag = new DisposableBag()
 
   init(conversationId: string, chatInfo: ChatUserInfo): void {
     super.init(conversationId, chatInfo)
     this.chatUserInfo = chatInfo
     this.getConversationInfo()
     ChatRepo.onP2PMessageReadReceipts(this.onReceiveP2PMessageReadReceiptFun)
-    ChatKitClient.nim.userService?.on('onUserProfileChanged', this.onUserProfileChangedFun)
-    ChatKitClient.nim.friendService?.on('onFriendInfoChanged', this.onFriendInfoChangedFun)
-    ChatKitClient.nim.friendService?.on('onFriendDeleted',
-      async (accountId: string, deletionType: V2NIMFriendDeletionType) => {
-        this.onFriendInfoDeleteFun(accountId)
-      })
+    this.eventDisposers.dispose()
+    this.eventDisposers.addAll([
+      UserEventRepo.onUserProfileChanged(this.onUserProfileChangedFun),
+      FriendEventRepo.onFriendInfoChanged(this.onFriendInfoChangedFun),
+      FriendEventRepo.onFriendDeleted(this.onFriendInfoDeleteFun)
+    ])
     // 注册自定义通知监听（用于接收对方的"正在输入"状态）
     if (IMKitConfigCenter.enableTypingStatus) {
       ChatRepo.onReceiveCustomNotifications(this.onReceiveCustomNotificationsFun)
@@ -73,7 +82,7 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
   onReceiveP2PMessageReadReceiptFun = (readReceipts: V2NIMP2PMessageReadReceipt[]) => {
     let receipt: V2NIMP2PMessageReadReceipt = readReceipts[0]
     readReceipts.forEach((item, index, readReceipts) => {
-      console.debug('netease onReceiveP2PMessageReadReceiptFun item:', item.timestamp, ',index:', index)
+      Logger.debug('ChatKitUI', 'netease onReceiveP2PMessageReadReceiptFun item:', item.timestamp, ',index:', index)
       if (item.timestamp > receipt.timestamp) {
         receipt = item
       }
@@ -82,10 +91,12 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
   }
   onUserProfileChangedFun = (user: V2NIMUser[]) => {
     user.forEach((item) => {
-      if (item.accountId == this.chatUserInfo?.currentUser?.accountId) {
+      if (item.accountId == ChatKitClient.getLoginUserId()) {
         this.chatUserInfo?.setCurrentUser(item)
       } else if (item.accountId == this.chatUserInfo?.chatUser?.accountId) {
         this.chatUserInfo?.setChatUser(item)
+      } else {
+        this.chatUserInfo?.updateExtraUser(item)
       }
     })
   }
@@ -95,16 +106,17 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
       this.chatUserInfo?.setChatFriend(friendInfo)
     }
   }
-  onFriendInfoDeleteFun = (accountId: String) => {
+  onFriendInfoDeleteFun = (accountId: string, deletionType?: V2NIMFriendDeletionType) => {
     if (accountId == this.chatUserInfo?.targetId) {
       this.chatUserInfo?.updateConversationName()
       this.chatUserInfo?.setChatFriend(undefined)
     }
   }
 
-  loadData() {
-    this.getMessageList()
+  async loadData(): Promise<void> {
     this.getUserInfo()
+    await this.getMessageList()
+    this.checkAIWelcomeMessageAfterInitialQuery()
     this.getMessageReceipt()
     this.getPinList()
   }
@@ -116,10 +128,12 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
   }
 
   toHandleReceiveMessage(messages: NIMMessageInfo[]): void {
+    this.getUserInfoWithMessage(messages)
     this.toHandleReceiptMessage(messages)
   }
 
   toHandleQueryMessage(messages: NIMMessageInfo[], originMsg: V2NIMMessage[]): void {
+    this.getUserInfoWithMessage(messages)
     this.toHandleReceiptMessage(messages)
   }
 
@@ -171,6 +185,43 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
       let chatUser = userList[0].accountId == this.targetId ? userList[0] : undefined;
       this.chatUserInfo?.setCurrentUser(currentUser);
       this.chatUserInfo?.setChatUser(chatUser);
+    }
+  }
+
+  private getUserInfoWithMessage(messages: NIMMessageInfo[]) {
+    if (!messages || messages.length === 0) {
+      return
+    }
+    const accountSet = new Set<string>()
+    messages.forEach((item) => {
+      if (item.message.senderId) {
+        accountSet.add(item.message.senderId)
+      }
+      extractAitAccountIds(item.message.serverExtension).forEach((accountId) => {
+        accountSet.add(accountId)
+      })
+    })
+
+    const requestAccountList: string[] = []
+    accountSet.forEach((accountId) => {
+      if (!accountId || accountId === ChatKitClient.getLoginUserId() || accountId === this.targetId) {
+        return
+      }
+      if (AIUserManager.isAIUser(accountId)) {
+        return
+      }
+      if (this.chatUserInfo?.extraUserMap.has(accountId)) {
+        return
+      }
+      requestAccountList.push(accountId)
+    })
+
+    if (requestAccountList.length > 0) {
+      ContactRepo.getUserListFromCloud(requestAccountList).then((users: V2NIMUser[]) => {
+        this.chatUserInfo?.addExtraUsers(users)
+      }).catch((error: Error) => {
+        Logger.error('ChatKitUI', 'ChatP2PViewModel getUserInfoWithMessage:getUserListFromCloud ', error.name)
+      })
     }
   }
 
@@ -272,7 +323,7 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
           this.setRemoteTyping(false)
         }
       } catch (e) {
-        console.debug('netease onReceiveCustomNotificationsFun parse error:', e)
+        Logger.debug('ChatKitUI', 'netease onReceiveCustomNotificationsFun parse error:', e)
       }
     }
   }
@@ -347,7 +398,7 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
     }
     ChatRepo.sendCustomNotification(this.conversationId, content, params)
       .catch((err: Error) => {
-        console.debug('netease sendInputNotification error:', err)
+        Logger.debug('ChatKitUI', 'netease sendInputNotification error:', err)
       })
   }
 
@@ -361,15 +412,56 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
     ChatRepo.insertMessageToLocal(tipMessage, this.conversationId)
   }
 
+  private insertLocalWelcomeMessage(welcomeText: string): void {
+    const welcomeMessage: V2NIMMessage = ChatRepo.createTextMessage(welcomeText)
+    ChatRepo.insertMessageToLocal(welcomeMessage, this.conversationId, this.targetId, Date.now())
+      .then((insertedMessage: V2NIMMessage) => {
+        const msgInfo = this.chatInfo?.getMessage(insertedMessage.messageClientId) ??
+          this.chatInfo?.insertMessage(insertedMessage)
+        if (msgInfo !== undefined) {
+          this.getUserInfoWithMessage([msgInfo])
+        }
+        this.isInsertingAIWelcomeMessage = false
+      })
+      .catch((err: Error) => {
+        this.isInsertingAIWelcomeMessage = false
+        Logger.debug('ChatKitUI', 'netease insertAIWelcomeMessage error:', err)
+      })
+  }
+
+  private insertAIWelcomeMessageIfNeeded(): void {
+    if (this.isInsertingAIWelcomeMessage) {
+      return
+    }
+    if ((this.chatInfo?.msgList.totalCount() ?? 0) > 0) {
+      return
+    }
+    const welcomeText = AIUserManager.getWelcomeText(this.targetId)
+    if (welcomeText.length === 0) {
+      return
+    }
+    this.isInsertingAIWelcomeMessage = true
+    this.insertLocalWelcomeMessage(welcomeText)
+  }
+
+  private checkAIWelcomeMessageAfterInitialQuery(): void {
+    if (this.hasCheckedAIWelcomeMessage) {
+      return
+    }
+    if (!this.hasLoadData) {
+      return
+    }
+    this.hasCheckedAIWelcomeMessage = true
+    this.insertAIWelcomeMessageIfNeeded()
+  }
+
   /**
    * 退出页面，清理
    */
   onDestroy() {
     super.onDestroy()
     ChatRepo.offP2PMessageReadReceipts(this.onReceiveP2PMessageReadReceiptFun)
-    ChatKitClient.nim.userService?.off('onUserProfileChanged', this.onUserProfileChangedFun)
-    ChatKitClient.nim.friendService?.off('onFriendInfoChanged', this.onFriendInfoChangedFun)
-    ChatKitClient.nim.friendService?.off('onFriendDeleted', this.onFriendInfoDeleteFun)
+    this.eventDisposers.dispose()
     // 清理"正在输入"相关资源
     ChatRepo.offReceiveCustomNotifications(this.onReceiveCustomNotificationsFun)
     if (this.typingTimeoutId !== undefined) {

@@ -5,7 +5,8 @@
  *
  */
 
-import { ChatKitClient } from '@nimkit/chatkit';
+import { Logger } from '@nimkit/common';
+import { ConversationIdUtilRepo } from '@nimkit/chatkit';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -26,8 +27,16 @@ export struct MyTeamsPage {
     try {
       await this.viewModel.getJoinedTeamList()
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
+  }
+
+  aboutToAppear(): void {
+    this.viewModel.initEventListeners()
+  }
+
+  aboutToDisappear(): void {
+    this.viewModel.onDestroy()
   }
 
   build() {
@@ -58,7 +67,7 @@ export struct MyTeamsPage {
               .onClick(() => {
                 this.pathStack.pushPath({
                   name: 'ChatTeamPage',
-                  param: ChatKitClient.nim.conversationIdUtil.teamConversationId(item.teamId)
+                  param: ConversationIdUtilRepo.teamConversationId(item.teamId)
                 })
               })
             })

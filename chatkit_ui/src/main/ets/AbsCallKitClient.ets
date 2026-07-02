@@ -4,17 +4,18 @@
  * found in the LICENSE file.
  *
  */
+import { Logger } from '@nimkit/common';
 import { common } from "@kit.AbilityKit";
 import { NIMInterface } from "@nimsdk/base";
 
 export class AbsCallKitClient {
   // call kit init
   init(context: common.Context, nim: NIMInterface, appKey: string, accountId: string, token: string): void {
-    console.log("init AbsCallKitClient");
+    Logger.info('ChatKitUI', "init AbsCallKitClient");
   }
   // call kit call
   call(target: string, callType: number): void {
-     console.log("call AbsCallKitClient");
+     Logger.info('ChatKitUI', "call AbsCallKitClient");
   }
   className():  string {
     return "AbsCallKitClient";

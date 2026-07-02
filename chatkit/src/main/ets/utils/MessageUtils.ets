@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  *
  */
+import { Logger } from '@nimkit/common';
 import { systemDateTime } from '@kit.BasicServicesKit';
 import { V2NIMMessage, V2NIMMessageRevokeNotification } from '@nimsdk/base';
 import { ChatKitClient } from '../ChatKitClient';
@@ -33,7 +34,7 @@ export function saveLocalRevokeMessage(conversationId: string, msg: V2NIMMessage
 
   revokeMsg.localExtension = JSON.stringify(localExtension)
   let createTime = msg.createTime + 10
-  console.debug('netease saveLocalRevokeMessage:', revokeMsg.localExtension)
+  Logger.debug('ChatKit', 'netease saveLocalRevokeMessage:', revokeMsg.localExtension)
   ChatRepo.saveLocalMessage(revokeMsg, conversationId, ChatKitClient.getLoginUserId(), createTime)
 }
 
@@ -55,7 +56,7 @@ export function saveLocalRevokeMessageFormOther(conversationId: string, msgNotif
   } as RevokeMessageExtension
 
   revokeMsg.localExtension = JSON.stringify(localExtension)
-  console.debug('netease saveLocalRevokeMessageFormOther:', revokeMsg.localExtension)
+  Logger.debug('ChatKit', 'netease saveLocalRevokeMessageFormOther:', revokeMsg.localExtension)
   let createTime = msgNotify.messageRefer.createTime + 10;
   ChatRepo.saveLocalMessage(revokeMsg, conversationId, msgNotify.revokeAccountId, createTime)
 }

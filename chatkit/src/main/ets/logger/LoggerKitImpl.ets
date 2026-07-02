@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { taskpool } from '@kit.ArkTS';
 import { LogLevel, NIMEStrAnyObj, V2NIMErrorImpl } from '@nimsdk/base';
 
@@ -79,13 +80,13 @@ export class LoggerKitImpl {
     message = message.slice(0, 2000)
     if (this.isOpenConsoleLog) {
       if (level === LogLevel.Debug) {
-        console.debug(label, message, args[0].length === 0 ? '' : JSON.stringify(args[0]))
+        Logger.debug('ChatKit', label, message, args[0].length === 0 ? '' : JSON.stringify(args[0]))
       } else if (level === LogLevel.Info) {
-        console.info(label, message, args[0].length === 0 ? '' : JSON.stringify(args[0]))
+        Logger.info('ChatKit', label, message, args[0].length === 0 ? '' : JSON.stringify(args[0]))
       } else if (level === LogLevel.Error) {
-        console.error(label, message, args[0].length === 0 ? '' : JSON.stringify(args[0]))
+        Logger.error('ChatKit', label, message, args[0].length === 0 ? '' : JSON.stringify(args[0]))
       } else if (level === LogLevel.Warn) {
-        console.warn(label, message, args[0].length === 0 ? '' : JSON.stringify(args[0]))
+        Logger.warn('ChatKit', label, message, args[0].length === 0 ? '' : JSON.stringify(args[0]))
       }
     }
   }

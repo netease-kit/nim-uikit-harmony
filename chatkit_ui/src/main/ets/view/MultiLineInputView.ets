@@ -5,10 +5,17 @@
  *
  */
 
-import { V2NIMTeam } from '@nimsdk/base';
+import { Logger } from '@nimkit/common';
+import { V2NIMAIUser, V2NIMTeam } from '@nimsdk/base';
 import { ChatAitDialog } from './ChatAitDialog';
-import { TeamMemberCache, TeamMemberWithUser } from '@nimkit/chatkit';
-import { ContactRepo } from '@nimkit/chatkit';
+import {
+  accountAll,
+  ContactRepo,
+  NEAIUserCache,
+  normalizeMultiLineTitle,
+  TeamMemberCache,
+  TeamMemberWithUser
+} from '@nimkit/chatkit';
 import { AitManager } from '../manager/ait/AitManager';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { AitEditorSpan } from './ChatInputView';
@@ -45,6 +52,14 @@ export struct MultiLineInputView {
    */
   @Param
   team?: V2NIMTeam = undefined
+  @Param
+  showAitAll: boolean = true
+  @Param
+  showAIUserAit: boolean = false
+  @Param
+  showTeamMemberAit: boolean = true
+  @Param
+  aiUsers: V2NIMAIUser[] = []
 
   /**
    * 会话名称（用于 placeholder）
@@ -152,8 +167,13 @@ export struct MultiLineInputView {
     builder: ChatAitDialog({
       teamId: this.teamId,
       team: this.team,
+      showAitAll: this.showAitAll,
+      showAIUser: this.showAIUserAit,
+      showTeamMember: this.showTeamMemberAit,
+      aiUsers: this.aiUsers,
       onSelectedAll: this.onSelectedAll.bind(this),
-      onMemberSelected: this.onTeamMemberSelected.bind(this)
+      onMemberSelected: this.onTeamMemberSelected.bind(this),
+      onAIUserSelected: this.onAIUserSelected.bind(this)
     }),
     openAnimation: {
       curve: Curve.Linear,
@@ -172,7 +192,8 @@ export struct MultiLineInputView {
    */
   onSelectedAll() {
     this.chatAitDialogController.close()
-    // TODO: 实现 @All 逻辑
+    let aitValue = getContext().resourceManager.getStringByNameSync('chat_team_ait_all') + ' '
+    this.addAitSpan(accountAll, aitValue, true)
   }
 
   /**
@@ -181,20 +202,31 @@ export struct MultiLineInputView {
    */
   onTeamMemberSelected(member: TeamMemberWithUser) {
     this.chatAitDialogController.close()
-    this.addAitUser(member)
+    this.addAitSpan(member.getAccId(), member.getAitName() + ' ', true)
+  }
+
+  onAIUserSelected(aiUser: V2NIMAIUser) {
+    this.chatAitDialogController.close()
+    this.addAitSpan(aiUser.accountId, (aiUser.name ?? aiUser.accountId) + ' ', true)
   }
 
   /**
    * 显示 @ 选择器
    */
   async showAitDialog() {
-    let teamMemberCache = TeamMemberCache.getInstance()
-    if (teamMemberCache.needFetchMember()) {
-      await teamMemberCache.getMemberList()
+    if (this.showTeamMemberAit && this.teamId && this.teamId.length > 0) {
+      let teamMemberCache = TeamMemberCache.getInstance()
+      if (teamMemberCache.needFetchMember()) {
+        await teamMemberCache.getMemberList()
+      }
+      // 检查是否有成员缺失 userInfo，如果有则从云端获取
+      await this.ensureMemberUserInfo(teamMemberCache)
     }
-    // 检查是否有成员缺失 userInfo，如果有则从云端获取
-    await this.ensureMemberUserInfo(teamMemberCache)
     this.chatAitDialogController.open()
+  }
+
+  private canShowAitDialog(): boolean {
+    return (this.teamId !== undefined && this.teamId.length > 0) || (this.showAIUserAit && this.aiUsers.length > 0)
   }
 
   /**
@@ -211,7 +243,7 @@ export struct MultiLineInputView {
         const userList = await ContactRepo.getUserListFromCloud(missingUserInfoAccountIds)
         teamMemberCache.onUserProfileChanged(userList)
       } catch (e) {
-        console.error(`MultiLineInputView ensureMemberUserInfo failed: ${e}`)
+        Logger.error('ChatKitUI', `MultiLineInputView ensureMemberUserInfo failed: ${e}`)
       }
     }
   }
@@ -220,20 +252,25 @@ export struct MultiLineInputView {
    * 添加 @ 用户（完全参考 ChatInputView 的实现）
    */
   addAitUser(member: TeamMemberWithUser) {
+    this.addAitSpan(member.getAccId(), member.getAitName() + ' ', true)
+  }
+
+  private addAitSpan(accountId: string, aitValue: string, deleteTrigger: boolean) {
     if (!this.multiLineBodyController) {
       return
     }
     
     const controller = this.multiLineBodyController
-    let aitValue = member.getAitName() + ' '
     const offset = controller.getCaretOffset()
     
-    // 删除原来的 @ 符号
-    const range: RichEditorRange = { start: offset - 1, end: offset }
-    controller.deleteSpans(range)
+    if (deleteTrigger) {
+      // 删除原来的 @ 符号
+      const range: RichEditorRange = { start: offset - 1, end: offset }
+      controller.deleteSpans(range)
+    }
     
     // 在删除后的位置添加 @ span（蓝色高亮）
-    const spanOffset = offset - 1
+    const spanOffset = deleteTrigger ? offset - 1 : offset
     controller.addBuilderSpan(() => this.AtSpan(aitValue), {
       offset: spanOffset
     })
@@ -241,7 +278,7 @@ export struct MultiLineInputView {
     // 记录 @ span 信息（注意：不在这里调用 aitManager.addAitWithText，发送时才调用）
     let aitSpan: AitEditorSpan = {
       spanIndex: spanOffset,
-      accountId: member.getAccId(),
+      accountId: accountId,
       value: '@' + aitValue,
     }
     
@@ -262,29 +299,21 @@ export struct MultiLineInputView {
     if (!this.multiLineBodyController) {
       return
     }
-    
+
     let sendMember = await TeamMemberCache.getInstance().getMemberById(senderId)
-    if (!sendMember) {
+    if (sendMember) {
+      let aitValue = '@' + sendMember.getAitName() + ' '
+      this.addAitSpan(senderId, aitValue.substring(1), false)
       return
     }
-    
-    const controller = this.multiLineBodyController
-    let aitValue = '@' + sendMember.getAitName() + ' '
-    const offset = controller.getCaretOffset()
-    
-    // 直接在当前光标位置添加 @ span（回复时不需要删除 @）
-    controller.addBuilderSpan(() => this.AtSpan(aitValue), {
-      offset: offset
-    })
-    
-    // 记录 @ span 信息
-    let aitSpan: AitEditorSpan = {
-      spanIndex: offset,
-      accountId: senderId,
-      value: aitValue,
+
+    const aiUser = NEAIUserCache.getAIUser(senderId)
+    if (!aiUser) {
+      return
     }
-    
-    this.builderSpans.push(aitSpan)
+
+    const aitValue = (aiUser.name ?? aiUser.accountId) + ' '
+    this.addAitSpan(aiUser.accountId, aitValue, false)
   }
 
   /**
@@ -396,7 +425,7 @@ export struct MultiLineInputView {
    */
   setContent(title: string, body: string, bodyNodes: RichInputTransferNode[] = []) {
     // 设置标题
-    this.multiLineTitle = title
+    this.multiLineTitle = normalizeMultiLineTitle(title)
     // 清空并设置正文
     if (this.multiLineBodyController) {
       if (bodyNodes.length > 0) {
@@ -418,6 +447,22 @@ export struct MultiLineInputView {
     if (this.aitManager) {
       this.aitManager.cleanAit()
     }
+  }
+
+  setBodyText(body: string) {
+    if (!this.multiLineBodyController) {
+      return
+    }
+    this.multiLineBodyController.deleteSpans()
+    this.builderSpans = []
+    if (body.length > 0) {
+      this.multiLineBodyController.addTextSpan(body)
+    }
+    this.hasBodyContent = body.trim().length > 0
+    if (this.aitManager) {
+      this.aitManager.cleanAit()
+    }
+    this.checkAndNotifyInputChange()
   }
 
   /**
@@ -512,14 +557,14 @@ export struct MultiLineInputView {
 
       // 标题栏（标题输入框 + 收起按钮）
       Row() {
-        TextInput({ text: this.multiLineTitle, placeholder: '请输入标题' })
+        TextInput({ text: this.multiLineTitle, placeholder: $r('app.string.multiline_title_placeholder') })
           .layoutWeight(1)
           .height(40)
           .fontSize(16)
           .backgroundColor($r('app.color.color_chat_page_bg'))
           .borderRadius(8)
           .onChange((value: string) => {
-            this.multiLineTitle = value
+            this.multiLineTitle = normalizeMultiLineTitle(value)
             // 通知输入状态变化（用于"正在输入"功能）
             this.checkAndNotifyInputChange()
           })
@@ -542,7 +587,7 @@ export struct MultiLineInputView {
         RichEditor({ controller: this.multiLineBodyController })
           .width('100%')
           .height(80)
-          .placeholder(`发送给 ${this.conversationName}`)
+          .placeholder($r('app.string.chat_send_tips', this.conversationName))
           .backgroundColor($r('app.color.color_chat_page_bg'))
           .borderRadius(8)
           .id('multiline_body_input')
@@ -551,8 +596,8 @@ export struct MultiLineInputView {
             this.checkAndNotifyInputChange()
           })
           .onIMEInputComplete((result: RichEditorTextSpanResult) => {
-            // 监听输入，检测 @ 触发（仅群聊）
-            if (!this.teamId) {
+            // 监听正文输入，检测 @ 触发
+            if (!this.canShowAitDialog()) {
               return
             }
             
@@ -567,7 +612,7 @@ export struct MultiLineInputView {
           .onReady(() => {
             // 初始化时设置内容（撤回重编辑、模式切换传递内容）
             if (this.initialTitle && this.initialTitle.length > 0) {
-              this.multiLineTitle = this.initialTitle
+              this.multiLineTitle = normalizeMultiLineTitle(this.initialTitle)
             }
             if (this.initialBodyNodes.length > 0) {
               this.restoreBodyNodes(this.initialBodyNodes)

@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -65,7 +66,7 @@ export struct MyBotsPage {
     try {
       await this.viewModel.loadBotList()
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 

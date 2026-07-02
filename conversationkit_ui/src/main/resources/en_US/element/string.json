@@ -17,44 +17,76 @@
       "value": "Got it"
     },
     {
+      "name": "bot_scan_entry",
+      "value": "Scan"
+    },
+    {
       "name": "conversation_title",
-      "value": "云信 Demo"
+      "value": "Yunxin Demo"
     },
     {
       "name": "stick_top_conversation",
-      "value": "置顶"
+      "value": "Pin to Top"
     },
     {
       "name": "unstick_top_conversation",
-      "value": "取消置顶"
+      "value": "Unpin"
     },
     {
       "name": "delete_conversation",
-      "value": "删除"
+      "value": "Delete"
     },
     {
       "name": "add_friend",
-      "value": "添加好友"
+      "value": "Add Friend"
     },
     {
       "name": "create_discuss_team",
-      "value": "创建讨论组"
+      "value": "Create Discussion Group"
     },
     {
       "name": "create_advance_team",
-      "value": "创建高级群"
+      "value": "Create Advanced Group"
     },
     {
       "name": "pull_up_load_text",
-      "value": "上拉加载更多"
+      "value": "Pull up to load more"
     },
     {
       "name": "createAdvancedTeamSuccess",
-      "value": "成功创建高级群"
+      "value": "Advanced group created successfully"
     },
     {
       "name": "join_team",
       "value": "Join Team"
+    },
+    {
+      "name": "conversation_have_ait",
+      "value": "[Someone @ me]"
+    },
+    {
+      "name": "conversation_ai_badge",
+      "value": "AI"
+    },
+    {
+      "name": "conversation_bot_sub_session_prefix",
+      "value": "[Sub-session] "
+    },
+    {
+      "name": "chat_ai_message_progressing",
+      "value": "Thinking…"
+    },
+    {
+      "name": "fraud_report_action",
+      "value": "Report"
+    },
+    {
+      "name": "fraud_report_success",
+      "value": "Reported successfully"
+    },
+    {
+      "name": "fraud_tip_content",
+      "value": "For Yunxin IM feature experience only. Do not trust remittance, prize, or other money-related messages. Avoid calling unknown numbers and stay alert for scams."
     }
   ]
 }

@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  *
  */
+import { Logger } from '@nimkit/common';
 import { Animator as animator, AnimatorOptions, AnimatorResult } from '@kit.ArkUI';
 import { AudioManager } from '../manager/AudioManager';
 import { contextConstant } from '@kit.AbilityKit';
@@ -44,7 +45,7 @@ export struct NEAudioRecordView {
   @Monitor('shouldStop')
   onShouldStopChanged() {
     if (this.shouldStop && this.isRecording) {
-      console.log("net ease record view received stop signal from parent")
+      Logger.info('ChatKitUI', "net ease record view received stop signal from parent")
       this.endRecord()
       this.isRecording = false
     }
@@ -76,7 +77,7 @@ export struct NEAudioRecordView {
     this.backAnimator.onCancel = () => {
     }
     this.backAnimator.onFrame = (value: number) => {
-      // console.info(_this.TAG, 'backAnimator onFrame ' + value)
+      // Logger.info('ChatKitUI', _this.TAG, 'backAnimator onFrame ' + value)
       _this.wid = value
       _this.hei = value
       _this.radius = value / 2.0
@@ -90,7 +91,7 @@ export struct NEAudioRecordView {
   }
 
   endRecord() {
-    console.log("net ease record stop " + this.path)
+    Logger.info('ChatKitUI', "net ease record stop " + this.path)
     if (this.intervalID !== undefined) {
       clearInterval(this.intervalID)
       this.intervalID = undefined
@@ -100,7 +101,7 @@ export struct NEAudioRecordView {
     }
     // 检查是否被取消
     if (AudioRecordManager.instance.isCancelled()) {
-      console.log("net ease record was cancelled, skip sending")
+      Logger.info('ChatKitUI', "net ease record was cancelled, skip sending")
       AudioRecordManager.instance.setCancelled(false)
       if (this.onRecordEnd) {
         this.onRecordEnd()
@@ -110,7 +111,7 @@ export struct NEAudioRecordView {
     if (this.path.length > 0 && this.duration > 0) {
       AudioRecordManager.instance.stopRecordingProcess().then(() => {
         if (this.onRecordAudio) {
-          console.log("net ease on record audio finish " + this.path)
+          Logger.info('ChatKitUI', "net ease on record audio finish " + this.path)
           this.onRecordAudio(this.path, this.duration)
         }
       })
@@ -151,7 +152,7 @@ export struct NEAudioRecordView {
         })
         .onTouch((event) => {
           if (event.type == TouchType.Down) {
-            console.log("net ease record start")
+            Logger.info('ChatKitUI', "net ease record start")
             if (this.backAnimator) {
               this.backAnimator.play()
             }
@@ -167,7 +168,7 @@ export struct NEAudioRecordView {
             }
             this.duration = 0
             this.intervalID = setInterval(() => {
-              console.log('net ease do every 1s. duration ' + this.duration);
+              Logger.info('ChatKitUI', 'net ease do every 1s. duration ' + this.duration);
               this.duration += 1;
               if (this.duration >= this.maxRecordTimer
                 && this.isRecording) {

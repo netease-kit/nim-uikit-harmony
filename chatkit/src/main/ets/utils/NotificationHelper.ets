@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { vibrator } from '@kit.SensorServiceKit';
 import { media } from '@kit.MediaKit';
 import { audio } from '@kit.AudioKit';
@@ -12,7 +13,7 @@ import { notificationManager } from '@kit.NotificationKit';
 import { wantAgent, WantAgent } from '@kit.AbilityKit';
 import { CommonConstants } from '@nimkit/common';
 import { SettingRepo } from '../repo/SettingRepo';
-import { V2NIMMessage, V2NIMConversationType } from '@nimsdk/base';
+import { V2NIMMessage, V2NIMConversationType, V2NIMMessageAIStreamStatus } from '@nimsdk/base';
 import { ChatKitClient } from '../ChatKitClient';
 import notification from '@ohos.notification';
 
@@ -67,7 +68,7 @@ export class NotificationHelper {
     try {
       return await notificationManager.isNotificationEnabled();
     } catch (error) {
-      console.error(NotificationHelper.TAG, `isSystemNotificationEnabled error: ${JSON.stringify(error)}`);
+      Logger.error('ChatKit', NotificationHelper.TAG, `isSystemNotificationEnabled error: ${JSON.stringify(error)}`);
       // 默认开启
       return true;
     }
@@ -85,7 +86,7 @@ export class NotificationHelper {
       const volumeGroupManager = await volumeManager.getVolumeGroupManager(groupId);
       return await volumeGroupManager.getRingerMode();
     } catch (error) {
-      console.error(NotificationHelper.TAG, `getRingerMode error: ${JSON.stringify(error)}`);
+      Logger.error('ChatKit', NotificationHelper.TAG, `getRingerMode error: ${JSON.stringify(error)}`);
       // 默认返回响铃模式
       return audio.AudioRingMode.RINGER_MODE_NORMAL;
     }
@@ -104,7 +105,7 @@ export class NotificationHelper {
       }
       return true;
     } catch (error) {
-      console.error(NotificationHelper.TAG, `isNotificationEnabled error: ${JSON.stringify(error)}`);
+      Logger.error('ChatKit', NotificationHelper.TAG, `isNotificationEnabled error: ${JSON.stringify(error)}`);
       // 默认开启通知
       return true;
     }
@@ -120,7 +121,7 @@ export class NotificationHelper {
       const isMuted = await SettingRepo.getConversationMuteStatus(conversationId);
       return isMuted ?? false;
     } catch (error) {
-      console.error(NotificationHelper.TAG, `isConversationMuted error: ${JSON.stringify(error)}`);
+      Logger.error('ChatKit', NotificationHelper.TAG, `isConversationMuted error: ${JSON.stringify(error)}`);
       // 默认不免打扰
       return false;
     }
@@ -173,14 +174,14 @@ export class NotificationHelper {
     // 1. 检查系统通知开关
     const systemNotificationEnabled = await NotificationHelper.isSystemNotificationEnabled();
     if (!systemNotificationEnabled) {
-      console.info(NotificationHelper.TAG, 'System notification disabled, skip notification');
+      Logger.info('ChatKit', NotificationHelper.TAG, 'System notification disabled, skip notification');
       return;
     }
 
     // 2. 检查 SDK 新消息通知开关
     const notificationEnabled = await NotificationHelper.isNotificationEnabled();
     if (!notificationEnabled) {
-      console.info(NotificationHelper.TAG, 'Notification disabled (dndOn), skip notification');
+      Logger.info('ChatKit', NotificationHelper.TAG, 'Notification disabled (dndOn), skip notification');
       return;
     }
 
@@ -188,18 +189,18 @@ export class NotificationHelper {
     if (messages && messages.length > 0) {
       const hasNonMuted = await NotificationHelper.hasNonMutedMessage(messages);
       if (!hasNonMuted) {
-        console.info(NotificationHelper.TAG, 'All messages are from muted conversations, skip notification');
+        Logger.info('ChatKit', NotificationHelper.TAG, 'All messages are from muted conversations, skip notification');
         return;
       }
     }
 
     // 4. 获取系统铃声模式
     const ringerMode = await NotificationHelper.getRingerMode();
-    console.info(NotificationHelper.TAG, `RingerMode: ${ringerMode}`);
+    Logger.info('ChatKit', NotificationHelper.TAG, `RingerMode: ${ringerMode}`);
 
     // 静音模式：不响铃不震动
     if (ringerMode === audio.AudioRingMode.RINGER_MODE_SILENT) {
-      console.info(NotificationHelper.TAG, 'Silent mode, skip notification');
+      Logger.info('ChatKit', NotificationHelper.TAG, 'Silent mode, skip notification');
       return;
     }
 
@@ -238,11 +239,11 @@ export class NotificationHelper {
         usage: 'notification'
       }, (error) => {
         if (error) {
-          console.error(NotificationHelper.TAG, `Vibrate failed: ${JSON.stringify(error)}`);
+          Logger.error('ChatKit', NotificationHelper.TAG, `Vibrate failed: ${JSON.stringify(error)}`);
         }
       });
     } catch (error) {
-      console.error(NotificationHelper.TAG, `Vibrate error: ${JSON.stringify(error)}`);
+      Logger.error('ChatKit', NotificationHelper.TAG, `Vibrate error: ${JSON.stringify(error)}`);
     }
   }
 
@@ -268,7 +269,7 @@ export class NotificationHelper {
       
       NotificationHelper.avPlayer.fdSrc = fileDescriptor;
     } catch (error) {
-      console.error(NotificationHelper.TAG, `Ring error: ${JSON.stringify(error)}`);
+      Logger.error('ChatKit', NotificationHelper.TAG, `Ring error: ${JSON.stringify(error)}`);
     }
   }
 
@@ -277,7 +278,7 @@ export class NotificationHelper {
    */
   private static setupAVPlayerCallback(avPlayer: media.AVPlayer): void {
     avPlayer.on('error', (err) => {
-      console.error(NotificationHelper.TAG, `AVPlayer error: ${err.code}, ${err.message}`);
+      Logger.error('ChatKit', NotificationHelper.TAG, `AVPlayer error: ${err.code}, ${err.message}`);
       avPlayer.reset();
     });
 
@@ -317,7 +318,7 @@ export class NotificationHelper {
       }
       NotificationHelper.channelCreated = true;
     } catch (error) {
-      console.error(NotificationHelper.TAG, `ensureNotificationChannel error: ${JSON.stringify(error)}`);
+      Logger.error('ChatKit', NotificationHelper.TAG, `ensureNotificationChannel error: ${JSON.stringify(error)}`);
     }
   }
 
@@ -351,7 +352,7 @@ export class NotificationHelper {
 
       return await wantAgent.getWantAgent(wantAgentInfo);
     } catch (error) {
-      console.error(NotificationHelper.TAG, `createWantAgent error: ${JSON.stringify(error)}`);
+      Logger.error('ChatKit', NotificationHelper.TAG, `createWantAgent error: ${JSON.stringify(error)}`);
       return undefined;
     }
   }
@@ -362,46 +363,61 @@ export class NotificationHelper {
    * @returns 通知标题和内容
    */
   private static getNotificationDisplayInfo(message: V2NIMMessage): NotificationDisplayInfo {
+    const resourceManager = getContext().resourceManager
     let title = '';
     let text = '';
 
     // 获取发送者名称作为标题
     if (message.conversationType === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
-      title = message.senderId ?? '新消息';
+      title = message.senderId ?? resourceManager.getStringByNameSync('notification_new_message_title')
     } else {
       // 群消息：显示群名或群 ID
-      title = '群消息';
+      title = resourceManager.getStringByNameSync('notification_group_message_title')
+    }
+
+    if (NotificationHelper.isAIStreamMessageStreaming(message)) {
+      text = resourceManager.getStringByNameSync('chat_ai_message_progressing')
+      return { title, text };
     }
 
     // 根据消息类型显示不同内容
     switch (message.messageType) {
       case 0: // 文本消息
-        text = message.text ?? '[消息]';
+        text = message.text ?? resourceManager.getStringByNameSync('notification_message_type_text')
         break;
       case 1: // 图片消息
-        text = '[图片]';
+        text = resourceManager.getStringByNameSync('notification_message_type_image')
         break;
       case 2: // 音频消息
-        text = '[语音]';
+        text = resourceManager.getStringByNameSync('notification_message_type_audio')
         break;
       case 3: // 视频消息
-        text = '[视频]';
+        text = resourceManager.getStringByNameSync('notification_message_type_video')
         break;
       case 4: // 位置消息
-        text = '[位置]';
+        text = resourceManager.getStringByNameSync('notification_message_type_location')
         break;
       case 5: // 通知消息
-        text = '[通知]';
+        text = resourceManager.getStringByNameSync('notification_message_type_notification')
         break;
       case 6: // 文件消息
-        text = '[文件]';
+        text = resourceManager.getStringByNameSync('notification_message_type_file')
         break;
       default:
-        text = '[消息]';
+        text = resourceManager.getStringByNameSync('notification_message_type_text')
         break;
     }
 
     return { title, text };
+  }
+
+  private static isAIStreamMessageStreaming(message: V2NIMMessage): boolean {
+    if (!message.aiConfig?.aiStream) {
+      return false
+    }
+    const status = message.aiConfig.aiStreamStatus
+    return status === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_PLACEHOLDER ||
+      status === V2NIMMessageAIStreamStatus.V2NIM_MESSAGE_AI_STREAM_STATUS_STREAMING
   }
 
   /**
@@ -412,7 +428,7 @@ export class NotificationHelper {
     try {
       // 如果当前正在该会话，不发通知
       if (message.conversationId === ChatKitClient.getCurrentConversationId()) {
-        console.info(NotificationHelper.TAG, 'Current conversation, skip notification');
+        Logger.info('ChatKit', NotificationHelper.TAG, 'Current conversation, skip notification');
         return;
       }
 
@@ -447,9 +463,9 @@ export class NotificationHelper {
 
       // 发布通知
       await notificationManager.publish(notificationRequest);
-      console.info(NotificationHelper.TAG, `Published notification for conversation: ${message.conversationId}`);
+      Logger.info('ChatKit', NotificationHelper.TAG, `Published notification for conversation: ${message.conversationId}`);
     } catch (error) {
-      console.error(NotificationHelper.TAG, `publishNotification error: ${JSON.stringify(error)}`);
+      Logger.error('ChatKit', NotificationHelper.TAG, `publishNotification error: ${JSON.stringify(error)}`);
     }
   }
 
@@ -477,9 +493,9 @@ export class NotificationHelper {
       await notificationManager.cancelAll();
       // 清除角标
       await notificationManager.setBadgeNumber(0);
-      console.info(NotificationHelper.TAG, 'Cleared all notifications and badge');
+      Logger.info('ChatKit', NotificationHelper.TAG, 'Cleared all notifications and badge');
     } catch (error) {
-      console.error(NotificationHelper.TAG, `clearAllNotifications error: ${JSON.stringify(error)}`);
+      Logger.error('ChatKit', NotificationHelper.TAG, `clearAllNotifications error: ${JSON.stringify(error)}`);
     }
   }
 

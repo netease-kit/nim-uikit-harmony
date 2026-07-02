@@ -1,3 +1,4 @@
+import { Logger } from '@nimkit/common';
 import { ChatKitClient, ErrorUtils, NEUserWithFriend, IMKitConfigCenter, PersonSelectParam, TeamRepo } from '@nimkit/chatkit'
 import { NECommonUtils } from '@nimkit/common'
 import { scanBarcode, scanCore } from '@kit.ScanKit'
@@ -157,7 +158,7 @@ export struct ConversationNavigationView {
           Image($r('app.media.nav_scan'))
             .width(14)
             .height(14)
-          Text('扫一扫')
+          Text($r('app.string.bot_scan_entry'))
             .fontSize(14)
             .fontColor('#ff333333')
             .margin({ left: 6 })
@@ -228,7 +229,7 @@ export struct ConversationNavigationView {
         }
       })
     } catch (scanErr) {
-      console.error('[ConversationNavigationView] scan error: ' + JSON.stringify(scanErr))
+      Logger.error('ConversationKit', '[ConversationNavigationView] scan error: ' + JSON.stringify(scanErr))
     }
   }
 
@@ -246,7 +247,7 @@ export struct ConversationNavigationView {
       let invitees = selectedList.map(user => user.user?.accountId ?? '')
       this.createGroupTeam(invitees)
     } catch (err) {
-      console.log(err)
+      Logger.info('ConversationKit', err)
     }
   }
 
@@ -256,7 +257,7 @@ export struct ConversationNavigationView {
       let invitees = selectedList.map(user => user.user?.accountId ?? '')
       this.createAdvanceTeam(invitees)
     } catch (err) {
-      console.log(err)
+      Logger.info('ConversationKit', err)
     }
   }
 
@@ -264,12 +265,12 @@ export struct ConversationNavigationView {
     if (isGroup) {
       pathStack.pushPath({
         name: 'PersonSelectPage',
-        param: new PersonSelectParam(this.groupSelectorCallback)
+        param: new PersonSelectParam(this.groupSelectorCallback, [], 200, true)
       })
     } else {
       pathStack.pushPath({
         name: 'PersonSelectPage',
-        param: new PersonSelectParam(this.teamSelectorCallback)
+        param: new PersonSelectParam(this.teamSelectorCallback, [], 200, true)
       })
     }
   }

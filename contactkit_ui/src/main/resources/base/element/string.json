@@ -21,6 +21,14 @@
       "value": "我的数字人"
     },
     {
+      "name": "person_select_ai_users_tab",
+      "value": "数字人"
+    },
+    {
+      "name": "no_ai_user",
+      "value": "暂无数字人"
+    },
+    {
       "name": "contact_clean",
       "value": "清空"
     },
@@ -162,7 +170,7 @@
     },
     {
       "name": "select_limit_tip",
-      "value": "最多选择%d个好友"
+      "value": "最多只能选择%d个联系人"
     },
     {
       "name": "select_none_tip",
@@ -298,7 +306,7 @@
     },
     {
       "name": "no_bot",
-      "value": "暂无机器人"
+      "value": "暂无机器人，点击右上角创建"
     },
     {
       "name": "create_bot",

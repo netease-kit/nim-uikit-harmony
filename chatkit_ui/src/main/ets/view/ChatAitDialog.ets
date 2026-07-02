@@ -5,6 +5,7 @@
  *
  */
 import {
+  AIUserManager,
   ChatKitClient,
   keyExtensionAtAll,
   TeamMemberCache,
@@ -13,7 +14,7 @@ import {
   typeExtensionAllowAll
 } from '@nimkit/chatkit'
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common'
-import { V2NIMTeam, V2NIMTeamMemberRole } from '@nimsdk/base'
+import { V2NIMAIUser, V2NIMTeam, V2NIMTeamMemberRole } from '@nimsdk/base'
 import { NavigationDialog } from './NavigationDialog'
 
 /**
@@ -23,10 +24,15 @@ import { NavigationDialog } from './NavigationDialog'
 export struct ChatAitDialog {
   animationDur: number = 300
   controller: CustomDialogController
-  @BuilderParam teamId: string
-  @BuilderParam team?: V2NIMTeam
+  teamId?: string
+  team?: V2NIMTeam
   onMemberSelected?: (member: TeamMemberWithUser) => void
   onSelectedAll?: () => void
+  onAIUserSelected?: (aiUser: V2NIMAIUser) => void
+  showAitAll: boolean = true
+  showAIUser: boolean = false
+  showTeamMember: boolean = true
+  aiUsers: V2NIMAIUser[] = []
   teamMemberCache: TeamMemberCache = TeamMemberCache.getInstance()
   @State showFlag: Visibility = Visibility.Visible
   //是否显示@All
@@ -99,8 +105,48 @@ export struct ChatAitDialog {
             }
           }
 
-          ForEach(this.teamMemberCache.getAllMembers(), (member: TeamMemberWithUser) => {
-            if (member.getAccId() !== ChatKitClient.getLoginUserId()) {
+          if (this.showAIUser) {
+            ForEach(this.aiUsers, (aiUser: V2NIMAIUser) => {
+              ListItem() {
+                Row() {
+                  CommonAvatar({
+                    item: new AvatarItem(
+                      aiUser.avatar,
+                      this.getAIUserAvatarName(aiUser),
+                      AvatarColorUntil.getBackgroundColorById(aiUser.accountId)
+                    )
+                  })
+                    .width(42)
+                    .height(42)
+                    .margin({
+                      right: 14
+                    })
+
+                  Text(this.getAIUserShowName(aiUser))
+                    .fontColor('#ff333333')
+                    .fontSize(16)
+                    .width('70%')
+                }
+                .padding({
+                  left: 20,
+                  right: 20,
+                  top: 10,
+                  bottom: 10
+                })
+                .onClick(() => {
+                  this.closeDialog()
+                  if (this.onAIUserSelected) {
+                    this.onAIUserSelected(aiUser)
+                  }
+                })
+              }
+            })
+          }
+
+          if (this.showTeamMember) {
+            ForEach(this.teamMemberCache.getAllMembers(), (member: TeamMemberWithUser) => {
+              if (member.getAccId() !== ChatKitClient.getLoginUserId() &&
+                !AIUserManager.isAIChatUser(member.getAccId())) {
               ListItem() {
                 Row() {
                   CommonAvatar({
@@ -135,7 +181,8 @@ export struct ChatAitDialog {
                 })
               }
             }
-          })
+            })
+          }
 
           ListItem() {
             Column() {
@@ -178,6 +225,10 @@ export struct ChatAitDialog {
    * 更新是否要显示@All的操作
    */
   async updateShowAitAllItem() {
+    if (!this.showAitAll) {
+      this.showAll = false
+      return
+    }
     let team = await this.teamMemberCache.getTeam()
     if (team) {
       if (TeamRepo.isGroupTeam(team)) {
@@ -209,5 +260,17 @@ export struct ChatAitDialog {
       return
     }
     this.showAll = false
+  }
+
+  private getAIUserShowName(aiUser: V2NIMAIUser): string {
+    return aiUser.name ?? aiUser.accountId
+  }
+
+  private getAIUserAvatarName(aiUser: V2NIMAIUser): string {
+    let name = this.getAIUserShowName(aiUser)
+    if (name.length > 2) {
+      name = name.substring(name.length - 2, name.length)
+    }
+    return name
   }
 }

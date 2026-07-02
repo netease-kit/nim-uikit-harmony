@@ -5,14 +5,22 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatUserInfo } from '../model/ChatUserInfo';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { MessageComponent } from '../view/MessageComponent';
 import { ChatP2PViewModel } from '../viewmodel/ChatP2PViewModel';
 import { NEChatEmojiView } from '../view/NEChatEmojiView';
-import { NEEmojiManager, NEEmojiParseResult, NIMEmoticonType } from '../manager/NEEmojiManager';
+import { NEEmojiManager, NIMEmoticonType } from '../manager/NEEmojiManager';
 import { NEChatMoreOperation } from '../view/ChatMoreOperationLayout';
 import { NEChatMoreOperationData, NEChatMoreOperationType } from '../model/NEChatMoreOperationData';
+import { AIHelperView } from '../view/ai/AIHelperView';
+import { AITranslateView } from '../view/ai/AITranslateView';
+import { AISearchPanel } from '../aisearchkit/AISearchPanel';
+import { AISearchSelectionState, getMultiLineAISearchText } from '../aisearchkit/AISearchMenuUtils';
+import { AIHelperItem } from '../model/AIHelperItem';
+import { AIHelperRepo } from '../repo/AIHelperRepo';
+import { inputMethod } from '@kit.IMEKit';
 import { NEAudioRecordView } from '../view/NEAudioRecordView';
 import { AitEditorSpan, InputStyleType, NEChatInputView } from '../view/ChatInputView';
 import { MultiLineInputView } from '../view/MultiLineInputView';
@@ -26,10 +34,10 @@ import { MessageOperationView } from '../view/MessageOperationView';
 import { MessageOperationItem, MessageOperationType } from '../model/MessageOperationItem';
 import { BusinessError, pasteboard } from '@kit.BasicServicesKit';
 import { DeviceUtils } from '../common/DeviceUtils';
-import { ImageViewDialog } from '@nimkit/common/src/main/ets/ImageViewDialog/ImageViewDialog';
+import { ImageViewDialog } from '@nimkit/common';
 import { V2NIMMessage, V2NIMMessageAudioAttachment, V2NIMMessageLocationAttachment, V2NIMMessageSendingState, V2NIMMessageType } from '@nimsdk/base';
 import { ChatConst } from '../constants/ChatConst';
-import { ChatKitClient } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
+import { ChatKitClient } from '@nimkit/chatkit';
 import { AudioRecordManager } from '../manager/AudioRecordManager';
 import { AudioPlayerManager } from '../manager/AudioPlayerManager';
 import {
@@ -39,6 +47,7 @@ import {
   ErrorUtils,
   getMultiLineBody,
   getMultiLineTitle,
+  AIUserManager,
   IMKitConfigCenter,
   MergedMessageAttachment,
   mergedMessageCustomType,
@@ -49,17 +58,28 @@ import {
   parseMultiLineAttachment,
   singleMessageLimitCount,
   SubscriptionRepo,
-  UserAIBotRepo,
+  UserAIBotManager,
   ChatRepo
 } from '@nimkit/chatkit';
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
+import { ConversationSelectModel } from '@nimkit/chatkit';
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
-import { contentOfMessage, downLoadAndOpenFile, getMessageImageUrl, getMessageImageUrls, getMessageVideoRatio, getMessageVideoUrl, getReplyMessageTitle, parseMessageText } from '../common/MessageHelper';
+import {
+  contentOfMessage,
+  downLoadAndOpenFile,
+  getMessageImageUrl,
+  getMessageImageUrls,
+  getMessageVideoRatio,
+  getMessageVideoUrl,
+  getReplyMessageTitle
+} from '../common/MessageHelper';
 import { sceneMap } from '@kit.MapKit';
 import {
-  computeOperateViewHeight,
-  computeOperateViewWidth,
+  canShowAISearchForMessage,
+  computeOperateViewHeightByCount,
+  computeOperateViewWidthByCount,
+  getOperateMenu,
+  getSelectedTextOperateMenu,
   getTranslationOperateMenu,
   setupMoreOperationData
 } from '../common/ChatUtils';
@@ -70,10 +90,14 @@ import { FraudTipView } from '../view/FraudTipView';
 import { HashMap } from '@kit.ArkTS';
 import { IsReceiveMsgOperation } from '../model/IsReceiveMsg';
 import { MessageTranslationService } from '../service/translation/MessageTranslationService';
+import { AitManager } from '../manager/ait/AitManager';
 import {
+  collectRichInputTransferNodes,
   RichInputTransferNode,
-  RichInputTransferNodeType
+  RichInputTransferNodeType,
+  restoreAitTransferNodesFromMessageText
 } from '../common/InputTransferUtils';
+import { buildAIHelperContext } from '../common/AIHelperUtils';
 
 @ComponentV2
 export struct ChatP2PPage {
@@ -84,6 +108,14 @@ export struct ChatP2PPage {
   // 底部扩展区域高度，默认为0
   @Local expandHeight: number = 0;
   @Local inputStyle: InputStyleType = InputStyleType.None;
+  @Local aiHelperLoading: boolean = false
+  @Local aiHelperError: boolean = false
+  @Local aiHelperItems: AIHelperItem[] = []
+  aiHelperLastMessageClientId: string = ''
+  aiHelperHiddenByMessageListTouch: boolean = false
+  aiHelperMediaRestoreTask: number = -1
+  @Local showTranslateView: boolean = false
+  @Local translateResetKey: number = 0
   @Local hideInput: boolean = false;
   @Local scrollHeight: number = 0;
   @Local showOperationView: boolean = false;
@@ -97,6 +129,11 @@ export struct ChatP2PPage {
   @Local translatedActionMsg: NIMMessageInfo | undefined = undefined
   @Local translationOperationMode: boolean = false
   @Local operationMenuItems: Array<MessageOperationItem> | undefined = undefined
+  @Local selectedOperationText: string = ''
+  @Local showAISearchPanel: boolean = false
+  @Local aiSearchKeyword: string = ''
+  @Local aiSearchSelectionState: AISearchSelectionState = new AISearchSelectionState()
+  @Local aiSearchSelectingMessageId: string = ''
   @Local replyMsg: NIMMessageInfo | undefined = undefined
   // 撤回重编辑的富文本内容
   @Local revokeMultiLineContent: string = ''
@@ -114,9 +151,19 @@ export struct ChatP2PPage {
   navBarHeight: number = 80;
   // 底部输入框以及固定按钮操作栏高度
   @Local bottomHeight: number = 105;
+  @Local translatePanelHeight: number = 80
+  @Local translateResult: string = ''
+  @Local translateIsLoading: boolean = false
+  @Local translateIsResultMode: boolean = false
+  @Local translateInputText: string = ''
   bottomMargin: number = 100;
   bottomWithReplyHeight: number = 135;
+  aiHelperInputHeight: number = 50;
+  aiHelperPanelHeight: number = 235;
   controller: RichEditorController = new RichEditorController()
+  //@所在的span
+  builderSpans: AitEditorSpan[] = []
+  aitManager: AitManager = new AitManager()
   operationMoreDataList: Array<NEChatMoreOperationData> = Array()
   listScroller: Scroller = new Scroller()
   toScroll: boolean = false
@@ -486,7 +533,7 @@ export struct ChatP2PPage {
   aboutToAppear(): void {
     NEEmojiManager.instance.setup();
     DeviceUtils.rootDirPath = getContext(this).filesDir
-    this.operationMoreDataList = setupMoreOperationData(true)
+    this.operationMoreDataList = setupMoreOperationData(true, NEAIUserCache.getAIUser(this.chatUserInfo.targetId) !== undefined)
     MessageTranslationService.instance.addTranslationFinishedListener(this.translationFinishedListener)
     window.getLastWindow(getContext(this)).then(currentWindow => {
       let property = currentWindow.getWindowProperties();
@@ -504,6 +551,12 @@ export struct ChatP2PPage {
         if (data.type == window.AvoidAreaType.TYPE_KEYBOARD) {
           this.showOperationView = false
           this.keyboardHeight = px2vp(data.area.bottomRect.height);
+          // 键盘弹出时自动退出 AI 助聊模式
+          if (this.keyboardHeight > 10 && this.inputStyle === InputStyleType.AiHelper) {
+            this.bottomHeight = this.getSingleLineInputHeight()
+            this.expandHeight = 0
+            this.inputStyle = InputStyleType.None
+          }
           // 如果是定位消息状态，收到键盘展开重新切换最新消息
           if (this.keyboardHeight > 10 && this.chatViewModel.hasNew) {
             this.chatViewModel.reloadMessageList()
@@ -516,12 +569,14 @@ export struct ChatP2PPage {
   }
 
   computeScrollHeight() {
-    if ((this.inputStyle === InputStyleType.Emoji || this.inputStyle === InputStyleType.Record ||
-      this.inputStyle === InputStyleType.More) && this.keyboardHeight <= 0) {
-      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight - this.expandHeight
+    const translateHeight = this.getTranslatePanelHeight()
+    if (((this.inputStyle === InputStyleType.Emoji || this.inputStyle === InputStyleType.Record ||
+      this.inputStyle === InputStyleType.More) && this.keyboardHeight <= 0) ||
+      this.inputStyle === InputStyleType.AiHelper) {
+      this.scrollHeight = this.screenHeight - this.bottomHeight - this.expandHeight - translateHeight
     } else if (this.inputStyle === InputStyleType.Multiline) {
       // 多行模式：bottomHeight = 0，需要考虑 expandHeight
-      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.expandHeight
+      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.expandHeight - translateHeight
       // 键盘弹出时滚动到底部
       if (this.keyboardHeight > 10) {
         setTimeout(() => {
@@ -531,7 +586,7 @@ export struct ChatP2PPage {
         }, 20)
       }
     } else {
-      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight
+      this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight - translateHeight
       if (this.keyboardHeight > 10) {
         this.expandHeight = 0
         this.inputStyle = InputStyleType.None;
@@ -544,6 +599,386 @@ export struct ChatP2PPage {
         }, 20)
       }
     }
+  }
+
+  private getTranslatePanelHeight(): number {
+    return this.showTranslateView && !this.showMultiSelect ? this.translatePanelHeight : 0
+  }
+
+  private getChatInputContainerHeight(): number {
+    if (this.showTranslateView && !this.showMultiSelect) {
+      return this.bottomHeight + this.translatePanelHeight
+    }
+    return this.bottomHeight
+  }
+
+  private getSingleLineInputHeight(): number {
+    return this.replyMsg ? this.bottomWithReplyHeight : 105
+  }
+
+  private getAIHelperInputHeight(): number {
+    return this.aiHelperInputHeight + (this.replyMsg ? this.bottomWithReplyHeight - 105 : 0)
+  }
+
+  private getInputExpandContainerHeight(): number {
+    return this.expandHeight
+  }
+
+  private getTranslateInputText(): string {
+    if (this.inputStyle === InputStyleType.Multiline) {
+      return this.multiLineInputViewInstance?.getMultiLineBodyText() ?? this.multiLineBody
+    }
+    return this.getMessageText()
+  }
+
+  private syncTranslateInputText() {
+    this.translateInputText = this.getTranslateInputText()
+  }
+
+  private setTranslateInputText(text: string) {
+    if (this.inputStyle === InputStyleType.Multiline) {
+      this.multiLineInputViewInstance?.setBodyText(text)
+      this.multiLineBody = text
+      this.multiLineBodyNodes = []
+      this.aitManager.cleanAit()
+      return
+    }
+    this.controller.deleteSpans()
+    this.builderSpans.splice(0, this.builderSpans.length)
+    this.aitManager.cleanAit()
+    if (text.length > 0) {
+      this.controller.addTextSpan(text, { offset: 0 })
+    }
+  }
+
+  private showAITranslateView() {
+    if (!IMKitConfigCenter.enableAI || !AIUserManager.getAITranslateUser()) {
+      return
+    }
+    this.showTranslateView = true
+    if (this.inputStyle === InputStyleType.More) {
+      this.inputStyle = InputStyleType.None
+      this.expandHeight = 0
+    }
+    this.computeScrollHeight()
+  }
+
+  private hideAITranslateView() {
+    this.showTranslateView = false
+    this.clearAITranslateState()
+    this.computeScrollHeight()
+  }
+
+  private hideAIHelperPanel() {
+    if (this.inputStyle !== InputStyleType.AiHelper) {
+      return
+    }
+    this.bottomHeight = this.getSingleLineInputHeight()
+    this.expandHeight = 0
+    this.inputStyle = InputStyleType.None
+    this.computeScrollHeight()
+  }
+
+  private resetAIHelperCache() {
+    this.aiHelperLoading = false
+    this.aiHelperError = false
+    this.aiHelperItems = []
+    this.aiHelperLastMessageClientId = ''
+    this.clearPendingAIHelperMediaRestore()
+  }
+
+  private restoreAIHelperPanelForMediaPreview() {
+    if (!this.aiHelperHiddenByMessageListTouch) {
+      return
+    }
+    this.clearAIHelperMediaRestoreTask()
+    this.aiHelperHiddenByMessageListTouch = false
+    this.inputStyle = InputStyleType.AiHelper
+    this.bottomHeight = this.getAIHelperInputHeight()
+    this.expandHeight = this.aiHelperPanelHeight
+    this.computeScrollHeight()
+  }
+
+  private markAIHelperHiddenByMessageListTouch() {
+    this.aiHelperHiddenByMessageListTouch = this.inputStyle === InputStyleType.AiHelper
+    if (!this.aiHelperHiddenByMessageListTouch) {
+      return
+    }
+    this.clearAIHelperMediaRestoreTask()
+    this.aiHelperMediaRestoreTask = setTimeout(() => {
+      this.aiHelperMediaRestoreTask = -1
+      this.aiHelperHiddenByMessageListTouch = false
+    }, 1500)
+  }
+
+  private clearAIHelperMediaRestoreTask() {
+    if (this.aiHelperMediaRestoreTask >= 0) {
+      clearTimeout(this.aiHelperMediaRestoreTask)
+      this.aiHelperMediaRestoreTask = -1
+    }
+  }
+
+  private clearPendingAIHelperMediaRestore() {
+    this.clearAIHelperMediaRestoreTask()
+    this.aiHelperHiddenByMessageListTouch = false
+  }
+
+  private resetAITranslateView() {
+    if (this.showTranslateView) {
+      this.translateResetKey += 1
+    }
+    this.clearAITranslateState()
+  }
+
+  private clearAITranslateState() {
+    this.translateResult = ''
+    this.translateIsLoading = false
+    this.translateIsResultMode = false
+  }
+
+  private getAIChatUsers() {
+    return AIUserManager.getAIChatUserList()
+  }
+
+  private canAitAIUser(): boolean {
+    return IMKitConfigCenter.enableAI &&
+      this.getAIChatUsers().length > 0 &&
+      !AIUserManager.isAIUser(this.chatUserInfo.targetId)
+  }
+
+  private shouldShowOnlineState(): boolean {
+    return IMKitConfigCenter.enableShownOnlineState &&
+      !AIUserManager.isAIUser(this.chatUserInfo.targetId)
+  }
+
+  private getAitPushList(): string[] | undefined {
+    return this.aitManager.getPushList()
+  }
+
+  private getFirstAitAIUserAccount(): string | undefined {
+    return this.aitManager.getFirstAIChatAccount(this.getAIChatUsers().map(aiUser => aiUser.accountId))
+  }
+
+  private getOperationText(): string {
+    if (!this.operationMsg) {
+      return ''
+    }
+    if (this.selectedOperationText.length > 0) {
+      return this.selectedOperationText
+    }
+    if (this.translationOperationMode) {
+      return MessageTranslationService.instance.getTranslatedDisplayText(this.operationMsg)
+    }
+    if (this.operationMsg.isMultiLineMsg) {
+      const title = getMultiLineTitle(this.operationMsg.message)
+      const body = getMultiLineBody(this.operationMsg.message)
+      return title && body ? `${title}\n${body}` : (title || body)
+    }
+    return this.operationMsg.message.text ?? ''
+  }
+
+  private getAISearchOperationText(): string {
+    if (!this.operationMsg) {
+      return ''
+    }
+    if (this.selectedOperationText.length > 0) {
+      return this.selectedOperationText
+    }
+    if (this.translationOperationMode) {
+      return MessageTranslationService.instance.getTranslatedDisplayText(this.operationMsg)
+    }
+    if (this.operationMsg.isMultiLineMsg) {
+      return getMultiLineAISearchText(getMultiLineBody(this.operationMsg.message))
+    }
+    return this.operationMsg.message.text ?? ''
+  }
+
+  private getMessageAISearchText(msg: NIMMessageInfo | undefined): string {
+    if (!msg) {
+      return ''
+    }
+    if (msg.isMultiLineMsg) {
+      return getMultiLineAISearchText(getMultiLineBody(msg.message))
+    }
+    if (msg.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+      return msg.message.text ?? ''
+    }
+    return ''
+  }
+
+  private getSelectionOperationMenuItems(): MessageOperationItem[] {
+    if (this.translationOperationMode && this.aiSearchSelectionState.isAllSelected()) {
+      return getTranslationOperateMenu()
+    }
+    if (!this.aiSearchSelectionState.active || this.aiSearchSelectionState.isAllSelected()) {
+      return getOperateMenu(this.operationMsg)
+    }
+    return getSelectedTextOperateMenu(this.aiSearchSelectionState.selectedText())
+  }
+
+  private updateSelectionOperationMenu(): void {
+    if (!this.aiSearchSelectionState.active) {
+      return
+    }
+    this.selectedOperationText = this.aiSearchSelectionState.isAllSelected() ? '' :
+    this.aiSearchSelectionState.selectedText()
+    this.operationMenuItems = this.getSelectionOperationMenuItems()
+    const itemCount = this.operationMenuItems.length
+    const opMenuWidth = computeOperateViewWidthByCount(itemCount)
+    const opMenuHeight = computeOperateViewHeightByCount(itemCount)
+    this.operationRect.x = this.aiSearchSelectionState.rectX +
+      (this.aiSearchSelectionState.rectWidth - opMenuWidth) / 2
+    if (this.operationRect.x < this.operationViewMargin) {
+      this.operationRect.x = this.operationViewMargin
+    }
+    if (this.operationRect.x + opMenuWidth + this.operationViewMargin > this.screenWidth) {
+      this.operationRect.x = this.screenWidth - opMenuWidth - this.operationViewMargin
+    }
+    this.operationRect.y = this.aiSearchSelectionState.rectY - opMenuHeight - this.operationViewMargin
+    if (this.operationRect.y < 0) {
+      this.operationRect.y = this.aiSearchSelectionState.rectY + this.aiSearchSelectionState.rectHeight +
+        this.operationViewMargin
+    }
+    this.showOperationView = itemCount > 0
+  }
+
+  private closeAISearchSelection(): void {
+    this.aiSearchSelectionState.close()
+    this.aiSearchSelectingMessageId = ''
+  }
+
+  private openAISearchSelection(event: GestureEvent, msg: NIMMessageInfo | undefined): boolean {
+    if (!canShowAISearchForMessage(msg)) {
+      return false
+    }
+    const text = this.getMessageAISearchText(msg).trim()
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] P2P openAISearchSelection msgId=${msg?.getMessageClientId()} textLength=${text.length} type=${msg?.getMessageType()} aiResponse=${msg?.isAIResponseMsg()} aiStream=${msg?.isAiStreamMessage()}`)
+    return this.openTextSelection(event, msg, text, false)
+  }
+
+  private openTranslationSelection(event: GestureEvent, msg: NIMMessageInfo | undefined): boolean {
+    const text = msg ? MessageTranslationService.instance.getTranslatedDisplayText(msg).trim() : ''
+    return this.openTextSelection(event, msg, text, true)
+  }
+
+  private openTextSelection(event: GestureEvent, msg: NIMMessageInfo | undefined, text: string,
+    isTranslation: boolean): boolean {
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] P2P openTextSelection msgId=${msg?.getMessageClientId()} textLength=${text.length} isTranslation=${isTranslation} hasX=${event.target.area.globalPosition.x !== undefined} hasY=${event.target.area.globalPosition.y !== undefined}`)
+    if (text.length === 0 || event.target.area.globalPosition.x === undefined ||
+      event.target.area.globalPosition.y === undefined) {
+      this.closeAISearchSelection()
+      Logger.info('ChatKitUI', `[AISearchMarkdownSelect] P2P openTextSelection close msgId=${msg?.getMessageClientId()}`)
+      return false
+    }
+    this.aiSearchSelectionState.open(text,
+      Number(event.target.area.globalPosition.x),
+      Number(event.target.area.globalPosition.y) - this.navBarHeight,
+      Number(event.target.area.width),
+      Number(event.target.area.height))
+    this.operationMsg = msg
+    this.translatedActionMsg = isTranslation ? msg : undefined
+    this.translationOperationMode = isTranslation
+    this.aiSearchSelectingMessageId = msg?.getMessageClientId() ?? ''
+    this.selectedOperationText = ''
+    this.operationMenuItems = this.getSelectionOperationMenuItems()
+    this.updateSelectionOperationMenu()
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] P2P setSelectingMessageId id=${this.aiSearchSelectingMessageId}`)
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] P2P openTextSelection opened msgId=${msg?.getMessageClientId()} active=${this.aiSearchSelectionState.active} rect=${this.aiSearchSelectionState.rectX},${this.aiSearchSelectionState.rectY},${this.aiSearchSelectionState.rectWidth},${this.aiSearchSelectionState.rectHeight}`)
+    return true
+  }
+
+  private showOperationMenu(event: GestureEvent, msg: NIMMessageInfo | undefined,
+    operationItems?: Array<MessageOperationItem>, selectedText: string = ''): void {
+    if (selectedText.length === 0) {
+      this.closeAISearchSelection()
+    }
+    this.operationMsg = msg
+    this.translationOperationMode = false
+    this.operationMenuItems = operationItems
+    this.selectedOperationText = selectedText
+    const itemCount = operationItems ? operationItems.length : getOperateMenu(msg).length
+    let opMenuWidth = computeOperateViewWidthByCount(itemCount)
+    let opMenuHeight = computeOperateViewHeightByCount(itemCount)
+    let marginSize = this.operationViewMargin
+    if (event.target.area.position.x !== undefined) {
+      let xPoint = Number(event.target.area.globalPosition.x) +
+        (Number(event.target.area.width) - opMenuWidth) / 2
+      if (xPoint < marginSize) {
+        xPoint = marginSize
+      }
+      if (xPoint + opMenuWidth + marginSize > this.screenWidth) {
+        xPoint = this.screenWidth - opMenuWidth - marginSize
+      }
+      this.operationRect.x = xPoint;
+    }
+    if (event.target.area.position.y !== undefined) {
+      let yPoint =
+        Number(event.target.area.globalPosition.y) - this.navBarHeight +
+        Number(event.target.area.height)
+      if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
+        yPoint =
+          yPoint - opMenuHeight - marginSize * 2 - Number(event.target.area.height);
+      }
+      if (yPoint < 0) {
+        yPoint = this.scrollHeight / 2;
+      }
+      this.operationRect.y = yPoint
+    }
+    this.showOperationView = itemCount > 0
+  }
+
+  private updateTextSelection(msg: NIMMessageInfo | undefined, text: string, start: number, end: number,
+    isTranslation: boolean): void {
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] P2P updateTextSelection enter msgId=${msg?.getMessageClientId()} active=${this.aiSearchSelectionState.active} operationSame=${this.operationMsg === msg} mode=${this.translationOperationMode} isTranslation=${isTranslation} start=${start} end=${end} textLength=${text.length}`)
+    if (!this.aiSearchSelectionState.active || this.operationMsg !== msg ||
+      this.translationOperationMode !== isTranslation) {
+      return
+    }
+    this.aiSearchSelectionState.text = text
+    this.aiSearchSelectionState.updateRange(start, end)
+    this.translatedActionMsg = isTranslation ? msg : undefined
+    this.selectedOperationText = this.aiSearchSelectionState.isAllSelected() ? '' :
+    this.aiSearchSelectionState.selectedText()
+    this.updateSelectionOperationMenu()
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] P2P updateTextSelection updated allSelected=${this.aiSearchSelectionState.isAllSelected()} selectedLength=${this.selectedOperationText.length}`)
+  }
+
+  @Builder
+  AITranslatePanel() {
+    AITranslateView({
+      inputText: this.translateInputText,
+      translateAccountId: AIUserManager.getAITranslateUser()?.accountId ?? '',
+      loginAccountId: ChatKitClient.getLoginUserId(),
+      languages: AIUserManager.getAITranslateLanguages(),
+      resetKey: this.translateResetKey,
+      initialTranslateResult: this.translateResult,
+      initialIsLoading: this.translateIsLoading,
+      initialIsResultMode: this.translateIsResultMode,
+      onTranslateClick: () => {
+        return this.getTranslateInputText()
+      },
+      onResultClick: (text: string) => {
+        this.setTranslateInputText(text)
+        this.computeScrollHeight()
+      },
+      onStateChange: (translateResult: string, isResultMode: boolean, isLoading: boolean) => {
+        this.translateResult = translateResult
+        this.translateIsResultMode = isResultMode
+        this.translateIsLoading = isLoading
+      },
+      onCloseClick: () => {
+        this.hideAITranslateView()
+      },
+      onHeightChange: (height: number) => {
+        if (height !== this.translatePanelHeight) {
+          this.translatePanelHeight = height
+          this.computeScrollHeight()
+        }
+      }
+    })
+      .width('100%')
+      .height(this.translatePanelHeight)
+      .backgroundColor('#F5F5F5')
   }
 
   getInputContentLength(): number {
@@ -571,29 +1006,32 @@ export struct ChatP2PPage {
   }
 
   getMessageText(): string {
-    let text = '';
-    let results = this.controller?.getSpans();
-    results?.forEach((item) => {
-      if (typeof (item as RichEditorImageSpanResult)['imageStyle'] != 'undefined') {
-        let resourcePath = (item as RichEditorImageSpanResult).valueResourceStr;
-        if (resourcePath != null && resourcePath.toString().length > 0) {
-          let path = resourcePath.toString();
-          let splits = path.split("/")
-          let fileName = splits[splits.length - 1];
-          let emoji = NEEmojiManager.instance.getEmojiByName(String(fileName));
-          if (emoji?.tag != null) {
-            text += emoji.tag;
-          }
-        }
-      } else {
-        text += (item as RichEditorTextSpanResult).value;
+    this.aitManager.cleanAit()
+    const nodes = collectRichInputTransferNodes(this.controller?.getSpans(), this.builderSpans)
+    let text = ''
+    nodes.forEach((node) => {
+      if (node.type === RichInputTransferNodeType.Ait) {
+        this.aitManager.addAitWithText(node.accountId ?? '', node.text, text.length)
       }
+      text += node.text
     })
     return text
   }
 
+  isAitEditorSpan(span: RichEditorImageSpanResult | RichEditorTextSpanResult): boolean {
+    return !(span as RichEditorTextSpanResult).value &&
+      !(span as RichEditorImageSpanResult).valueResourceStr?.toString().replaceAll(' ', '')
+  }
+
+  @Builder
+  AtSpan(nickname: string) {
+    Text(nickname)
+      .fontColor('#FF337EFF')
+  }
+
   private restoreSingleLineTransferNodes(title: string, bodyText: string, bodyNodes: RichInputTransferNode[]) {
     this.controller.deleteSpans()
+    this.builderSpans.splice(0, this.builderSpans.length)
     if (title.length > 0) {
       this.controller.addTextSpan(bodyText.length > 0 || bodyNodes.length > 0 ? `${title}\n` : title)
     }
@@ -609,6 +1047,19 @@ export struct ChatP2PPage {
         if (node.type === RichInputTransferNodeType.Emoji && node.emojiFile) {
           this.controller.addImageSpan($rawfile(`emoji/${node.emojiFile}`), {
             imageStyle: { size: [16, 16] }
+          })
+          return
+        }
+
+        if (node.type === RichInputTransferNodeType.Ait) {
+          const spanOffset = this.controller.getCaretOffset()
+          this.controller.addBuilderSpan(() => this.AtSpan(node.text), {
+            offset: spanOffset
+          })
+          this.builderSpans.push({
+            spanIndex: spanOffset,
+            accountId: node.accountId ?? '',
+            value: node.text
           })
         }
       })
@@ -630,11 +1081,13 @@ export struct ChatP2PPage {
     try {
       const imageModel =
         onlyMsg ? await getMessageImageUrl(msg, this.chatUserInfo) : await getMessageImageUrls(msg, this.chatUserInfo)
+      this.restoreAIHelperPanelForMediaPreview()
       this.imagesIndexModel = imageModel
       this.chatViewModel.isPageVisible = false
       this.imageViewerDialog.open()
     } catch (err) {
-      console.error(err)
+      this.clearPendingAIHelperMediaRestore()
+      Logger.error('ChatKitUI', err)
     }
   }
 
@@ -642,11 +1095,13 @@ export struct ChatP2PPage {
     AudioPlayerManager.instance.stopPlayAll()
     this.videoFileUrl = getMessageVideoUrl(msg, this.chatUserInfo)
     if (this.videoFileUrl == undefined) {
+      this.clearPendingAIHelperMediaRestore()
       NECommonUtils.showToast($r('app.string.chat_msg_download_tips'))
       return
     }
     this.videoRatio = getMessageVideoRatio(msg)
     if (this.videoFileUrl) {
+      this.restoreAIHelperPanelForMediaPreview()
       this.chatViewModel.isPageVisible = false
       this.videoViewerDialog.open()
     }
@@ -665,40 +1120,44 @@ export struct ChatP2PPage {
     };
     // 拉起地点详情页
     sceneMap.queryLocation(getContext(this) as common.UIAbilityContext, queryLocationOptions).then(() => {
-      console.info("netease QueryLocation", "Succeeded in querying location.");
+      Logger.info('ChatKitUI', "netease QueryLocation", "Succeeded in querying location.");
     }).catch((err: BusinessError) => {
-      console.error("netease QueryLocation", `Failed to query Location, code: ${err.code}, message: ${err.message}`);
+      Logger.error('ChatKitUI', "netease QueryLocation", `Failed to query Location, code: ${err.code}, message: ${err.message}`);
     });
   }
 
   @Builder
   build() {
     NavDestination() {
-      NavigationBackBuilder({
-        title: this.chatUserInfo.conversationName,
-        // 在线状态显示
-        titleSuffix: IMKitConfigCenter.enableShownOnlineState
-          ? (SubscriptionRepo.onlineStateMap.get(this.chatUserInfo.targetId) ? '(在线)' : '(离线)')
-          : undefined,
-        // 听筒模式时显示听筒图标
-        titleSuffixIcon: IMKitConfigCenter.enableEarphoneMode
-          ? $r('app.media.ic_chat_audio_earphone')
-          : undefined,
-        rightButtonIcon: this.showMultiSelect ? undefined : $r('app.media.ic_public_more_dot'),
-        rightButtonTitle: this.showMultiSelect ? $r('app.string.chat_msg_dialog_cancel') : undefined,
-        rightButtonAction: () => {
-          this.goToSettingPage(this.pathStack)
-        },
-        leftButtonAction: () => {
-          this.pathStack.pop()
-        },
-        // 正在输入提示
-        enableTypingIndicator: IMKitConfigCenter.enableTypingStatus,
-        showTypingIndicator: this.chatViewModel.isRemoteTyping,
-        typingIndicatorText: $r('app.string.chat_typing_indicator')
-      })
+      Stack() {
+        Column() {
+          NavigationBackBuilder({
+            title: this.chatUserInfo.conversationName,
+            // 在线状态显示
+            titleSuffix: this.shouldShowOnlineState()
+              ? (SubscriptionRepo.getOnlineState(this.chatUserInfo.targetId)
+                ? $r('app.string.chat_title_status_online')
+                : $r('app.string.chat_title_status_offline'))
+              : undefined,
+            // 听筒模式时显示听筒图标
+            titleSuffixIcon: IMKitConfigCenter.enableEarphoneMode
+              ? $r('app.media.ic_chat_audio_earphone')
+              : undefined,
+            rightButtonIcon: this.showMultiSelect ? undefined : $r('app.media.ic_public_more_dot'),
+            rightButtonTitle: this.showMultiSelect ? $r('app.string.chat_msg_dialog_cancel') : undefined,
+            rightButtonAction: () => {
+              this.goToSettingPage(this.pathStack)
+            },
+            leftButtonAction: () => {
+              this.pathStack.pop()
+            },
+            // 正在输入提示
+            enableTypingIndicator: IMKitConfigCenter.enableTypingStatus,
+            showTypingIndicator: this.chatViewModel.isRemoteTyping,
+            typingIndicatorText: $r('app.string.chat_typing_indicator')
+          })
 
-      RelativeContainer() {
+          RelativeContainer() {
         // 防诈条和断网条 - 放在顶部
         Column() {
           // 防诈条
@@ -731,18 +1190,20 @@ export struct ChatP2PPage {
                   message: msg,
                   chatInfo: this.chatUserInfo,
                   showSelect: this.showMultiSelect,
+                  aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
+                  aiSearchSelectingTranslation: this.translationOperationMode,
                   onMessageClick: {
                     onAvatarClick: ((msg: NIMMessageInfo | undefined) => {
                       if (this.showMultiSelect) {
                         return
                       }
                       if (msg != null) {
-                        if (msg?.message.senderId == ChatKitClient.getLoginUserId()) {
+                        const senderId = msg.getDisplaySenderId()
+                        if (senderId == ChatKitClient.getLoginUserId()) {
                           this.pathStack.pushPath({
                             name: 'MineInfoPage'
                           })
                         } else {
-                          const senderId = msg?.message.senderId
                           if (senderId && NEAIUserCache.getAIUser(senderId)) {
                             this.pathStack.pushPath({ name: 'AIPersonInfoPage', param: senderId })
                           } else {
@@ -755,43 +1216,21 @@ export struct ChatP2PPage {
                       if (this.showMultiSelect) {
                         return
                       }
-                      this.operationMsg = msg
-                      this.translationOperationMode = false
-                      this.operationMenuItems = undefined
-                      let opMenuWidth = computeOperateViewWidth(msg)
-                      let opMenuHeight = computeOperateViewHeight(msg)
-                      let marginSize = this.operationViewMargin
-                      if (event.target.area.position.x !== undefined) {
-                        let xPoint = Number(event.target.area.globalPosition.x) +
-                          (Number(event.target.area.width) - opMenuWidth) / 2
-                        if (xPoint < marginSize) {
-                          xPoint = marginSize
-                        }
-                        if (xPoint + opMenuWidth + marginSize > this.screenWidth) {
-                          xPoint = this.screenWidth - opMenuWidth - marginSize
-                        }
-                        this.operationRect.x = xPoint;
+                      if (msg?.isRevokeMsg) {
+                        return
                       }
-                      if (event.target.area.position.y !== undefined) {
-                        let yPoint =
-                          Number(event.target.area.globalPosition.y) - this.navBarHeight +
-                          Number(event.target.area.height)
-                        if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
-                          yPoint =
-                            yPoint - opMenuHeight - marginSize * 2 - Number(event.target.area.height);
-                        }
-                        if (yPoint < 0) {
-                          yPoint = this.scrollHeight / 2;
-
-                        }
-                        this.operationRect.y = yPoint
+                      if (msg?.isAIStreamInProgress()) {
+                        return
                       }
-                      this.showOperationView = true
+                      if (this.openAISearchSelection(event, msg)) {
+                        return
+                      }
+                      this.showOperationMenu(event, msg, getOperateMenu(msg))
                     }),
                     onItemClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
                       if (this.showMultiSelect) {
-                        if (msg) {
-                          if (!msg?.isSelectedMsg && !msg.isRevokeMsg) {
+                        if (msg?.canOperateInMultiSelect()) {
+                          if (!msg?.isSelectedMsg) {
                             this.chatViewModel.addSelectMessage(msg)
                           } else {
                             this.chatViewModel.removeSelectMessage(msg)
@@ -820,24 +1259,21 @@ export struct ChatP2PPage {
                           this.loadReplyInfo(msg.replyMsg)
                         }
                         if (multiLine) {
+                          const bodyNodes =
+                            restoreAitTransferNodesFromMessageText(multiLine.data.body, msg.message.serverExtension)
                           this.revokeMultiLineContent = JSON.stringify({
                             title: multiLine.data.title,
                             body: multiLine.data.body,
+                            bodyNodes: bodyNodes,
                             _ts: Date.now()
                           })
                           return
                         }
 
-                        parseMessageText(msg.revokeInfo?.revokeMsgText)?.forEach((item: NEEmojiParseResult) => {
-                          if (item.text) {
-                            this.controller.addTextSpan(item.text)
-                          } else if (item.emoji) {
-                            this.controller.addImageSpan($rawfile(`emoji/${item.emoji.file}`),
-                              {
-                                imageStyle: { size: [16, 16] }
-                              })
-                          }
-                        })
+                        const bodyNodes =
+                          restoreAitTransferNodesFromMessageText(msg.revokeInfo?.revokeMsgText,
+                            msg.message.serverExtension)
+                        this.restoreSingleLineTransferNodes('', msg.revokeInfo?.revokeMsgText ?? '', bodyNodes)
                       } else if (msg?.revokeInfo !== undefined) {
                         NECommonUtils.showToast($r('app.string.chat_revoke_edit_error_tips'))
                       }
@@ -872,41 +1308,38 @@ export struct ChatP2PPage {
                     },
                     onTranslatedAreaLongClick: (event: GestureEvent, msg: NIMMessageInfo | undefined) => {
                       if (msg) {
+                        if (this.openTranslationSelection(event, msg)) {
+                          return
+                        }
                         this.operationMsg = msg
                         this.translatedActionMsg = msg
                         this.translationOperationMode = true
                         this.operationMenuItems = getTranslationOperateMenu()
-                        const itemCount = this.operationMenuItems.length
-                        const opMenuWidth = ChatConst.menuItemWidth * Math.min(itemCount, ChatConst.menuItemColumnNum)
-                        const opMenuHeight =
-                          ChatConst.menuItemHeight * (Math.ceil(itemCount / ChatConst.menuItemColumnNum))
-                        let marginSize = this.operationViewMargin
-                        let xPoint = Number(event.target.area.globalPosition.x) +
-                          (Number(event.target.area.width) - opMenuWidth) / 2
-                        if (xPoint < marginSize) {
-                          xPoint = marginSize
-                        }
-                        if (xPoint + opMenuWidth + marginSize > this.screenWidth) {
-                          xPoint = this.screenWidth - opMenuWidth - marginSize
-                        }
-                        this.operationRect.x = xPoint
-                        let yPoint = Number(event.target.area.globalPosition.y) - this.navBarHeight +
-                          Number(event.target.area.height)
-                        if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
-                          yPoint = yPoint - opMenuHeight - marginSize * 2 - Number(event.target.area.height)
-                        }
-                        if (yPoint < 0) {
-                          yPoint = this.scrollHeight / 2
-                        }
-                        this.operationRect.y = yPoint
-                        this.showOperationView = true
+                        this.showOperationMenu(event, msg, this.operationMenuItems)
+                        this.translationOperationMode = true
                       }
+                    },
+                    onTextSelectionChange: (msg: NIMMessageInfo | undefined, text: string, start: number,
+                      end: number, isTranslation: boolean) => {
+                      this.updateTextSelection(msg, text, start, end, isTranslation)
                     },
                     onAvatarLongPress: () => {
 
                     },
                     onReadReceiptClick: (_event: ClickEvent) => {
 
+                    },
+                    // AI 流式消息 - 停止输出
+                    onAIStreamStop: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                      if (msg) {
+                        this.chatViewModel.stopAIStream(msg)
+                      }
+                    },
+                    // AI 流式消息 - 重新生成
+                    onAIStreamRefresh: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
+                      if (msg) {
+                        this.chatViewModel.regenAIMessage(msg)
+                      }
                     }
                   },
                 })
@@ -960,25 +1393,33 @@ export struct ChatP2PPage {
           .height(this.scrollHeight - this.bottomMargin - this.tipBannerHeight)
           .onScrollStart(() => {
             this.showOperationView = false
+            this.closeAISearchSelection()
+            this.clearPendingAIHelperMediaRestore()
           })
           .onTouch((event) => {
             if (event.type == TouchType.Down) {
+              this.markAIHelperHiddenByMessageListTouch()
               this.showOperationView = false
+              this.closeAISearchSelection()
               this.getUIContext().getFocusController().clearFocus();
               // 多行模式下点击消息列表不切换模式，只收起键盘
               if (this.inputStyle === InputStyleType.Multiline) {
                 return
               }
-              // 非多行模式：收起 emoji/more/record 面板
-              this.bottomHeight = 105
-              this.scrollHeight = this.defaultInputViewHeight;
+              // 非多行模式：收起 emoji/more/record/aiHelper 面板
+              this.bottomHeight = this.getSingleLineInputHeight()
               this.expandHeight = 0;
               this.inputStyle = InputStyleType.None
+              this.computeScrollHeight()
             }
           })
 
-          Column()
-            .height(this.bottomHeight)
+          Column() {
+            if (this.showTranslateView && !this.showMultiSelect) {
+              this.AITranslatePanel()
+            }
+          }
+            .height(this.getChatInputContainerHeight())
             .backgroundColor(Color.Transparent)
             .backgroundColor($r('app.color.chat_input_background'))
             .id("chat_input")
@@ -997,14 +1438,14 @@ export struct ChatP2PPage {
               replyMsg: this.replyMsg,
               chatInfo: this.chatUserInfo,
               revokeMultiLineContent: this.revokeMultiLineContent,
-              onRestoreMultiLineContent: (title: string, body: string) => {
+              onRestoreMultiLineContent: (title: string, body: string, bodyNodes: RichInputTransferNode[]) => {
                 // 恢复撤回重编辑的多行内容
                 this.multiLineTitle = title
                 this.multiLineBody = body
-                this.multiLineBodyNodes = []
+                this.multiLineBodyNodes = bodyNodes
                 // 如果当前已经在多行模式，需要直接更新 MultiLineInputView 的内容
                 if (this.inputStyle === InputStyleType.Multiline && this.multiLineInputViewInstance) {
-                  this.multiLineInputViewInstance.setContent(title, body)
+                  this.multiLineInputViewInstance.setContent(title, body, bodyNodes)
                 }
               },
               onDidClickCloseReply: () => {
@@ -1026,6 +1467,7 @@ export struct ChatP2PPage {
               },
               onDidClickAudio: () => {
                 this.showOperationView = false
+                this.hideAIHelperPanel()
                 let context = getContext(this) as common.UIAbilityContext
                 this.getUIContext().getFocusController().clearFocus()
                 PermissionsUtils.reqPermissionsFromUser(['ohos.permission.MICROPHONE'], context).then((result) => {
@@ -1033,11 +1475,11 @@ export struct ChatP2PPage {
                     if (this.inputStyle == InputStyleType.Record) {
                       this.expandHeight = 0
                       this.inputStyle = InputStyleType.None;
-                      this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                      this.computeScrollHeight()
                     } else {
                       this.inputStyle = InputStyleType.Record
                       this.expandHeight = ChatConst.messageInputAreaHeight
-                      this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                      this.computeScrollHeight()
                     }
                   } else {
                     NECommonUtils.showToast($r('app.string.chat_permission_deny_tips'))
@@ -1047,26 +1489,44 @@ export struct ChatP2PPage {
               },
               onDidClickEmoji: () => {
                 this.showOperationView = false
+                this.hideAIHelperPanel()
                 if (this.inputStyle == InputStyleType.Emoji) {
                   this.expandHeight = 0
                   this.inputStyle = InputStyleType.None;
-                  this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                  this.computeScrollHeight()
                 } else {
                   this.inputStyle = InputStyleType.Emoji
                   this.expandHeight = ChatConst.messageInputAreaHeight
-                  this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                  this.computeScrollHeight()
                 }
               },
               onDidClickMore: () => {
                 this.showOperationView = false
+                this.hideAIHelperPanel()
                 if (this.inputStyle == InputStyleType.More) {
                   this.expandHeight = 0
                   this.inputStyle = InputStyleType.None;
-                  this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                  this.computeScrollHeight()
                 } else {
                   this.inputStyle = InputStyleType.More
                   this.expandHeight = ChatConst.messageInputAreaHeight
-                  this.scrollHeight = this.screenHeight - this.expandHeight - this.bottomHeight
+                  this.computeScrollHeight()
+                }
+              },
+              onDidClickAIHelper: () => {
+                this.showOperationView = false
+                if (this.inputStyle == InputStyleType.AiHelper) {
+                  this.bottomHeight = this.getSingleLineInputHeight()
+                  this.expandHeight = 0
+                  this.inputStyle = InputStyleType.None;
+                  this.computeScrollHeight()
+                } else {
+                  inputMethod.getController().stopInputSession()
+                  this.inputStyle = InputStyleType.AiHelper
+                  this.bottomHeight = this.getAIHelperInputHeight()
+                  this.expandHeight = this.aiHelperPanelHeight
+                  this.computeScrollHeight()
+                  this.loadAIHelperData(false)
                 }
               },
               onSendTextMessage: () => {
@@ -1076,17 +1536,26 @@ export struct ChatP2PPage {
                   NECommonUtils.showToast($r('app.string.null_message_not_support'))
                   return
                 }
-                this.chatViewModel.sendTextMessage(text, this.replyMsg)
+                this.chatViewModel.sendTextMessage(text, this.replyMsg, this.aitManager.aitModel,
+                  this.getAitPushList(), this.getFirstAitAIUserAccount())
                 this.clearInput(true)
+                this.aitManager.cleanAit()
+                this.builderSpans.splice(0, this.builderSpans.length)
+                this.resetAITranslateView()
               },
               onSendMultiLineMessage: (title: string, body: string) => {
                 this.showOperationView = false
-                this.chatViewModel.sendMultiLineMessage(title, body, this.replyMsg)
+                this.chatViewModel.sendMultiLineMessage(title, body, this.replyMsg, this.aitManager.aitModel,
+                  this.getAitPushList(), this.getFirstAitAIUserAccount())
                 this.clearInput(true)
+                this.aitManager.cleanAit()
+                this.builderSpans.splice(0, this.builderSpans.length)
+                this.resetAITranslateView()
                 // 发送后滚动到最新消息
                 this.scrollToNewMessage()
               },
               onInputTextChange: (hasText: boolean) => {
+                this.syncTranslateInputText()
                 // 通知 ViewModel 输入状态变化（用于"正在输入"功能）
                 this.chatViewModel.sendInputNotification(hasText)
               },
@@ -1097,13 +1566,14 @@ export struct ChatP2PPage {
                 transferBodyNodes?: RichInputTransferNode[]
               ) => {
                 this.showOperationView = false
+                this.hideAIHelperPanel()
                 if (isMultiline) {
                   this.inputStyle = InputStyleType.Multiline
                   // 多行模式：隐藏单行输入框，使用 expandHeight 显示多行面板
                   this.bottomHeight = 0
                   // 有回复时高度增加 36（32px 回复预览 + 4px margin）
                   this.expandHeight = this.replyMsg ? 186 : 150
-                  this.scrollHeight = this.screenHeight - this.bottomHeight - this.expandHeight
+                  this.computeScrollHeight()
                   // 单行 → 多行转换：
                   // - 单行第一行 → 多行标题
                   // - 单行第二行起 → 多行正文
@@ -1113,21 +1583,27 @@ export struct ChatP2PPage {
                   this.scrollToNewMessage()
                 } else {
                   this.inputStyle = InputStyleType.None
-                  this.bottomHeight = this.replyMsg ? this.bottomWithReplyHeight : 105
+                  this.bottomHeight = this.getSingleLineInputHeight()
                   this.expandHeight = 0
-                  this.scrollHeight = this.screenHeight - this.bottomHeight
+                  this.computeScrollHeight()
                   this.restoreSingleLineTransferNodes(transferTitle ?? '', transferBody ?? '', transferBodyNodes ?? [])
                   this.multiLineBodyNodes = []
                 }
               },
               conversationName: this.chatUserInfo.conversationName ?? '',
+              aitManager: this.aitManager,
+              builderSpans: this.builderSpans,
+              showAitAll: false,
+              showAIUserAit: this.canAitAIUser(),
+              showTeamMemberAit: false,
+              aiUsers: this.getAIChatUsers(),
               inputStyle: this.inputStyle
             }).alignRules({
               left: { anchor: "chat_input", align: HorizontalAlign.Start },
               right: { anchor: "chat_input", align: HorizontalAlign.End },
               bottom: { anchor: "chat_input", align: VerticalAlign.Bottom },
-              top: { anchor: "chat_input", align: VerticalAlign.Top },
-            }).backgroundColor($r('app.color.chat_input_background'))
+            }).height(this.bottomHeight)
+              .backgroundColor(this.inputStyle === InputStyleType.AiHelper ? $r('app.color.ai_chat_helper_background_main') : $r('app.color.chat_input_background'))
               .visibility(this.showMultiSelect ? Visibility.None : Visibility.Visible)
           }
 
@@ -1162,7 +1638,6 @@ export struct ChatP2PPage {
                 left: { anchor: "chat_input", align: HorizontalAlign.Start },
                 right: { anchor: "chat_input", align: HorizontalAlign.End },
                 bottom: { anchor: "chat_input", align: VerticalAlign.Bottom },
-                top: { anchor: "chat_input", align: VerticalAlign.Top },
               }).backgroundColor($r('app.color.chat_input_background'))
           }
 
@@ -1221,10 +1696,10 @@ export struct ChatP2PPage {
                         sceneMap.chooseLocation(getContext(this) as common.UIAbilityContext, locationChoosingOptions)
                           .then((data) => {
                             this.chatViewModel.sendLocationMessage(data)
-                            console.info("ChooseLocation", "Succeeded in choosing location.");
+                            Logger.info('ChatKitUI', "ChooseLocation", "Succeeded in choosing location.");
                           })
                           .catch((err: BusinessError) => {
-                            console.error("ChooseLocation",
+                            Logger.error('ChatKitUI', "ChooseLocation",
                               `Failed to choose location, code: ${err.code}, message: ${err.message}`);
                           });
                       } else {
@@ -1247,7 +1722,7 @@ export struct ChatP2PPage {
                       ]
                     })
                       .then((data: promptAction.ActionMenuSuccessResponse) => {
-                        console.info('showActionMenu success, click button: ' + data.index);
+                        Logger.info('ChatKitUI', 'showActionMenu success, click button: ' + data.index);
                         let callType: number = 1; // 默认音频通话
                         // 根据选中索引，切换通话类型
                         switch (data.index) {
@@ -1272,8 +1747,11 @@ export struct ChatP2PPage {
                         ChatKitUIClient.getInstance().call(targetId, callType)
                       })
                       .catch((err: Error) => {
-                        console.error('showActionMenu error: ' + err);
+                        Logger.error('ChatKitUI', 'showActionMenu error: ' + err);
                       })
+                  } else if (data.type == NEChatMoreOperationType.Translate) {
+                    inputMethod.getController().stopInputSession()
+                    this.showAITranslateView()
                   }
                 }
               }).padding({ top: 10 })
@@ -1302,8 +1780,12 @@ export struct ChatP2PPage {
                     NECommonUtils.showToast($r('app.string.null_message_not_support'))
                     return
                   }
-                  this.chatViewModel.sendTextMessage(text, this.replyMsg)
+                  this.chatViewModel.sendTextMessage(text, this.replyMsg, this.aitManager.aitModel,
+                    this.getAitPushList(), this.getFirstAitAIUserAccount())
                   this.clearInput(true)
+                  this.aitManager.cleanAit()
+                  this.builderSpans.splice(0, this.builderSpans.length)
+                  this.resetAITranslateView()
                 }
               }).padding({ top: 0 })
                 .width('100%')
@@ -1313,19 +1795,66 @@ export struct ChatP2PPage {
                   right: { anchor: "__container__", align: HorizontalAlign.End },
                   top: { anchor: "__container__", align: VerticalAlign.Top }
                 })
+            } else if (this.inputStyle === InputStyleType.AiHelper) {
+              // AI 助聊面板
+              AIHelperView({
+                isLoading: this.aiHelperLoading,
+                isError: this.aiHelperError,
+                helperItems: this.aiHelperItems,
+                clickListener: {
+                  onShow: () => {
+                    this.loadAIHelperData(false)
+                  },
+                  onRefreshClick: () => {
+                    this.loadAIHelperData(true)
+                  },
+                  onTryAgainClick: () => {
+                    this.loadAIHelperData(true)
+                  },
+                  onItemClick: (item: AIHelperItem) => {
+                    this.chatViewModel.sendTextMessage(item.content)
+                  },
+                  onItemEditClick: (item: AIHelperItem) => {
+                    this.controller.deleteSpans()
+                    this.controller.addTextSpan(item.content, { offset: 0 })
+                    this.hideAIHelperPanel()
+                    inputMethod.getController().showTextInput()
+                  }
+                }
+              })
+                .width('100%')
+                .height(this.expandHeight)
+                .linearGradient({
+                  direction: GradientDirection.Bottom,
+                  colors: [
+                    [$r('app.color.ai_chat_helper_background_main'), 0.0],
+                    [$r('app.color.ai_chat_helper_background_sub'), 1.0]
+                  ]
+                })
+                .alignRules({
+                  left: { anchor: "__container__", align: HorizontalAlign.Start },
+                  right: { anchor: "__container__", align: HorizontalAlign.End },
+                  top: { anchor: "__container__", align: VerticalAlign.Top }
+                })
             } else if (this.inputStyle === InputStyleType.Multiline) {
               // 多行输入模式面板：使用 visibility 控制显隐，避免组件销毁导致内容丢失
-              MultiLineInputView({
-                teamId: undefined,  // P2P 不需要群聊功能
+              Column() {
+                MultiLineInputView({
+                teamId: undefined,
                 team: undefined,
+                showAitAll: false,
+                showAIUserAit: this.canAitAIUser(),
+                showTeamMemberAit: false,
+                aiUsers: this.getAIChatUsers(),
                 conversationName: this.chatUserInfo.conversationName ?? '',
                 initialTitle: this.multiLineTitle,
                 initialBody: this.multiLineBody,
                 initialBodyNodes: this.multiLineBodyNodes,
-                aitManager: undefined,  // P2P 不需要 @ 功能
+                aitManager: this.aitManager,
                 replyMsg: this.replyMsg,
                 chatInfo: this.chatUserInfo,
                 onInputTextChange: (hasText: boolean) => {
+                  this.syncTranslateInputText()
                   // 通知 ViewModel 输入状态变化（用于"正在输入"功能）
                   this.chatViewModel.sendInputNotification(hasText)
                 },
@@ -1337,25 +1866,29 @@ export struct ChatP2PPage {
                   this.replyMsg = undefined
                   // 恢复高度
                   this.expandHeight = 150
-                  this.scrollHeight = this.screenHeight - this.keyboardHeight - this.expandHeight
+                  this.computeScrollHeight()
                 },
                 onSendMultiLineMessage: (title: string, body: string) => {
                   // 发送消息
                   if (title.length > 0) {
-                    this.chatViewModel.sendMultiLineMessage(title, body, this.replyMsg)
+                    this.chatViewModel.sendMultiLineMessage(title, body, this.replyMsg, this.aitManager.aitModel,
+                      this.getAitPushList(), this.getFirstAitAIUserAccount())
                   } else {
-                    this.chatViewModel.sendTextMessage(body, this.replyMsg)
+                    this.chatViewModel.sendTextMessage(body, this.replyMsg, this.aitManager.aitModel,
+                      this.getAitPushList(), this.getFirstAitAIUserAccount())
                   }
+                  this.aitManager.cleanAit()
                   // 清空缓存
                   this.multiLineTitle = ''
                   this.multiLineBody = ''
                   this.multiLineBodyNodes = []
+                  this.resetAITranslateView()
                   // 清除回复消息（但保持多行模式和键盘状态）
                   if (this.replyMsg) {
                     this.replyMsg = undefined
                     // 恢复到无回复时的高度（保持多行模式和键盘）
                     this.expandHeight = 150
-                    this.scrollHeight = this.screenHeight - this.keyboardHeight - this.expandHeight
+                    this.computeScrollHeight()
                   }
                   this.scrollToNewMessage()
                 },
@@ -1366,16 +1899,18 @@ export struct ChatP2PPage {
                   this.multiLineBodyNodes = []
                   // 切换回单行模式
                   this.inputStyle = InputStyleType.None
-                  this.bottomHeight = this.replyMsg ? this.bottomWithReplyHeight : 105
+                  this.bottomHeight = this.getSingleLineInputHeight()
                   this.expandHeight = 0
-                  this.scrollHeight = this.screenHeight - this.bottomHeight
+                  this.computeScrollHeight()
                   this.restoreSingleLineTransferNodes(title, bodyText, bodyNodes)
                 }
               })
-                .visibility(this.showMultiSelect ? Visibility.None : Visibility.Visible)
+              }
+              .width('100%')
+              .visibility(this.showMultiSelect ? Visibility.None : Visibility.Visible)
             }
           }
-          .height(this.expandHeight)
+          .height(this.getInputExpandContainerHeight())
           .width('100%')
           .alignRules({
             left: { anchor: "__container__", align: HorizontalAlign.Start },
@@ -1437,15 +1972,7 @@ export struct ChatP2PPage {
                 }
                 if (item.operationType == MessageOperationType.Copy) {
                   // 获取要复制的文本内容
-                  let copyText = this.translationOperationMode ?
-                    MessageTranslationService.instance.getTranslatedDisplayText(this.operationMsg!) :
-                    (this.operationMsg.message.text ?? '')
-                  // 多行消息：复制 标题 + 换行 + 正文
-                  if (!this.translationOperationMode && this.operationMsg.isMultiLineMsg) {
-                    const title = getMultiLineTitle(this.operationMsg.message)
-                    const body = getMultiLineBody(this.operationMsg.message)
-                    copyText = title && body ? `${title}\n${body}` : (title || body)
-                  }
+                  let copyText = this.getOperationText()
                   const pasteboardData =
                     pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, copyText)
                   pasteboard.getSystemPasteboard().setDataSync(pasteboardData)
@@ -1488,6 +2015,7 @@ export struct ChatP2PPage {
                 } else if (item.operationType == MessageOperationType.Unpin) {
                   this.chatViewModel.unpinMessage(this.operationMsg)
                 } else if (item.operationType == MessageOperationType.Select) {
+                  this.hideAIHelperPanel()
                   this.chatViewModel.clearSelectMessage()
                   this.chatViewModel.addSelectMessage(this.operationMsg)
                   this.showMultiSelect = true
@@ -1514,9 +2042,25 @@ export struct ChatP2PPage {
                   MessageTranslationService.instance.translate(this.operationMsg)
                 } else if (item.operationType == MessageOperationType.HideTranslation) {
                   MessageTranslationService.instance.hideTranslation(this.operationMsg)
+                } else if (item.operationType == MessageOperationType.AISearch) {
+                  const keyword = this.getAISearchOperationText().trim()
+                  if (keyword.length > 0) {
+                    if (ChatKitClient.connectBroken()) {
+                      NECommonUtils.showToast($r('app.string.chat_ai_search_network_error'))
+                      this.translationOperationMode = false
+                      this.operationMenuItems = undefined
+                      this.selectedOperationText = ''
+                      this.closeAISearchSelection()
+                      return
+                    }
+                    this.aiSearchKeyword = keyword
+                    this.showAISearchPanel = true
+                  }
                 }
                 this.translationOperationMode = false
                 this.operationMenuItems = undefined
+                this.selectedOperationText = ''
+                this.closeAISearchSelection()
               }
             })
               .position({ x: this.operationRect.x, y: this.operationRect.y })
@@ -1524,9 +2068,39 @@ export struct ChatP2PPage {
               .shadow(ShadowStyle.OUTER_DEFAULT_MD)
 
           }
-        }
+
+          }
       .margin({ bottom: this.bottomMargin })
       .expandSafeArea([SafeAreaType.KEYBOARD])
+      .layoutWeight(1)
+      .width('100%')
+      .height('100%')
+        }
+        .width('100%')
+        .height('100%')
+
+        if (this.showAISearchPanel) {
+          Column()
+            .width('100%')
+            .height(220)
+            .backgroundColor(Color.White)
+            .position({ x: 0, y: '100%' })
+            .offset({ y: -1 })
+            .zIndex(99)
+
+          AISearchPanel({
+            keyword: this.aiSearchKeyword,
+            onClose: () => {
+              this.showAISearchPanel = false
+              this.aiSearchKeyword = ''
+            }
+          })
+            .position({ x: 0, y: 0 })
+            .zIndex(100)
+        }
+      }
+      .width('100%')
+      .height('100%')
     }
     .hideTitleBar(true)
     .onReady((context: NavDestinationContext) => {
@@ -1538,10 +2112,10 @@ export struct ChatP2PPage {
         // Bot 不支持音视频通话，不显示 Call 按钮
         const targetId = this.chatUserInfo.targetId
         if (targetId) {
-          if (NEAIUserCache.getAIUser(targetId) || UserAIBotRepo.isDeletedUserAIBot(targetId)) {
+          if (NEAIUserCache.getAIUser(targetId) || UserAIBotManager.isDeletedUserAIBot(targetId)) {
             this.operationMoreDataList = setupMoreOperationData(true, true)
           } else {
-            UserAIBotRepo.getUserAIBot({ accid: targetId }).then((bot) => {
+            UserAIBotManager.getUserAIBot({ accid: targetId }).then((bot) => {
               if (bot) {
                 this.operationMoreDataList = setupMoreOperationData(true, true)
               }
@@ -1579,11 +2153,13 @@ export struct ChatP2PPage {
     // 多行模式下调整 expandHeight 并弹出键盘
     if (this.inputStyle === InputStyleType.Multiline) {
       this.expandHeight = 186
-      this.scrollHeight = this.screenHeight - this.expandHeight
+      this.computeScrollHeight()
       this.scheduleMultiLineFocus()
       return
     }
-    this.bottomHeight = this.bottomWithReplyHeight
+    this.bottomHeight = this.inputStyle === InputStyleType.AiHelper ? this.getAIHelperInputHeight() :
+      this.getSingleLineInputHeight()
+    this.computeScrollHeight()
     this.scheduleSingleLineFocus()
   }
 
@@ -1601,7 +2177,7 @@ export struct ChatP2PPage {
     if (this.inputStyle === InputStyleType.Multiline) {
       this.inputStyle = InputStyleType.None
       this.expandHeight = 0
-      this.bottomHeight = 105
+      this.bottomHeight = this.getSingleLineInputHeight()
       this.computeScrollHeight()
     }
   }
@@ -1629,7 +2205,7 @@ export struct ChatP2PPage {
       try {
         this.getUIContext().getFocusController().requestFocus("chat_edit_input")
       } catch (e) {
-        console.warn(`ChatP2PPage scheduleSingleLineFocus failed: ${e}`)
+        Logger.warn('ChatKitUI', `ChatP2PPage scheduleSingleLineFocus failed: ${e}`)
       }
     }, 100)
   }
@@ -1646,9 +2222,40 @@ export struct ChatP2PPage {
       try {
         this.getUIContext().getFocusController().requestFocus("multiline_body_input")
       } catch (e) {
-        console.warn(`ChatP2PPage scheduleMultiLineFocus failed: ${e}`)
+        Logger.warn('ChatKitUI', `ChatP2PPage scheduleMultiLineFocus failed: ${e}`)
       }
     }, 100)
+  }
+
+  /**
+   * 加载 AI 助聊回复灵感数据
+   * 素材：最近 5 条 TEXT 成功消息 + 对方最后一条消息
+   */
+  private async loadAIHelperData(forceRefresh: boolean = true): Promise<void> {
+    const context = buildAIHelperContext(this.chatViewModel.chatInfo?.msgList.getMessageList() ?? [])
+    if (!forceRefresh && this.aiHelperItems.length > 0 && !this.aiHelperError &&
+      context.latestMessageClientId === this.aiHelperLastMessageClientId) {
+      return
+    }
+    this.aiHelperLoading = true
+    this.aiHelperError = false
+    try {
+      const chatAccountId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(
+        this.chatViewModel.conversationId)
+      const selfAccountId = ChatKitClient.getLoginUserId()
+      const body = AIHelperRepo.buildRequestJSON(context.history, context.receiverLastMessage, chatAccountId,
+        selfAccountId)
+      const items = await AIHelperRepo.requestAIHelper(body)
+      if (items.length > 0) {
+        this.aiHelperItems = items
+        this.aiHelperLastMessageClientId = context.latestMessageClientId
+      } else {
+        this.aiHelperError = true
+      }
+    } catch (_err) {
+      this.aiHelperError = true
+    }
+    this.aiHelperLoading = false
   }
 
   clearInput(clearInput?: boolean) {
@@ -1656,7 +2263,8 @@ export struct ChatP2PPage {
       this.controller.deleteSpans()
     }
     this.replyMsg = undefined
-    this.bottomHeight = 105
+    this.bottomHeight = this.inputStyle === InputStyleType.AiHelper ? this.getAIHelperInputHeight() :
+      this.getSingleLineInputHeight()
     this.computeScrollHeight()
   }
 
@@ -1852,16 +2460,20 @@ export struct ChatP2PPage {
       if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
         this.showImageDetail(msg, onlyShow)
       } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE) {
+        this.clearPendingAIHelperMediaRestore()
         downLoadAndOpenFile(msg, getContext(this), this.chatUserInfo)
       } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
         this.showVideoDetail(msg)
       } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
+        this.clearPendingAIHelperMediaRestore()
         this.showLocationDetail(msg)
       } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
+        this.clearPendingAIHelperMediaRestore()
         if (onlyShow) {
           this.playAudioMessage(msg)
         }
       } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM) {
+        this.clearPendingAIHelperMediaRestore()
         const attachment = msg.message.attachment
         if (attachment) {
           const type = CustomMessageUtils.typeOfCustomMessage(attachment)
@@ -1875,6 +2487,8 @@ export struct ChatP2PPage {
             }
           }
         }
+      } else {
+        this.clearPendingAIHelperMediaRestore()
       }
     }
   }
@@ -1931,7 +2545,7 @@ export struct ChatP2PPage {
         primaryButton: {
           value: $r('app.string.chat_msg_dialog_cancel'),
           action: () => {
-            console.info('Callback when the first button is clicked')
+            Logger.info('ChatKitUI', 'Callback when the first button is clicked')
           }
         },
         secondaryButton: {
@@ -1940,7 +2554,7 @@ export struct ChatP2PPage {
           style: DialogButtonStyle.HIGHLIGHT,
           value: $r('app.string.chat_msg_dialog_sure'),
           action: () => {
-            console.info('Callback when the second button is clicked')
+            Logger.info('ChatKitUI', 'Callback when the second button is clicked')
             this.chatViewModel.revokeMessage(message)
           }
         }
@@ -1949,6 +2563,7 @@ export struct ChatP2PPage {
   }
 
   goToSettingPage(pathStack: NavPathStack) {
+    this.hideAIHelperPanel()
     if (this.showMultiSelect) {
       this.chatViewModel.clearSelectMessage()
       this.showMultiSelect = false
@@ -1966,6 +2581,8 @@ export struct ChatP2PPage {
 
   onPageHide(): void {
     this.chatViewModel.clearUnreadCount()
+    this.hideAIHelperPanel()
+    this.resetAIHelperCache()
   }
 
   /**
@@ -2013,6 +2630,7 @@ export struct ChatP2PPage {
     this.chatViewModel.clearUnreadCount()
     this.chatViewModel.onDestroy()
     AudioPlayerManager.instance.stopPlayAll()
+    this.resetAIHelperCache()
     
     // 清空多行输入框状态和内容（退出聊天页面时）
     this.multiLineTitle = ''

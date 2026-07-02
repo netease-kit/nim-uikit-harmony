@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { media } from '@kit.MediaKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import fs from '@ohos.file.fs';
@@ -47,11 +48,11 @@ export class AudioRecordManager {
   public setup() {
     if (this.avRecorder === undefined) {
       media.createAVRecorder().then((recorder: media.AVRecorder) => {
-        console.log('net ease AudioRecordManager create success');
+        Logger.info('ChatKitUI', 'net ease AudioRecordManager create success');
         this.avRecorder = recorder;
         this.setupAudioRecordListen();
       }, (error: BusinessError) => {
-        console.error(`net ease createAVRecorder failed ${error}`);
+        Logger.error('ChatKitUI', `net ease createAVRecorder failed ${error}`);
       })
     }
   }
@@ -61,11 +62,11 @@ export class AudioRecordManager {
     if (this.avRecorder !== undefined) {
       // 状态机变化回调函数
       this.avRecorder.on('stateChange', (state: media.AVRecorderState, reason: media.StateChangeReason) => {
-        console.log(`net ease AudioRecorder current state is ${state}`);
+        Logger.info('ChatKitUI', `net ease AudioRecorder current state is ${state}`);
       })
       // 错误上报回调函数
       this.avRecorder.on('error', (err: BusinessError) => {
-        console.error(`net ease AudioRecorder failed, code is ${err.code}, message is ${err.message}`);
+        Logger.error('ChatKitUI', `net ease AudioRecorder failed, code is ${err.code}, message is ${err.message}`);
       })
     }
   }
@@ -87,7 +88,7 @@ export class AudioRecordManager {
     let file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.READ_WRITE);
     let url = 'fd://' + file.fd
 
-    console.log("net ease AudioRecorder url is: " + url);
+    Logger.info('ChatKitUI', "net ease AudioRecorder url is: " + url);
     avConfig.url = url;
 
     // 3.配置录制参数完成准备工作
@@ -95,7 +96,7 @@ export class AudioRecordManager {
     // 4.开始录制
     await this.avRecorder.start();
 
-    console.log('net ease AudioRecorder start success')
+    Logger.info('ChatKitUI', 'net ease AudioRecorder start success')
   }
 
   // 暂停录制对应的流程
@@ -134,13 +135,13 @@ export class AudioRecordManager {
     if (this.avRecorder !== undefined) {
       // 状态上报回调函数
       this.avRecorder.on('stateChange', (state: media.AVRecorderState, reason: media.StateChangeReason) => {
-        console.log(`net ease current state is ${state}`);
+        Logger.info('ChatKitUI', `net ease current state is ${state}`);
         // 用户可以在此补充状态发生切换后想要进行的动作
       })
 
       // 错误上报回调函数
       this.avRecorder.on('error', (err: BusinessError) => {
-        console.error(`net ease avRecorder failed, code is ${err.code}, message is ${err.message}`);
+        Logger.error('ChatKitUI', `net ease avRecorder failed, code is ${err.code}, message is ${err.message}`);
       })
     }
   }

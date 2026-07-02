@@ -60,7 +60,7 @@ export class ContactRepo {
   static onLoginStatusFun = (status: V2NIMLoginStatus) => {
     switch (status) {
       case V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGOUT:
-        NEFriendUserCache.getInstance().removeAllFriendInfo()
+        NEFriendUserCache.peekInstance()?.removeAllFriendInfo()
         NEFriendUserCache.mineUserCache = undefined
         break;
       default:
@@ -69,14 +69,21 @@ export class ContactRepo {
   }
 
   static onUserProfileChangedFun = async (users: V2NIMUser[]) => {
+    const friendUserCache = NEFriendUserCache.peekInstance()
     users.forEach((user) => {
-      if (NEFriendUserCache.getInstance().isFriend(user.accountId)) {
-        NEFriendUserCache.getInstance().updateFriendInfo({
+      if (friendUserCache?.isFriend(user.accountId)) {
+        friendUserCache.updateFriendInfo({
           user: user
         })
       }
-      if (NEFriendUserCache.isMe(user.accountId) && NEFriendUserCache.mineUserCache) {
-        NEFriendUserCache.mineUserCache.user = user
+      if (user.accountId === ChatKitClient.getLoginUserId()) {
+        if (NEFriendUserCache.mineUserCache) {
+          NEFriendUserCache.mineUserCache.user = user
+        } else {
+          NEFriendUserCache.mineUserCache = new NEUserWithFriend({
+            user: user
+          })
+        }
       }
     })
 
@@ -146,9 +153,10 @@ export class ContactRepo {
         })
       }
 
-      if (NEFriendUserCache.getInstance().isFriend(accountId)) {
+      const friendUserCache = NEFriendUserCache.peekInstance()
+      if (friendUserCache?.isFriend(accountId)) {
         friendList.push(user)
-        NEFriendUserCache.getInstance().updateFriendInfo({
+        friendUserCache.updateFriendInfo({
           user: user
         })
       }

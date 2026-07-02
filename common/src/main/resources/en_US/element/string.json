@@ -2,79 +2,79 @@
   "string": [
     {
       "name": "mine_account_nick",
-      "value": "昵称:%s"
+      "value": "Nickname: %s"
     },
     {
       "name": "mine_account_id",
-      "value": "账号"
+      "value": "Account"
     },
     {
       "name": "mine_account_id_tip",
-      "value": "账号:%s"
+      "value": "Account: %s"
     },
     {
       "name": "mine_edit_cancel",
-      "value": "取消"
+      "value": "Cancel"
     },
     {
       "name": "mine_edit_sure",
-      "value": "确认"
+      "value": "Confirm"
     },
     {
       "name": "mine_info_save",
-      "value": "完成"
+      "value": "Done"
     },
     {
       "name": "common_close",
-      "value": "关闭"
+      "value": "Close"
     },
     {
       "name": "common_sure",
-      "value": "确定"
+      "value": "Confirm"
     },
     {
       "name": "common_sure_count",
-      "value": "确定(%d)"
+      "value": "Confirm (%d)"
     },
     {
       "name": "mine_info_save_ok",
-      "value": "保存完成"
+      "value": "Saved"
     },
     {
       "name": "text_input_placeholder",
-      "value": "请输入帐号"
+      "value": "Please enter account"
     },
     {
       "name": "empty_tips",
-      "value": "该用户不存在"
+      "value": "This user does not exist"
     },
     {
       "name": "common_search",
-      "value": "搜索"
+      "value": "Search"
     },
     {
       "name": "common_search_placeholder",
-      "value": "请输入你要搜索的关键字"
+      "value": "Please enter a keyword to search"
     },
     {
       "name": "common_search_ai_users",
-      "value": "搜索"
+      "value": "Search"
     },
     {
       "name": "all_space_not_support",
-      "value": "不支持全空格"
+      "value": "All-space input is not supported"
     },
     {
       "name": "no_friend",
-      "value": "暂无好友"
+      "value": "No friends"
     },
     {
       "name": "no_team",
-      "value": "暂无群聊"
+      "value": "No groups"
     },
     {
       "name": "no_ai_user",
-      "value": "暂无数字人"
+      "value": "No digital avatars"
     },
     {
       "name": "cancel",
@@ -86,67 +86,71 @@
     },
     {
       "name": "dialog_take_picture",
-      "value": "拍照"
+      "value": "Take Photo"
     },
     {
       "name": "dialog_photo",
-      "value": "从手机相册选择"
+      "value": "Choose from Gallery"
     },
     {
       "name": "setting_pin",
-      "value": "标记"
+      "value": "Pin"
     },
     {
       "name": "setting_unpin",
-      "value": "取消标记"
+      "value": "Unpin"
     },
     {
       "name": "setting_pin_empty",
-      "value": "暂无标记消息"
+      "value": "No pinned messages"
     },
     {
       "name": "setting_message_notify",
-      "value": "开启消息提醒"
+      "value": "Enable message notifications"
     },
     {
       "name": "setting_message_stick_top",
-      "value": "聊天置顶"
+      "value": "Pin chat to top"
+    },
+    {
+      "name": "chat_message_set_ai_pin",
+      "value": "PIN"
     },
     {
       "name": "chat_permission_deny_tips",
-      "value": "请在设置页面添加相关权限"
+      "value": "Please enable the required permissions in Settings"
     },
     {
       "name": "copy_success",
-      "value": "复制成功"
+      "value": "Copied successfully"
     },
     {
       "name": "person_select",
-      "value": "选择"
+      "value": "Select"
     },
     {
       "name": "conversation_select_limit_tip",
-      "value": "最多只能选择%d个会话"
+      "value": "You can select up to %d conversations"
     },
     {
       "name": "conversation_empty",
-      "value": "暂无会话"
+      "value": "No conversations"
     },
     {
       "name": "common_network_error",
-      "value": "当前网络不可用，请检查你的网络设置。"
+      "value": "Network is unavailable. Please check your network settings."
     },
     {
       "name": "common_operate_failed",
-      "value": "操作失败"
+      "value": "Operation failed"
     },
     {
       "name": "common_content_empty",
-      "value": "暂无内容"
+      "value": "No content"
     },
     {
       "name": "team_history_record",
-      "value": "历史记录"
+      "value": "History"
     },
     {
       "name": "search_chat_history",
@@ -154,15 +158,15 @@
     },
     {
       "name": "exception_description",
-      "value": "异常说明"
+      "value": "Error Description"
     },
     {
       "name": "delete_success",
-      "value": "删除成功"
+      "value": "Deleted successfully"
     },
     {
       "name": "conversation_loading",
-      "value": "会话加载中..."
+      "value": "Loading conversations..."
     },
     {
       "name": "search_message_loading",

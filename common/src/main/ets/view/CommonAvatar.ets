@@ -24,39 +24,110 @@ export struct CommonAvatar {
    */
   @Param textColor: ResourceColor = '#ffFFFFFF'
   @Param longPressGesture: ((event: GestureEvent) => void) | undefined = undefined
+  @Local failedAvatarKey: string = ''
+  @Local loadedAvatarKey: string = ''
 
   build() {
     if (this.item != null) {
 
-      if (this.item.avatarUrl == null || this.item.avatarUrl.toString().length <= 0) {
-        Stack() {
-          Column() {
-          }.width('100%').height('100%').backgroundColor(this.item.color)
-          .borderRadius(this.roundRadius)
-
-          Text(this.item.name)
-            .fontSize(this.textSize)
-            .fontColor(this.textColor)
-            .ellipsisMode(EllipsisMode.END)
-            .textAlign(TextAlign.Center)
-            .margin({
-              left: 6, right: 6
-            })
-            .width('100%')
-            .maxLines(1)
-        }.gesture(LongPressGesture().onAction(this.longPressGesture))
+      if (this.shouldShowFallbackAvatar()) {
+        this.fallbackAvatar()
+      } else if (this.shouldShowLoadingPlaceholder()) {
+        this.avatarWithPlaceholder()
       } else {
-        Image(this.item.avatarUrl)
-          .syncLoad(true)
-          .borderRadius(this.roundRadius)
-         .onGestureJudgeBegin(() => {
-          return GestureJudgeResult.CONTINUE;
-        }).parallelGesture(LongPressGesture().onAction(event => {
-            this.longPressGesture?.(event)
-          }
-        ))
+        this.imageAvatar()
       }
     }
+  }
+
+  @Builder
+  private fallbackAvatar() {
+    Stack() {
+      this.fallbackAvatarContent()
+    }.gesture(LongPressGesture().onAction(this.longPressGesture))
+  }
+
+  @Builder
+  private avatarWithPlaceholder() {
+    Stack() {
+      if (!this.shouldShowLoadedAvatar()) {
+        this.fallbackAvatarContent()
+      }
+
+      Image(this.item?.avatarUrl)
+        .width('100%')
+        .height('100%')
+        .objectFit(ImageFit.Cover)
+        .syncLoad(false)
+        .borderRadius(this.roundRadius)
+        .opacity(this.shouldShowLoadedAvatar() ? 1 : 0)
+        .onComplete(() => {
+          this.loadedAvatarKey = this.getAvatarFailureKey()
+        })
+        .onError(() => {
+          this.failedAvatarKey = this.getAvatarFailureKey()
+        })
+    }.gesture(LongPressGesture().onAction(this.longPressGesture))
+  }
+
+  @Builder
+  private imageAvatar() {
+    Image(this.item?.avatarUrl)
+      .width('100%')
+      .height('100%')
+      .objectFit(ImageFit.Cover)
+      .syncLoad(false)
+      .borderRadius(this.roundRadius)
+      .onError(() => {
+        this.failedAvatarKey = this.getAvatarFailureKey()
+      })
+      .onGestureJudgeBegin(() => {
+        return GestureJudgeResult.CONTINUE;
+      }).parallelGesture(LongPressGesture().onAction(event => {
+        this.longPressGesture?.(event)
+      }
+    ))
+  }
+
+  @Builder
+  private fallbackAvatarContent() {
+    Stack() {
+      Column() {
+      }.width('100%').height('100%').backgroundColor(this.item?.color)
+      .borderRadius(this.roundRadius)
+
+      Text(this.item?.name)
+        .fontSize(this.textSize)
+        .fontColor(this.textColor)
+        .ellipsisMode(EllipsisMode.END)
+        .textAlign(TextAlign.Center)
+        .margin({
+          left: 6, right: 6
+        })
+        .width('100%')
+        .maxLines(1)
+    }
+  }
+
+  private shouldShowFallbackAvatar(): boolean {
+    const avatarUrl = this.getAvatarUrlKey()
+    return avatarUrl.length <= 0 || this.getAvatarFailureKey() === this.failedAvatarKey
+  }
+
+  private shouldShowLoadingPlaceholder(): boolean {
+    return typeof this.item?.avatarUrl === 'string'
+  }
+
+  private shouldShowLoadedAvatar(): boolean {
+    return this.getAvatarFailureKey() === this.loadedAvatarKey
+  }
+
+  private getAvatarUrlKey(): string {
+    return this.item?.avatarUrl?.toString() ?? ''
+  }
+
+  private getAvatarFailureKey(): string {
+    return `${this.getAvatarUrlKey()}|${this.item?.name ?? ''}|${this.item?.color ?? ''}`
   }
 }
 

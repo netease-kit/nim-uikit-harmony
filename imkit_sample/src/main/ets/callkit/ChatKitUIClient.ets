@@ -58,34 +58,81 @@ interface PushPayloadData {
 }
 
 export class CallKitClient extends AbsCallKitClient {
+  private context?: common.Context = undefined;
+  private nim?: NIMInterface = undefined;
+  private appKey: string = '';
+  private accountId: string = '';
+  private token: string = '';
+  private hasSetupEngine: boolean = false;
+  private hasLoggedIn: boolean = false;
+  private loginPromise?: Promise<boolean> = undefined;
+
   className():  string {
     return "CallKitClient";
   }
 
   public init(context: common.Context, nim: NIMInterface, appKey: string, accountId: string, token: string): void {
-    // 创建配置对象
-    const config: NESetupConfig = new NESetupConfig(
-      context,                    // common.Context 对象
-      nim,                        // NIM SDK 实例
-      appKey,                     // AppKey
-      accountId,                  // 当前登录的账号ID
-    );
+    this.context = context;
+    this.nim = nim;
+    this.appKey = appKey;
+    this.accountId = accountId;
+    this.token = token;
+    this.hasSetupEngine = false;
+    this.hasLoggedIn = false;
+    this.loginPromise = undefined;
+  }
 
-    // 初始化 CallKit 引擎
-    NECallUI.getInstance().setupEngine(config);
+  private ensureInitialized(): Promise<boolean> {
+    if (!this.context || !this.nim || !this.appKey || !this.accountId || !this.token) {
+      console.error('CallKit', 'callkit lazy init skipped: missing init params');
+      return Promise.resolve(false);
+    }
 
-    // 登录 CallKit
-    NECallUI.getInstance().login(
-      appKey, // 云信 APP_KEY
-      accountId, // 账号 ID
-      token          // 账号 Token（从业务服务器获取）
+    if (!this.hasSetupEngine) {
+      this.setupEngine();
+    }
+
+    if (this.hasLoggedIn) {
+      return Promise.resolve(true);
+    }
+
+    if (this.loginPromise) {
+      return this.loginPromise;
+    }
+
+    this.loginPromise = NECallUI.getInstance().login(
+      this.appKey,
+      this.accountId,
+      this.token
     )
       .then((res: NEResult) => {
+        this.hasLoggedIn = true;
         console.log(`CallKit login success, res: ${JSON.stringify(res)}`);
+        return true;
       })
       .catch((err: Error) => {
+        this.loginPromise = undefined;
         console.log(`CallKit login failed, err: ${JSON.stringify(err)}`);
+        return false;
       });
+
+    return this.loginPromise;
+  }
+
+  private setupEngine(): void {
+    if (!this.context || !this.nim) {
+      return;
+    }
+
+    const config: NESetupConfig = new NESetupConfig(
+      this.context,               // common.Context 对象
+      this.nim,                   // NIM SDK 实例
+      this.appKey,                // AppKey
+      this.accountId,             // 当前登录的账号ID
+    );
+
+    NECallUI.getInstance().setupEngine(config);
+    this.hasSetupEngine = true;
   }
 
   /**
@@ -114,6 +161,16 @@ export class CallKitClient extends AbsCallKitClient {
   }
 
   public call(target: string, callType: number): void {
+    this.ensureInitialized()
+      .then((initialized: boolean) => {
+        if (!initialized) {
+          return;
+        }
+        this.startCall(target, callType);
+      })
+  }
+
+  private startCall(target: string, callType: number): void {
     // 创建呼叫参数（核心：动态传入选中的callType）
     const param: NECallParam = new NECallParam(
       target, // 被叫用户账号ID
@@ -123,8 +180,10 @@ export class CallKitClient extends AbsCallKitClient {
     // 设置推送配置
     const pushConfig: NECallPushConfig = new NECallPushConfig();
     pushConfig.pushEnabled = true;
-    pushConfig.pushTitle = '来电提醒';
-    pushConfig.pushContent = callType === NECallType.AUDIO ? '您有一个音频通话' : '您有一个视频通话';
+    pushConfig.pushTitle = getContext().resourceManager.getStringByNameSync('call_push_title');
+    pushConfig.pushContent = callType === NECallType.AUDIO
+      ? getContext().resourceManager.getStringByNameSync('call_push_audio_content')
+      : getContext().resourceManager.getStringByNameSync('call_push_video_content');
     pushConfig.pushPayload = this.generatePushPayload();
     param.pushConfig = pushConfig;
 

@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { IsDiscussion, NEFriendUserCache, TeamRepo } from '@nimkit/chatkit'
 import { SearchListModel } from '../model/SearchListModel'
 
@@ -62,7 +63,7 @@ export class SearchViewModel {
         this.teamDic.set(item.teamId, model)
       }
     } catch (err) {
-      console.log(err)
+      Logger.info('ContactKit', err)
     }
   }
 

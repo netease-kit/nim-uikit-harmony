@@ -30,6 +30,20 @@ export struct MessageOperationView {
   @Local viewWidth: number = 0;
 
   aboutToAppear(): void {
+    this.updateOperationData()
+  }
+
+  @Monitor('operationItems')
+  onOperationItemsChange(): void {
+    this.updateOperationData()
+  }
+
+  @Monitor('operateMsg')
+  onOperateMsgChange(): void {
+    this.updateOperationData()
+  }
+
+  private updateOperationData(): void {
     if (this.operationItems && this.operationItems.length > 0) {
       this.operationMoreDataList = this.operationItems
     } else {

@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatKitClient, ContactRepo, ErrorUtils } from '@nimkit/chatkit';
 import { CommonEmptyResult, CommonTextInput, NavigationBackBuilder } from '@nimkit/common';
 
@@ -38,7 +39,7 @@ export struct AddFriendPage {
           })
         }
       } catch (err) {
-        console.error(err)
+        Logger.error('ContactKit', err)
         this.isEmpty = true
       }
     }

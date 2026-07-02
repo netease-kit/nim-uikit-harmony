@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import {
   V2NIMAntispamConfig,
   V2NIMCreateTeamParams,
@@ -39,6 +40,7 @@ import HashMap from '@ohos.util.HashMap'
 import { ChatKitClient } from '../ChatKitClient'
 import { IMKitConfigCenter } from '../IMKitConfigCenter'
 import { TeamMemberResult, TeamMemberWithUser } from '../model/TeamMemberWithUser'
+import { NEAIUserCache } from '../NEAIUserCache'
 import { NEFriendUserCache } from '../NEFriendUserCache'
 import { buildTeamCreateInviteLocalExtension } from '../utils/TeamInviteNotificationUtils'
 import { isDiscussionTeamByServerExtension } from '../utils/TopStickyPermissionUtils'
@@ -73,6 +75,23 @@ export function getCreateTeamSuccessTipResourceName(createTeamParams: V2NIMCreat
   }
 
   return 'createAdvancedTeamSuccess'
+}
+
+const TEAM_NAME_MAX_LENGTH: number = 30
+
+export function buildTeamNameByMemberNames(mineName: string | undefined, memberNames: string[]): string {
+  const names: string[] = []
+  if (mineName && mineName.length > 0) {
+    names.push(mineName)
+  }
+
+  memberNames.forEach((name: string) => {
+    if (name && name.length > 0) {
+      names.push(name)
+    }
+  })
+
+  return names.join('、').slice(0, TEAM_NAME_MAX_LENGTH)
 }
 
 export class TeamRepo {
@@ -190,7 +209,7 @@ export class TeamRepo {
         await ConversationRepo.createConversation(conversationId)
       }
     } catch (err) {
-      console.error('ensureTeamConversationCreated error: ' + JSON.stringify(err))
+      Logger.error('ChatKit', 'ensureTeamConversationCreated error: ' + JSON.stringify(err))
     }
   }
 
@@ -603,6 +622,27 @@ export class TeamRepo {
   }
 
   /**
+   * 获取群申请/邀请未读数量
+   */
+  static async getTeamJoinActionInfoUnreadCount(): Promise<number | undefined> {
+    return await ChatKitClient.nim.teamService?.getTeamJoinActionInfoUnreadCount()
+  }
+
+  /**
+   * 设置群申请/邀请已读
+   */
+  static async setTeamJoinActionInfoRead(applicationInfo?: V2NIMTeamJoinActionInfo): Promise<void> {
+    await ChatKitClient.nim.teamService?.setTeamJoinActionInfoRead(applicationInfo)
+  }
+
+  /**
+   * 清空所有群申请/邀请记录
+   */
+  static async clearAllTeamJoinActionInfo(): Promise<void> {
+    await ChatKitClient.nim.teamService?.clearAllTeamJoinActionInfo()
+  }
+
+  /**
    * 根据关键字搜索群信息
    *  - 混合搜索高级群和超大群，like匹配
    *  - 只搜索群名称
@@ -705,9 +745,9 @@ export class TeamRepo {
         teamType,
         accountIds
       )
-      console.debug(`TeamRepo getTeamMembersByIds  result = ${teamMemberList.length} `);
+      Logger.debug('ChatKit', `TeamRepo getTeamMembersByIds  result = ${teamMemberList.length} `);
     } catch (e) {
-      console.error(`TeamRepo getTeamMembersByIds  ${e}`);
+      Logger.error('ChatKit', `TeamRepo getTeamMembersByIds  ${e}`);
     }
 
     let teamMembers: TeamMemberWithUser[] = teamMemberList.map((teamMember) => {
@@ -748,13 +788,24 @@ export class TeamRepo {
    * @returns
    */
   private static getTeamNameByMemberId(inviteeAccountIds?: string[]): string {
-    if (inviteeAccountIds) {
-      let inviteeUser = NEFriendUserCache.getInstance().getFriendsByIds(inviteeAccountIds)
-      let inviteeNames = inviteeUser.map(user => user.user?.name ?? user.user?.accountId)
-      let teamName = inviteeNames.slice(0, Math.min(inviteeNames.length, 30)).join('、')
-      let mineName = NEFriendUserCache.mineUserCache?.showName(false)
-      teamName = mineName + '、' + teamName
-      return teamName.slice(0, Math.min(teamName.length, 30))
+    if (inviteeAccountIds && inviteeAccountIds.length > 0) {
+      const friendCache = NEFriendUserCache.getInstance()
+      const inviteeNames: string[] = inviteeAccountIds.map((accountId: string) => {
+        const friendUser = friendCache.getFriendById(accountId)
+        const friendName = friendUser?.showName(false)
+        if (friendName && friendName.length > 0) {
+          return friendName
+        }
+
+        const aiUser = NEAIUserCache.getAIUser(accountId)
+        if (aiUser?.name && aiUser.name.length > 0) {
+          return aiUser.name
+        }
+
+        return aiUser?.accountId ?? accountId
+      })
+      const mineName = NEFriendUserCache.mineUserCache?.showName(false)
+      return buildTeamNameByMemberNames(mineName, inviteeNames)
     }
     return ''
 

@@ -27,4 +27,11 @@ export interface MessageItemClick {
   onSendFailClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void
   // 长按译文区域
   onTranslatedAreaLongClick?: (event: GestureEvent, msg: NIMMessageInfo | undefined) => void
+  // 文本选择范围变化
+  onTextSelectionChange?: (msg: NIMMessageInfo | undefined, text: string, start: number, end: number,
+    isTranslation: boolean) => void
+  // AI 流式消息 - 停止输出
+  onAIStreamStop?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void
+  // AI 流式消息 - 重新生成
+  onAIStreamRefresh?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void
 }

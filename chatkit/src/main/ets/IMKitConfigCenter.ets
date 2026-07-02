@@ -18,10 +18,6 @@ export class IMKitConfigCenter {
    */
   @Trace static enableShownOnlineState: boolean = true;
   /**
-   * 是否启用 AI 数字人功能
-   */
-  @Trace static enableAI: boolean = false;
-  /**
    * 是否反垃圾检测提示消息，控制消息发送后命中反垃圾，是否提示TIPS消息
    */
   @Trace static enableAntiSpamTipMessage: boolean = true;
@@ -68,9 +64,21 @@ export class IMKitConfigCenter {
    */
   @Trace static enableTopMessage: boolean = true;
   /**
+   * 是否启用 AI 数字人功能
+   */
+  @Trace static enableAI: boolean = true;
+  /**
    * 是否启用 AI 流式输出模式
    */
   @Trace static enableAIStream: boolean = true;
+  /**
+   * 是否启用 AI 助聊功能
+   */
+  @Trace static enableAIChatHelper: boolean = true;
+  /**
+   * 是否启用 AI 划词搜索功能
+   */
+  @Trace static enableAIWordSearch: boolean = true;
   /**
    * 是否启用富文本消息
    */

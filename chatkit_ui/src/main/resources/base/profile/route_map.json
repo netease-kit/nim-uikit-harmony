@@ -17,6 +17,22 @@
       }
     },
     {
+      "name": "ChatBotSubSessionListPage",
+      "pageSourceFile": "src/main/ets/pages/ChatBotSubSessionListPage.ets",
+      "buildFunction": "ChatBotSubSessionListPageBuilder",
+      "data": {
+        "description": "this is bot topic sub session list page"
+      }
+    },
+    {
+      "name": "ChatBotSubSessionPage",
+      "pageSourceFile": "src/main/ets/pages/ChatBotSubSessionPage.ets",
+      "buildFunction": "ChatBotSubSessionPageBuilder",
+      "data": {
+        "description": "this is bot topic sub session chat page"
+      }
+    },
+    {
       "name": "UserSettingPage",
       "pageSourceFile": "src/main/ets/pages/UserSettingPage.ets",
       "buildFunction": "UserSettingPageBuilder",

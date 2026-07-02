@@ -5,21 +5,40 @@
  *
  */
 import {
-  ChatKitClient, ChatRepo, IMKitConfigCenter,
+  AIUserAgentProvider,
+  AIUserManager,
+  ChatKitClient, IMKitConfigCenter,
   IMKitCustomFactory,
   MessageCallback,
   MessageSendParams,
   PushConfigManager
 } from '@nimkit/chatkit';
-import { ChatKitConfig } from '@nimkit/chatkit_ui/src/main/ets/ChatKitConfig';
-import { CommonConstants, NECommonUtils, SUPPORTED_TRANSLATION_LANGUAGES, TranslationLanguageCode } from '@nimkit/common';
+import { ChatKitConfig } from '@nimkit/chatkit_ui';
+import {
+  AppLanguageCode,
+  CommonConstants,
+  getCurrentSystemLanguage,
+  getStoredAppLanguage,
+  NECommonUtils,
+  resolveEffectiveAppLanguage,
+  SUPPORTED_TRANSLATION_LANGUAGES,
+  TranslationLanguageCode
+} from '@nimkit/common';
+import i18n from '@ohos.i18n';
 
 import { NimRepository } from '../ability/NimRepository';
 import { AppConfig } from '../constants/AppConfig';
-import { resolveReadMessageEnabled, resolveTeamJoinAgreeModeEnabled } from '../manager/GlobalConfigStorage';
+import {
+  resolveLocalConversationEnabled,
+  resolveReadMessageEnabled,
+  resolveTeamJoinAgreeModeEnabled
+} from '../manager/GlobalConfigStorage';
 import { preferences } from '@kit.ArkData';
-import { DeprecatedIndexButton } from '../other/DeprecatedIndexButton'
-import { V2NIMConversationType, V2NIMSendMessageParams } from '@nimsdk/base';
+import { V2NIMAIUser, V2NIMConversationType, V2NIMSendMessageParams } from '@nimsdk/base';
+import { StartupPerfDebugTimer } from '../uitrace/StartupPerfDebugTimer';
+
+const AI_SEARCH_USER_ACCOUNT: string = 'search'
+const AI_TRANSLATION_USER_ACCOUNT: string = 'translation'
 
 /** 推送跳转数据 */
 interface PushJumpData {
@@ -123,6 +142,20 @@ class MessageSendCallbackImpl implements MessageCallback {
   }
 }
 
+class AIUserAgentProviderImpl implements AIUserAgentProvider {
+  getAiSearchUser(users: V2NIMAIUser[]): V2NIMAIUser | undefined {
+    return users.find((user: V2NIMAIUser) => user.accountId === AI_SEARCH_USER_ACCOUNT)
+  }
+
+  getAiTranslateUser(users: V2NIMAIUser[]): V2NIMAIUser | undefined {
+    return users.find((user: V2NIMAIUser) => user.accountId === AI_TRANSLATION_USER_ACCOUNT)
+  }
+
+  getAiTranslateLanguages(_users: V2NIMAIUser[]): string[] {
+    return []
+  }
+}
+
 /**
  * Index is the entry of application and Here is a list showing three buttons,
  * click the button to jump to different pages.
@@ -150,6 +183,7 @@ PersistentStorage.persistProp(CommonConstants.KEY_SETTING_NOTIFY_RING, true);
 PersistentStorage.persistProp(CommonConstants.KEY_SETTING_NOTIFY_VIBRATE, true);
 PersistentStorage.persistProp(CommonConstants.KEY_SETTING_AUTO_TRANSLATION_ENABLE_TIME, 0);
 PersistentStorage.persistProp(CommonConstants.KEY_SETTING_TRANSLATION_TARGET_LANGUAGE, TranslationLanguageCode.ZH_CHS);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_APP_LANGUAGE, AppLanguageCode.Auto);
 
 @Entry
 @ComponentV2
@@ -174,11 +208,30 @@ struct Index {
     return TranslationLanguageCode.ZH_CHS
   }
 
+  private resolveAppLanguage(): AppLanguageCode {
+    return resolveEffectiveAppLanguage(getStoredAppLanguage(), getCurrentSystemLanguage())
+  }
+
+  private syncAppPreferredLanguage(): void {
+    const storedAppLanguage = getStoredAppLanguage()
+    const preferredLanguage = storedAppLanguage === AppLanguageCode.Auto ? 'default' : storedAppLanguage
+    try {
+      i18n.System.setAppPreferredLanguage(preferredLanguage)
+    } catch (e) {
+      console.warn(`setAppPreferredLanguage failed: ${e}`)
+    }
+  }
+
   login = async (accountId: string, token: string) => {
     const nimRepository = NimRepository.getInstance(getContext(this))
     try {
+      StartupPerfDebugTimer.startIfNotRunning('sample.auto_login')
+      StartupPerfDebugTimer.mark('sample.login.begin')
+      this.logPerf('sample.login.begin')
       await nimRepository.login(accountId, token, AppConfig.appKey)
     } catch (err) {
+      StartupPerfDebugTimer.fail('sample.login.failed')
+      this.logPerf('sample.login.failed', `${err}`)
       this.showLoginPage = true
       const tips = getContext(this).resourceManager.getStringSync($r('app.string.login_failed').id)
       NECommonUtils.showToast(tips + err)
@@ -187,10 +240,13 @@ struct Index {
   }
 
   async onPageShow(): Promise<void> {
+    AIUserManager.setProvider(new AIUserAgentProviderImpl())
     let dataPreferences: preferences.Preferences | null = null;
     const options: preferences.Options = { name: 'imkit_data' };
     dataPreferences = preferences.getPreferencesSync(getContext(this), options);
-    IMKitConfigCenter.enableLocalConversation = dataPreferences.getSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, true) as boolean
+    IMKitConfigCenter.enableLocalConversation = resolveLocalConversationEnabled(
+      dataPreferences.getSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, undefined) as boolean | undefined
+    )
     IMKitConfigCenter.enableShownOnlineState = dataPreferences.getSync(CommonConstants.KEY_SETTING_SHOWN_ONLINE_STATE, true) as boolean
     IMKitConfigCenter.enableTeamJoinAgreeModelAuth = resolveTeamJoinAgreeModeEnabled(
       dataPreferences.getSync(CommonConstants.KEY_SETTING_TEAM_JOIN_AGREE_MODE, undefined) as boolean | undefined
@@ -217,10 +273,14 @@ struct Index {
     IMKitConfigCenter.enableEarphoneMode = AppStorage.get(CommonConstants.KEY_SETTING_EARPIECE_MODE) ?? false
     const autoTranslationEnableTime = this.resolveAutoTranslationEnableTime()
     const translationTargetLanguage = this.resolveTranslationTargetLanguage()
+    const appLanguage = this.resolveAppLanguage()
     AppStorage.set(CommonConstants.KEY_SETTING_AUTO_TRANSLATION_ENABLE_TIME, autoTranslationEnableTime)
     AppStorage.set(CommonConstants.KEY_SETTING_TRANSLATION_TARGET_LANGUAGE, translationTargetLanguage)
+    AppStorage.set(CommonConstants.KEY_SETTING_APP_LANGUAGE, getStoredAppLanguage())
     IMKitConfigCenter.autoTranslationEnableTime = autoTranslationEnableTime
     IMKitConfigCenter.translationTargetLanguage = translationTargetLanguage
+    this.syncAppPreferredLanguage()
+    console.info(`effective app language: ${appLanguage}`)
     // 加载推送配置
     const pushConfigEnabled = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_PUSH_CONFIG_ENABLED) ?? false
     const pushConfigContent = AppStorage.get<string>(CommonConstants.KEY_SETTING_PUSH_CONFIG_CONTENT) ||
@@ -243,7 +303,7 @@ struct Index {
           Row().height(80)
           Image($r('app.media.im_uikit_icon'))
             .width(120).height(120)
-          Text('云信IM').fontSize(24)
+          Text($r('app.string.ability_label')).fontSize(24)
             .fontColor('#333333')
 
           Row().height(127)
@@ -251,7 +311,9 @@ struct Index {
           Button($r('app.string.login'), { type: ButtonType.Normal, stateEffect: true })
             .alignSelf(ItemAlign.Center)
             .onClick(() => {
-              NimRepository.getInstance(getContext(this)).login(AppConfig.userId, AppConfig.userToken, AppConfig.appKey)
+              StartupPerfDebugTimer.start('app.login_click')
+              this.logPerf('app.login_click')
+              this.login(AppConfig.userId, AppConfig.userToken)
             })
             .borderRadius(10)
             .height(50)
@@ -292,5 +354,8 @@ struct Index {
       }
     }.mode(NavigationMode.Auto)
     .hideTitleBar(true)
+  }
+
+  private logPerf(_stage: string, _detail: string = ''): void {
   }
 }

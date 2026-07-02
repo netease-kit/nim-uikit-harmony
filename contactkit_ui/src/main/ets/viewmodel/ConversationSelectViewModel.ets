@@ -5,8 +5,9 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatKitClient, ConversationRepo, IMKitConfigCenter, LocalConversationRepo } from '@nimkit/chatkit'
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel'
+import { ConversationSelectModel } from '@nimkit/chatkit'
 import { ContactViewModel } from './ContactViewModel'
 import { MyTeamsViewModel } from './MyTeamsViewModel'
 
@@ -32,7 +33,7 @@ export class ConversationSelectViewModel {
       await this.getTeamList(filters)
       await this.getConversationList(filters)
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 
@@ -105,7 +106,7 @@ export class ConversationSelectViewModel {
         }
       }
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 
@@ -134,7 +135,7 @@ export class ConversationSelectViewModel {
         }
       }
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 
@@ -159,7 +160,7 @@ export class ConversationSelectViewModel {
         this.teamList.push(model)
       }
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 

@@ -3,8 +3,9 @@
  *  Use of this source code is governed by a MIT license that can be
  *  found in the LICENSE file.
  */
+import { Logger } from '@nimkit/common';
 import { ChatKitClient, ChatRepo, collectionTypeOffset, ContactRepo, ErrorUtils, IMKitConfigCenter } from '@nimkit/chatkit'
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel'
+import { ConversationSelectModel } from '@nimkit/chatkit'
 import {
   V2NIMMessage,
   V2NIMMessageConfig,
@@ -49,7 +50,7 @@ export class DateGroupedMessages {
   }
 }
 
-const messageListLimit: number = 50
+const messageListLimit: number = 100
 
 @ObservedV2
 export class ChatSearchFileMessageViewModel {
@@ -160,7 +161,7 @@ export class ChatSearchFileMessageViewModel {
           this.userMap.set(u.accountId, u)
         }
       } catch (err) {
-        console.error('file getUserListFromCloud error:', err)
+        Logger.error('ChatKitUI', 'file getUserListFromCloud error:', err)
       } finally {
         // done
       }
@@ -168,7 +169,7 @@ export class ChatSearchFileMessageViewModel {
       // 将消息转换为 NIMMessageInfo
       this.convertToMessageInfoList()
     } catch (err) {
-      console.error('ChatSearchFileMessageViewModel searchMessages error:', err)
+      Logger.error('ChatKitUI', 'ChatSearchFileMessageViewModel searchMessages error:', err)
       // throw err
     } finally {
       this.isLoading = false
@@ -265,7 +266,7 @@ export class ChatSearchFileMessageViewModel {
     progress?: (percentage: number) => void) {
     const mergedParams = this.beforeSendMessage(params)
     ChatRepo.sendMessage(msg, conversationId, mergedParams, progress).catch((err: BusinessError) => {
-      console.error("net ease send message error", err.code, err.message);
+      Logger.error('ChatKitUI', "net ease send message error", err.code, err.message);
       sendMessageFailedTips(msg, err, conversationId)
     })
   }
@@ -286,7 +287,7 @@ export class ChatSearchFileMessageViewModel {
             this.sendForwardMessage(forwardMsg, conversation.conversationId)
           }
         } catch (err) {
-          console.error(err)
+          Logger.error('ChatKitUI', err)
         }
       })
 
@@ -297,7 +298,7 @@ export class ChatSearchFileMessageViewModel {
           setTimeout(() => {
             ChatRepo.sendMessage(leaveMsg, conversation.conversationId!)
               .catch((err: BusinessError) => {
-                console.error("net ease send message error", err.code, err.message);
+                Logger.error('ChatKitUI', "net ease send message error", err.code, err.message);
                 sendMessageFailedTips(leaveMsg, err, conversation.conversationId!)
               })
           }, 200)

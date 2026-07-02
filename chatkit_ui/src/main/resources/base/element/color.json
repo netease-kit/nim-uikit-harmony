@@ -17,6 +17,14 @@
       "value": "#E9EFF5"
     },
     {
+      "name": "ai_chat_helper_background_main",
+      "value": "#E8F5FF"
+    },
+    {
+      "name": "ai_chat_helper_background_sub",
+      "value": "#CEF4FF"
+    },
+    {
       "name": "color_chat_send",
       "value": "#337EFF"
     },

@@ -2,199 +2,207 @@
   "string": [
     {
       "name": "contact_title",
-      "value": "通讯录"
+      "value": "Contacts"
     },
     {
       "name": "contact_validation_message",
-      "value": "验证消息"
+      "value": "Verification Messages"
     },
     {
       "name": "contact_blocklist",
-      "value": "黑名单"
+      "value": "Blocklist"
     },
     {
       "name": "contact_my_teams",
-      "value": "我的群聊"
+      "value": "My Groups"
     },
     {
       "name": "contact_ai_users",
-      "value": "我的数字人"
+      "value": "My Digital Avatars"
+    },
+    {
+      "name": "person_select_ai_users_tab",
+      "value": "Digital Avatars"
+    },
+    {
+      "name": "no_ai_user",
+      "value": "No digital avatars"
     },
     {
       "name": "contact_clean",
-      "value": "清空"
+      "value": "Clear"
     },
     {
       "name": "contact_blockList_tip",
-      "value": "你不会收到列表中任何联系人的消息"
+      "value": "You will not receive messages from any contacts in this list"
     },
     {
       "name": "contact_blockList_relieve",
-      "value": "解除"
+      "value": "Remove"
     },
     {
       "name": "contact_validation_accept",
-      "value": "同意"
+      "value": "Accept"
     },
     {
       "name": "contact_validation_accepted",
-      "value": "已同意"
+      "value": "Accepted"
     },
     {
       "name": "contact_validation_refuse",
-      "value": "拒绝"
+      "value": "Reject"
     },
     {
       "name": "contact_validation_refused",
-      "value": "已拒绝"
+      "value": "Rejected"
     },
     {
       "name": "contact_validation_expired",
-      "value": "已过期"
+      "value": "Expired"
     },
     {
       "name": "contact_validation_add_me",
-      "value": "好友申请"
+      "value": "Friend Request"
     },
     {
       "name": "contact_validation_accepted_me",
-      "value": "同意了你的好友请求"
+      "value": "Accepted your friend request"
     },
     {
       "name": "contact_validation_refused_me",
-      "value": "拒绝了你的好友请求"
+      "value": "Rejected your friend request"
     },
     {
       "name": "person_info_nick",
-      "value": "昵称"
+      "value": "Nickname"
     },
     {
       "name": "person_info_gender",
-      "value": "性别"
+      "value": "Gender"
     },
     {
       "name": "person_info_birthday",
-      "value": "生日"
+      "value": "Birthday"
     },
     {
       "name": "person_info_mobile",
-      "value": "手机"
+      "value": "Mobile"
     },
     {
       "name": "person_info_email",
-      "value": "邮箱"
+      "value": "Email"
     },
     {
       "name": "person_info_sign",
-      "value": "个性签名"
+      "value": "Signature"
     },
     {
       "name": "person_info_alias",
-      "value": "备注名"
+      "value": "Alias"
     },
     {
       "name": "person_gender_unknown",
-      "value": "未知"
+      "value": "Unknown"
     },
     {
       "name": "person_gender_male",
-      "value": "男"
+      "value": "Male"
     },
     {
       "name": "person_gender_female",
-      "value": "女"
+      "value": "Female"
     },
     {
       "name": "person_setting_remind",
-      "value": "消息提醒"
+      "value": "Message Notifications"
     },
     {
       "name": "person_setting_add_block",
-      "value": "加入黑名单"
+      "value": "Add to Blocklist"
     },
     {
       "name": "person_info_add",
-      "value": "添加好友"
+      "value": "Add Friend"
     },
     {
       "name": "person_info_add_tip",
-      "value": "好友申请已发送"
+      "value": "Friend request sent"
     },
     {
       "name": "person_info_chat",
-      "value": "聊天"
+      "value": "Chat"
     },
     {
       "name": "person_info_delete",
-      "value": "删除好友"
+      "value": "Delete Friend"
     },
     {
       "name": "person_info_delete_tip",
-      "value": "将联系人“%s”删除"
+      "value": "Delete contact \"%s\""
     },
     {
       "name": "search_result_friend",
-      "value": "好友"
+      "value": "Friend"
     },
     {
       "name": "search_result_discussion",
-      "value": "讨论组"
+      "value": "Discussion Group"
     },
     {
       "name": "search_result_senior",
-      "value": "高级群"
+      "value": "Advanced Group"
     },
     {
       "name": "mine_info",
-      "value": "个人信息"
+      "value": "Profile"
     },
     {
       "name": "mine_info_avatar",
-      "value": "头像"
+      "value": "Avatar"
     },
     {
       "name": "validation_empty",
-      "value": "暂无验证消息"
+      "value": "No verification messages"
     },
     {
       "name": "avatar_uploading",
-      "value": "头像上传中%d%"
+      "value": "Uploading avatar %d%"
     },
     {
       "name": "select_limit_tip",
-      "value": "最多选择%d个好友"
+      "value": "You can select up to %d contacts"
     },
     {
       "name": "select_none_tip",
-      "value": "请选择联系人"
+      "value": "Please select contacts"
     },
     {
       "name": "let_us_chat",
-      "value": "我已经同意了你的申请，现在开始聊天吧~"
+      "value": "I have accepted your request. Let's start chatting~"
     },
     {
       "name": "conversation_select_conversation",
-      "value": "最近会话"
+      "value": "Recent Conversations"
     },
     {
       "name": "conversation_select_contact",
-      "value": "我的好友"
+      "value": "My Friends"
     },
     {
       "name": "conversation_select_team",
-      "value": "我的群聊"
+      "value": "My Groups"
     },
     {
       "name": "conversation_select_multi",
-      "value": "多选"
+      "value": "Multi-select"
     },
     {
       "name": "conversation_selected",
-      "value": "已选"
+      "value": "Selected"
     },
     {
       "name": "validate_processed",
-      "value": "该验证消息已在其他端处理"
+      "value": "This verification message has been processed on another device"
     },
     {
       "name": "friend_limit",
@@ -349,6 +357,14 @@
       "value": "Are you sure you want to delete this bot? This cannot be undone"
     },
     {
+      "name": "bot_delete_btn",
+      "value": "Delete"
+    },
+    {
+      "name": "bot_delete_item",
+      "value": "Delete Bot"
+    },
+    {
       "name": "bot_refresh_token",
       "value": "Refresh Token"
     },
@@ -363,6 +379,10 @@
     {
       "name": "bot_refresh_token_success",
       "value": "Token refreshed and copied to clipboard"
+    },
+    {
+      "name": "bot_refresh_token_fail",
+      "value": "Refresh failed, please try again"
     },
     {
       "name": "bot_config",
@@ -441,6 +461,14 @@
       "value": "Create New Bot"
     },
     {
+      "name": "bot_limit_select_existing",
+      "value": "Select Existing Bot"
+    },
+    {
+      "name": "bot_limit_go_delete",
+      "value": "Go Delete Bot"
+    },
+    {
       "name": "bot_bind_select_existing",
       "value": "Select Existing Bot"
     },
@@ -459,6 +487,34 @@
     {
       "name": "bot_bind_title",
       "value": "Bind Bot"
+    },
+    {
+      "name": "bot_qr_expired_title",
+      "value": "QR Code Expired"
+    },
+    {
+      "name": "bot_qr_expired_message",
+      "value": "Please regenerate the QR code and scan again"
+    },
+    {
+      "name": "bot_qr_expired_btn",
+      "value": "Got It"
+    },
+    {
+      "name": "bot_limit_bind_title",
+      "value": "Bot Limit Reached (10)"
+    },
+    {
+      "name": "bot_limit_bind_message",
+      "value": "You have created 10 bots. Please choose:"
+    },
+    {
+      "name": "bot_info_title",
+      "value": "Bot"
+    },
+    {
+      "name": "bot_edit_name_title",
+      "value": "Edit Nickname"
     },
     {
       "name": "bot_token_empty_tip",

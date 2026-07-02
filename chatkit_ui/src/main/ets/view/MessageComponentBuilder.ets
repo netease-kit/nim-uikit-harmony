@@ -4,14 +4,18 @@
  *  found in the LICENSE file.
  */
 
-import { NEEmojiParseResult } from '../manager/NEEmojiManager'
+import { Logger } from '@nimkit/common';
+import { EmojiParseType, NEEmojiParseResult } from '../manager/NEEmojiManager'
 import {
   V2NIMConversationType,
+  V2NIMMessageAIStatus,
+  V2NIMMessageCallAttachment,
   V2NIMMessageFileAttachment,
   V2NIMMessageLocationAttachment,
   V2NIMMessageType
 } from '@nimsdk/base'
 import {
+  buildAitDisplayText,
   formatVideoDuration,
   getAitNodes,
   getCallMessageIcon,
@@ -40,73 +44,118 @@ import { ChatAitNode } from '../model/ChatAitNode'
 import { ChatKitClient, getMultiLineBody, getMultiLineTitle, IMKitConfigCenter, MergedMessageAttachment, NEFriendUserCache } from '@nimkit/chatkit'
 import { ChatInfo } from '../model/ChatInfo'
 import { NECommonUtils } from '@nimkit/common'
-import { Markdown } from '@nimkit/markdown'
-import { markConfig } from '@nimkit/markdown'
-import { get } from '@nimsdk/vendor'
+import { Markdown, MarkdownSelectable, markConfig } from '@nimkit/markdown'
 import { ChatKitUIClient } from '../ChatKitUIClient'
 import { http } from '@kit.NetworkKit'
 import { common } from '@kit.AbilityKit'
 import { parseTextWithLinks, TextNode, TextNodeType, LinkInfo, LinkType } from '../utils/TextNodeParser'
 import { LinkClickUtils } from '../utils/LinkClickUtils'
-import { linkifyExtension } from '../utils/MarkdownLinkifyExtension'
 import { MessageTranslationService } from '../service/translation/MessageTranslationService'
+import { linkifyExtension } from '../utils/MarkdownLinkifyExtension'
+import {
+  AISearchTextRenderUnit,
+  getRenderedTextLength,
+  getMultiLineAISearchText,
+  normalizeRenderedSelectionRange
+} from '../aisearchkit/AISearchMenuUtils'
 
-/**
- * 初始化 Markdown 组件的 linkify 支持
- * 通过 marked 的 tokenizer 扩展机制，在解析阶段识别 URL/电话/邮箱
- */
-function initMarkdownLinkify() {
-  // 注册 linkify tokenizer 扩展
+const AI_SEARCH_MARKDOWN_SELECT_DEBUG_TAG = 'AISearchMarkdownSelect'
+let aiMarkdownLinkifyRegistered = false
+
+function debugAISearchMarkdownSelect(message: string): void {
+  Logger.info('ChatKitUI', `[${AI_SEARCH_MARKDOWN_SELECT_DEBUG_TAG}] ${message}`)
+}
+
+function ensureAIMarkdownLinkifyRegistered(): void {
+  if (aiMarkdownLinkifyRegistered) {
+    return
+  }
   markConfig.addPlugin([linkifyExtension])
+  aiMarkdownLinkifyRegistered = true
+}
 
-  // 注册链接点击回调
-  // Markdown 组件渲染 link token 时会调用这个回调
-  markConfig.registerLinkClick = (url?: string) => {
-    if (!url) return
+function getEmojiRenderUnits(text: string): AISearchTextRenderUnit[] {
+  const units: AISearchTextRenderUnit[] = []
+  parseMessageText(text)?.forEach((item: NEEmojiParseResult) => {
+    if (item.type === EmojiParseType.emoji && item.emoji?.tag) {
+      units.push({
+        sourceStart: item.startIndex,
+        sourceLength: item.emoji.tag.length,
+        renderLength: 1
+      })
+    }
+  })
+  return units
+}
 
-    // 从 AppStorage 获取 context
-    const context = AppStorage.get<common.UIAbilityContext>('currentUIAbilityContext')
-    if (!context) return
+@ComponentV2
+struct AIMarkdownText {
+  @Param
+  content: string = ''
+  @Param
+  selecting: boolean = false
+  private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
+  @Event
+  onSelectionChange?: (text: string, start: number, end: number) => void
 
-    // 根据 URL 格式判断类型并处理
+  @Monitor('content', 'selecting')
+  onMarkdownStateChange(): void {
+    debugAISearchMarkdownSelect(`AIMarkdownText state contentLength=${this.content.length} selecting=${this.selecting}`)
+  }
+
+  aboutToAppear(): void {
+    ensureAIMarkdownLinkifyRegistered()
+    markConfig.registerLinkClick = (url?: string) => {
+      this.onLinkClick(url)
+    }
+    debugAISearchMarkdownSelect(`AIMarkdownText appear contentLength=${this.content.length} selecting=${this.selecting}`)
+  }
+
+  private onLinkClick(url?: string): void {
+    if (!url) {
+      return
+    }
+    let linkText = url
+    let linkType = LinkType.URL
     if (url.startsWith('mailto:')) {
-      // 邮箱
-      const email = url.replace('mailto:', '')
-      const linkInfo: LinkInfo = {
-        type: LinkType.EMAIL,
-        text: email,
-        url: url,
-        start: 0,
-        end: email.length
-      }
-      LinkClickUtils.handleLinkClick(context, linkInfo)
+      linkText = url.replace('mailto:', '')
+      linkType = LinkType.EMAIL
     } else if (url.startsWith('tel:')) {
-      // 电话
-      const phone = url.replace('tel:', '')
-      const linkInfo: LinkInfo = {
-        type: LinkType.PHONE,
-        text: phone,
-        url: url,
-        start: 0,
-        end: phone.length
-      }
-      LinkClickUtils.handleLinkClick(context, linkInfo)
+      linkText = url.replace('tel:', '')
+      linkType = LinkType.PHONE
+    }
+    const linkInfo: LinkInfo = { type: linkType, text: linkText, url: url, start: 0, end: linkText.length }
+    LinkClickUtils.handleLinkClick(this.context, linkInfo)
+  }
+
+  build() {
+    if (this.selecting) {
+      MarkdownSelectable({
+        content: this.content,
+        textLineSpace: 6,
+        fontStyle: {
+          fontColor: $r('app.color.color_chat_title'),
+          fontSize: $r('app.float.chat_message_text_font_size')
+        },
+        selectable: true,
+        selecting: this.selecting,
+        onSelectionChange: this.onSelectionChange,
+        onLinkClick: (url?: string) => {
+          this.onLinkClick(url)
+        }
+      })
     } else {
-      // URL
-      const linkInfo: LinkInfo = {
-        type: LinkType.URL,
-        text: url,
-        url: url,
-        start: 0,
-        end: url.length
-      }
-      LinkClickUtils.handleLinkClick(context, linkInfo)
+      Markdown({
+        content: this.content,
+        textLineSpace: 6,
+        fontStyle: {
+          fontColor: $r('app.color.color_chat_title'),
+          fontSize: $r('app.float.chat_message_text_font_size')
+        }
+      })
     }
   }
 }
-
-// 初始化（模块加载时执行一次）
-initMarkdownLinkify()
 
 @ComponentV2
 export struct messageContent {
@@ -116,20 +165,33 @@ export struct messageContent {
   onMessageClick: MessageItemClick | undefined
   @BuilderParam
   chatInfo: ChatInfo | undefined
+  @Param
+  aiSearchSelectingMessageId: string = ''
+  @Param
+  aiSearchSelectingTranslation: boolean = false
+
+  private isAIStreamResponseMessage(): boolean {
+    return this.message.isAiStreamMessage() &&
+      this.message.message.aiConfig?.aiStatus === V2NIMMessageAIStatus.V2NIM_MESSAGE_AI_STATUS_RESPONSE
+  }
 
   build() {
     if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
-      if (this.message.isAiStreamMessage() == false) {
+      if (!this.isAIStreamResponseMessage()) {
         textBuilder({
           message: this.message,
           onMessageClick: this.onMessageClick,
-          chatInfo: this.chatInfo
+          chatInfo: this.chatInfo,
+          aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
+          aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
         });
       } else {
         richTextBuilder({
           message: this.message,
           onMessageClick: this.onMessageClick,
-          chatInfo: this.chatInfo
+          chatInfo: this.chatInfo,
+          aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
+          aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
         });
       }
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
@@ -146,7 +208,13 @@ export struct messageContent {
       callBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM) {
       if (this.message.isMultiLineMsg) {
-        multiLineMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick, chatInfo: this.chatInfo })
+        multiLineMessageBuilder({
+          message: this.message,
+          onMessageClick: this.onMessageClick,
+          chatInfo: this.chatInfo,
+          aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
+          aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
+        })
       } else if (this.message.isMergeMsg) {
         mergedMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick })
       } else {
@@ -253,6 +321,10 @@ export struct multiLineMessageBuilder {
    */
   @Param
   isPinCollectionMode: boolean = false
+  @Param
+  aiSearchSelectingMessageId: string = ''
+  @Param
+  aiSearchSelectingTranslation: boolean = false
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
 
   /**
@@ -267,6 +339,43 @@ export struct multiLineMessageBuilder {
    */
   private onReplyClick(event: ClickEvent) {
     this.onMessageClick?.onReplyClick?.(event, this.message.replyMsg)
+  }
+
+  private getMultiLineTitleText(): string {
+    return getMultiLineTitle(this.message.message)
+  }
+
+  private getMultiLineBodyText(): string {
+    return getMultiLineBody(this.message.message)
+  }
+
+  private getSelectableMultiLineText(): string {
+    return getMultiLineAISearchText(this.getMultiLineBodyText())
+  }
+
+  private isSelectingMultiLineText(): boolean {
+    return !this.isPinCollectionMode && this.aiSearchSelectingMessageId.length > 0 &&
+      this.aiSearchSelectingMessageId === this.message.getMessageClientId() &&
+      !this.aiSearchSelectingTranslation
+  }
+
+  private getSelectableMultiLineTextLength(): number {
+    const text = this.getSelectableMultiLineText()
+    return getRenderedTextLength(text, getEmojiRenderUnits(text))
+  }
+
+  private handleMultiLineTextSelectionChange(selectionStart: number, selectionEnd: number): void {
+    const text = this.getSelectableMultiLineText()
+    const range = normalizeRenderedSelectionRange(text, getEmojiRenderUnits(text), selectionStart, selectionEnd)
+    this.onMessageClick?.onTextSelectionChange?.(this.message, text, range[0], range[1], false)
+  }
+
+  @Builder
+  private EmptySelectionMenu() {
+    Blank()
+      .width(1)
+      .height(1)
+      .opacity(0)
   }
 
   @Builder
@@ -378,29 +487,53 @@ export struct multiLineMessageBuilder {
 
       if (!this.message.isReceiveMessage() || !this.message.translatedText || this.message.translationLoading || this.message.translationFailed ||
         this.isPinCollectionMode || this.message.showOriginalText) {
-        // 标题：加粗显示，不做链接高亮和 @ 高亮（按冒烟用例 108 要求）
-        // 列表模式下：最多 1 行，超长打点
-        if (getMultiLineTitle(this.message.message).length > 0) {
-          Text() {
-            this.MultiLineTitleContent(getMultiLineTitle(this.message.message))
+        if (this.isPinCollectionMode) {
+          // 列表模式保持标题、正文分开渲染，避免影响原有截断规则。
+          if (this.getMultiLineTitleText().length > 0) {
+            Text() {
+              this.MultiLineTitleContent(this.getMultiLineTitleText())
+            }
+              .fontWeight(FontWeight.Bold)
+              .fontSize($r('app.float.chat_message_text_font_size'))
+              .fontColor($r('app.color.color_chat_title'))
+              .textAlign(TextAlign.Start)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .ellipsisMode(EllipsisMode.END)
           }
-            .fontWeight(FontWeight.Bold)
-            .fontSize($r('app.float.chat_message_text_font_size'))
-            .fontColor($r('app.color.color_chat_title'))
+          if (this.getMultiLineBodyText().length > 0) {
+            Text() {
+              this.MultiLineBodyContent(this.getMultiLineBodyText())
+            }
             .textAlign(TextAlign.Start)
-            .maxLines(this.isPinCollectionMode ? 1 : undefined)
-            .textOverflow(this.isPinCollectionMode ? { overflow: TextOverflow.Ellipsis } : undefined)
-            .ellipsisMode(this.isPinCollectionMode ? EllipsisMode.END : undefined)
-        }
-        if (getMultiLineBody(this.message.message).length > 0) {
-          Text() {
-            this.MultiLineBodyContent(getMultiLineBody(this.message.message))
+            .margin({ top: this.getMultiLineTitleText().length > 0 ? 4 : 0 })
+            .maxLines(this.getMultiLineTitleText().length > 0 ? 2 : 3)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .ellipsisMode(EllipsisMode.END)
           }
-          .textAlign(TextAlign.Start)
-          .margin({ top: getMultiLineTitle(this.message.message).length > 0 ? 4 : 0 })
-          .maxLines(this.isPinCollectionMode ? (getMultiLineTitle(this.message.message).length > 0 ? 2 : 3) : undefined)
-          .textOverflow(this.isPinCollectionMode ? { overflow: TextOverflow.Ellipsis } : undefined)
-          .ellipsisMode(this.isPinCollectionMode ? EllipsisMode.END : undefined)
+        } else {
+          if (this.getMultiLineTitleText().length > 0) {
+            Text() {
+              this.MultiLineTitleContent(this.getMultiLineTitleText())
+            }
+            .textAlign(TextAlign.Start)
+            .copyOption(CopyOptions.None)
+          }
+          if (this.getSelectableMultiLineText().length > 0) {
+            Text() {
+              this.MultiLineBodyContent(this.getMultiLineBodyText())
+            }
+            .textAlign(TextAlign.Start)
+            .copyOption(CopyOptions.LocalDevice)
+            .margin({ top: this.getMultiLineTitleText().length > 0 ? 4 : 0 })
+            .selection(this.isSelectingMultiLineText() ? 0 : -1,
+              this.isSelectingMultiLineText() ? this.getSelectableMultiLineTextLength() : -1)
+            .selectedBackgroundColor('#66337EFF')
+            .bindSelectionMenu(TextSpanType.DEFAULT, this.EmptySelectionMenu, TextResponseType.DEFAULT)
+            .onTextSelectionChange((selectionStart: number, selectionEnd: number) => {
+              this.handleMultiLineTextSelectionChange(selectionStart, selectionEnd)
+            })
+          }
         }
       }
 
@@ -499,6 +632,10 @@ export struct richTextBuilder {
   onMessageClick: MessageItemClick | undefined
   @BuilderParam
   chatInfo: ChatInfo | undefined
+  @Param
+  aiSearchSelectingMessageId: string = ''
+  @Param
+  aiSearchSelectingTranslation: boolean = false
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
 
   aboutToAppear(): void {
@@ -513,6 +650,27 @@ export struct richTextBuilder {
 
   private onRevokeEditClick(event: ClickEvent) {
     this.onMessageClick?.onRevokeEditClick?.(event, this.message)
+  }
+
+  private getAitExtension(): string | undefined {
+    return this.message.isAIResponseMsg() ? undefined : this.message.message.serverExtension
+  }
+
+  private getDisplayMessageText(): string {
+    return this.message.message.text?.trimStart()?.trimEnd() ?? ''
+  }
+
+  private isSelectingMessageText(): boolean {
+    const selecting = this.aiSearchSelectingMessageId.length > 0 &&
+      this.aiSearchSelectingMessageId === this.message.getMessageClientId() &&
+      !this.aiSearchSelectingTranslation
+    debugAISearchMarkdownSelect(`richTextBuilder isSelectingMessageText msgId=${this.message.getMessageClientId()} activeId=${this.aiSearchSelectingMessageId} selecting=${selecting} translation=${this.aiSearchSelectingTranslation}`)
+    return selecting
+  }
+
+  private handleMarkdownTextSelectionChange(text: string, selectionStart: number, selectionEnd: number): void {
+    debugAISearchMarkdownSelect(`richTextBuilder handleMarkdownTextSelectionChange msgId=${this.message.getMessageClientId()} start=${selectionStart} end=${selectionEnd} textLength=${text.length}`)
+    this.onMessageClick?.onTextSelectionChange?.(this.message, text, selectionStart, selectionEnd, false)
   }
 
   /**
@@ -578,9 +736,9 @@ export struct richTextBuilder {
               })
           }
         } else {
-          ForEach(parseMessageText(this.message.message.text?.trimStart()?.trimEnd()), (item: NEEmojiParseResult) => {
+          ForEach(parseMessageText(this.getDisplayMessageText()), (item: NEEmojiParseResult) => {
             if (item.text) {
-              ForEach(getAitNodes(item.startIndex, item.text, this.message.message.serverExtension),
+              ForEach(getAitNodes(item.startIndex, item.text, this.getAitExtension()),
                 (node: ChatAitNode) => {
                   if (node.segment) {
                     Span(node.text)
@@ -588,15 +746,12 @@ export struct richTextBuilder {
                       .textCase(TextCase.Normal)
                       .fontColor('#337EFF')
                   } else {
-                    // 使用 Markdown 组件渲染，linkify 扩展会在解析阶段识别 URL/电话/邮箱
-                    Markdown({
+                    AIMarkdownText({
                       content: node.text,
-                      lineSpace: 0,
-                      textLineSpace: 6,
-                      fontStyle: {
-                        fontColor: $r('app.color.color_chat_title'),
-                        fontSize: $r('app.float.chat_message_text_font_size')
-                      },
+                      selecting: this.isSelectingMessageText(),
+                      onSelectionChange: (text: string, selectionStart: number, selectionEnd: number) => {
+                        this.handleMarkdownTextSelectionChange(text, selectionStart, selectionEnd)
+                      }
                     })
                   }
                 })
@@ -630,6 +785,10 @@ export struct textBuilder {
   onMessageClick: MessageItemClick | undefined
   @BuilderParam
   chatInfo: ChatInfo | undefined
+  @Param
+  aiSearchSelectingMessageId: string = ''
+  @Param
+  aiSearchSelectingTranslation: boolean = false
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
 
   private onItemClick(event: ClickEvent) {
@@ -640,11 +799,67 @@ export struct textBuilder {
     this.onMessageClick?.onRevokeEditClick?.(event, this.message)
   }
 
+  private getAitExtension(): string | undefined {
+    return this.message.isAIResponseMsg() ? undefined : this.message.message.serverExtension
+  }
+
+  private getDisplayMessageText(): string {
+    const text = this.message.message.text ?? ''
+    if (this.message.message.aiConfig?.aiStatus === V2NIMMessageAIStatus.V2NIM_MESSAGE_AI_STATUS_AT) {
+      return buildAitDisplayText(text, this.getAitExtension())
+    }
+    return text
+  }
+
+  private getSelectableMessageText(): string {
+    return this.getDisplayMessageText().trimStart().trimEnd()
+  }
+
+  private getSelectableMessageTextLength(): number {
+    const text = this.getSelectableMessageText()
+    return getRenderedTextLength(text, getEmojiRenderUnits(text))
+  }
+
+  private getSelectableTranslatedText(): string {
+    return this.message.translatedText ?? ''
+  }
+
+  private isSelectingMessageText(): boolean {
+    return this.aiSearchSelectingMessageId.length > 0 &&
+      this.aiSearchSelectingMessageId === this.message.getMessageClientId() &&
+      !this.aiSearchSelectingTranslation
+  }
+
+  private isSelectingTranslationText(): boolean {
+    return this.aiSearchSelectingMessageId.length > 0 &&
+      this.aiSearchSelectingMessageId === this.message.getMessageClientId() &&
+      this.aiSearchSelectingTranslation
+  }
+
   /**
    * 处理链接点击
    */
   private onLinkClick(linkInfo: LinkInfo) {
     LinkClickUtils.handleLinkClick(this.context, linkInfo)
+  }
+
+  private handleMessageTextSelectionChange(selectionStart: number, selectionEnd: number): void {
+    const text = this.getSelectableMessageText()
+    const range = normalizeRenderedSelectionRange(text, getEmojiRenderUnits(text), selectionStart, selectionEnd)
+    this.onMessageClick?.onTextSelectionChange?.(this.message, text, range[0], range[1], false)
+  }
+
+  private handleTranslationTextSelectionChange(selectionStart: number, selectionEnd: number): void {
+    this.onMessageClick?.onTextSelectionChange?.(this.message, this.getSelectableTranslatedText(),
+      selectionStart, selectionEnd, true)
+  }
+
+  @Builder
+  private EmptySelectionMenu() {
+    Blank()
+      .width(1)
+      .height(1)
+      .opacity(0)
   }
 
   aboutToAppear(): void {
@@ -710,9 +925,9 @@ export struct textBuilder {
                 })
             }
           } else {
-            ForEach(parseMessageText(this.message.message.text?.trimStart()?.trimEnd()), (item: NEEmojiParseResult) => {
+            ForEach(parseMessageText(this.getSelectableMessageText()), (item: NEEmojiParseResult) => {
               if (item.text) {
-                ForEach(getAitNodes(item.startIndex, item.text, this.message.message.serverExtension),
+                ForEach(getAitNodes(item.startIndex, item.text, this.getAitExtension()),
                   (node: ChatAitNode) => {
                     if (node.segment) {
                       Span(node.text)
@@ -753,6 +968,14 @@ export struct textBuilder {
         .fontSize($r('app.float.chat_subtitle_text_font_size'))
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .ellipsisMode(EllipsisMode.END)
+        .copyOption(CopyOptions.LocalDevice)
+        .selection(this.isSelectingMessageText() ? 0 : -1,
+          this.isSelectingMessageText() ? this.getSelectableMessageTextLength() : -1)
+        .selectedBackgroundColor('#66337EFF')
+        .bindSelectionMenu(TextSpanType.DEFAULT, this.EmptySelectionMenu, TextResponseType.DEFAULT)
+        .onTextSelectionChange((selectionStart: number, selectionEnd: number) => {
+          this.handleMessageTextSelectionChange(selectionStart, selectionEnd)
+        })
       }
 
       if (this.message.isReceiveMessage() && this.message.translationLoading) {
@@ -790,11 +1013,19 @@ export struct textBuilder {
               .width('100%')
               .margin({ top: 8, bottom: 8 })
           }
-          Text(this.message.translatedText)
+          Text(this.message.translatedText ?? '')
             .lineHeight(20)
             .fontSize($r('app.float.chat_subtitle_text_font_size'))
             .fontColor($r('app.color.color_chat_title'))
             .textAlign(TextAlign.Start)
+            .copyOption(CopyOptions.LocalDevice)
+            .selection(this.isSelectingTranslationText() ? 0 : -1,
+              this.isSelectingTranslationText() ? this.getSelectableTranslatedText().length : -1)
+            .selectedBackgroundColor('#66337EFF')
+            .bindSelectionMenu(TextSpanType.DEFAULT, this.EmptySelectionMenu, TextResponseType.DEFAULT)
+            .onTextSelectionChange((selectionStart: number, selectionEnd: number) => {
+              this.handleTranslationTextSelectionChange(selectionStart, selectionEnd)
+            })
           Row() {
             Image($r('app.media.ic_chat_menu_translate'))
               .width(12)
@@ -994,10 +1225,10 @@ export struct imageBuilder {
         imageSource.createPixelMap().then((pixelMap) => {
           this.message.cachedThumbPixelMap = pixelMap
         }).catch((err: Error) => {
-          console.debug('netease cacheThumbPixelMap createPixelMap failed:', err.message)
+          Logger.debug('ChatKitUI', 'netease cacheThumbPixelMap createPixelMap failed:', err.message)
         })
       } catch (err) {
-        console.debug('netease cacheThumbPixelMap failed:', err)
+        Logger.debug('ChatKitUI', 'netease cacheThumbPixelMap failed:', err)
       }
     } else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
       // 网络图片需要先下载再创建 PixelMap
@@ -1013,11 +1244,11 @@ export struct imageBuilder {
             imageSource.createPixelMap().then((pixelMap) => {
               this.message.cachedThumbPixelMap = pixelMap
             }).catch((err: Error) => {
-              console.debug('netease cacheThumbPixelMap createPixelMap from http failed:', err.message)
+              Logger.debug('ChatKitUI', 'netease cacheThumbPixelMap createPixelMap from http failed:', err.message)
             })
           }
         }).catch((err: Error) => {
-          console.debug('netease cacheThumbPixelMap http request failed:', err.message)
+          Logger.debug('ChatKitUI', 'netease cacheThumbPixelMap http request failed:', err.message)
         }).finally(() => {
           httpRequest.destroy()
         })
@@ -1144,8 +1375,9 @@ export struct callBuilder {
       }
 
       // call
+      const callAttachment = this.message.message.attachment as V2NIMMessageCallAttachment | undefined
       let callType: number = 1; // 默认音频通话
-      if (get(this.message.message.attachment ?? {}, 'type') === 2) { // is video?
+      if (callAttachment?.type === 2) { // is video?
         callType = 2;
       }
       ChatKitUIClient.getInstance().call(targetId, callType)
@@ -1243,9 +1475,9 @@ export struct locationBuilder {
       // 获取静态图
       staticMap.getMapImage(staticMapOptions).then((value) => {
         this.imagePex = value;
-        console.info("netease location Succeeded in getting image.");
+        Logger.info('ChatKitUI', "netease location Succeeded in getting image.");
       }).catch((error: BusinessError) => {
-        console.info("netease location fail in getting image.", error.code, error.message);
+        Logger.info('ChatKitUI', "netease location fail in getting image.", error.code, error.message);
       });
     }
   }
@@ -1309,9 +1541,9 @@ export struct pinLocationBuilder {
       // 获取静态图
       staticMap.getMapImage(staticMapOptions).then((value) => {
         this.imagePex = value;
-        console.info("netease location Succeeded in getting image.");
+        Logger.info('ChatKitUI', "netease location Succeeded in getting image.");
       }).catch((error: BusinessError) => {
-        console.info("netease location fail in getting image.", error.code, error.message);
+        Logger.info('ChatKitUI', "netease location fail in getting image.", error.code, error.message);
       });
     }
   }

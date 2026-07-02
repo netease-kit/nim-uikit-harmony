@@ -10,7 +10,7 @@ import {
   isLocalTeamCreateInviteMessage,
   shouldCollapseTeamCreateInviteNotifications
 } from '@nimkit/chatkit';
-import { V2NIMMessagePin } from '@nimsdk/base';
+import { V2NIMMessageAIStatus, V2NIMMessagePin } from '@nimsdk/base';
 import { V2NIMMessage, V2NIMMessageSendingState } from '@nimsdk/base/src/main/ets/nim/sdk/V2NIMMessageService';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { IsReceiveMsg, IsReceiveMsgOperation } from './IsReceiveMsg';
@@ -59,22 +59,34 @@ export class ChatInfo {
     return '';
   };
 
+  getMessageDisplaySenderId(message: V2NIMMessage): string {
+    const aiAccountId = message.aiConfig?.accountId
+    if (message.aiConfig?.aiStatus === V2NIMMessageAIStatus.V2NIM_MESSAGE_AI_STATUS_RESPONSE && aiAccountId) {
+      return aiAccountId
+    }
+    return message.senderId
+  }
+
+  getAccountId(param?: string | V2NIMMessage): string {
+    if (param === undefined) {
+      return ''
+    }
+    if ((param as V2NIMMessage).senderId) {
+      return this.getMessageDisplaySenderId(param as V2NIMMessage)
+    }
+    return param as string
+  }
+
   getChatUserAvatarUrl(param?: string | V2NIMMessage): string {
     return '';
   };
 
   getChatUserAvatarName(param?: string | V2NIMMessage): string {
-    if (param as V2NIMMessage) {
-      return (param as V2NIMMessage).senderId
-    }
-    return param as string;
+    return this.getAccountId(param)
   };
 
   getChatUserShowName(param?: string | V2NIMMessage, alias: boolean = true, teamNick: boolean = true): string {
-    if (param as V2NIMMessage) {
-      return (param as V2NIMMessage).senderId
-    }
-    return param as string;
+    return this.getAccountId(param)
   };
 
   getCurrentUserShowName(): string {

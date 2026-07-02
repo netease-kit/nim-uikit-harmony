@@ -5,7 +5,6 @@
  *
  */
 
-import { ChatKitClient } from './ChatKitClient';
 import { NEUserWithFriend } from './model/NEUserWithFriend';
 import { V2NIMFriend, V2NIMUser } from '@nimsdk/base';
 import { ContactRepo } from './repo/ContactRepo';
@@ -27,17 +26,18 @@ export class NEFriendUserCache {
 
   private constructor() {
     ContactRepo.addListener()
-    ContactRepo.getFriendList()
-    ContactRepo.getUserListFromCloud([ChatKitClient.getLoginUserId()])
-    ContactRepo.getBlockList()
   }
 
-  public static getInstance() {
+  public static getInstance(): NEFriendUserCache {
     if (!AppStorage.get<NEFriendUserCache>(NEFriendUserCache.name)) {
       let instance = new NEFriendUserCache()
       AppStorage.setOrCreate<NEFriendUserCache>(NEFriendUserCache.name, instance);
     }
     return AppStorage.get<NEFriendUserCache>(NEFriendUserCache.name) as NEFriendUserCache;
+  }
+
+  public static peekInstance(): NEFriendUserCache | undefined {
+    return AppStorage.get<NEFriendUserCache>(NEFriendUserCache.name)
   }
 
   /// 是否是自己

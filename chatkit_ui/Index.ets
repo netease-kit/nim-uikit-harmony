@@ -9,11 +9,35 @@ export { NEEmojiManager } from './src/main/ets/manager/NEEmojiManager'
 
 export { ChatP2PPage } from './src/main/ets/pages/ChatP2PPage'
 
+export { ChatKitConfig } from './src/main/ets/ChatKitConfig'
+
+export { NIMMessageInfo } from './src/main/ets/model/NIMMessageInfo'
+
 export { ForwardMessageDialog } from './src/main/ets/view/ForwardMessageDialog'
 
 export { TextMessageDetailDialog } from './src/main/ets/view/TextMessageDetailDialog'
 
 export { MessageItemClick } from './src/main/ets/view/MessageItemClick'
+
+export { DeviceUtils } from './src/main/ets/common/DeviceUtils'
+
+export { DateUtils } from './src/main/ets/common/DateUtils'
+
+export { AudioPlayerManager } from './src/main/ets/manager/AudioPlayerManager'
+
+export {
+  downLoadAndOpenFile,
+  getMessageImageUrls,
+  getMessageVideoRatio,
+  getMessageVideoUrl,
+  sendMessageFailedTips
+} from './src/main/ets/common/MessageHelper'
+
+export { buildSendMessageParams } from './src/main/ets/common/SendMessageParamsHelper'
+
+export { showLocationDetail } from './src/main/ets/common/ChatUtils'
+
+export { pinMessageContent } from './src/main/ets/view/MessageComponentBuilder'
 
 export { ChatKitUIClient } from './src/main/ets/ChatKitUIClient'
 

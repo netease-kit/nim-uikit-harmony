@@ -5,7 +5,8 @@
  *
  */
 
-import { ErrorUtils, UserAIBotRepo } from '@nimkit/chatkit';
+import { Logger } from '@nimkit/common';
+import { ErrorUtils, UserAIBotManager } from '@nimkit/chatkit';
 import { NavigationBackBuilder, NECommonUtils } from '@nimkit/common';
 
 export class EditBotNameParam {
@@ -55,13 +56,13 @@ export struct EditBotNamePage {
     if (!ErrorUtils.checkNetworkAndToast()) return
     this.isSubmitting = true
     try {
-      console.info('[EditBotNamePage] doSave start, accid=' + this.accid + ', name=' + trimmed)
-      await UserAIBotRepo.updateUserAIBot({
+      Logger.info('ContactKit', '[EditBotNamePage] doSave start, accid=' + this.accid + ', name=' + trimmed)
+      await UserAIBotManager.updateUserAIBot({
         accid: this.accid,
         name: trimmed,
         icon: this.icon.length > 0 ? this.icon : undefined
       })
-      console.info('[EditBotNamePage] doSave success')
+      Logger.info('ContactKit', '[EditBotNamePage] doSave success')
       NECommonUtils.showToast($r('app.string.bot_update_success'))
       const result: Record<string, string> = {
         'accid': this.accid,
@@ -70,7 +71,7 @@ export struct EditBotNamePage {
       }
       this.pathStack.pop(result)
     } catch (err) {
-      console.error('[EditBotNamePage] doSave error: ' + JSON.stringify(err))
+      Logger.error('ContactKit', '[EditBotNamePage] doSave error: ' + JSON.stringify(err))
       NECommonUtils.showToast($r('app.string.bot_create_fail'))
     } finally {
       this.isSubmitting = false
@@ -84,19 +85,19 @@ export struct EditBotNamePage {
         rightButtonTitle: $r('app.string.mine_info_save'),
         rightButtonColor: this.content.trim().length > 0 ? '#337EFF' : '#CCCCCC',
         rightButtonAction: (): void => {
-          console.info('[EditBotNamePage] rightButton clicked, content=' + this.content + ', accid=' + this.accid + ', isSubmitting=' + this.isSubmitting)
+          Logger.info('ContactKit', '[EditBotNamePage] rightButton clicked, content=' + this.content + ', accid=' + this.accid + ', isSubmitting=' + this.isSubmitting)
           const trimmed = this.content.trim()
-          console.info('[EditBotNamePage] trimmed=' + trimmed + ', originalName=' + this.originalName + ', equal=' + (trimmed === this.originalName))
+          Logger.info('ContactKit', '[EditBotNamePage] trimmed=' + trimmed + ', originalName=' + this.originalName + ', equal=' + (trimmed === this.originalName))
           if (trimmed.length <= 0 || this.isSubmitting) {
-            console.info('[EditBotNamePage] blocked by length or isSubmitting')
+            Logger.info('ContactKit', '[EditBotNamePage] blocked by length or isSubmitting')
             return
           }
           if (trimmed === this.originalName) {
-            console.info('[EditBotNamePage] no change, pop directly')
+            Logger.info('ContactKit', '[EditBotNamePage] no change, pop directly')
             this.pathStack.pop()
             return
           }
-          console.info('[EditBotNamePage] checkNetwork=' + ErrorUtils.checkNetworkAndToast())
+          Logger.info('ContactKit', '[EditBotNamePage] checkNetwork=' + ErrorUtils.checkNetworkAndToast())
           this.doSave()
         },
         backgroundColor: '#EFF1F4',

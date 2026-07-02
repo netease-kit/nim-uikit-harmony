@@ -5,7 +5,8 @@
  *
  */
 
-import { UserAIBotRepo } from '@nimkit/chatkit'
+import { Logger } from '@nimkit/common';
+import { UserAIBotManager } from '@nimkit/chatkit'
 import { V2NIMGetUserAIBotListResult, V2NIMUserAIBot } from '@nimsdk/base'
 
 @ObservedV2
@@ -21,7 +22,8 @@ export class BotInfoViewModel {
       let pageToken: string | undefined = undefined
       let found = false
       while (!found) {
-        const result: V2NIMGetUserAIBotListResult | undefined = await UserAIBotRepo.getUserAIBotList({ limit: 100, pageToken: pageToken })
+        const result: V2NIMGetUserAIBotListResult | undefined =
+          await UserAIBotManager.getUserAIBotList({ limit: 100, pageToken: pageToken })
         if (result && result.bots) {
           for (const bot of result.bots) {
             if (bot.accid === this.accid) {
@@ -38,7 +40,7 @@ export class BotInfoViewModel {
         }
       }
     } catch (err) {
-      console.error('loadBot error: ' + JSON.stringify(err))
+      Logger.error('ContactKit', 'loadBot error: ' + JSON.stringify(err))
     } finally {
       this.isLoading = false
     }
@@ -46,7 +48,7 @@ export class BotInfoViewModel {
 
   async updateBotName(name: string): Promise<boolean> {
     try {
-      await UserAIBotRepo.updateUserAIBot({ accid: this.accid, name: name })
+      await UserAIBotManager.updateUserAIBot({ accid: this.accid, name: name })
       if (this.bot) {
         const updated: V2NIMUserAIBot = {
           accid: this.bot.accid,
@@ -73,14 +75,14 @@ export class BotInfoViewModel {
       }
       return true
     } catch (err) {
-      console.error('updateBotName error: ' + JSON.stringify(err))
+      Logger.error('ContactKit', 'updateBotName error: ' + JSON.stringify(err))
       return false
     }
   }
 
   async updateBotAvatar(icon: string): Promise<boolean> {
     try {
-      await UserAIBotRepo.updateUserAIBot({ accid: this.accid, icon: icon })
+      await UserAIBotManager.updateUserAIBot({ accid: this.accid, icon: icon })
       if (this.bot) {
         const updated: V2NIMUserAIBot = {
           accid: this.bot.accid,
@@ -107,7 +109,7 @@ export class BotInfoViewModel {
       }
       return true
     } catch (err) {
-      console.error('updateBotAvatar error: ' + JSON.stringify(err))
+      Logger.error('ContactKit', 'updateBotAvatar error: ' + JSON.stringify(err))
       return false
     }
   }
@@ -136,29 +138,30 @@ export class BotInfoViewModel {
         ownerid: this.bot.ownerid
       }
       this.bot = updated
+      UserAIBotManager.mergeLocalUserAIBot(updated)
     }
   }
 
   async deleteBot(): Promise<boolean> {
     try {
-      await UserAIBotRepo.deleteUserAIBot({ accid: this.accid })
+      await UserAIBotManager.deleteUserAIBot({ accid: this.accid })
       return true
     } catch (err) {
-      console.error('deleteBot error: ' + JSON.stringify(err))
+      Logger.error('ContactKit', 'deleteBot error: ' + JSON.stringify(err))
       return false
     }
   }
 
   async refreshToken(): Promise<string | undefined> {
     try {
-      const result = await UserAIBotRepo.refreshUserAIBotToken({ accid: this.accid })
+      const result = await UserAIBotManager.refreshUserAIBotToken({ accid: this.accid })
       if (result) {
         this.lastToken = result.token
         return result.token
       }
       return undefined
     } catch (err) {
-      console.error('refreshToken error: ' + JSON.stringify(err))
+      Logger.error('ContactKit', 'refreshToken error: ' + JSON.stringify(err))
       return undefined
     }
   }

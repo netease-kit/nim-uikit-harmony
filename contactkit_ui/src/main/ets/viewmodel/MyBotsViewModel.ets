@@ -5,7 +5,8 @@
  *
  */
 
-import { ChatKitClient, UserAIBotRepo } from '@nimkit/chatkit'
+import { Logger } from '@nimkit/common';
+import { ChatKitClient, UserAIBotManager } from '@nimkit/chatkit'
 import { NECommonUtils } from '@nimkit/common'
 import { V2NIMGetUserAIBotListResult, V2NIMUserAIBot } from '@nimsdk/base'
 
@@ -59,7 +60,7 @@ export class MyBotsViewModel {
       let hasMore = true
 
       while (hasMore) {
-        const result: V2NIMGetUserAIBotListResult | undefined = await UserAIBotRepo.getUserAIBotList(
+        const result: V2NIMGetUserAIBotListResult | undefined = await UserAIBotManager.getUserAIBotList(
           pageToken ? { pageToken: pageToken, limit: 100 } : { limit: 100 }
         )
         if (result && result.bots) {
@@ -73,13 +74,13 @@ export class MyBotsViewModel {
         }
       }
 
-      console.info('MyBotsViewModel loadBotList result count: ' + allBots.length +
+      Logger.info('ContactKit', 'MyBotsViewModel loadBotList result count: ' + allBots.length +
         ', first bot name: ' + (allBots.length > 0 ? (allBots[0].name ?? 'undefined') : 'empty'))
       const sortedBots = MyBotsViewModel.sortBots(allBots)
       this.botList = sortedBots
       MyBotsViewModel.memoryBotList = [...sortedBots]
     } catch (err) {
-      console.error('loadBotList error: ' + JSON.stringify(err))
+      Logger.error('ContactKit', 'loadBotList error: ' + JSON.stringify(err))
       const restored = this.restoreMemoryBotList()
       if (ChatKitClient.connectBroken()) {
         NECommonUtils.showToast($r('app.string.chat_network_error_tips'))

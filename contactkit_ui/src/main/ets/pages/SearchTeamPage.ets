@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ErrorUtils, TeamRepo } from '@nimkit/chatkit';
 import { CommonEmptyResult, CommonTextInput, NavigationBackBuilder } from '@nimkit/common';
 import { V2NIMTeam, V2NIMTeamType } from '@nimsdk/base';
@@ -40,7 +41,7 @@ export struct SearchTeamPage {
           this.isEmpty = true
         }
       } catch (err) {
-        console.error('SearchTeamPage search error', err)
+        Logger.error('ContactKit', 'SearchTeamPage search error', err)
         this.isEmpty = true
       }
     }

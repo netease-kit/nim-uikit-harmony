@@ -8,8 +8,8 @@ import { ChatInfo } from './ChatInfo';
 import { V2NIMFriend, V2NIMMessage, V2NIMTeamMessageReadReceipt, V2NIMUser } from '@nimsdk/base';
 import { V2NIMTeam, V2NIMTeamMember } from '@nimsdk/base/src/main/ets/nim/sdk/V2NIMTeamService';
 import { NIMMessageInfo } from './NIMMessageInfo';
-import { NEFriendUserCache } from '@nimkit/chatkit/src/main/ets/NEFriendUserCache';
-import { ChatKitClient } from '@nimkit/chatkit';
+import { NEFriendUserCache } from '@nimkit/chatkit';
+import { ChatKitClient, NEAIUserCache } from '@nimkit/chatkit';
 
 @ObservedV2
 export class ChatTeamInfo extends ChatInfo {
@@ -83,11 +83,11 @@ export class ChatTeamInfo extends ChatInfo {
   }
 
   getChatUserAvatarUrl(param?: string | V2NIMMessage): string {
-    let accountId: string = ""
-    if ((param as V2NIMMessage).senderId) {
-      accountId = (param as V2NIMMessage).senderId
-    } else {
-      accountId = param as string;
+    let accountId: string = this.getAccountId(param)
+
+    const aiUser = NEAIUserCache.getAIUser(accountId)
+    if (aiUser) {
+      return aiUser.avatar ?? ''
     }
 
     if (this.teamUserMap.has(accountId)) {
@@ -101,15 +101,16 @@ export class ChatTeamInfo extends ChatInfo {
     if (this.teamUserMap.has(accountId)) {
       return this.teamUserMap.get(accountId)?.avatar ?? '';
     }
-    return '';
+    return NEFriendUserCache.mineUserCache?.user?.avatar ?? '';
   }
 
   getChatUserAvatarName(param?: string | V2NIMMessage): string {
-    let accountId: string = ""
-    if ((param as V2NIMMessage).senderId) {
-      accountId = (param as V2NIMMessage).senderId
-    } else {
-      accountId = param as string;
+    let accountId: string = this.getAccountId(param)
+
+    const aiUser = NEAIUserCache.getAIUser(accountId)
+    if (aiUser) {
+      let aiName = aiUser.name ?? aiUser.accountId
+      return aiName.length > 2 ? aiName.substring(aiName.length - 2, aiName.length) : aiName
     }
 
     let result = '';
@@ -127,6 +128,9 @@ export class ChatTeamInfo extends ChatInfo {
 
     if (result == null || result.trim() === '') {
       result = this.teamUserMap.get(accountId)?.name ?? '';
+    }
+    if (result == null || result.trim() === '') {
+      result = NEFriendUserCache.mineUserCache?.user?.name ?? '';
     }
 
     if (result == null || result.trim() === '') {
@@ -155,11 +159,11 @@ export class ChatTeamInfo extends ChatInfo {
   }
 
   getChatUserShowName(param?: string | V2NIMMessage, alias: boolean = true, teamNick: boolean = true): string {
-    let accountId: string = ""
-    if ((param as V2NIMMessage).senderId) {
-      accountId = (param as V2NIMMessage).senderId
-    } else {
-      accountId = param as string;
+    let accountId: string = this.getAccountId(param)
+
+    const aiUser = NEAIUserCache.getAIUser(accountId)
+    if (aiUser) {
+      return aiUser.name ?? aiUser.accountId
     }
 
     let result = '';

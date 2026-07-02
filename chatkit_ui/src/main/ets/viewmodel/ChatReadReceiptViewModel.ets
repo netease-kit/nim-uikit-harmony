@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  *
  */
+import { Logger } from '@nimkit/common';
 import { ChatKitClient, ChatRepo, TeamMemberWithUser, TeamRepo } from '@nimkit/chatkit'
 import { V2NIMMessage, V2NIMTeamMessageReadReceiptDetail, V2NIMTeamType } from '@nimsdk/base'
 
@@ -38,7 +39,7 @@ export class ChatReadReceiptViewModel {
           }
         }
       ).catch((error: Error) => {
-        console.log(error.message)
+        Logger.info('ChatKitUI', error.message)
       })
     }
 

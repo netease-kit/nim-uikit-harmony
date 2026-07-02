@@ -4,6 +4,7 @@
  *  found in the LICENSE file.
  */
 
+import { Logger } from '@nimkit/common';
 import { CommonEmptyResult, NavigationBackBuilder, NECommonUtils, VideoViewerDialog, } from '@nimkit/common'
 import { ChatSearchVideoMessageParams, ChatSearchVideoMessageViewModel, DateGroupedMessages } from '../viewmodel/ChatSearchVideoMessageViewModel'
 import { NIMMessageInfo } from '../model/NIMMessageInfo'
@@ -12,7 +13,7 @@ import { V2NIMConversationType, V2NIMMessageFileAttachment, V2NIMMessageVideoAtt
 import { MessageItemClick } from '../view/MessageItemClick'
 import { ChatBaseViewModel } from '../viewmodel/ChatBaseViewModel'
 import { ChatKitClient, conversationSelectLimitCount, ConversationSelectParam, ErrorUtils, IMKitConfigCenter, TeamRepo } from '@nimkit/chatkit'
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel'
+import { ConversationSelectModel } from '@nimkit/chatkit'
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog'
 import { ChatUserInfo } from '../model/ChatUserInfo'
 import { ChatTeamInfo } from '../model/ChatTeamInfo'
@@ -327,7 +328,7 @@ export struct ChatSearchVideoMessagePage {
         }
       }
     } catch (err) {
-      console.error('ChatSearchVideoMessagePage loadMessages error:', err)
+      Logger.error('ChatKitUI', 'ChatSearchVideoMessagePage loadMessages error:', err)
     }
   }
 

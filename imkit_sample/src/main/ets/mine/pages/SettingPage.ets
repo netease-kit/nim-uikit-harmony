@@ -5,20 +5,19 @@
  *
  */
 
-import { ViewItemSwitch } from '@nimkit/common/src/main/ets/model/ViewItemSwitch';
 import {
   CommonConstants,
   DoubleAlertDialog,
   NavigationBackBuilder,
   NECommonUtils,
-  ViewItemArrow,
-  ViewItemBuilder
+  ViewItemBuilder,
+  ViewItemSwitch
 } from '@nimkit/common';
-import { ChatKitClient } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
-import { ConversationRepo, IMKitConfigCenter } from '@nimkit/chatkit';
+import { ChatKitClient, ConversationRepo, IMKitConfigCenter, LocalConversationRepo } from '@nimkit/chatkit';
 import { preferences } from '@kit.ArkData';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { common, Want } from '@kit.AbilityKit';
+import { common } from '@kit.AbilityKit';
+import { resolveLocalConversationEnabled } from '../../manager/GlobalConfigStorage';
 
 // 跳转页面入口函数
 @Builder
@@ -50,8 +49,9 @@ export struct SettingPage {
   aboutToAppear(): void {
     let options: preferences.Options = { name: 'imkit_data' };
     this.dataPreferences = preferences.getPreferencesSync(getContext(this), options);
-    this.localConversationOrOpen =
-      this.dataPreferences?.getSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, true) as boolean
+    this.localConversationOrOpen = resolveLocalConversationEnabled(
+      this.dataPreferences?.getSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, undefined) as boolean | undefined
+    )
 
     this.secondItems = [
       // 听筒模式开关（暂时隐藏，通过长按语音消息切换）
@@ -66,35 +66,42 @@ export struct SettingPage {
         itemHeight: 48,
         isOpen: this.localConversationOrOpen,
         switchChange: ((isOpen: boolean) => {
-          this.dataPreferences?.putSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, isOpen)
-          this.dataPreferences?.flush((err: BusinessError) => {
-            if (err) {
-              console.error("Failed to flush. code =" + err.code + ", message =" + err.message);
-              return;
-            }
-            console.info("Succeeded in flushing.");
-          })
-          IMKitConfigCenter.enableLocalConversation = isOpen
-
-          // restart app
-          let applicationContext = this.context.getApplicationContext();
-          let want: Want = {
-            abilityName: 'IMAbility'
-          };
-          try {
-            applicationContext.restartApp(want);
-          } catch (error) {
-            console.error(`restartApp fail, error: ${JSON.stringify(error)}`);
-          }
+          this.saveConversationModeAndRestart(isOpen)
         })
       },
     ]
+  }
+
+  private saveConversationModeAndRestart(isOpen: boolean): void {
+    if (!this.dataPreferences) {
+      return
+    }
+    this.dataPreferences.putSync(CommonConstants.KEY_SETTING_LOCAL_CONVERSATION, isOpen)
+    this.dataPreferences.flush((err: BusinessError) => {
+      if (err) {
+        console.error("Failed to flush. code =" + err.code + ", message =" + err.message);
+        return;
+      }
+      console.info("Succeeded in flushing.");
+      IMKitConfigCenter.enableLocalConversation = isOpen
+      this.exitApp()
+    })
+  }
+
+  private exitApp(): void {
+    let applicationContext = this.context.getApplicationContext();
+    try {
+      applicationContext.killAllProcesses();
+    } catch (error) {
+      console.error(`exitApp fail, error: ${JSON.stringify(error)}`);
+    }
   }
 
   async logout() {
     try {
       await ChatKitClient.nim.loginService.logout()
       ConversationRepo.removeAllConversationListener()
+      LocalConversationRepo.removeAllConversationListener()
       ChatKitClient.onDestroy()
     } catch (err) {
       console.error(err)
@@ -178,6 +185,21 @@ export struct SettingPage {
             .backgroundColor(Color.White)
             .onClick(() => {
               this.pathStack.pushPath({ name: 'TranslationSettingPage' })
+            })
+
+            ListItem() {
+              ViewItemBuilder({
+                title: $r('app.string.translation_app_language'),
+                itemHeight: 48,
+                routerUrl: 'AppLanguagePage',
+                rightIcon: $r('app.media.arrow_right')
+              })
+            }
+            .width('100%')
+            .height(48)
+            .backgroundColor(Color.White)
+            .onClick(() => {
+              this.pathStack.pushPath({ name: 'AppLanguagePage' })
             })
           }
           .borderRadius(8)

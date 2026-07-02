@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  *
  */
+import { Logger } from '@nimkit/common';
 import { AitMessage } from './AitMessage'
 import { plainToClass, Transform, Type } from 'class-transformer'
 import 'reflect-metadata'
@@ -259,7 +260,7 @@ export function getAitModelFromJson(extension?: string): AitModel | undefined {
         }
       }
     }catch (e) {
-      console.error('parse json error', JSON.stringify(e), JSON.stringify(extension))
+      Logger.error('ChatKit', 'parse json error', JSON.stringify(e), JSON.stringify(extension))
       return undefined
     }
   }

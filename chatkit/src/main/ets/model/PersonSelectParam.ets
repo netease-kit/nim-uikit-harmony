@@ -11,11 +11,13 @@ export class PersonSelectParam {
   filterList?: string[] = [];
   selectLimit: number = 200;
   onClickSureButton?: (selectedList: NEUserWithFriend[]) => void = undefined
+  showAIUsers: boolean = false
 
   constructor(onClickSureButton?: (selectedList: NEUserWithFriend[]) => void, filterList: string[] = [],
-    selectLimit: number = 200) {
+    selectLimit: number = 200, showAIUsers: boolean = false) {
     this.filterList = filterList
     this.selectLimit = selectLimit
     this.onClickSureButton = onClickSureButton
+    this.showAIUsers = showAIUsers
   }
 }

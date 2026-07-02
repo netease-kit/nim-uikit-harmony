@@ -5,7 +5,9 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
+import { AIErrorCode } from '@nimkit/chatkit';
 import Hash from '@ohos.file.hash';
 import fs from '@ohos.file.fs';
 import {
@@ -31,6 +33,7 @@ import {
   V2NIMTeamUpdateInfoMode
 } from '@nimsdk/base';
 import {
+  accountAll,
   aitKey,
   ChatKitClient,
   ChatRepo,
@@ -552,31 +555,25 @@ export function getAitNodes(startIndex: number, text: string, extension?: string
             const segmentEndInText = segment.end - startIndex
 
             // 边界检查，确保索引在有效范围内
-            let success: boolean = false
             if (segmentStartInText >= 0 && segmentEndInText <= text.length && segmentStartInText < segmentEndInText) {
-              const actualText = text.substring(segmentStartInText, segmentEndInText)
+              let actualText = text.substring(segmentStartInText, segmentEndInText + 1)
+              if (actualText.trim() !== value.text.trim()) {
+                actualText = text.substring(segmentStartInText, segmentEndInText)
+              }
 
               // 验证 @ 标记的文本与消息实际内容是否匹配（去除首尾空格后比较）
               if (actualText.trim() === value.text.trim()) {
                 let node: ChatAitNode = {
                   text: value.text,
-                  segment: segment,
+                  segment: {
+                    start: segment.start,
+                    end: segment.start + actualText.length - 1,
+                    broken: segment.broken
+                  },
                   account: key
                 }
                 segments.push(...[node])
-                success = true
               }
-            }
-
-            // 如果失败，使用默认直接添加逻辑
-            if (!success) {
-              // 索引超出边界，直接添加（保持原有行为）
-              let node: ChatAitNode = {
-                text: value.text,
-                segment: segment,
-                account: key
-              }
-              segments.push(...[node])
             }
           }
         }
@@ -617,6 +614,63 @@ export function getAitNodes(startIndex: number, text: string, extension?: string
   return aitNodes
 }
 
+export function buildAitDisplayText(text?: string, extension?: string): string {
+  const sourceText = text ?? ''
+  const aitModel = getAitModelFromJson(extension)
+  if (!aitModel || aitModel.aitBlocks.size <= 0) {
+    return sourceText
+  }
+
+  let prefix = ''
+  const segments: ChatAitNode[] = []
+  aitModel.aitBlocks.forEach((value, key) => {
+    value.segments.forEach((segment) => {
+      if (!segment.broken) {
+        const duplicate = segments.some((item) =>
+          item.account === key &&
+          item.text === value.text &&
+          item.segment?.start === segment.start)
+        if (duplicate) {
+          return
+        }
+        segments.push({
+          text: value.text,
+          segment: segment,
+          account: key
+        })
+      }
+    })
+  })
+  segments.sort((a, b) => (a.segment?.start ?? 0) - (b.segment?.start ?? 0))
+
+  for (const node of segments) {
+    const segment = node.segment
+    if (!segment || segment.start !== prefix.length) {
+      break
+    }
+    prefix += node.text
+  }
+
+  if (prefix.length <= 0 || sourceText.startsWith(prefix) || sourceText.startsWith(prefix.trimEnd())) {
+    return sourceText
+  }
+  return prefix + sourceText
+}
+
+export function extractAitAccountIds(extension?: string): string[] {
+  const aitModel = getAitModelFromJson(extension)
+  if (!aitModel) {
+    return []
+  }
+  const accountIds: string[] = []
+  aitModel.aitBlocks.forEach((_value, key) => {
+    if (key !== accountAll && !accountIds.includes(key)) {
+      accountIds.push(key)
+    }
+  })
+  return accountIds
+}
+
 export function parseText(msgText: string): Array<NEEmojiParseResult> | undefined {
   let text = msgText?.trimStart().trimEnd();
   let result: Array<NEEmojiParseResult> | undefined = undefined
@@ -635,7 +689,7 @@ export function getVideoMessageUrl(messageInfo: NIMMessageInfo): string {
       urlResult = makeVideoThumbUrl(videoAttachment.url);
     }
   }
-  console.debug('netease getVideoMessageUrl:', urlResult)
+  Logger.debug('ChatKitUI', 'netease getVideoMessageUrl:', urlResult)
   return urlResult
 }
 
@@ -711,7 +765,7 @@ export function getMessageAttachmentPath(msg: NIMMessageInfo): string {
       filePath = DeviceUtils.rootDirPath + subDir + msg.message.messageClientId + fileExt
     }
   }
-  console.debug('netease getMessageAttachmentPath:', filePath)
+  Logger.debug('ChatKitUI', 'netease getMessageAttachmentPath:', filePath)
   return filePath;
 }
 
@@ -722,7 +776,7 @@ export function getFileMessageAttachmentName(msg: NIMMessageInfo): string {
     let fileAttachment = msg.message.attachment as V2NIMMessageFileAttachment;
     fileName = fileAttachment.name ?? ''
   }
-  console.debug('netease getFileMessageAttachmentName:', fileName)
+  Logger.debug('ChatKitUI', 'netease getFileMessageAttachmentName:', fileName)
   return fileName;
 }
 
@@ -735,7 +789,7 @@ export function getFileMessageAttachmentExt(msg: NIMMessageInfo): string {
       fileExt = '.' + fileExt
     }
   }
-  console.debug('netease getFileMessageAttachmentExt:', fileExt)
+  Logger.debug('ChatKitUI', 'netease getFileMessageAttachmentExt:', fileExt)
   return fileExt;
 }
 
@@ -756,7 +810,7 @@ export function clearForwardAtMark(forwardMessage: V2NIMMessage) {
       }
       forwardMessage.serverExtension = JSON.stringify(remoteExt)
     } catch (err) {
-      console.error(err)
+      Logger.error('ChatKitUI', err)
     }
   }
 }
@@ -976,7 +1030,7 @@ export async function createForwardMessageListFileDetail(messages: V2NIMMessage[
     }
     return undefined
   } catch (err) {
-    console.error(err)
+    Logger.error('ChatKitUI', err)
     NECommonUtils.showToast($r('app.string.chat_multi_forward_failed'))
     if (fs.accessSync(filePath)) {
       fs.unlink(filePath)
@@ -1068,7 +1122,7 @@ export async function downloadAttachment(msg: NIMMessageInfo, path: string, chat
         }
         )
       } catch (err) {
-        console.log('netease downloadAttachment', err)
+        Logger.info('ChatKitUI', 'netease downloadAttachment', err)
         msg.setDownloadProgress(-1)
       }
     }
@@ -1128,7 +1182,7 @@ export async function getMessageImageUrls(message?: NIMMessageInfo, chatInfo?: C
                 model.imageUrls[imageIndex] = uri
               }
             } catch (err) {
-              console.log('netease getMessageImageUrls', err)
+              Logger.info('ChatKitUI', 'netease getMessageImageUrls', err)
             }
           }
         }
@@ -1169,7 +1223,7 @@ export async function getMessageImageUrl(message?: NIMMessageInfo, chatInfo?: Ch
                 model.imageUrls[imageIndex] = uri
               }
             } catch (err) {
-              console.log('netease getMessageImageUrl', err)
+              Logger.info('ChatKitUI', 'netease getMessageImageUrl', err)
             }
           }
         }
@@ -1193,7 +1247,7 @@ export function downLoadAndOpenFile(msg: NIMMessageInfo, context: Context, chatI
       let fileExt = getFileMessageAttachmentExt(msg);
       openFileWithApp(uri, fileName, fileExt, context)
     }).catch((err: BusinessError) => {
-      console.error("netease get file info failed with error message: " + err.message + ", error code: " + err.code);
+      Logger.error('ChatKitUI', "netease get file info failed with error message: " + err.message + ", error code: " + err.code);
       downloadAttachment(msg, path, chatInfo)
       NECommonUtils.showToast($r('app.string.chat_msg_download_tips'))
       return
@@ -1360,4 +1414,67 @@ export function isSupportMessage(msgInfo: NIMMessageInfo): boolean {
     result = false
   }
   return result
+}
+
+/**
+ * AI 错误码 → 用户友好提示文案
+ * 对齐 Android MessageHelper.getAIErrorCodeMsg()
+ */
+export function getAIErrorCodeMsg(errorCode: number): Resource {
+  switch (errorCode) {
+    case AIErrorCode.AI_ERROR_TIPS_CODE:
+      return $r('app.string.chat_ai_unsupported_format_tip')
+    case AIErrorCode.V2NIM_ERROR_CODE_FAILED_TO_REQUEST_LLM:
+      return $r('app.string.chat_ai_error_failed_request_to_the_llm')
+    case AIErrorCode.V2NIM_ERROR_CODE_AI_MESSAGES_FUNCTION_DISABLED:
+      return $r('app.string.chat_ai_error_ai_messages_function_disabled')
+    case AIErrorCode.V2NIM_ERROR_CODE_IS_NOT_AI_ACCOUNT:
+      return $r('app.string.chat_ai_error_not_an_ai_account')
+    case AIErrorCode.V2NIM_ERROR_CODE_AI_ACCOUNT_BLOCKLIST_OPERATION_NOT_ALLOWED:
+      return $r('app.string.chat_ai_error_cannot_blocklist_an_ai_account')
+    case AIErrorCode.V2NIM_ERROR_CODE_PARAMETER_ERROR:
+      return $r('app.string.chat_ai_error_parameter')
+    case AIErrorCode.V2NIM_ERROR_CODE_ACCOUNT_NOT_EXIST:
+    case AIErrorCode.V2NIM_ERROR_CODE_FRIEND_NOT_EXIST:
+      return $r('app.string.chat_ai_error_user_not_exist')
+    case AIErrorCode.V2NIM_ERROR_CODE_ACCOUNT_BANNED:
+      return $r('app.string.chat_ai_error_user_banned')
+    case AIErrorCode.V2NIM_ERROR_CODE_ACCOUNT_CHAT_BANNED:
+      return $r('app.string.chat_ai_error_user_chat_banned')
+    case AIErrorCode.V2NIM_ERROR_CODE_MESSAGE_HIT_ANTISPAM:
+      return $r('app.string.chat_ai_error_message_hit_antispam')
+    case AIErrorCode.V2NIM_ERROR_CODE_TEAM_MEMBER_NOT_EXIST:
+      return $r('app.string.chat_ai_error_team_member_not_exist')
+    case AIErrorCode.V2NIM_ERROR_CODE_TEAM_NORMAL_MEMBER_CHAT_BANNED:
+      return $r('app.string.chat_ai_error_team_normal_member_chat_banned')
+    case AIErrorCode.V2NIM_ERROR_CODE_TEAM_MEMBER_CHAT_BANNED:
+      return $r('app.string.chat_ai_error_team_member_chat_banned')
+    case AIErrorCode.V2NIM_ERROR_CODE_RATE_LIMIT:
+      return $r('app.string.chat_ai_error_rate_limit_exceeded')
+    default:
+      return $r('app.string.chat_ai_error')
+  }
+}
+
+export function isAIUnsupportedFormatTipText(text?: string): boolean {
+  return text !== undefined && text.indexOf('AI messages must be of text') >= 0
+}
+
+/**
+ * 获取 TIPS 消息提示内容，AI 错误码映射为用户友好文案
+ * 对齐 Android MessageHelper.getTipsMessageContent()
+ */
+export function getTipsMessageContent(message: V2NIMMessage): ResourceStr {
+  const errorCode = message.messageStatus?.errorCode
+  if (errorCode !== undefined && errorCode !== 200) {
+    const aiErrorMsg = getAIErrorCodeMsg(errorCode)
+    // 如果错误码映射到了默认兜底文案，且原始 text 不为空，优先用原始 text
+    if (aiErrorMsg.id !== $r('app.string.chat_ai_error').id) {
+      return aiErrorMsg
+    }
+  }
+  if (isAIUnsupportedFormatTipText(message.text)) {
+    return $r('app.string.chat_ai_unsupported_format_tip')
+  }
+  return message.text ?? $r('app.string.chat_message_empty_tip_text')
 }

@@ -23,7 +23,6 @@ export class NEAIUserCache {
     if (!AppStorage.get<NEAIUserCache>(NEAIUserCache.name)) {
       const instance: NEAIUserCache = new NEAIUserCache()
       AppStorage.setOrCreate<NEAIUserCache>(NEAIUserCache.name, instance);
-      instance.load()
     }
     return AppStorage.get<NEAIUserCache>(NEAIUserCache.name) as NEAIUserCache;
   }
@@ -57,6 +56,11 @@ export class NEAIUserCache {
     const instance = NEAIUserCache.getInstance()
     instance.aiUserMap.clear()
     instance.mineUser = undefined
+  }
+
+  public static clearAIUsers(): void {
+    const instance = NEAIUserCache.getInstance()
+    instance.aiUserMap.clear()
   }
 
   public static getMineUser(): V2NIMUser | undefined {

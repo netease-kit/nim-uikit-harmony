@@ -81,12 +81,24 @@
       "value": "转发"
     },
     {
+      "name": "chat_operation_reply",
+      "value": "回复 "
+    },
+    {
+      "name": "chat_input_reply_text",
+      "value": "回复 | "
+    },
+    {
       "name": "chat_operation_translate",
       "value": "翻译"
     },
     {
       "name": "chat_operation_collection",
       "value": "收藏"
+    },
+    {
+      "name": "chat_operation_multi_select",
+      "value": "多选"
     },
     {
       "name": "chat_message_top_sticky",
@@ -107,6 +119,62 @@
     {
       "name": "chat_collection_success",
       "value": "已收藏"
+    },
+    {
+      "name": "fraud_report_action",
+      "value": "点击举报"
+    },
+    {
+      "name": "fraud_report_success",
+      "value": "举报成功"
+    },
+    {
+      "name": "fraud_tip_content",
+      "value": "仅用于体验云信IM产品功能，请勿轻信汇款，中奖等涉及钱款的信息，勿轻易拨打陌生电话，谨防上当受骗。"
+    },
+    {
+      "name": "link_click_email_action_title",
+      "value": "向“%s”发送邮件"
+    },
+    {
+      "name": "link_click_email_send",
+      "value": "使用默认邮件账户"
+    },
+    {
+      "name": "link_click_email_copy",
+      "value": "复制邮箱"
+    },
+    {
+      "name": "link_click_email_app_not_found",
+      "value": "未检测到邮箱应用"
+    },
+    {
+      "name": "link_click_email_open_failed",
+      "value": "无法打开邮件应用"
+    },
+    {
+      "name": "link_click_browser_open_failed",
+      "value": "无法打开浏览器"
+    },
+    {
+      "name": "link_click_phone_action_title",
+      "value": "“%s”可能是一个电话号码，你可以"
+    },
+    {
+      "name": "link_click_phone_call",
+      "value": "呼叫"
+    },
+    {
+      "name": "link_click_phone_copy",
+      "value": "复制"
+    },
+    {
+      "name": "link_click_phone_call_failed",
+      "value": "无法拨打电话"
+    },
+    {
+      "name": "link_click_copy_success",
+      "value": "已复制到剪贴板"
     },
     {
       "name": "chat_operation_multi_forward",
@@ -203,6 +271,14 @@
     {
       "name": "chat_team_error_tip_content",
       "value": "您已被移出群聊或该群聊已被解散"
+    },
+    {
+      "name": "chat_team_error_tip_title",
+      "value": "提示"
+    },
+    {
+      "name": "chat_msg_download_tips",
+      "value": "消息正在下载中..."
     },
     {
       "name": "chat_setting",
@@ -334,7 +410,7 @@
     },
     {
       "name": "chat_network_error_tips",
-      "value": "当前网络异常，请检查你的网络设置"
+      "value": "当前网络不可用，请检查你的网络设置。"
     },
     {
       "name": "chat_pin_limit_error_tips",
@@ -602,7 +678,7 @@
     },
     {
       "name": "search_date_year_month_format",
-      "value": "%d年%d月"
+      "value": "%d年%s"
     },
     {
       "name": "search_date_year_format",
@@ -663,6 +739,14 @@
     {
       "name": "chat_typing_indicator",
       "value": "正在输入中..."
+    },
+    {
+      "name": "chat_title_status_online",
+      "value": "(在线)"
+    },
+    {
+      "name": "chat_title_status_offline",
+      "value": "(离线)"
     },
     {
       "name": "chat_not_friend_call_tip",
@@ -727,6 +811,282 @@
     {
       "name": "chat_message_voice_too_long",
       "value": "语音过长，无法转换"
+    },
+    {
+      "name": "chat_ai_message_progressing",
+      "value": "大模型请求响应中..."
+    },
+    {
+      "name": "chat_ai_unsupported_format_tip",
+      "value": "暂不支持该格式"
+    },
+    {
+      "name": "chat_ai_error",
+      "value": "服务器繁忙，请稍后再试"
+    },
+    {
+      "name": "chat_ai_search_error",
+      "value": "模型请求异常"
+    },
+    {
+      "name": "chat_ai_error_failed_request_to_the_llm",
+      "value": "请求大语言模型失败"
+    },
+    {
+      "name": "chat_ai_error_ai_messages_function_disabled",
+      "value": "AI消息功能未开通"
+    },
+    {
+      "name": "chat_ai_error_not_an_ai_account",
+      "value": "不是数字人账号"
+    },
+    {
+      "name": "chat_ai_error_cannot_blocklist_an_ai_account",
+      "value": "不允许对数字人进行黑名单操作"
+    },
+    {
+      "name": "chat_ai_error_parameter",
+      "value": "参数错误"
+    },
+    {
+      "name": "chat_ai_error_user_not_exist",
+      "value": "用户不存在"
+    },
+    {
+      "name": "chat_ai_error_user_banned",
+      "value": "用户被禁用"
+    },
+    {
+      "name": "chat_ai_error_user_chat_banned",
+      "value": "用户被禁言"
+    },
+    {
+      "name": "chat_ai_error_message_hit_antispam",
+      "value": "消息命中反垃圾"
+    },
+    {
+      "name": "chat_ai_error_team_member_not_exist",
+      "value": "群成员不存在"
+    },
+    {
+      "name": "chat_ai_error_team_normal_member_chat_banned",
+      "value": "群普通成员被禁言"
+    },
+    {
+      "name": "chat_ai_error_team_member_chat_banned",
+      "value": "群成员被禁言"
+    },
+    {
+      "name": "chat_ai_error_rate_limit_exceeded",
+      "value": "频率超限"
+    },
+    {
+      "name": "chat_message_removed_tip",
+      "value": "该消息已撤回或删除"
+    },
+    {
+      "name": "chat_ai_stream_stop",
+      "value": "停止"
+    },
+    {
+      "name": "chat_ai_stream_refresh",
+      "value": "刷新"
+    },
+    {
+      "name": "chat_ai_helper_title",
+      "value": "回复灵感"
+    },
+    {
+      "name": "chat_ai_helper_error_title",
+      "value": "回复灵感获取失败"
+    },
+    {
+      "name": "chat_ai_helper_error_try",
+      "value": "点击重试"
+    },
+    {
+      "name": "chat_ai_translate",
+      "value": "AI处理"
+    },
+    {
+      "name": "chat_ai_translate_action",
+      "value": "翻译"
+    },
+    {
+      "name": "chat_ai_translate_tips",
+      "value": "翻译为..."
+    },
+    {
+      "name": "chat_ai_translate_target_language",
+      "value": "翻译语言"
+    },
+    {
+      "name": "chat_ai_translate_language_title",
+      "value": "将输入内容翻译为"
+    },
+    {
+      "name": "chat_use_ai_translate",
+      "value": "使用"
+    },
+    {
+      "name": "chat_ai_search",
+      "value": "AI划词搜"
+    },
+    {
+      "name": "chat_ai_search_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "chat_ai_searching",
+      "value": "AI划词搜索中..."
+    },
+    {
+      "name": "chat_ai_search_more_info",
+      "value": "补充信息"
+    },
+    {
+      "name": "chat_ai_search_hint",
+      "value": "补充输入更多内容"
+    },
+    {
+      "name": "chat_ai_search_network_error",
+      "value": "网络连接失败，请检查网络后再试"
+    },
+    {
+      "name": "chat_ai_search_send",
+      "value": "确认"
+    },
+    {
+      "name": "chat_bot_sub_session_title",
+      "value": "话题"
+    },
+    {
+      "name": "chat_bot_sub_session_search_hint",
+      "value": "搜索子会话名称"
+    },
+    {
+      "name": "chat_bot_sub_session_empty",
+      "value": "暂无话题，发送第一条消息开始新话题"
+    },
+    {
+      "name": "chat_bot_sub_session_search_empty",
+      "value": "未找到相关子会话"
+    },
+    {
+      "name": "chat_bot_sub_session_no_message",
+      "value": "暂无消息"
+    },
+    {
+      "name": "chat_bot_sub_session_untitled",
+      "value": "新话题"
+    },
+    {
+      "name": "chat_bot_sub_session_new",
+      "value": "新会话"
+    },
+    {
+      "name": "chat_bot_sub_session_create_conversation",
+      "value": "新建会话"
+    },
+    {
+      "name": "chat_bot_sub_session_rename",
+      "value": "重命名"
+    },
+    {
+      "name": "chat_bot_sub_session_rename_conversation",
+      "value": "重命名会话"
+    },
+    {
+      "name": "chat_bot_sub_session_delete",
+      "value": "删除"
+    },
+    {
+      "name": "chat_bot_sub_session_save",
+      "value": "确定"
+    },
+    {
+      "name": "chat_bot_sub_session_setting",
+      "value": "设置"
+    },
+    {
+      "name": "chat_bot_sub_session_delete_confirm",
+      "value": "删除该话题？"
+    },
+    {
+      "name": "chat_bot_sub_session_delete_title",
+      "value": "话题删除"
+    },
+    {
+      "name": "chat_bot_sub_session_delete_topic",
+      "value": "删除话题“%s”？"
+    },
+    {
+      "name": "chat_bot_sub_session_input_name",
+      "value": "请输入话题名称"
+    },
+    {
+      "name": "chat_bot_sub_session_load_error",
+      "value": "话题加载失败"
+    },
+    {
+      "name": "chat_bot_sub_session_load_failed",
+      "value": "加载失败"
+    },
+    {
+      "name": "chat_bot_sub_session_load_more_failed",
+      "value": "数据请求失败，请稍后重试"
+    },
+    {
+      "name": "chat_bot_sub_session_retry",
+      "value": "点击重试"
+    },
+    {
+      "name": "chat_bot_sub_session_offline_create",
+      "value": "当前离线，暂无法新建会话"
+    },
+    {
+      "name": "chat_bot_sub_session_rename_failed",
+      "value": "修改失败，请重试"
+    },
+    {
+      "name": "chat_bot_sub_session_delete_failed",
+      "value": "删除失败，请重试"
+    },
+    {
+      "name": "chat_bot_sub_session_removed",
+      "value": "当前话题已被删除"
+    },
+    {
+      "name": "chat_bot_sub_session_guide",
+      "value": "和%s开始聊一聊"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_image",
+      "value": "[图片消息]"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_file",
+      "value": "[文件消息]"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_file_with_name",
+      "value": "[文件消息] %s"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_audio",
+      "value": "[语音消息]"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_video",
+      "value": "[视频消息]"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_message",
+      "value": "[消息]"
+    },
+    {
+      "name": "chat_bot_sub_session_action_after_send",
+      "value": "发送消息后可操作话题"
     }
   ]
 }

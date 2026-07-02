@@ -6,163 +6,171 @@
     },
     {
       "name": "team_member",
-      "value": "群成员"
+      "value": "Team Members"
     },
     {
       "name": "team_nick",
-      "value": "我在群里的昵称"
+      "value": "My Team Nickname"
     },
     {
       "name": "team_mute",
-      "value": "群禁言"
+      "value": "Team Mute"
     },
     {
       "name": "team_dismiss",
-      "value": "解散群聊"
+      "value": "Dismiss Group Chat"
     },
     {
       "name": "team_left",
-      "value": "退出群聊"
+      "value": "Leave Group Chat"
     },
     {
       "name": "team_group_left",
-      "value": "退出讨论组"
+      "value": "Leave Discussion Group"
     },
     {
       "name": "team_setting",
-      "value": "设置"
+      "value": "Settings"
     },
     {
       "name": "team_info",
-      "value": "群信息"
+      "value": "Team Info"
     },
     {
       "name": "team_avatar",
-      "value": "群头像"
+      "value": "Team Avatar"
     },
     {
       "name": "team_name",
-      "value": "群名称"
+      "value": "Team Name"
     },
     {
       "name": "team_des",
-      "value": "群介绍"
+      "value": "Team Introduction"
     },
     {
       "name": "team_edit_avatar",
-      "value": "修改头像"
+      "value": "Change Avatar"
     },
     {
       "name": "team_default_avatar_selector",
-      "value": "选择默认图标"
+      "value": "Select Default Icon"
     },
     {
       "name": "team_owner",
-      "value": "群主"
+      "value": "Owner"
     },
     {
       "name": "team_manage",
-      "value": "群管理"
+      "value": "Team Management"
     },
     {
       "name": "team_owner_and_manager",
-      "value": "群主和管理员"
+      "value": "Owner and Managers"
     },
     {
       "name": "team_all_member",
-      "value": "所有人"
+      "value": "Everyone"
     },
     {
       "name": "team_edit_team_info",
-      "value": "谁可以编辑群信息"
+      "value": "Who can edit team info"
     },
     {
       "name": "team_add_team_member",
-      "value": "谁可以添加群成员"
+      "value": "Who can add team members"
     },
     {
       "name": "team_group_member",
-      "value": "讨论组成员"
+      "value": "Discussion Group Members"
     },
     {
       "name": "team_select_none_member_tip",
-      "value": "请选择成员"
+      "value": "Please select members"
     },
     {
       "name": "team_select_member_title",
-      "value": "人员选择"
+      "value": "Select Members"
     },
     {
       "name": "team_remove_manager",
-      "value": "移除"
+      "value": "Remove"
     },
     {
       "name": "team_add_manager",
-      "value": "添加管理员"
+      "value": "Add Manager"
     },
     {
       "name": "team_manager",
-      "value": "群管理员"
+      "value": "Team Managers"
     },
     {
       "name": "team_manage_manager",
-      "value": "管理管理员"
+      "value": "Manage Managers"
     },
     {
       "name": "team_none_manager",
-      "value": "暂无群管理人员"
+      "value": "No managers yet"
     },
     {
       "name": "manager",
-      "value": "管理员"
+      "value": "Manager"
     },
     {
       "name": "team_remove_member_title",
-      "value": "是否移除"
+      "value": "Remove?"
     },
     {
       "name": "team_remove_member_content",
-      "value": "移除后该成员将离开当前群聊"
+      "value": "After removal, this member will leave the current group chat"
     },
     {
       "name": "team_remove_manager_content",
-      "value": "移除后该成员将无管理权限"
+      "value": "After removal, this member will lose manager privileges"
     },
     {
       "name": "team_add_manager_limit_tip",
-      "value": "最多只能设置%d个管理员"
+      "value": "You can set up to %d managers"
     },
     {
       "name": "team_member_select_limit_tip",
-      "value": "最多只能选取%d个群成员"
+      "value": "You can select up to %d team members"
     },
     {
       "name": "team_add_manager_failed_tip",
-      "value": "管理员添加失败"
+      "value": "Failed to add manager"
     },
     {
       "name": "team_operate_no_permission_tip",
-      "value": "您暂无操作权限"
+      "value": "You do not have permission to perform this action"
     },
     {
       "name": "team_add_manager_empty_tip",
-      "value": "暂无成员"
+      "value": "No members"
+    },
+    {
+      "name": "team_manager_limit_zero_tip",
+      "value": "The manager limit is 0, so no manager can be added"
+    },
+    {
+      "name": "team_manager_limit_reached_tip",
+      "value": "The manager limit has been reached (%d)"
     },
     {
       "name": "team_dismiss_content",
-      "value": "是否解散群聊?"
+      "value": "Dismiss this group chat?"
     },
     {
       "name": "team_left_content",
-      "value": "是否退出群聊?"
+      "value": "Leave this group chat?"
     },
     {
       "name": "team_group_left_content",
-      "value": "是否退出讨论组?"
+      "value": "Leave this discussion group?"
     },
     {
       "name": "team_ait_permission",
-      "value": "谁可以@所有人"
+      "value": "Who can @all"
     },
     {
       "name": "team_top_sticky_permission",
@@ -195,6 +203,10 @@
     {
       "name": "team_join_mode_title",
       "value": "Join Group Mode"
+    },
+    {
+      "name": "team_id",
+      "value": "Team ID: "
     }
   ]
 }

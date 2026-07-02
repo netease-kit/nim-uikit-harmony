@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatInfo } from '../model/ChatInfo'
 import { NIMMessageInfo } from '../model/NIMMessageInfo'
 import { getVideoMessageThumbnail } from '../common/MessageHelper'
@@ -81,7 +82,7 @@ export struct TopMessageBar {
           this.imageThumbUrl = thumbUrl
         }
       }).catch((err: Error) => {
-        console.debug('netease top message image thumb failed:', err.message)
+        Logger.debug('ChatKitUI', 'netease top message image thumb failed:', err.message)
       })
       return
     }
@@ -93,7 +94,7 @@ export struct TopMessageBar {
           this.videoMessageThumbnail = thumbnail
         }
       }).catch((err: Error) => {
-        console.debug('netease top message video thumb failed:', err.message)
+        Logger.debug('ChatKitUI', 'netease top message video thumb failed:', err.message)
       })
     }
   }

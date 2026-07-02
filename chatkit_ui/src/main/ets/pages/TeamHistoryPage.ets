@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ErrorUtils } from '@nimkit/chatkit';
 import { ChatBaseViewModel } from '../viewmodel/ChatBaseViewModel';
 import {
@@ -17,7 +18,7 @@ import {
   NavigationBackBuilder,
   TailString
 } from '@nimkit/common';
-import { DateUtil } from '@nimkit/common/src/main/ets/utils/DateUtil';
+import { DateUtil } from '@nimkit/common';
 import { TeamHistoryModel, TeamHistoryViewModel } from '../viewmodel/TeamHistoryViewModel';
 import { V2NIMConversationType } from '@nimsdk/base';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
@@ -42,7 +43,7 @@ export struct TeamHistoryPage {
           await this.viewModel?.searchHistoryMessages(event.text)
           this.isEmpty = (this.viewModel?.historyList.length ?? 0) <= 0
         } catch (err) {
-          console.error(err)
+          Logger.error('ChatKitUI', err)
           this.isEmpty = true
         }
       }

@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  */
 
+import { Logger } from '@nimkit/common';
 import {
   ChatKitClient,
   ChatRepo,
@@ -28,7 +29,7 @@ import {
 } from '@nimsdk/base'
 import { HashMap } from '@kit.ArkTS'
 import { SearchFTSHistory } from '../model/SearchFTSHistory'
-import { assign } from '@nimsdk/vendor'
+import { assign } from '@nimsdk/base'
 
 /**
  * 统一的全文搜索历史消息 ViewModel
@@ -150,7 +151,7 @@ export class SearchFTSHistoryViewModel {
         this.historyList.push(model)
       }
     } catch (err) {
-      console.error(err)
+      Logger.error('ChatKitUI', err)
     }
   }
 
@@ -182,7 +183,7 @@ export class SearchFTSHistoryViewModel {
         this.getMineUserWithFriend()
       }
     } catch (err) {
-      console.error(err)
+      Logger.error('ChatKitUI', err)
     }
   }
 
@@ -220,7 +221,7 @@ export class SearchFTSHistoryViewModel {
         this.getMineTeamMember()
       }
     } catch (err) {
-      console.error(err)
+      Logger.error('ChatKitUI', err)
     }
   }
 

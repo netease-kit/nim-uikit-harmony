@@ -39,9 +39,9 @@ export struct PinMessageComponent {
       if (this.message) {
         Row() {
           CommonAvatar({
-            item: new AvatarItem(this.chatUserInfo?.getChatUserAvatarUrl(this.message?.message.senderId ?? '') ?? '',
-              this.chatUserInfo?.getChatUserAvatarName(this.message?.message.senderId ?? '') ?? '',
-              AvatarColorUntil.getBackgroundColorById(this.message?.message.senderId ?? '')),
+            item: new AvatarItem(this.chatUserInfo?.getChatUserAvatarUrl(this.message?.message) ?? '',
+              this.chatUserInfo?.getChatUserAvatarName(this.message?.message) ?? '',
+              AvatarColorUntil.getBackgroundColorById(this.message?.getDisplaySenderId() ?? '')),
             longPressGesture: () => {
               this.onMessageClick?.onAvatarLongPress?.( this.message)
             }
@@ -55,7 +55,7 @@ export struct PinMessageComponent {
               this.onMessageClick?.onAvatarClick?.(this.message)
             })
           Column() {
-            Text(this.chatUserInfo?.getChatUserShowName(this.message?.message.senderId ?? ''))
+            Text(this.chatUserInfo?.getChatUserShowName(this.message?.message))
               .fontColor($r('app.color.color_chat_sub_title'))
               .fontSize($r('app.float.chat_subtitle_text_font_size'))
               .maxLines(1)

@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  *
  */
+import { Logger } from '@nimkit/common';
 import { EmojiDataModel, NEEmojiManager, NIMInputEmoticon } from '../manager/NEEmojiManager';
 import { NEChatEmojiListItem } from './NEChatEmojiListItem';
 import display from '@ohos.display';
@@ -26,16 +27,16 @@ export struct NEChatEmojiView {
     if (this.data.sourceData.length == null) {
       this.data = NEEmojiManager.instance.dataModel;
     }
-    console.log("net ease emoji view about to appear ", this.data.sourceData.length);
+    Logger.info('ChatKitUI', "net ease emoji view about to appear ", this.data.sourceData.length);
     this.page = this.data.sourceData.length / this.pageSize;
     let offset = this.data.sourceData.length % this.pageSize;
-    console.log('net ease emoji view data page ', this.page);
+    Logger.info('ChatKitUI', 'net ease emoji view data page ', this.page);
     for (let index = 0; index < this.page; index++) {
-      console.log('net ease emoji view data index ', index);
+      Logger.info('ChatKitUI', 'net ease emoji view data index ', index);
       let sliceData = this.data.sourceData.slice(index * this.pageSize, this.pageSize * (index + 1))
       let deleteData = NEEmojiManager.instance.deleteEmoji
       if (deleteData !== undefined) {
-        console.log('net ease emoji view delete data ', deleteData);
+        Logger.info('ChatKitUI', 'net ease emoji view delete data ', deleteData);
         sliceData.push(deleteData);
       }
       this.pageData.push(sliceData);
@@ -44,13 +45,13 @@ export struct NEChatEmojiView {
     if (offset > 0) {
       this.pageData.push(this.data.sourceData.slice(this.page * this.pageSize, offset));
     }
-    console.log('net ease emoji view data page ', this.pageData.length);
+    Logger.info('ChatKitUI', 'net ease emoji view data page ', this.pageData.length);
 
     this.deviceWidth = display.getDefaultDisplaySync().width;
     this.deviceHeight = display.getDefaultDisplaySync().height;
 
-    console.log('net ease emoji view device width ', this.deviceWidth);
-    console.log('net ease emoji view device height ', this.deviceHeight);
+    Logger.info('ChatKitUI', 'net ease emoji view device width ', this.deviceWidth);
+    Logger.info('ChatKitUI', 'net ease emoji view device height ', this.deviceHeight);
   }
 
   // randomColor(): ResourceColor {

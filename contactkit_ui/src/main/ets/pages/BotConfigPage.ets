@@ -5,7 +5,7 @@
  *
  */
 
-import { ChatKitClient, ErrorUtils, UserAIBotRepo } from '@nimkit/chatkit';
+import { ChatKitClient, ErrorUtils, UserAIBotManager } from '@nimkit/chatkit';
 import { NavigationBackBuilder, NECommonUtils } from '@nimkit/common';
 import { pasteboard } from '@kit.BasicServicesKit';
 
@@ -112,17 +112,17 @@ export struct BotConfigPage {
         this.isNetworkError = true
         return
       }
-      UserAIBotRepo.getUserAIBotList({ limit: 100 }).then((result) => {
+      UserAIBotManager.getUserAIBotList({ limit: 100 }).then((result) => {
         if (result && result.bots) {
           for (const bot of result.bots) {
             if (bot.accid === this.accid) {
               const accid = bot.accid
               const self = this
               const loadToken = async (): Promise<void> => {
-                const botDetail = await UserAIBotRepo.getUserAIBot({ accid: accid })
+                const botDetail = await UserAIBotManager.getUserAIBot({ accid: accid })
                 let token = botDetail?.token ?? ''
                 if (token.length === 0) {
-                  const refreshResult = await UserAIBotRepo.refreshUserAIBotToken({ accid: accid })
+                  const refreshResult = await UserAIBotManager.refreshUserAIBotToken({ accid: accid })
                   token = refreshResult?.token ?? ''
                 }
                 if (token.length > 0) {

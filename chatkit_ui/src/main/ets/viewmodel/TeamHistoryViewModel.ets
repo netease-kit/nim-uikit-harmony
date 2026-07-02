@@ -4,6 +4,7 @@
  * found in the LICENSE file.
  *
  */
+import { Logger } from '@nimkit/common';
 import { ChatKitClient, ChatRepo, TeamMemberWithUser, TeamRepo } from '@nimkit/chatkit'
 import { V2NIMMessage, V2NIMMessageType, V2NIMTeamMember, V2NIMTeamType } from '@nimsdk/base'
 
@@ -53,7 +54,7 @@ export class TeamHistoryViewModel {
         this.historyList.push(model)
       }
     } catch (err) {
-      console.error(err)
+      Logger.error('ChatKitUI', err)
     }
   }
 
@@ -79,7 +80,7 @@ export class TeamHistoryViewModel {
         this.getMineTeamMember()
       }
     } catch (err) {
-      console.error(err)
+      Logger.error('ChatKitUI', err)
     }
   }
 

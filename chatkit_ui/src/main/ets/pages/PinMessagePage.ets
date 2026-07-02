@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { ChatTeamInfo } from '../model/ChatTeamInfo';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { PinMessageComponent } from '../view/PinMessageComponent';
@@ -26,11 +27,11 @@ import {
 } from '../common/MessageHelper';
 import { V2NIMConversationType, V2NIMErrorCode, V2NIMMessageType } from '@nimsdk/base';
 import pasteboard from '@ohos.pasteboard';
-import { ChatKitClient } from '@nimkit/chatkit/src/main/ets/ChatKitClient';
-import { ChatRepo } from '@nimkit/chatkit/src/main/ets/repo/ChatRepo';
+import { ChatKitClient } from '@nimkit/chatkit';
+import { ChatRepo } from '@nimkit/chatkit';
 import { TextMessageDetailDialog } from '../view/TextMessageDetailDialog';
-import { ConversationSelectParam } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectParam';
-import { ConversationSelectModel } from '@nimkit/chatkit/src/main/ets/model/ConversationSelectModel';
+import { ConversationSelectParam } from '@nimkit/chatkit';
+import { ConversationSelectModel } from '@nimkit/chatkit';
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog';
 import { ChatPinViewModel } from '../viewmodel/ChatPinViewModel';
 import {
@@ -296,7 +297,7 @@ export struct PinMessagePage {
       this.imagesIndexModel = imageModel
       this.imageViewerDialog.open()
     } catch (err) {
-      console.log(err)
+      Logger.info('ChatKitUI', err)
     }
   }
 

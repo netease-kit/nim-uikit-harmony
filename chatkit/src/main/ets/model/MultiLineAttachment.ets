@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { multiLineMessageCustomType } from '../constant/Constant';
 import { V2NIMMessage, V2NIMMessageAttachment, V2NIMMessageType } from '@nimsdk/base';
 
@@ -26,6 +27,16 @@ export interface MultiLineAttachment {
   data: MultiLineAttachmentData;
 }
 
+export const MULTI_LINE_TITLE_MAX_LENGTH: number = 20
+
+export function normalizeMultiLineTitle(title: string): string {
+  if (!title) {
+    return ''
+  }
+  const singleLineTitle = title.replace(/\r\n/g, '').replace(/[\r\n]/g, '')
+  return singleLineTitle.substring(0, MULTI_LINE_TITLE_MAX_LENGTH)
+}
+
 /**
  * 解析换行消息附件
  * @param attachmentStr 附件 JSON 字符串
@@ -42,7 +53,7 @@ export function parseMultiLineAttachment(attachmentStr: string | undefined): Mul
     }
     return null;
   } catch (e) {
-    console.error(`parseMultiLineAttachment failed: ${e}`);
+    Logger.error('ChatKit', `parseMultiLineAttachment failed: ${e}`);
     return null;
   }
 }
@@ -54,10 +65,11 @@ export function parseMultiLineAttachment(attachmentStr: string | undefined): Mul
  * @returns 附件 JSON 字符串
  */
 export function createMultiLineAttachment(title: string, body: string): string {
+  const normalizedTitle = normalizeMultiLineTitle(title)
   const attachment: MultiLineAttachment = {
     type: multiLineMessageCustomType,
     data: {
-      title,
+      title: normalizedTitle,
       body
     }
   };

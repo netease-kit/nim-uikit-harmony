@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { MergeDetailMessageComponent } from '../view/MessageComponent';
 import { NEEmojiManager } from '../manager/NEEmojiManager';
@@ -83,7 +84,7 @@ export struct MergeMessageDetailPage {
       this.imagesIndexModel = imageModel
       this.imageViewerDialog.open()
     } catch (err) {
-      console.log(err)
+      Logger.info('ChatKitUI', err)
     }
   }
 
@@ -110,9 +111,9 @@ export struct MergeMessageDetailPage {
     };
     // 拉起地点详情页
     sceneMap.queryLocation(getContext(this) as common.UIAbilityContext, queryLocationOptions).then(() => {
-      console.info("netease QueryLocation", "Succeeded in querying location.");
+      Logger.info('ChatKitUI', "netease QueryLocation", "Succeeded in querying location.");
     }).catch((err: BusinessError) => {
-      console.error("netease QueryLocation", `Failed to query Location, code: ${err.code}, message: ${err.message}`);
+      Logger.error('ChatKitUI', "netease QueryLocation", `Failed to query Location, code: ${err.code}, message: ${err.message}`);
     });
   }
 

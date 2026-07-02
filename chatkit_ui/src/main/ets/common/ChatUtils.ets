@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import { filePreview } from '@kit.PreviewKit';
 import { BusinessError, systemDateTime } from '@kit.BasicServicesKit';
 import { NEChatMoreOperationData, NEChatMoreOperationType } from '../model/NEChatMoreOperationData';
@@ -23,6 +24,7 @@ import { MessageOperationItem, MessageOperationType } from '../model/MessageOper
 import { ChatConst } from '../constants/ChatConst';
 import {
   ChatKitClient,
+  AIUserManager,
   getTopStickyPermissionMode,
   hasTopStickyPermission,
   IMKitConfigCenter,
@@ -30,6 +32,7 @@ import {
 } from '@nimkit/chatkit';
 import { ChatKitConfig } from '../ChatKitConfig';
 import { isSupportMessage } from '../common/MessageHelper';
+import { canShowAISearchForMessageType } from '../aisearchkit/AISearchMenuUtils';
 
 
 export function openFileWithApp(fileUri: string, fileName: string, fileExt: string, context: Context) {
@@ -43,9 +46,9 @@ export function openFileWithApp(fileUri: string, fileName: string, fileExt: stri
     mimeType: getOpenFileType(fileExt)
   };
   filePreview.openPreview(context, fileInfo, displayInfo).then(() => {
-    console.info('Succeeded in opening preview');
+    Logger.info('ChatKitUI', 'Succeeded in opening preview');
   }).catch((err: BusinessError) => {
-    console.error(`Failed to open preview, err.code = ${err.code}, err.message = ${err.message}`);
+    Logger.error('ChatKitUI', `Failed to open preview, err.code = ${err.code}, err.message = ${err.message}`);
   });
 }
 
@@ -62,9 +65,9 @@ export function showLocationDetail(msg: NIMMessageInfo, context: common.UIAbilit
   };
   // 拉起地点详情页
   sceneMap.queryLocation(context, queryLocationOptions).then(() => {
-    console.info("netease QueryLocation", "Succeeded in querying location.");
+    Logger.info('ChatKitUI', "netease QueryLocation", "Succeeded in querying location.");
   }).catch((err: BusinessError) => {
-    console.error("netease QueryLocation", `Failed to query Location, code: ${err.code}, message: ${err.message}`);
+    Logger.error('ChatKitUI', "netease QueryLocation", `Failed to query Location, code: ${err.code}, message: ${err.message}`);
   });
 }
 
@@ -99,6 +102,15 @@ export function setupMoreOperationData(isP2P: boolean, isBot: boolean = false) {
     callOperationData.type = NEChatMoreOperationType.Call;
     callOperationData.imageSource = "app.media.ic_public_chat_call";
     operationMoreDataList.push(callOperationData);
+  }
+
+  // 翻译
+  if (IMKitConfigCenter.enableAI && AIUserManager.getAITranslateUser()) {
+    const translateOperationData = new NEChatMoreOperationData();
+    translateOperationData.operationTitle = $r("app.string.chat_ai_translate_action");
+    translateOperationData.type = NEChatMoreOperationType.Translate;
+    translateOperationData.imageSource = "app.media.ic_chat_translate_action";
+    operationMoreDataList.push(translateOperationData);
   }
 
   return operationMoreDataList
@@ -208,6 +220,14 @@ export function isCharacterEmoji(str: string): boolean {
 
 export function getOperateMenu(operateMsg: NIMMessageInfo | undefined, topMsg?: NIMMessageInfo | undefined): MessageOperationItem[] {
   let operationMoreDataList: MessageOperationItem[] = []
+  if (operateMsg?.isAIStreamInProgress()) {
+    return []
+  }
+  if (operateMsg !== undefined &&
+    operateMsg.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED) {
+    operationMoreDataList.push(buildDeleteMenuItem())
+    return operationMoreDataList
+  }
   let localExtension = operateMsg?.message.localExtension;
   if (localExtension == undefined || !localExtension.includes(ChatConst.revokeLocalKey)) {
 
@@ -275,11 +295,7 @@ export function getOperateMenu(operateMsg: NIMMessageInfo | undefined, topMsg?: 
 
     }
 
-    let deleteItem = new MessageOperationItem()
-    deleteItem.operationType = MessageOperationType.Delete;
-    deleteItem.operationText = $r('app.string.chat_operation_delete');
-    deleteItem.operationImage = $r('app.media.ic_chat_menu_delete');
-    operationMoreDataList.push(deleteItem);
+    operationMoreDataList.push(buildDeleteMenuItem());
 
     if (operateMsg !== undefined &&
       operateMsg.message.sendingState == V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SUCCEEDED
@@ -296,7 +312,7 @@ export function getOperateMenu(operateMsg: NIMMessageInfo | undefined, topMsg?: 
 
     // 多选选项：发送中的消息不支持多选
     if (operateMsg !== undefined &&
-      operateMsg.message.sendingState !== V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SENDING) {
+      operateMsg.canOperateInMultiSelect()) {
       let selectItem = new MessageOperationItem()
       selectItem.operationType = MessageOperationType.Select;
       selectItem.operationText = $r('app.string.chat_operation_multi_select');
@@ -347,86 +363,68 @@ export function getOperateMenu(operateMsg: NIMMessageInfo | undefined, topMsg?: 
       translateItem.operationImage = $r('app.media.ic_chat_menu_translate');
       operationMoreDataList.push(translateItem);
     }
+
+    if (canShowAISearchForMessage(operateMsg)) {
+      appendAISearchMenuItem(operationMoreDataList)
+    }
   }
 
   return operationMoreDataList
 }
 
+function buildDeleteMenuItem(): MessageOperationItem {
+  let deleteItem = new MessageOperationItem()
+  deleteItem.operationType = MessageOperationType.Delete;
+  deleteItem.operationText = $r('app.string.chat_operation_delete');
+  deleteItem.operationImage = $r('app.media.ic_chat_menu_delete');
+  return deleteItem
+}
+
+export function isAISearchEnabled(): boolean {
+  return IMKitConfigCenter.enableAI && IMKitConfigCenter.enableAIWordSearch &&
+    AIUserManager.getAISearchUser() !== undefined
+}
+
+export function canShowAISearchForMessage(msg: NIMMessageInfo | undefined): boolean {
+  if (!msg) {
+    return false
+  }
+  return isAISearchEnabled() && canShowAISearchForMessageType(msg.getMessageType(), msg.isMultiLineMsg)
+}
+
+export function appendAISearchMenuItem(items: MessageOperationItem[]): void {
+  if (!isAISearchEnabled()) {
+    return
+  }
+  let aiSearchItem = new MessageOperationItem()
+  aiSearchItem.operationType = MessageOperationType.AISearch
+  aiSearchItem.operationText = $r('app.string.chat_ai_search')
+  aiSearchItem.operationImage = $r('app.media.ic_chat_ai_search')
+  items.push(aiSearchItem)
+}
+
+export function getSelectedTextOperateMenu(text: string): MessageOperationItem[] {
+  const operationMoreDataList: MessageOperationItem[] = []
+  if (text.length === 0) {
+    return operationMoreDataList
+  }
+
+  let copyItem = new MessageOperationItem()
+  copyItem.operationType = MessageOperationType.Copy
+  copyItem.operationText = $r('app.string.chat_operation_copy')
+  copyItem.operationImage = $r('app.media.ic_chat_menu_copy')
+  operationMoreDataList.push(copyItem)
+
+  appendAISearchMenuItem(operationMoreDataList)
+  return operationMoreDataList
+}
+
+export function getOperateMenuCount(msgInfo: NIMMessageInfo | undefined, topMsg?: NIMMessageInfo | undefined): number {
+  return getOperateMenu(msgInfo, topMsg).length
+}
+
 export function getOperateMenuSize(msgInfo: NIMMessageInfo | undefined) {
-  let count = 0
-  if (msgInfo == undefined) {
-    return count
-  }
-  let localExtension = msgInfo?.message.localExtension;
-  if (localExtension == undefined || !localExtension.includes(ChatConst.revokeLocalKey)) {
-    // 语音消息且发送成功时，添加播放模式切换选项
-    if (msgInfo.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO &&
-      msgInfo.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SUCCEEDED) {
-      count++
-    }
-    // 删除
-    count++
-    if (msgInfo.isServerAntiSpam === false) {
-      // 多选
-      count++
-    }
-    // 文本消息和多行消息 (type=102) 都支持复制
-    if (msgInfo !== undefined &&
-      (msgInfo.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ||
-        msgInfo.isMultiLineMsg)) {
-      // 复制
-      count++
-    }
-
-    if (msgInfo.message.sendingState == V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SUCCEEDED
-      && isSupportMessage(msgInfo)) {
-
-      if (msgInfo.message.messageType !== V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
-        // 回复
-        count++
-        // 收藏（仅当收藏功能开启时）
-        if (IMKitConfigCenter.enableCollection) {
-          count++
-        }
-        if (msgInfo.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT || msgInfo.isMultiLineMsg) {
-          // 翻译
-          count++
-          // 转发
-          count++
-          // 标记（仅当标记功能开启时）
-          if (IMKitConfigCenter.enablePin) {
-            count++
-          }
-        } else if (msgInfo.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
-          // 标记（仅当标记功能开启时）
-          if (IMKitConfigCenter.enablePin) {
-            count++
-          }
-          // 语音转文字（未转换过）
-          if (!msgInfo.voiceToText) {
-            count++
-          }
-        } else {
-          // 转发
-          count++
-          // 标记（仅当标记功能开启时）
-          if (IMKitConfigCenter.enablePin) {
-            count++
-          }
-        }
-
-        if (msgInfo.getMessageType() !== V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL &&
-          systemDateTime.getTime() - msgInfo.message.createTime < ChatKitConfig.messageRevokeTimeLimit
-          && msgInfo.message.senderId == ChatKitClient.getLoginUserId()) {
-          // 撤回
-          count++;
-        }
-      }
-    }
-
-
-  }
-  return count
+  return getOperateMenuCount(msgInfo)
 }
 
 /**
@@ -440,6 +438,14 @@ export function computeOperateViewWidth(msg: NIMMessageInfo | undefined): number
 
 export function computeOperateViewHeight(msg: NIMMessageInfo | undefined): number {
   return ChatConst.menuItemHeight * (Math.ceil(getOperateMenuSize(msg) / ChatConst.menuItemColumnNum))
+}
+
+export function computeOperateViewWidthByCount(itemCount: number): number {
+  return ChatConst.menuItemWidth * Math.min(itemCount, ChatConst.menuItemColumnNum)
+}
+
+export function computeOperateViewHeightByCount(itemCount: number): number {
+  return ChatConst.menuItemHeight * (Math.ceil(itemCount / ChatConst.menuItemColumnNum))
 }
 
 export function getTranslationOperateMenu(): MessageOperationItem[] {
@@ -462,6 +468,8 @@ export function getTranslationOperateMenu(): MessageOperationItem[] {
   hideItem.operationText = $r('app.string.chat_translation_action_hide')
   hideItem.operationImage = $r('app.media.ic_chat_menu_translate_hide')
   operationMoreDataList.push(hideItem)
+
+  appendAISearchMenuItem(operationMoreDataList)
 
   return operationMoreDataList
 }
@@ -510,12 +518,12 @@ export function getTopStickyMenuItem(operateMsg: NIMMessageInfo | undefined,
     // 当前消息就是已置顶消息 → 取消置顶
     item.operationType = MessageOperationType.UnTopSticky
     item.operationText = $r('app.string.chat_message_un_top_sticky')
-    item.operationImage = $r('app.media.ic_chat_menu_pin')
+    item.operationImage = $r('app.media.ic_chat_pop_untop_sticky')
   } else {
     // 置顶
     item.operationType = MessageOperationType.TopSticky
     item.operationText = $r('app.string.chat_message_top_sticky')
-    item.operationImage = $r('app.media.ic_chat_top_sticky')
+    item.operationImage = $r('app.media.ic_chat_pop_top_sticky')
   }
   return item
 }

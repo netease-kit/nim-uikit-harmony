@@ -5,14 +5,14 @@
  *
  */
 
-import { ViewItemSwitch } from '@nimkit/common/src/main/ets/model/ViewItemSwitch';
+import { ViewItemSwitch } from '@nimkit/common';
 import {
   CommonConstants,
   NavigationBackBuilder,
   ViewItemBuilder
 } from '@nimkit/common';
 import { IMKitConfigCenter } from '@nimkit/chatkit';
-import { ChatKitConfig } from '@nimkit/chatkit_ui/src/main/ets/ChatKitConfig';
+import { ChatKitConfig } from '@nimkit/chatkit_ui';
 import { preferences } from '@kit.ArkData';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { resolveReadMessageEnabled, resolveTeamJoinAgreeModeEnabled } from '../../manager/GlobalConfigStorage';

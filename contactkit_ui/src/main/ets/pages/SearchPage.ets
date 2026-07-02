@@ -5,6 +5,7 @@
  *
  */
 
+import { Logger } from '@nimkit/common';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -40,7 +41,7 @@ export struct SearchPage {
         value.length > 0 && this.viewModel.friendData.length === 0 && this.viewModel.discussData.length === 0 &&
           this.viewModel.seniorData.length === 0
     } catch (err) {
-      console.error(err)
+      Logger.error('ContactKit', err)
     }
   }
 

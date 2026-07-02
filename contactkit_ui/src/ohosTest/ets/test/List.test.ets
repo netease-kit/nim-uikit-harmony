@@ -1,12 +1,14 @@
-/*
- * Copyright (c) 2022 NetEase, Inc. All rights reserved.
- * Use of this source code is governed by a MIT license that can be
- * found in the LICENSE file.
- *
- */
-
 import abilityTest from './Ability.test';
+import localUnitTest from './LocalUnit.test';
+import contactVerifyUnreadTest from './ContactVerifyUnread.test';
+import teamVerifyViewModelTest from './TeamVerifyViewModel.test';
+import teamProfilePageTest from './TeamProfilePage.test';
+import contactModelTest from './ContactModel.test';
+import teamVerifyInfoBeanTest from './TeamVerifyInfoBean.test';
+import contactLogicTest from './ContactLogic.test';
 
 export default function testsuite() {
-  abilityTest();
+  abilityTest(); localUnitTest(); contactVerifyUnreadTest();
+  teamVerifyViewModelTest(); teamProfilePageTest(); contactModelTest();
+  teamVerifyInfoBeanTest(); contactLogicTest();
 }

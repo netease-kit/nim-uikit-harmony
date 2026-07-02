@@ -38,8 +38,9 @@ export class KitReport {
       }, (err, data) => {
         if (!err) {
           console.debug('coreKit server success')
+        } else {
+          console.error('coreKit server failed', JSON.stringify(err))
         }
-        console.debug('coreKit server failed')
       })
 
   }

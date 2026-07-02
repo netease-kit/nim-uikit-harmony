@@ -149,6 +149,14 @@
       "value": "暂无成员"
     },
     {
+      "name": "team_manager_limit_zero_tip",
+      "value": "管理员人数上限为0，无法添加管理员"
+    },
+    {
+      "name": "team_manager_limit_reached_tip",
+      "value": "管理员人数已达上限（%d人）"
+    },
+    {
       "name": "team_dismiss_content",
       "value": "是否解散群聊?"
     },
