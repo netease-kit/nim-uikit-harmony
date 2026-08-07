@@ -50,6 +50,7 @@ import {
   getMultiLineTitle,
   AIUserManager,
   IMKitConfigCenter,
+  isMultiLineMessage,
   MergedMessageAttachment,
   mergedMessageCustomType,
   mergedMessageLimitCount,
@@ -324,12 +325,14 @@ export struct ChatBotSubSessionPage {
   @Local newMessageMap: HashMap<string, V2NIMMessage> = new HashMap() // 和 newMessageCount 同步操作的，用于记录 newMessage 里面有的消息
   // 新增：是否显示滚动到新消息按钮
   @Local showScrollToNewMessageButton: boolean = false;
+  @Local showSubSessionGuide: boolean = false;
   // 新增：是否需要停止录音（用于通知 NEAudioRecordView 停止录音）
   @Local shouldStopRecord: boolean = false;
   // 新增：tipBannerArea 的高度（防诈条+断网条）
   @Local tipBannerHeight: number = 0;
   // 新增：转发弹窗是否打开（用于阻止键盘弹出时自动滚动到底部）
   isForwardDialogOpen: boolean = false;
+  private pendingExpandPanelAfterKeyboardHide: boolean = false
   private singleLineFocusTask: number = -1
   private multiLineFocusTask: number = -1
   private translationFinishedListener: (messageClientId: string) => void = (messageClientId: string) => {
@@ -394,6 +397,7 @@ export struct ChatBotSubSessionPage {
   })
   @Local videoFileUrl?: string
   @Local videoRatio?: number
+  textMessageDetailDialog: CustomDialogController | undefined = undefined
   videoViewerDialog: CustomDialogController = new CustomDialogController({
     builder: VideoViewerDialog({
       videoUrl: this.videoFileUrl,
@@ -456,6 +460,10 @@ export struct ChatBotSubSessionPage {
   })
   topicActionDialog?: CustomDialogController = undefined
   invalidForwardDialogSureAction?: () => void
+  private closeTextMessageDetailDialog(): void {
+    this.textMessageDetailDialog?.close()
+  }
+
   invalidForwardFailureDialog?: CustomDialogController = new CustomDialogController({
     builder: DoubleAlertDialog({
       title: $r('app.string.exception_description'),
@@ -533,6 +541,7 @@ export struct ChatBotSubSessionPage {
       }
 
       this.chatUserInfo.setReceiveMsg(false)
+      this.updateSubSessionGuide()
       this.firstLoadData = false;
     }
   }
@@ -640,15 +649,20 @@ export struct ChatBotSubSessionPage {
       // 正常情况下直接滚动到底部
       this.listScroller.scrollEdge(Edge.Bottom)
     }
-    // 滚动到底部时，对所有消息发送已读回执（因为会滚动到最新，所以传全部消息列表）
-    if (this.newMessageCount > 0) {
-      const allMessages = this.chatUserInfo.msgList.getMessageList()
-      this.chatViewModel.toHandleReceiptMessage(allMessages)
-    }
     // 重置状态
     this.clearNewMessageCount()
     this.showScrollToNewMessageButton = false
     this.isAtBottom = true
+  }
+
+  private updateSubSessionGuide(): void {
+    this.showSubSessionGuide = this.chatViewModel.currentTopic === undefined &&
+      this.chatUserInfo.msgList.totalCount() <= 0
+  }
+
+  private getSubSessionGuideText(): string {
+    return getContext(this).resourceManager.getStringSync($r('app.string.chat_bot_sub_session_guide').id,
+      this.getBotSubtitle())
   }
 
   private handleTranslationFinished(messageClientId: string): void {
@@ -714,6 +728,9 @@ export struct ChatBotSubSessionPage {
     const translateHeight = this.getTranslatePanelHeight()
     if ((this.inputStyle === InputStyleType.Emoji || this.inputStyle === InputStyleType.Record ||
       this.inputStyle === InputStyleType.More || this.inputStyle === InputStyleType.AiHelper) && this.keyboardHeight <= 0) {
+      if (this.inputStyle !== InputStyleType.AiHelper) {
+        this.pendingExpandPanelAfterKeyboardHide = false
+      }
       this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight - this.expandHeight - translateHeight
     } else if (this.inputStyle === InputStyleType.Multiline) {
       // 多行模式：bottomHeight = 0，需要考虑 expandHeight
@@ -729,8 +746,10 @@ export struct ChatBotSubSessionPage {
     } else {
       this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight - translateHeight
       if (this.keyboardHeight > 10) {
-        this.expandHeight = 0
-        this.inputStyle = InputStyleType.None;
+        if (!this.pendingExpandPanelAfterKeyboardHide) {
+          this.expandHeight = 0
+          this.inputStyle = InputStyleType.None;
+        }
         setTimeout(() => {
           // 如果转发弹窗打开或页面不可见，跳过滚动到底部
           if (!this.isForwardDialogOpen && this.chatViewModel.isPageVisible) {
@@ -872,6 +891,10 @@ export struct ChatBotSubSessionPage {
     if (this.translationOperationMode && this.aiSearchSelectionState.isAllSelected()) {
       return getTranslationOperateMenu()
     }
+    if (this.translationOperationMode) {
+      // Hide AI search for translated text
+      return getSelectedTextOperateMenu(this.aiSearchSelectionState.selectedText(), false)
+    }
     if (!this.aiSearchSelectionState.active || this.aiSearchSelectionState.isAllSelected()) {
       return this.filterSubSessionOperationItems(getOperateMenu(this.operationMsg))
     }
@@ -914,6 +937,21 @@ export struct ChatBotSubSessionPage {
   private closeAISearchSelection(): void {
     this.aiSearchSelectionState.close()
     this.aiSearchSelectingMessageId = ''
+  }
+
+  private clearOperationMenuIfMatch(messageClientId?: string): void {
+    if (!messageClientId ||
+      (this.operationMsg?.getMessageClientId() !== messageClientId &&
+        this.aiSearchSelectingMessageId !== messageClientId)) {
+      return
+    }
+    this.showOperationView = false
+    this.operationMsg = undefined
+    this.translatedActionMsg = undefined
+    this.translationOperationMode = false
+    this.operationMenuItems = undefined
+    this.selectedOperationText = ''
+    this.closeAISearchSelection()
   }
 
   private openAISearchSelection(event: GestureEvent, msg: NIMMessageInfo | undefined): boolean {
@@ -1147,13 +1185,24 @@ export struct ChatBotSubSessionPage {
         this.subSessionParam.botName,
         topic
       )
+      this.updateSubSessionGuide()
     })
     this.chatViewModel.setTopicRemovedListener(() => {
       NECommonUtils.showToast($r('app.string.chat_bot_sub_session_removed'))
       this.popWithTopicResult(true)
     })
     this.chatViewModel.init(this.conversationId, this.chatUserInfo);
-    this.chatViewModel.loadData();
+    this.chatViewModel.onOperateMessageInvalid = (messageClientId: string) => {
+      this.clearOperationMenuIfMatch(messageClientId)
+    }
+    this.chatViewModel.loadData()
+      .then(() => {
+        this.updateSubSessionGuide()
+      })
+      .catch((err: BusinessError) => {
+        this.updateSubSessionGuide()
+        Logger.error('ChatKitUI', `ChatBotSubSessionPage loadData error: ${err.code}, ${err.message}`)
+      });
   }
 
   async showImageDetail(msg?: NIMMessageInfo, onlyMsg?: boolean) {
@@ -1199,6 +1248,32 @@ export struct ChatBotSubSessionPage {
     }).catch((err: BusinessError) => {
       Logger.error('ChatKitUI', "netease QueryLocation", `Failed to query Location, code: ${err.code}, message: ${err.message}`);
     });
+  }
+
+  @Builder
+  SubSessionGuideView() {
+    Column() {
+      Image($r('app.media.ic_bot_sub_session_guide'))
+        .width(60)
+        .height(60)
+
+      Text(this.getSubSessionGuideText())
+        .fontSize(24)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#999999')
+        .margin({ top: 24 })
+    }
+    .width('100%')
+    .height(this.scrollHeight - this.bottomMargin - this.tipBannerHeight)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .alignRules({
+      left: { anchor: "__container__", align: HorizontalAlign.Start },
+      right: { anchor: "__container__", align: HorizontalAlign.End },
+      top: { anchor: "tipBannerArea", align: VerticalAlign.Bottom },
+    })
+    .hitTestBehavior(HitTestMode.None)
+    .zIndex(1)
   }
 
   @Builder
@@ -1441,9 +1516,8 @@ export struct ChatBotSubSessionPage {
             }
             this.listScrollEndPosition = end;
             this.listScrollStartPosition = start;
-            // 如果有新消息，发送已读回执
-            if (this.newMessageCount > 0) {
-              // 滑到底部时，对可见范围内的消息发送已读回执
+            // 只按当前可见区发送已读回执，避免把未进入视窗的消息提前标记。
+            if (this.chatViewModel.isPageVisible) {
               const allMessages = this.chatUserInfo.msgList.getMessageList()
               const visibleMessages = allMessages.slice(this.listScrollStartPosition, this.listScrollEndPosition + 1)
               this.chatViewModel.toHandleReceiptMessage(visibleMessages)
@@ -1479,11 +1553,16 @@ export struct ChatBotSubSessionPage {
               }
               // 非多行模式：收起 emoji/more/record/aiHelper 面板
               this.bottomHeight = 105
+              this.pendingExpandPanelAfterKeyboardHide = false
               this.expandHeight = 0;
               this.inputStyle = InputStyleType.None
               this.computeScrollHeight()
             }
           })
+
+          if (this.showSubSessionGuide) {
+            this.SubSessionGuideView()
+          }
 
           Column() {
             if (this.showTranslateView && this.inputStyle !== InputStyleType.Multiline && !this.showMultiSelect) {
@@ -1543,10 +1622,12 @@ export struct ChatBotSubSessionPage {
                 PermissionsUtils.reqPermissionsFromUser(['ohos.permission.MICROPHONE'], context).then((result) => {
                   if (result.grantStatus == true) {
                     if (this.inputStyle == InputStyleType.Record) {
+                      this.pendingExpandPanelAfterKeyboardHide = false
                       this.expandHeight = 0
                       this.inputStyle = InputStyleType.None;
                       this.computeScrollHeight()
                     } else {
+                      this.pendingExpandPanelAfterKeyboardHide = this.keyboardHeight > 10
                       this.inputStyle = InputStyleType.Record
                       this.expandHeight = ChatConst.messageInputAreaHeight
                       this.computeScrollHeight()
@@ -1560,10 +1641,12 @@ export struct ChatBotSubSessionPage {
               onDidClickEmoji: () => {
                 this.showOperationView = false
                 if (this.inputStyle == InputStyleType.Emoji) {
+                  this.pendingExpandPanelAfterKeyboardHide = false
                   this.expandHeight = 0
                   this.inputStyle = InputStyleType.None;
                   this.computeScrollHeight()
                 } else {
+                  this.pendingExpandPanelAfterKeyboardHide = this.keyboardHeight > 10
                   this.inputStyle = InputStyleType.Emoji
                   this.expandHeight = ChatConst.messageInputAreaHeight
                   this.computeScrollHeight()
@@ -1572,10 +1655,12 @@ export struct ChatBotSubSessionPage {
               onDidClickMore: () => {
                 this.showOperationView = false
                 if (this.inputStyle == InputStyleType.More) {
+                  this.pendingExpandPanelAfterKeyboardHide = false
                   this.expandHeight = 0
                   this.inputStyle = InputStyleType.None;
                   this.computeScrollHeight()
                 } else {
+                  this.pendingExpandPanelAfterKeyboardHide = this.keyboardHeight > 10
                   this.inputStyle = InputStyleType.More
                   this.expandHeight = ChatConst.messageInputAreaHeight
                   this.computeScrollHeight()
@@ -1663,6 +1748,7 @@ export struct ChatBotSubSessionPage {
               showAIUserAit: this.canAitAIUser(),
               showTeamMemberAit: false,
               aiUsers: this.getAIChatUsers(),
+              enableAIHelper: false,
               inputStyle: this.inputStyle
             }).alignRules({
               left: { anchor: "chat_input", align: HorizontalAlign.Start },
@@ -2053,9 +2139,12 @@ export struct ChatBotSubSessionPage {
                   this.showDialogToRevoke(this.operationMsg)
                 } else if (item.operationType == MessageOperationType.Forward) {
                   // 转发
+                  // Keep forward content consistent during selection
+                  const useTranslatedText = this.translationOperationMode
+                  const translatedText = useTranslatedText ?
+                    MessageTranslationService.instance.getTranslatedDisplayText(this.operationMsg) : ''
                   this.forwardMessageAction = (selectedList: ConversationSelectModel[]) => {
-                    if (this.translationOperationMode) {
-                      const translatedText = MessageTranslationService.instance.getTranslatedDisplayText(this.operationMsg!)
+                    if (useTranslatedText) {
                       if (translatedText.length === 0) {
                         return
                       }
@@ -2202,10 +2291,12 @@ export struct ChatBotSubSessionPage {
       this.chatViewModel.isPageVisible = true
       // 重置录音停止信号
       this.shouldStopRecord = false
-      // 回到页面时，只对可见范围内的消息发送已读回执
-      const allMessages = this.chatUserInfo.msgList.getMessageList()
-      const visibleMessages = allMessages.slice(this.listScrollStartPosition, this.listScrollEndPosition + 1)
-      this.chatViewModel.toHandleReceiptMessage(visibleMessages)
+      if (!this.firstLoadData) {
+        // 首屏滚动位置未稳定时不发回执，等列表完成首屏定位后再按可见区处理。
+        const allMessages = this.chatUserInfo.msgList.getMessageList()
+        const visibleMessages = allMessages.slice(this.listScrollStartPosition, this.listScrollEndPosition + 1)
+        this.chatViewModel.toHandleReceiptMessage(visibleMessages)
+      }
     })
     .onHidden(() => {
       // 页面隐藏时设置为不可见
@@ -2522,10 +2613,14 @@ export struct ChatBotSubSessionPage {
    */
   showMessageDetail(msg: NIMMessageInfo | undefined, onlyShow?: boolean) {
     if (msg) {
-      if (onlyShow && msg.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
-        let textMessageDetailDialog: CustomDialogController = new CustomDialogController({
+      if (onlyShow &&
+        (msg.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT || isMultiLineMessage(msg.message))) {
+        this.textMessageDetailDialog = new CustomDialogController({
           builder: TextMessageDetailDialog({
-            message: msg
+            message: msg,
+            onClose: () => {
+              this.closeTextMessageDetailDialog()
+            }
           }),
           cornerRadius: 0,
           alignment: DialogAlignment.Center,
@@ -2534,7 +2629,7 @@ export struct ChatBotSubSessionPage {
           width: '100%',
           customStyle: true
         })
-        textMessageDetailDialog.open()
+        this.textMessageDetailDialog.open()
       }
       if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
         this.showImageDetail(msg, onlyShow)
@@ -2807,6 +2902,7 @@ export struct ChatBotSubSessionPage {
   aboutToDisappear(): void {
     MessageTranslationService.instance.removeTranslationFinishedListener(this.translationFinishedListener)
     this.chatViewModel.clearUnreadCount()
+    this.chatViewModel.onOperateMessageInvalid = undefined
     this.chatViewModel.onDestroy()
     AudioPlayerManager.instance.stopPlayAll()
     

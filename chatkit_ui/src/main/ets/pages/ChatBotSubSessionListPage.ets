@@ -178,6 +178,14 @@ export struct ChatBotSubSessionListPage {
           .layoutWeight(1)
           .height(40)
           .padding({ left: 0, right: 0, top: 0, bottom: 0 })
+          .cancelButton({
+            style: CancelButtonStyle.INPUT,
+            icon: {
+              src: $r('app.media.input_clean'),
+              size: 16,
+              color: '#B3B7BC'
+            }
+          })
           .onChange((value: string) => {
             this.viewModel.search(value)
           })
@@ -308,7 +316,7 @@ export struct ChatBotSubSessionListPage {
             fontSize: 16,
             normalFontColor: '#1F2329',
             highlightFontColor: '#337EFF',
-            showFullText: true
+            showFullText: false
           })
             .layoutWeight(1)
 

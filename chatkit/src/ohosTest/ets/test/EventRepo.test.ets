@@ -10,10 +10,11 @@ import { UserEventRepo } from '../../../main/ets/repo/UserEventRepo';
 import { FriendEventRepo } from '../../../main/ets/repo/FriendEventRepo';
 import { TeamEventRepo } from '../../../main/ets/repo/TeamEventRepo';
 import { ConversationEventRepo } from '../../../main/ets/repo/ConversationEventRepo';
+import { ConversationGroupEventRepo } from '../../../main/ets/repo/ConversationGroupEventRepo';
 import { V2NIMDataSyncType, V2NIMDataSyncState, V2NIMError,
   V2NIMConnectStatus, V2NIMLoginStatus, V2NIMUser, V2NIMFriend,
   V2NIMFriendAddApplication, V2NIMFriendAddRejection, V2NIMTeam,
-  V2NIMTeamMember } from '@nimsdk/base';
+  V2NIMTeamMember, V2NIMConversation, V2NIMConversationGroup } from '@nimsdk/base';
 
 export default function EventRepoTest() {
   describe('LoginEventRepo', () => {
@@ -124,6 +125,32 @@ export default function EventRepoTest() {
       ConversationEventRepo.onCloudTotalUnreadCountChanged(cb);
       ConversationEventRepo.offCloudTotalUnreadCountChanged(cb);
       expect(true).assertTrue();
+    });
+  });
+
+  describe('ConversationGroupEventRepo', () => {
+    it('should_register_conversation_group_events', 0, () => {
+      const groupCb = (group: V2NIMConversationGroup): void => {};
+      const deleteCb = (groupId: string): void => {};
+      const addCb = (groupId: string, conversations: V2NIMConversation[]): void => {};
+      const removeCb = (groupId: string, conversationIds: string[]): void => {};
+
+      const created = ConversationGroupEventRepo.onConversationGroupCreated(groupCb);
+      const changed = ConversationGroupEventRepo.onConversationGroupChanged(groupCb);
+      const deleted = ConversationGroupEventRepo.onConversationGroupDeleted(deleteCb);
+      const added = ConversationGroupEventRepo.onConversationsAddedToGroup(addCb);
+      const removed = ConversationGroupEventRepo.onConversationsRemovedFromGroup(removeCb);
+
+      expect(created !== undefined).assertTrue();
+      expect(changed !== undefined).assertTrue();
+      expect(deleted !== undefined).assertTrue();
+      expect(added !== undefined).assertTrue();
+      expect(removed !== undefined).assertTrue();
+      created();
+      changed();
+      deleted();
+      added();
+      removed();
     });
   });
 }

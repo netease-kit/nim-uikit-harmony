@@ -223,11 +223,6 @@ export function getOperateMenu(operateMsg: NIMMessageInfo | undefined, topMsg?: 
   if (operateMsg?.isAIStreamInProgress()) {
     return []
   }
-  if (operateMsg !== undefined &&
-    operateMsg.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED) {
-    operationMoreDataList.push(buildDeleteMenuItem())
-    return operationMoreDataList
-  }
   let localExtension = operateMsg?.message.localExtension;
   if (localExtension == undefined || !localExtension.includes(ChatConst.revokeLocalKey)) {
 
@@ -301,7 +296,8 @@ export function getOperateMenu(operateMsg: NIMMessageInfo | undefined, topMsg?: 
       operateMsg.message.sendingState == V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SUCCEEDED
       && isSupportMessage(operateMsg) && operateMsg.message.messageType !== V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL
       && systemDateTime.getTime() - operateMsg.message.createTime < ChatKitConfig.messageRevokeTimeLimit
-      && operateMsg.message.senderId == ChatKitClient.getLoginUserId()) {
+      // Only show revoke for messages shown as mine
+      && operateMsg.getDisplaySenderId() == ChatKitClient.getLoginUserId()) {
 
       let undoItem = new MessageOperationItem()
       undoItem.operationImage = $r('app.media.ic_chat_menu_revoke');
@@ -355,6 +351,8 @@ export function getOperateMenu(operateMsg: NIMMessageInfo | undefined, topMsg?: 
     if (operateMsg !== undefined &&
       operateMsg.isReceiveMessage() &&
       operateMsg.message.sendingState == V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SUCCEEDED
+      // Hide translate for revoke notices
+      && !operateMsg.isRevokeMsg
       && (operateMsg.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT || operateMsg.isMultiLineMsg)
     ) {
       let translateItem = new MessageOperationItem()
@@ -403,7 +401,7 @@ export function appendAISearchMenuItem(items: MessageOperationItem[]): void {
   items.push(aiSearchItem)
 }
 
-export function getSelectedTextOperateMenu(text: string): MessageOperationItem[] {
+export function getSelectedTextOperateMenu(text: string, allowAISearch: boolean = true): MessageOperationItem[] {
   const operationMoreDataList: MessageOperationItem[] = []
   if (text.length === 0) {
     return operationMoreDataList
@@ -415,7 +413,9 @@ export function getSelectedTextOperateMenu(text: string): MessageOperationItem[]
   copyItem.operationImage = $r('app.media.ic_chat_menu_copy')
   operationMoreDataList.push(copyItem)
 
-  appendAISearchMenuItem(operationMoreDataList)
+  if (allowAISearch) {
+    appendAISearchMenuItem(operationMoreDataList)
+  }
   return operationMoreDataList
 }
 
@@ -469,8 +469,6 @@ export function getTranslationOperateMenu(): MessageOperationItem[] {
   hideItem.operationImage = $r('app.media.ic_chat_menu_translate_hide')
   operationMoreDataList.push(hideItem)
 
-  appendAISearchMenuItem(operationMoreDataList)
-
   return operationMoreDataList
 }
 
@@ -509,7 +507,10 @@ export function getTopStickyMenuItem(operateMsg: NIMMessageInfo | undefined,
   if (operateMsg.message.conversationType !== V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
     return undefined
   }
-  if (operateMsg.message.sendingState !== V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SUCCEEDED) {
+  const errorCode = operateMsg.message.messageStatus?.errorCode
+  // Keep messages shown as failed out of top sticky actions.
+  if (operateMsg.message.sendingState !== V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SUCCEEDED ||
+    (errorCode !== undefined && errorCode !== 200) || operateMsg.isServerAntiSpam) {
     return undefined
   }
 

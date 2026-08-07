@@ -4,8 +4,9 @@
  * found in the LICENSE file.
  *
  */
-import { DisposableBag, FriendEventRepo, TeamEventRepo, TeamMemberWithUser, TeamRepo } from '@nimkit/chatkit'
+import { DisposableBag, FriendEventRepo, IMKitConfigCenter, NEAIUserCache, TeamEventRepo, TeamMemberWithUser, TeamRepo } from '@nimkit/chatkit'
 import { TeamMemberSelectorMode } from '@nimkit/chatkit'
+import { Logger } from '@nimkit/common'
 import {
   V2NIMFriend,
   V2NIMQueryDirection,
@@ -41,6 +42,9 @@ export class TeamMemberSelectorViewModel {
   // 是否正在搜索
   @Trace isSearching: boolean = false
   private disposableBag: DisposableBag = new DisposableBag()
+  private hasLoadedAIUsers: boolean = false
+  private aiUsersLoadingPromise: Promise<void> | undefined = undefined
+  private selectorSessionId: number = 0
 
   /**
    * 初始化
@@ -52,6 +56,9 @@ export class TeamMemberSelectorViewModel {
     this.teamId = teamId
     this.selectLimit = selectLimit
     this.mode = mode
+    this.hasLoadedAIUsers = false
+    this.aiUsersLoadingPromise = undefined
+    this.selectorSessionId += 1
     this.initMemberChangeListener()
   }
 
@@ -104,8 +111,11 @@ export class TeamMemberSelectorViewModel {
       return
     }
     if (this.teamId) {
+      const currentSessionId = this.selectorSessionId
+      const currentTeamId = this.teamId
       try {
-        let result = await TeamRepo.getTeamMembers(this.teamId,
+        await this.ensureAIUsersLoaded()
+        let result = await TeamRepo.getTeamMembers(currentTeamId,
           V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, {
             roleQueryType: this.showManager ? undefined :
               V2NIMTeamMemberRoleQueryType.V2NIM_TEAM_MEMBER_ROLE_QUERY_TYPE_NORMAL,
@@ -113,10 +123,10 @@ export class TeamMemberSelectorViewModel {
             nextToken: this.nextToken,
             direction: V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_ASC
           })
-        if (result) {
+        if (result && this.isCurrentSession(currentSessionId, currentTeamId)) {
           this.isFinish = result.finished
           this.nextToken = result.nextToken
-          this.memberList.push(...result.memberList)
+          this.memberList.push(...this.filterVisibleMembers(result.memberList))
         }
       } catch (e) {
 
@@ -174,11 +184,10 @@ export class TeamMemberSelectorViewModel {
 
   onTeamMemberJoined(members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
+      const currentSessionId = this.selectorSessionId
+      const currentTeamId = this.teamId
       let accIds = members.map(m => m.accountId)
-      TeamRepo.getTeamMembersByIds(this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
-        accIds).then((newMembers) => {
-        this.memberList.push(...newMembers)
-      })
+      this.appendJoinedMembers(currentSessionId, currentTeamId, accIds)
     }
   }
 
@@ -207,6 +216,7 @@ export class TeamMemberSelectorViewModel {
   }
 
   onDestroy() {
+    this.selectorSessionId += 1
     this.disposableBag.dispose()
   }
 
@@ -293,5 +303,52 @@ export class TeamMemberSelectorViewModel {
       return this.searchResultList
     }
     return this.memberList
+  }
+
+  private isCurrentSession(sessionId: number, teamId: string): boolean {
+    return this.selectorSessionId === sessionId && this.teamId === teamId
+  }
+
+  private async appendJoinedMembers(currentSessionId: number, currentTeamId: string, accIds: string[]): Promise<void> {
+    try {
+      const newMembers = await TeamRepo.getTeamMembersByIds(currentTeamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, accIds)
+      await this.ensureAIUsersLoaded()
+      if (!this.isCurrentSession(currentSessionId, currentTeamId)) {
+        return
+      }
+      this.memberList.push(...this.filterVisibleMembers(newMembers))
+    } catch (e) {
+      Logger.error('TeamKit', e)
+    }
+  }
+
+  private async ensureAIUsersLoaded(): Promise<void> {
+    if (this.mode !== TeamMemberSelectorMode.ADD_MANAGER || !IMKitConfigCenter.enableAI || this.hasLoadedAIUsers) {
+      return
+    }
+    if (!this.aiUsersLoadingPromise) {
+      const loadingPromise = (async (): Promise<void> => {
+        try {
+          await NEAIUserCache.getInstance().load()
+          this.hasLoadedAIUsers = true
+        } catch (e) {
+          this.hasLoadedAIUsers = false
+          Logger.error('TeamKit', e)
+        }
+      })()
+      this.aiUsersLoadingPromise = loadingPromise.finally(() => {
+        this.aiUsersLoadingPromise = undefined
+      })
+    }
+    await this.aiUsersLoadingPromise
+  }
+
+  private filterVisibleMembers(members: TeamMemberWithUser[]): TeamMemberWithUser[] {
+    if (this.mode !== TeamMemberSelectorMode.ADD_MANAGER || !IMKitConfigCenter.enableAI) {
+      return members
+    }
+    // 加管理员时不展示数字人。
+    return members.filter((member: TeamMemberWithUser): boolean =>
+      NEAIUserCache.getAIUser(member.getAccId()) === undefined)
   }
 }

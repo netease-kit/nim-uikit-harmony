@@ -16,6 +16,7 @@ import {
   AIUserManager,
   IMKitConfigCenter,
   LocalConversationRepo,
+  NEFriendUserCache,
   SettingRepo,
   UserEventRepo
 } from '@nimkit/chatkit';
@@ -102,14 +103,16 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
   }
   onFriendInfoChangedFun = (friendInfo: V2NIMFriend) => {
     if (friendInfo.accountId == this.chatUserInfo?.targetId) {
+      NEFriendUserCache.getInstance().updateFriendInfo({ friend: friendInfo })
       this.chatUserInfo?.updateConversationName()
-      this.chatUserInfo?.setChatFriend(friendInfo)
+      this.chatUserInfo?.msgList.notifyDataReload()
     }
   }
-  onFriendInfoDeleteFun = (accountId: string, deletionType?: V2NIMFriendDeletionType) => {
+  onFriendInfoDeleteFun = (accountId: string, _deletionType?: V2NIMFriendDeletionType) => {
     if (accountId == this.chatUserInfo?.targetId) {
+      NEFriendUserCache.getInstance().removeFriendInfo(accountId)
       this.chatUserInfo?.updateConversationName()
-      this.chatUserInfo?.setChatFriend(undefined)
+      this.chatUserInfo?.msgList.notifyDataReload()
     }
   }
 
@@ -129,12 +132,10 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
 
   toHandleReceiveMessage(messages: NIMMessageInfo[]): void {
     this.getUserInfoWithMessage(messages)
-    this.toHandleReceiptMessage(messages)
   }
 
   toHandleQueryMessage(messages: NIMMessageInfo[], originMsg: V2NIMMessage[]): void {
     this.getUserInfoWithMessage(messages)
-    this.toHandleReceiptMessage(messages)
   }
 
   toHandleDataSyncFinished(): void {
@@ -174,7 +175,8 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
   }
 
   async getUserInfo() {
-    const userList = await ContactRepo.getUserList([this.targetId, ChatKitClient.getLoginUserId()]);
+    const userList = await ContactRepo.getUserList([this.targetId, ChatKitClient.getLoginUserId()])
+    const friendList = await ContactRepo.getFriendByIds([this.targetId])
     if (userList.length > 1) {
       let currentUser = userList[0].accountId == this.targetId ? userList[1] : userList[0];
       let chatUser = userList[0].accountId == this.targetId ? userList[0] : userList[1];
@@ -186,6 +188,12 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
       this.chatUserInfo?.setCurrentUser(currentUser);
       this.chatUserInfo?.setChatUser(chatUser);
     }
+    const targetFriend = friendList.find((item) => item.accountId === this.targetId)
+    // Keep friend alias ready before P2P sender names render
+    if (targetFriend) {
+      NEFriendUserCache.getInstance().updateFriendInfo({ friend: targetFriend })
+    }
+    this.chatUserInfo?.updateConversationName()
   }
 
   private getUserInfoWithMessage(messages: NIMMessageInfo[]) {

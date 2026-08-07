@@ -8,8 +8,6 @@
 import { ChatKitClient, TeamRepo } from '@nimkit/chatkit'
 import {
   AvatarColorUntil,
-  AvatarItem,
-  CommonAvatar,
   NavigationBackBuilder,
   NECommonUtils,
   TextEditParams
@@ -24,10 +22,17 @@ import {
 import { TeamInfoViewModel } from '../viewModel/TeamInfoViewModel'
 import { AvatarEditParams } from './TeamAvatarPage'
 
+export interface TeamInfoPageParam {
+  teamInfo: V2NIMTeam
+  teamAvatar: string
+  onTeamAvatarChanged?: (avatar: string) => void
+}
+
 @ComponentV2
 struct TeamInfoPage {
   pathStack: NavPathStack = new NavPathStack()
   @Local viewModel: TeamInfoViewModel = new TeamInfoViewModel()
+  onTeamAvatarChanged?: (avatar: string) => void
 
   build() {
     NavDestination() {
@@ -35,7 +40,7 @@ struct TeamInfoPage {
         title: $r('app.string.team_info'),
         backgroundColor: '#ffEFF1F4',
         leftButtonAction: () => {
-          this.pathStack.pop()
+          this.pathStack.pop(this.viewModel.teamAvatar)
         }
       })
       if (this.viewModel.teamInfo) {
@@ -47,18 +52,39 @@ struct TeamInfoPage {
 
             Blank().layoutWeight(1)
 
-            CommonAvatar({
-              item: new AvatarItem(
-                this.viewModel.teamInfo?.avatar,
-                this.viewModel.teamInfo?.name,
-                AvatarColorUntil.getBackgroundColorById(this.viewModel.teamInfo?.teamId)
-              )
-            })
+            if (this.viewModel.teamAvatar) {
+              Image(this.viewModel.teamAvatar)
+                .width(42)
+                .height(42)
+                .draggable(false)
+                .objectFit(ImageFit.Cover)
+                .syncLoad(false)
+                .borderRadius(20)
+                .margin({
+                  right: 12
+                })
+            } else {
+              Stack() {
+                Text(this.viewModel.teamInfo.name)
+                  .fontSize(14)
+                  .fontColor('#ffFFFFFF')
+                  .ellipsisMode(EllipsisMode.END)
+                  .textAlign(TextAlign.Center)
+                  .margin({
+                    left: 6,
+                    right: 6
+                  })
+                  .width('100%')
+                  .maxLines(1)
+              }
               .width(42)
               .height(42)
+              .backgroundColor(AvatarColorUntil.getBackgroundColorById(this.viewModel.teamInfo.teamId))
+              .borderRadius(20)
               .margin({
                 right: 12
               })
+            }
 
             Image($r('app.media.arrow_right'))
               .width(4.92)
@@ -129,10 +155,22 @@ struct TeamInfoPage {
     .backgroundColor('#ffEFF1F4')
     .onReady((context: NavDestinationContext) => {
       this.pathStack = context.pathStack
-      let teamInfo = context.pathStack.getParamByName('TeamInfoPage')[0] as V2NIMTeam
-      this.viewModel.initTeamData(teamInfo)
+      const param = context.pathStack.getParamByName('TeamInfoPage')[0] as TeamInfoPageParam | V2NIMTeam
+      if (this.isTeamInfoPageParam(param)) {
+        const routeParam = param as TeamInfoPageParam
+        this.onTeamAvatarChanged = routeParam.onTeamAvatarChanged
+        this.viewModel.initTeamData(routeParam.teamInfo, routeParam.teamAvatar)
+      } else {
+        // Keep existing callers that pass V2NIMTeam directly working.
+        this.viewModel.initTeamData(param as V2NIMTeam)
+      }
       this.viewModel.getMineTeamMember()
     })
+  }
+
+  private isTeamInfoPageParam(param?: TeamInfoPageParam | V2NIMTeam): boolean {
+    // NavPathStack may return a plain object without the original class prototype.
+    return !!param && typeof (param as TeamInfoPageParam).teamInfo === 'object'
   }
 
   //修改群名称
@@ -181,7 +219,7 @@ struct TeamInfoPage {
       param: params,
       onPop: (popInfo: PopInfo) => {
         let teamDesc = popInfo.result as string | undefined
-        if (teamDesc) {
+        if (teamDesc !== undefined) {
           let params: V2NIMUpdateTeamInfoParams = {
             intro: teamDesc
           }
@@ -209,7 +247,7 @@ struct TeamInfoPage {
   //修改群头像
   goToEditTeamAvatar() {
     const param: AvatarEditParams = {
-      avatar: this.viewModel.teamInfo?.avatar ?? '',
+      avatar: this.viewModel.teamAvatar,
       showSave: this.havePermissionToEditTeamInfo()
     }
     this.pathStack.pushPath({
@@ -218,20 +256,29 @@ struct TeamInfoPage {
       onPop: (popInfo: PopInfo) => {
         let teamAvatar = popInfo.result as string | undefined
         if (teamAvatar) {
+          const previousAvatar = this.viewModel.teamAvatar
+          // Keep the info page showing the new avatar before SDK callback arrives.
+          this.applyLocalTeamAvatar(teamAvatar)
           let params: V2NIMUpdateTeamInfoParams = {
             avatar: teamAvatar
           }
           TeamRepo.updateTeamInfo(
             this.viewModel.teamInfo?.teamId,
-            V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
+            this.viewModel.teamInfo?.teamType ?? V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
             params
           ).catch((e: Error) => {
+            this.applyLocalTeamAvatar(previousAvatar)
             ChatKitClient.logger?.debug(`update team info error:${e.message}`)
             NECommonUtils.showToast($r('app.string.common_operate_failed'))
           })
         }
       }
     })
+  }
+
+  applyLocalTeamAvatar(avatar: string) {
+    this.viewModel.applyLocalTeamAvatar(avatar)
+    this.onTeamAvatarChanged?.(avatar)
   }
 
   aboutToDisappear(): void {

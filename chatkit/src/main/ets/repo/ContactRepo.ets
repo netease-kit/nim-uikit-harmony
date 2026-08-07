@@ -276,9 +276,7 @@ export class ContactRepo {
    */
   static async getFriendList(): Promise<V2NIMFriend[]> {
     let friendList = await ChatKitClient.nim.friendService?.getFriendList() ?? []
-    if (AppStorage.get<NEFriendUserCache>(NEFriendUserCache.name)) {
-      NEFriendUserCache.getInstance().loadFriendList(friendList)
-    }
+    NEFriendUserCache.getInstance().loadFriendList(friendList)
 
     ContactRepo.initalFriendLetter(friendList)
     return friendList
@@ -300,8 +298,13 @@ export class ContactRepo {
    */
   static async getUserWithFriendByIds(accountIds: string[]): Promise<NEUserWithFriend[]> {
     let userWithFriends: NEUserWithFriend[] = []
+    const loginUserId = ChatKitClient.getLoginUserId()
+    const friendUserCache = NEFriendUserCache.getInstance()
     const users = await ContactRepo.getUserListFromCloud(accountIds)
     const friends = await ContactRepo.getFriendByIds(accountIds)
+    const canUpdateFriendCache = loginUserId.length > 0 &&
+      loginUserId === ChatKitClient.getLoginUserId() &&
+      NEFriendUserCache.peekInstance() === friendUserCache
 
     let friendsMap: Map<string, NEUserWithFriend> = new Map<string, NEUserWithFriend>()
     for (const friend of friends) {
@@ -319,8 +322,8 @@ export class ContactRepo {
         friend: friend,
         user: user
       })
-      if (friend) {
-        NEFriendUserCache.getInstance().updateFriendInfo({
+      if (friend && canUpdateFriendCache) {
+        friendUserCache.updateFriendInfo({
           friendUser: userWithFriend
         })
       }

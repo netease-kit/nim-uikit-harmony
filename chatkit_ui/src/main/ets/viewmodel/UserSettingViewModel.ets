@@ -18,7 +18,7 @@ export class UserSettingViewModel {
   @Trace conversationId: string = "";
   accountId: string = "";
   //是否消息通知
-  @Trace isMessageNotify: boolean = false
+  @Trace isMessageNotify: boolean = true
   //是否置顶
   @Trace isStickTop: boolean = false
   //是否显示 AI 数字人 PIN 置顶开关
@@ -43,15 +43,25 @@ export class UserSettingViewModel {
       if (IMKitConfigCenter.enableLocalConversation) {
         const conversation = await LocalConversationRepo.getConversation(this.conversationId)
         this.isStickTop = conversation?.stickTop ?? false
-        this.isMessageNotify = !(conversation?.mute ?? false)
       } else {
         const conversation = await ConversationRepo.getConversation(this.conversationId)
         this.isStickTop = conversation?.stickTop ?? false
-        this.isMessageNotify = !(conversation?.mute ?? false)
       }
 
     } catch (err) {
       Logger.error('ChatKitUI', err)
+    }
+
+    await this.getP2PMessageNotify()
+  }
+
+  private async getP2PMessageNotify() {
+    try {
+      const muteMode = await SettingRepo.getP2PMessageMuteMode(this.accountId)
+      this.isMessageNotify = muteMode !== V2NIMP2PMessageMuteMode.V2NIM_P2P_MESSAGE_MUTE_MODE_ON
+    } catch (err) {
+      Logger.error('ChatKitUI', err)
+      this.isMessageNotify = true
     }
   }
 
@@ -73,7 +83,7 @@ export class UserSettingViewModel {
   }
 
   /**
-   * 设置群消息是否通知
+   * 设置 P2P 消息是否通知
    * @param isOn
    */
   async setP2PNotify(isOn: boolean) {

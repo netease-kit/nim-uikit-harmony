@@ -41,10 +41,8 @@ export struct TranslationSettingPage {
         return $r('app.string.translation_lang_ru')
       case TranslationLanguageCode.PT:
         return $r('app.string.translation_lang_pt')
-      case TranslationLanguageCode.AR:
-        return $r('app.string.translation_lang_ar')
-      case TranslationLanguageCode.HI:
-        return $r('app.string.translation_lang_hi')
+      case TranslationLanguageCode.IT:
+        return $r('app.string.translation_lang_it')
       case TranslationLanguageCode.VI:
         return $r('app.string.translation_lang_vi')
       case TranslationLanguageCode.TH:

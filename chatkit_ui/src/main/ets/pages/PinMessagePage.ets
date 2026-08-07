@@ -199,6 +199,9 @@ export struct PinMessagePage {
   @Local forwardMessages: NIMMessageInfo[] = []
   @Local forwardConversations: ConversationSelectModel[] = []
   @Local currentConversationName?: string
+  private closeTextMessageDetailDialog(): void {
+    this.textMessageDetailDialog?.close()
+  }
   forwardMessageDialog = new CustomDialogController({
     builder: ForwardMessageDialog({
       conversationList: this.forwardConversations,
@@ -233,7 +236,10 @@ export struct PinMessagePage {
   })
   textMessageDetailDialog: CustomDialogController = new CustomDialogController({
     builder: TextMessageDetailDialog({
-      message: this.tapMessage
+      message: this.tapMessage,
+      onClose: () => {
+        this.closeTextMessageDetailDialog()
+      }
     }),
     cornerRadius: 0,
     alignment: DialogAlignment.Center,

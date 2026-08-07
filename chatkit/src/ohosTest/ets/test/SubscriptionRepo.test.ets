@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from '@ohos/hypium';
-import { V2NIMLoginStatus } from '@nimsdk/base';
+import { V2NIMLoginClientType, V2NIMLoginStatus, V2NIMUserStatus } from '@nimsdk/base';
 import { SubscriptionRepo } from '../../../main/ets/repo/SubscriptionRepo';
 
 export default function subscriptionRepoTest() {
@@ -15,6 +15,16 @@ export default function subscriptionRepoTest() {
       SubscriptionRepo.subscriptionArray = [];
       SubscriptionRepo.subscriptionInFlightSet.clear();
     };
+
+    const makeUserStatus = (accountId: string, statusType: number, serverExtension?: string): V2NIMUserStatus => {
+      return {
+        accountId,
+        statusType,
+        clientType: V2NIMLoginClientType.V2NIM_LOGIN_CLIENT_TYPE_PC,
+        publishTime: 0,
+        serverExtension
+      } as V2NIMUserStatus
+    }
 
     it('should_keep_cached_online_state_during_temporary_unlogin_status', 0, async () => {
       resetSubscriptionRepo();
@@ -60,6 +70,48 @@ export default function subscriptionRepoTest() {
       expect(SubscriptionRepo.getOnlineState('friendA')).assertUndefined();
       expect(SubscriptionRepo.subscriptionArray.length).assertEqual(0);
       expect(SubscriptionRepo.subscriptionInFlightSet.size).assertEqual(0);
+    });
+
+    it('should_mark_custom_status_user_online_when_server_extension_contains_online_clients', 0, () => {
+      resetSubscriptionRepo();
+
+      SubscriptionRepo.applyUserStatusChanged([
+        makeUserStatus('friendA', 10001, '{"online":[16]}')
+      ])
+
+      expect(SubscriptionRepo.getOnlineState('friendA')).assertTrue();
+    });
+
+    it('should_mark_user_offline_when_server_extension_online_list_is_empty', 0, () => {
+      resetSubscriptionRepo();
+
+      SubscriptionRepo.applyUserStatusChanged([
+        makeUserStatus('friendA', 1, '{"online":[]}')
+      ])
+
+      expect(SubscriptionRepo.getOnlineState('friendA')).assertFalse();
+    });
+
+    it('should_fallback_to_status_type_when_server_extension_is_missing', 0, () => {
+      resetSubscriptionRepo();
+
+      SubscriptionRepo.applyUserStatusChanged([
+        makeUserStatus('friendA', 1),
+        makeUserStatus('friendB', 10001)
+      ])
+
+      expect(SubscriptionRepo.getOnlineState('friendA')).assertTrue();
+      expect(SubscriptionRepo.getOnlineState('friendB')).assertFalse();
+    });
+
+    it('should_ignore_invalid_server_extension_and_fallback_to_status_type', 0, () => {
+      resetSubscriptionRepo();
+
+      SubscriptionRepo.applyUserStatusChanged([
+        makeUserStatus('friendA', 1, 'not-json')
+      ])
+
+      expect(SubscriptionRepo.getOnlineState('friendA')).assertTrue();
     });
   });
 }

@@ -13,6 +13,7 @@ import { sensor } from '@kit.SensorServiceKit';
 import { CommonConstants } from '@nimkit/common';
 import { IMKitConfigCenter } from '@nimkit/chatkit';
 
+@ObservedV2
 export class AudioPlayerManager {
   static logTag: string = 'AudioPlayerManager'
   static instance: AudioPlayerManager = new AudioPlayerManager()
@@ -20,7 +21,9 @@ export class AudioPlayerManager {
   onFinish?: () => void
   avPlayer?: media.AVPlayer
   //正在播放的URL
-  playingUrl?: string
+  @Trace playingUrl?: string
+  // 正在播放的消息 clientId
+  @Trace playingMessageClientId?: string
   //audioRender
   audioRenderer?: audio.AudioRenderer
   // 距离传感器是否已注册
@@ -139,6 +142,7 @@ export class AudioPlayerManager {
         case 'stopped': // stop接口成功调用后触发该状态机上报
           Logger.debug('ChatKitUI', `${AudioPlayerManager.logTag}`, 'AVPlayer state stopped called.');
           avPlayer.reset(); // 调用reset接口初始化avplayer状态
+          this.clearPlayingTarget()
           if (this.onFinish) {
             this.onFinish()
           }
@@ -155,6 +159,7 @@ export class AudioPlayerManager {
     // 监听interrupt
     avPlayer.on('audioInterrupt', (interruptEvent) => {
       Logger.debug('ChatKitUI', `${AudioPlayerManager.logTag} audioInterrupt ${interruptEvent}`)
+      this.clearPlayingTarget()
       if (this.onFinish) {
         this.onFinish()
       }
@@ -163,26 +168,28 @@ export class AudioPlayerManager {
 
   //设置语言播放设备
   async setAudioPlayDevice() {
-    let audioStreamInfo: audio.AudioStreamInfo = {
-      samplingRate: audio.AudioSamplingRate.SAMPLE_RATE_44100,
-      channels: audio.AudioChannel.CHANNEL_1,
-      sampleFormat: audio.AudioSampleFormat.SAMPLE_FORMAT_S16LE,
-      encodingType: audio.AudioEncodingType.ENCODING_TYPE_RAW
-    };
-
-    let audioRendererInfo: audio.AudioRendererInfo = {
-      usage: audio.StreamUsage.STREAM_USAGE_VOICE_MESSAGE,
-      rendererFlags: 0
-    };
-
-    let audioRendererOptions: audio.AudioRendererOptions = {
-      streamInfo: audioStreamInfo,
-      rendererInfo: audioRendererInfo
-    };
-
-
-    this.audioRenderer = await audio.createAudioRenderer(audioRendererOptions)
     let earpieceOpen = AppStorage.get<boolean>(CommonConstants.KEY_SETTING_EARPIECE_MODE)
+    if (!this.audioRenderer || this.audioRenderer.state === audio.AudioState.STATE_RELEASED) {
+      let audioStreamInfo: audio.AudioStreamInfo = {
+        samplingRate: audio.AudioSamplingRate.SAMPLE_RATE_44100,
+        channels: audio.AudioChannel.CHANNEL_1,
+        sampleFormat: audio.AudioSampleFormat.SAMPLE_FORMAT_S16LE,
+        encodingType: audio.AudioEncodingType.ENCODING_TYPE_RAW
+      };
+
+      let audioRendererInfo: audio.AudioRendererInfo = {
+        usage: audio.StreamUsage.STREAM_USAGE_VOICE_MESSAGE,
+        rendererFlags: 0
+      };
+
+      let audioRendererOptions: audio.AudioRendererOptions = {
+        streamInfo: audioStreamInfo,
+        rendererInfo: audioRendererInfo
+      };
+
+      this.audioRenderer = await audio.createAudioRenderer(audioRendererOptions)
+    }
+
     Logger.info('ChatKitUI', `${AudioPlayerManager.logTag} , earpieceOpen = ${earpieceOpen}`)
     await this.audioRenderer.setDefaultOutputDevice((earpieceOpen ?? false) ? audio.DeviceType.EARPIECE :
     audio.DeviceType.SPEAKER)
@@ -192,14 +199,24 @@ export class AudioPlayerManager {
 
   }
 
+  private clearPlayingTarget() {
+    this.playingUrl = undefined
+    this.playingMessageClientId = undefined
+  }
+
+  isMessagePlaying(messageClientId?: string): boolean {
+    return !!messageClientId && this.playingMessageClientId === messageClientId && this.isPlaying()
+  }
+
 
   // 通过url设置网络地址来实现播放直播码流
   async avPlayerLive(url: string, onStart?: () => void,
-    onFinish?: () => void) {
+    onFinish?: () => void, messageClientId?: string) {
     await this.setAudioPlayDevice()
     // 创建avPlayer实例对象
     if (!this.avPlayer) {
       this.avPlayer = await media.createAVPlayer();
+      this.setAVPlayerCallback(this.avPlayer);
     }
 
     if (this.onFinish) {
@@ -210,7 +227,7 @@ export class AudioPlayerManager {
     if (this.playingUrl === url
       && (this.avPlayer?.state === 'prepared' ||
         this.avPlayer?.state === 'playing')) {
-      this.playingUrl = undefined
+      this.clearPlayingTarget()
       await this.avPlayer?.reset()
       // 停止播放时注销距离传感器
       this.unregisterProximitySensor()
@@ -219,6 +236,7 @@ export class AudioPlayerManager {
 
     await this.avPlayer?.reset()
     this.playingUrl = url
+    this.playingMessageClientId = messageClientId
 
     // 包装 onStart 回调，在播放开始时注册距离传感器
     this.onStart = () => {
@@ -238,8 +256,6 @@ export class AudioPlayerManager {
       }
     }
 
-    // 创建状态机变化回调函数
-    this.setAVPlayerCallback(this.avPlayer);
     this.avPlayer.url = url
   }
 
@@ -250,6 +266,7 @@ export class AudioPlayerManager {
     if (this.onFinish) {
       this.onFinish()
     }
+    this.clearPlayingTarget()
     await this.avPlayer?.reset()
     await this.audioRenderer?.stop()
     this.audioRenderer = undefined

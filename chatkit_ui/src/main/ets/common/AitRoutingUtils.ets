@@ -6,11 +6,18 @@
  */
 
 import { InputStyleType } from '../view/ChatInputView'
+import { V2NIMAIUser } from '@nimsdk/base'
+import { TeamMemberCache } from '@nimkit/chatkit'
 
 export enum AitInsertTarget {
   None = 0,
   SingleLine = 1,
   MultiLine = 2,
+}
+
+export interface AitCandidate {
+  accountId: string
+  displayName: string
 }
 
 export function resolveAvatarLongPressAitTarget(
@@ -30,4 +37,24 @@ export function resolveAvatarLongPressAitAccountId(displaySenderId: string | und
     return undefined
   }
   return displaySenderId
+}
+
+export async function resolveAitCandidateByAccountId(accountId: string,
+  aiUsers: V2NIMAIUser[]): Promise<AitCandidate | undefined> {
+  const aiUser = aiUsers.find(aiUser => aiUser.accountId === accountId)
+  if (aiUser) {
+    return {
+      accountId: aiUser.accountId,
+      displayName: aiUser.name ?? aiUser.accountId
+    }
+  }
+
+  const member = await TeamMemberCache.getInstance().getMemberById(accountId)
+  if (member) {
+    return {
+      accountId: member.getAccId(),
+      displayName: member.getAitName()
+    }
+  }
+  return undefined
 }

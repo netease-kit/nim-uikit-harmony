@@ -6,3 +6,7 @@
  */
 
 export { ConversationPage, LocalConversationPage } from './src/main/ets/pages/ConversationPage'
+export { ConversationGroupManagePage } from './src/main/ets/pages/ConversationGroupManagePage'
+export { ConversationGroupNameEditPage } from './src/main/ets/pages/ConversationGroupNameEditPage'
+export { ConversationGroupSelectConversationPage } from './src/main/ets/pages/ConversationGroupSelectConversationPage'
+export { ConversationGroupSettingPage } from './src/main/ets/pages/ConversationGroupSettingPage'

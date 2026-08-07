@@ -4,7 +4,6 @@
  * found in the LICENSE file.
  *
  */
-
 import { NEEmojiManager, NEEmojiParseResult } from '../manager/NEEmojiManager';
 import { ChatAitNode } from '../model/ChatAitNode';
 import { getAitNodes, parseMessageText } from './MessageHelper';
@@ -82,7 +81,7 @@ export function collectRichInputTransferNodes(
 
     const imageSpan = span as RichEditorImageSpanResult
     const resourcePath = imageSpan.valueResourceStr?.toString()
-    if (resourcePath && resourcePath.length > 0) {
+    if (resourcePath && resourcePath.replaceAll(' ', '').length > 0) {
       const segments = resourcePath.split('/')
       const fileName = segments[segments.length - 1]
       const emoji = NEEmojiManager.instance.getEmojiByName(fileName)

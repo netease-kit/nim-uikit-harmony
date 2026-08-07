@@ -9,6 +9,9 @@ import { StorageRepo } from '../../../main/ets/repo/StorageRepo';
 import { AIRepo } from '../../../main/ets/repo/AIRepo';
 import { UserAIBotManager } from '../../../main/ets/manager/UserAIBotManager';
 import { ConversationIdUtilRepo } from '../../../main/ets/repo/ConversationIdUtilRepo';
+import { ConversationGroupRepo } from '../../../main/ets/repo/ConversationGroupRepo';
+import { ChatKitClient } from '../../../main/ets/ChatKitClient';
+import { NIMInterface, V2NIMConversationFilter } from '@nimsdk/base';
 
 export default function ServiceRepoTest() {
   describe('ChatRepo', () => {
@@ -39,6 +42,35 @@ export default function ServiceRepoTest() {
       const count: number | undefined = ConversationRepo.getTotalUnreadCount();
       expect(true).assertTrue();
     });
+    it('should_not_throw_when_safe_unread_filter_subscription_api_throws', 0, () => {
+      const originalNim = ChatKitClient.nim;
+      let subscribeCalled = false;
+      let unsubscribeCalled = false;
+      ChatKitClient.nim = {
+        conversationService: {
+          subscribeUnreadCountByFilter: (_filter: V2NIMConversationFilter): void => {
+            subscribeCalled = true;
+            throw new Error('not login');
+          },
+          unsubscribeUnreadCountByFilter: (_filter: V2NIMConversationFilter): void => {
+            unsubscribeCalled = true;
+            throw new Error('not login');
+          }
+        }
+      } as NIMInterface;
+
+      try {
+        const subscribeResult = ConversationRepo.safeSubscribeUnreadCountByFilter({ ignoreMuted: true });
+        const unsubscribeResult = ConversationRepo.safeUnsubscribeUnreadCountByFilter({ ignoreMuted: true });
+
+        expect(subscribeCalled).assertTrue();
+        expect(unsubscribeCalled).assertTrue();
+        expect(subscribeResult).assertFalse();
+        expect(unsubscribeResult).assertFalse();
+      } finally {
+        ChatKitClient.nim = originalNim;
+      }
+    });
   });
 
   describe('SmallRepo_existence', () => {
@@ -51,6 +83,9 @@ export default function ServiceRepoTest() {
     it('should_access_ConversationIdUtilRepo', 0, () => {
       expect(ConversationIdUtilRepo !== undefined).assertTrue();
     });
+    it('should_access_ConversationGroupRepo', 0, () => {
+      expect(ConversationGroupRepo !== undefined).assertTrue();
+    });
     it('should_access_SettingRepo', 0, () => {
       expect(SettingRepo !== undefined).assertTrue();
     });
@@ -62,6 +97,38 @@ export default function ServiceRepoTest() {
     });
     it('should_access_UserAIBotManager', 0, () => {
       expect(UserAIBotManager !== undefined).assertTrue();
+    });
+  });
+
+  describe('ConversationGroupRepo', () => {
+    it('should_not_throw_when_safe_unread_filter_subscription_api_throws', 0, () => {
+      const originalNim = ChatKitClient.nim;
+      let subscribeCalled = false;
+      let unsubscribeCalled = false;
+      ChatKitClient.nim = {
+        conversationService: {
+          subscribeUnreadCountByFilter: (_filter: V2NIMConversationFilter): void => {
+            subscribeCalled = true;
+            throw new Error('not login');
+          },
+          unsubscribeUnreadCountByFilter: (_filter: V2NIMConversationFilter): void => {
+            unsubscribeCalled = true;
+            throw new Error('not login');
+          }
+        }
+      } as NIMInterface;
+
+      try {
+        const subscribeResult = ConversationGroupRepo.safeSubscribeUnreadCountByGroupId('groupA');
+        const unsubscribeResult = ConversationGroupRepo.safeUnsubscribeUnreadCountByGroupId('groupA');
+
+        expect(subscribeCalled).assertTrue();
+        expect(unsubscribeCalled).assertTrue();
+        expect(subscribeResult).assertFalse();
+        expect(unsubscribeResult).assertFalse();
+      } finally {
+        ChatKitClient.nim = originalNim;
+      }
     });
   });
 }

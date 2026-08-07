@@ -405,6 +405,10 @@
       "value": "%s 标记了这条信息"
     },
     {
+      "name": "chat_pin_message_suffix",
+      "value": " 标记了这条信息"
+    },
+    {
       "name": "chat_team_all_mute",
       "value": "当前群主设置为禁言"
     },
@@ -1079,6 +1083,10 @@
     {
       "name": "chat_bot_sub_session_summary_video",
       "value": "[视频消息]"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_robot",
+      "value": "[机器人消息]"
     },
     {
       "name": "chat_bot_sub_session_summary_message",

@@ -12,6 +12,9 @@ import { V2NIMLoginStatus, V2NIMUserStatus, V2NIMUserStatusSubscribeResult } fro
 import { ChatKitClient } from '../ChatKitClient';
 import { subscriptionOnlineStateDuration } from '../constant/Constant';
 
+interface SubscriptionOnlineExtension {
+  online?: number[]
+}
 
 @ObservedV2
 export class SubscriptionRepo {
@@ -162,10 +165,14 @@ export class SubscriptionRepo {
     SubscriptionRepo.subscriptionInFlightSet.clear();
   }
 
-  private static onUserStatusChangedFun = (userStatusList: V2NIMUserStatus[]): void => {
-    userStatusList.forEach((value: V2NIMUserStatus, index: number, array: V2NIMUserStatus[]) => {
-      SubscriptionRepo.onlineStateMap.set(value.accountId, value.statusType === 1);
+  static applyUserStatusChanged(userStatusList: V2NIMUserStatus[]): void {
+    userStatusList.forEach((value: V2NIMUserStatus): void => {
+      SubscriptionRepo.onlineStateMap.set(value.accountId, SubscriptionRepo.resolveOnlineState(value));
     })
+  }
+
+  private static onUserStatusChangedFun = (userStatusList: V2NIMUserStatus[]): void => {
+    SubscriptionRepo.applyUserStatusChanged(userStatusList)
   }
 
   static addListener() {
@@ -195,6 +202,34 @@ export class SubscriptionRepo {
     if (index > -1) {
       SubscriptionRepo.subscriptionArray.splice(index, 1);
     }
+  }
+
+  private static resolveOnlineState(userStatus: V2NIMUserStatus): boolean {
+    const serverOnlineState: boolean | undefined = SubscriptionRepo.parseOnlineStateFromServerExtension(userStatus.serverExtension)
+    if (typeof serverOnlineState === 'boolean') {
+      return serverOnlineState
+    }
+    return userStatus.statusType === 1
+  }
+
+  private static parseOnlineStateFromServerExtension(serverExtension?: string): boolean | undefined {
+    if (!serverExtension || serverExtension.length === 0) {
+      return undefined
+    }
+
+    try {
+      const parsed: SubscriptionOnlineExtension = JSON.parse(serverExtension) as SubscriptionOnlineExtension
+      if (parsed !== undefined && parsed !== null && typeof parsed === 'object') {
+        const online: number[] | undefined = parsed.online
+        if (Array.isArray(online)) {
+          return online.length > 0
+        }
+      }
+    } catch (_e) {
+      return undefined
+    }
+
+    return undefined
   }
 
   static async resubscribe() {

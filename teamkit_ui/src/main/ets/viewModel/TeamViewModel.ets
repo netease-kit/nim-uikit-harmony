@@ -39,6 +39,7 @@ import { TeamMemberWithUser } from '@nimkit/chatkit';
 @ObservedV2
 export class TeamSettingViewModel {
   @Trace team?: V2NIMTeam
+  @Trace displayAvatar: string = ''
   @Trace teamMemberList: TeamMemberWithUser[] = []
   teamId: string
   teamType: V2NIMTeamType = V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL
@@ -52,6 +53,8 @@ export class TeamSettingViewModel {
   private disposableBag: DisposableBag = new DisposableBag()
   private readonly cloudConversationStrategy: CloudConversationStrategy = new CloudConversationStrategy()
   private readonly localConversationStrategy: LocalConversationStrategy = new LocalConversationStrategy()
+  private teamInfoRequestVersion: number = 0
+  private displayAvatarVersion: number = 0
 
   constructor(teamId: string) {
     this.teamId = teamId
@@ -121,7 +124,7 @@ export class TeamSettingViewModel {
 
   onTeamInfoUpdated(team: V2NIMTeam) {
     if (team.teamId === this.teamId) {
-      this.team = team
+      this.getTeamInfo(team)
     }
   }
 
@@ -205,10 +208,10 @@ export class TeamSettingViewModel {
   }
 
   initTeamInfo() {
+    this.destroy()
     this.getTeamInfo();
     this.getConversationInfo();
     this.getTeamMember();
-    this.destroy()
     this.disposableBag.addAll([
       TeamEventRepo.onTeamSyncFinished((): void => {
         this.onSyncFinished()
@@ -245,10 +248,27 @@ export class TeamSettingViewModel {
    * @param teamId
    * @returns
    */
-  async getTeamInfo() {
+  async getTeamInfo(callbackTeam?: V2NIMTeam) {
+    const requestVersion = ++this.teamInfoRequestVersion
+    const avatarVersion = this.displayAvatarVersion
     TeamRepo.getTeamInfo(this.teamId, this.teamType).then((team) => {
-      this.team = team
+      if (requestVersion !== this.teamInfoRequestVersion) {
+        return
+      }
+      const finalTeam = team ?? callbackTeam
+      if (!finalTeam) {
+        return
+      }
+      this.team = finalTeam
+      if (avatarVersion === this.displayAvatarVersion) {
+        this.displayAvatar = finalTeam.avatar ?? callbackTeam?.avatar ?? this.displayAvatar
+      }
     })
+  }
+
+  applyLocalTeamAvatar(avatar: string) {
+    this.displayAvatarVersion += 1
+    this.displayAvatar = avatar
   }
 
   /**
@@ -258,8 +278,22 @@ export class TeamSettingViewModel {
     this.getConversationStrategy().getConversation(ConversationIdUtilRepo.teamConversationId(this.teamId))
       .then((conversation) => {
         this.isStickTop = conversation?.stickTop ?? false
-        this.isMessageNotify = !(conversation?.mute ?? false)
       })
+      .catch((e: Error) => {
+        ChatKitClient.logger?.debug(`TeamSettingViewModel getConversationInfo error = ${e.message}`)
+      })
+    this.getTeamMessageNotify()
+  }
+
+  private async getTeamMessageNotify() {
+    try {
+      const muteMode = await SettingRepo.getTeamMessageMuteMode(this.teamId, this.teamType)
+      this.isMessageNotify = muteMode === undefined ||
+        muteMode === V2NIMTeamMessageMuteMode.V2NIM_TEAM_MESSAGE_MUTE_MODE_OFF
+    } catch (e) {
+      ChatKitClient.logger?.debug(`TeamSettingViewModel getTeamMessageNotify error = ${e}`)
+      this.isMessageNotify = true
+    }
   }
 
   /**
@@ -327,6 +361,7 @@ export class TeamSettingViewModel {
   }
 
   destroy() {
+    this.teamInfoRequestVersion += 1
     this.disposableBag.dispose()
   }
 

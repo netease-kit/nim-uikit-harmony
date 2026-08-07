@@ -32,6 +32,7 @@ import {
   V2NIMTextTranslationResult,
   V2NIMTeamMessageReadReceipt,
   V2NIMTeamMessageReadReceiptDetail,
+  V2NIMThreadMessageListResult,
   V2NIMVoiceToTextParams
 } from '@nimsdk/base';
 import { ChatKitClient } from '../ChatKitClient';
@@ -197,6 +198,15 @@ export class ChatRepo {
   static async getMessageListByRefers(messageRefers: V2NIMMessageRefer[]): Promise<V2NIMMessage[]> {
     let messageList = await ChatKitClient.nim.messageService!!.getMessageListByRefers(messageRefers)
     return messageList ?? [];
+  }
+
+  /**
+   * 从本地查询 Thread 消息列表
+   * @param message 根消息引用
+   * @returns Thread 根消息及本地回复列表
+   */
+  static async getLocalThreadMessageList(message: V2NIMMessageRefer): Promise<V2NIMThreadMessageListResult> {
+    return await ChatKitClient.nim.messageService!!.getLocalThreadMessageList(message)
   }
 
   /**

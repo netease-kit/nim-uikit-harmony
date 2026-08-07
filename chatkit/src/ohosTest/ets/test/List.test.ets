@@ -16,6 +16,7 @@ import serviceRepoTest from './ServiceRepo.test';
 import aiUserManagerTest from './AIUserManager.test';
 import loggerTest from './Logger.test';
 import subscriptionRepoTest from './SubscriptionRepo.test';
+import conversationGroupDisplayConfigStoreTest from './ConversationGroupDisplayConfigStore.test';
 
 export default function testsuite() {
   abilityTest(); localUnitTest(); deferredStartupTaskTest();
@@ -24,4 +25,5 @@ export default function testsuite() {
   customMessageUtilsTest(); utilsAndAitTest(); topStickyTest();
   multiLineTest(); eventRepoTest(); serviceRepoTest();
   aiUserManagerTest(); loggerTest(); subscriptionRepoTest();
+  conversationGroupDisplayConfigStoreTest();
 }

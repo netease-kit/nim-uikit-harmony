@@ -87,6 +87,186 @@
     {
       "name": "fraud_tip_content",
       "value": "For Yunxin IM feature experience only. Do not trust remittance, prize, or other money-related messages. Avoid calling unknown numbers and stay alert for scams."
+    },
+    {
+      "name": "conversation_group_manage_title",
+      "value": "Conversation Groups"
+    },
+    {
+      "name": "conversation_group_default_all",
+      "value": "All"
+    },
+    {
+      "name": "conversation_group_default_ait",
+      "value": "@Me"
+    },
+    {
+      "name": "conversation_group_default_unread",
+      "value": "Unread"
+    },
+    {
+      "name": "conversation_group_create_action",
+      "value": "New Group"
+    },
+    {
+      "name": "conversation_group_visible_section",
+      "value": "Pinned Groups"
+    },
+    {
+      "name": "conversation_group_hidden_section",
+      "value": "Hidden Groups"
+    },
+    {
+      "name": "conversation_group_hidden_empty",
+      "value": "No hidden groups"
+    },
+    {
+      "name": "conversation_group_create_title",
+      "value": "New Group"
+    },
+    {
+      "name": "conversation_group_rename_title",
+      "value": "Rename Group"
+    },
+    {
+      "name": "conversation_group_name_placeholder",
+      "value": "Set group name"
+    },
+    {
+      "name": "conversation_group_name_empty_tips",
+      "value": "Group name cannot be empty"
+    },
+    {
+      "name": "conversation_group_limit_tips",
+      "value": "Conversation group limit exceeded"
+    },
+    {
+      "name": "conversation_group_save_failed",
+      "value": "Save failed. Try again"
+    },
+    {
+      "name": "conversation_group_done",
+      "value": "Done"
+    },
+    {
+      "name": "conversation_group_confirm",
+      "value": "Confirm"
+    },
+    {
+      "name": "conversation_group_name_item",
+      "value": "Group Name"
+    },
+    {
+      "name": "conversation_group_setting_title",
+      "value": "Set Conversation Group"
+    },
+    {
+      "name": "conversation_group_add_conversation",
+      "value": "Add Conversations"
+    },
+    {
+      "name": "conversation_group_add_conversation_title_count",
+      "value": "Add Conversations (%d/%d)"
+    },
+    {
+      "name": "conversation_group_member_section",
+      "value": "Conversations"
+    },
+    {
+      "name": "conversation_group_member_section_count",
+      "value": "(%d)"
+    },
+    {
+      "name": "conversation_group_detail_empty",
+      "value": "No conversations"
+    },
+    {
+      "name": "conversation_group_remove_conversation",
+      "value": "Remove"
+    },
+    {
+      "name": "conversation_group_delete_short",
+      "value": "Delete"
+    },
+    {
+      "name": "conversation_group_remove_failed",
+      "value": "Remove failed. Try again"
+    },
+    {
+      "name": "conversation_group_delete_action",
+      "value": "Delete Group"
+    },
+    {
+      "name": "conversation_group_delete_title",
+      "value": "Delete Group"
+    },
+    {
+      "name": "conversation_group_delete_message",
+      "value": "Conversations in this group will not be deleted"
+    },
+    {
+      "name": "conversation_group_delete_failed",
+      "value": "Delete failed. Try again"
+    },
+    {
+      "name": "conversation_group_not_exist_tips",
+      "value": "Conversation group does not exist"
+    },
+    {
+      "name": "conversation_group_cancel",
+      "value": "Cancel"
+    },
+    {
+      "name": "conversation_group_recent_conversation",
+      "value": "Recent Conversations"
+    },
+    {
+      "name": "conversation_group_search_placeholder",
+      "value": "Search conversations"
+    },
+    {
+      "name": "conversation_group_search_empty",
+      "value": "No results"
+    },
+    {
+      "name": "conversation_group_add_empty",
+      "value": "No conversations to add"
+    },
+    {
+      "name": "conversation_group_select_limit_tips",
+      "value": "Select up to 100 conversations"
+    },
+    {
+      "name": "conversation_group_partial_add_failed",
+      "value": "Partial failure"
+    },
+    {
+      "name": "conversation_group_partial_add_success_tips",
+      "value": "Partial failure. Added %s"
+    },
+    {
+      "name": "conversation_group_partial_add_name_separator",
+      "value": ", "
+    },
+    {
+      "name": "conversation_group_partial_add_name_overflow_suffix",
+      "value": " and more"
+    },
+    {
+      "name": "conversation_group_add_failed",
+      "value": "Add failed. Try again"
+    },
+    {
+      "name": "conversation_group_belonged_group_limit_tips",
+      "value": "Conversation belongs to too many groups"
+    },
+    {
+      "name": "conversation_group_conversations_in_group_limit_tips",
+      "value": "Too many conversations in this group"
+    },
+    {
+      "name": "conversation_group_conversation_not_exist_tips",
+      "value": "Conversation does not exist"
     }
   ]
 }

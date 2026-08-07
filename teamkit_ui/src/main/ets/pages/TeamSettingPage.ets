@@ -36,6 +36,7 @@ import {
   TeamSettingParam
 } from '@nimkit/chatkit'
 import { MemberListParams } from './TeamMemberListPage'
+import { TeamInfoPageParam } from './TeamInfoPage'
 
 @ComponentV2
 export struct TeamSettingPage {
@@ -45,7 +46,8 @@ export struct TeamSettingPage {
   //
   // @Local teamMemberList:V2NIMTeamMember[] = []
 
-  teamViewModel?: TeamSettingViewModel
+  @Local teamViewModel?: TeamSettingViewModel
+
   dialogLeaveGroupTeamDialogController: CustomDialogController = new CustomDialogController({
     builder: CommonConfirmDialog({
       title: $r('app.string.team_group_left'),
@@ -87,17 +89,39 @@ export struct TeamSettingPage {
         Column() {
           Column() {
             Row() {
-              CommonAvatar({
-                item: new AvatarItem(this.teamViewModel.team.avatar,
-                  this.teamViewModel.team.name,
-                  AvatarColorUntil.getBackgroundColorById(this.teamViewModel.team.teamId)),
-                roundRadius: 18
-              })
+              if (this.teamViewModel.displayAvatar) {
+                Image(this.teamViewModel.displayAvatar)
+                  .width(42)
+                  .height(42)
+                  .draggable(false)
+                  .objectFit(ImageFit.Cover)
+                  .syncLoad(false)
+                  .borderRadius(18)
+                  .margin({
+                    right: 12
+                  })
+              } else {
+                Stack() {
+                  Text(this.teamViewModel.team.name)
+                    .fontSize(14)
+                    .fontColor('#ffFFFFFF')
+                    .ellipsisMode(EllipsisMode.END)
+                    .textAlign(TextAlign.Center)
+                    .margin({
+                      left: 6,
+                      right: 6
+                    })
+                    .width('100%')
+                    .maxLines(1)
+                }
                 .width(42)
                 .height(42)
+                .backgroundColor(AvatarColorUntil.getBackgroundColorById(this.teamViewModel.team.teamId))
+                .borderRadius(18)
                 .margin({
                   right: 12
                 })
+              }
 
               Column() {
                 Text(this.teamViewModel.team.name)
@@ -138,9 +162,26 @@ export struct TeamSettingPage {
               .width(16)
               .height(16)
               .onClick(() => {
+                const teamInfo = this.teamViewModel?.team
+                if (!teamInfo) {
+                  return
+                }
+                const param: TeamInfoPageParam = {
+                  teamInfo: teamInfo,
+                  teamAvatar: this.teamViewModel?.displayAvatar ?? '',
+                  onTeamAvatarChanged: (avatar: string) => {
+                    this.teamViewModel?.applyLocalTeamAvatar(avatar)
+                  }
+                }
                 this.pathStack.pushPath({
                   name: 'TeamInfoPage',
-                  param: this.teamViewModel?.team
+                  param: param,
+                  onPop: (popInfo: PopInfo) => {
+                    const updatedAvatar = popInfo.result as string | undefined
+                    if (updatedAvatar) {
+                      this.teamViewModel?.applyLocalTeamAvatar(updatedAvatar)
+                    }
+                  }
                 })
               })
 

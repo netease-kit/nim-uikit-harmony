@@ -16,6 +16,8 @@ import {
 } from '@nimsdk/base';
 import { ChatKitClient } from '../ChatKitClient';
 
+const TAG = '[ConversationRepo]'
+
 export class ConversationRepo {
   /**
    * 获取会话列表
@@ -236,6 +238,16 @@ export class ConversationRepo {
     return ChatKitClient.nim.conversationService?.subscribeUnreadCountByFilter(filter)
   }
 
+  static safeSubscribeUnreadCountByFilter(filter: V2NIMConversationFilter): boolean {
+    try {
+      ConversationRepo.subscribeUnreadCountByFilter(filter)
+      return true
+    } catch (e) {
+      ChatKitClient.logger?.error(TAG, 'safeSubscribeUnreadCountByFilter', `${e}`)
+      return false
+    }
+  }
+
   /**
    * 取消订阅指定过滤条件的会话未读变化
    *
@@ -243,6 +255,16 @@ export class ConversationRepo {
    */
   static unsubscribeUnreadCountByFilter(filter: V2NIMConversationFilter) {
     return ChatKitClient.nim.conversationService?.unsubscribeUnreadCountByFilter(filter)
+  }
+
+  static safeUnsubscribeUnreadCountByFilter(filter: V2NIMConversationFilter): boolean {
+    try {
+      ConversationRepo.unsubscribeUnreadCountByFilter(filter)
+      return true
+    } catch (e) {
+      ChatKitClient.logger?.error(TAG, 'safeUnsubscribeUnreadCountByFilter', `${e}`)
+      return false
+    }
   }
 
   /**

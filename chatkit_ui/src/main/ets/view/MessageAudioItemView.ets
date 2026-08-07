@@ -22,6 +22,7 @@ export struct MessageAudioItemView {
   onMessageClick: MessageItemClick | undefined
   @BuilderParam
   isReceiveStyle: boolean | undefined
+  audioPlayerManager: AudioPlayerManager = AudioPlayerManager.instance
   @Local
   receiveSoundIndex: number = 2
   sendSoundImages = [
@@ -39,20 +40,27 @@ export struct MessageAudioItemView {
   //定时器id
   intervalId?: number
 
+  aboutToAppear(): void {
+    this.syncPlayState()
+  }
+
+  @Monitor('audioPlayerManager.playingMessageClientId')
+  onPlayingMessageChanged(): void {
+    this.syncPlayState()
+  }
+
   aboutToDisappear(): void {
-    clearInterval(this.intervalId)
+    this.resetPlayState()
     if (shouldStopAudioPlaybackOnMessageItemDisappear()) {
       AudioPlayerManager.instance.stopPlayAll()
     }
   }
 
   onPlayStart: () => void = () => {
-    this.startPlayAni()
+    this.syncPlayState()
   }
   onPlayFinished: () => void = () => {
-    clearInterval(this.intervalId)
-    this.receiveSoundIndex = 2
-    this.sendSoundIndex = 2
+    this.resetPlayState()
   }
 
   showReceiveStyle(): boolean {
@@ -113,13 +121,13 @@ export struct MessageAudioItemView {
       right: 12
     })
     .onClick(() => {
-      clearInterval(this.intervalId)
-      this.intervalId = undefined
+      this.resetPlayState()
       let audioManager = AudioPlayerManager.instance
       if (this.message.message.attachment) {
         audioManager.avPlayerLive((this.message.message.attachment as V2NIMMessageAudioAttachment).url ?? '',
           this.onPlayStart,
-          this.onPlayFinished
+          this.onPlayFinished,
+          this.message.message.messageClientId
         )
       }
     })
@@ -129,7 +137,27 @@ export struct MessageAudioItemView {
     .width(getAudioMessageWidth(this.message))
   }
 
+  private syncPlayState() {
+    if (AudioPlayerManager.instance.isMessagePlaying(this.message.message.messageClientId)) {
+      this.startPlayAni()
+      return
+    }
+    this.resetPlayState()
+  }
+
+  private resetPlayState() {
+    if (this.intervalId !== undefined) {
+      clearInterval(this.intervalId)
+      this.intervalId = undefined
+    }
+    this.receiveSoundIndex = 2
+    this.sendSoundIndex = 2
+  }
+
   startPlayAni() {
+    if (this.intervalId !== undefined) {
+      return
+    }
     this.intervalId = setInterval(() => {
       if (this.sendSoundIndex === 2) {
         this.sendSoundIndex = 0

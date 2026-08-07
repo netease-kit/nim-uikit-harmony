@@ -63,6 +63,7 @@ import {
   getMultiLineTitle,
   AIUserManager,
   IMKitConfigCenter,
+  isMultiLineMessage,
   MergedMessageAttachment,
   mergedMessageCustomType,
   mergedMessageLimitCount,
@@ -117,6 +118,7 @@ import {
 } from '../common/InputTransferUtils';
 import {
   AitInsertTarget,
+  resolveAitCandidateByAccountId,
   resolveAvatarLongPressAitAccountId,
   resolveAvatarLongPressAitTarget
 } from '../common/AitRoutingUtils';
@@ -161,6 +163,9 @@ export struct ChatTeamPage {
   // 多行输入面板组件实例引用
   multiLineInputViewInstance?: MultiLineInputView = undefined
   textMessageDetailDialog: CustomDialogController | undefined = undefined;
+  private closeTextMessageDetailDialog(): void {
+    this.textMessageDetailDialog?.close()
+  }
   operationRect: NERectData = new NERectData();
   screenHeight: number = 0;
   screenWidth: number = 0;
@@ -199,6 +204,7 @@ export struct ChatTeamPage {
   @Local tipBannerHeight: number = 0;
   // 新增：转发弹窗是否打开（用于阻止键盘弹出时自动滚动到底部）
   isForwardDialogOpen: boolean = false;
+  private pendingExpandPanelAfterKeyboardHide: boolean = false
   private singleLineFocusTask: number = -1
   private multiLineFocusTask: number = -1
   private multiLineReplyAitTask: number = -1
@@ -542,11 +548,6 @@ export struct ChatTeamPage {
       // 正常情况下直接滚动到底部
       this.listScroller.scrollEdge(Edge.Bottom)
     }
-    // 滚动到底部时，对所有消息发送已读回执（因为会滚动到最新，所以传全部消息列表）
-    if (this.newMessageCount > 0) {
-      const allMessages = this.chatTeamInfo?.msgList.getMessageList() ?? []
-      this.chatViewModel.getAndSendMessageReceipts(allMessages)
-    }
     // 重置状态
     this.clearNewMessageCount()
     this.showScrollToNewMessageButton = false
@@ -612,6 +613,7 @@ export struct ChatTeamPage {
     const translateHeight = this.getTranslatePanelHeight()
     if ((this.inputStyle === InputStyleType.Emoji || this.inputStyle === InputStyleType.Record ||
       this.inputStyle === InputStyleType.More) && this.keyboardHeight <= 0) {
+      this.pendingExpandPanelAfterKeyboardHide = false
       this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight - this.expandHeight - translateHeight
     } else if (this.inputStyle === InputStyleType.Multiline) {
       // 多行模式：bottomHeight = 0，需要考虑 expandHeight
@@ -627,8 +629,10 @@ export struct ChatTeamPage {
     } else {
       this.scrollHeight = this.screenHeight - this.keyboardHeight - this.bottomHeight - translateHeight
       if (this.keyboardHeight > 10) {
-        this.expandHeight = 0
-        this.inputStyle = InputStyleType.None;
+        if (!this.pendingExpandPanelAfterKeyboardHide) {
+          this.expandHeight = 0
+          this.inputStyle = InputStyleType.None;
+        }
         setTimeout(() => {
           // 如果转发弹窗打开或页面不可见，跳过滚动到底部
           if (!this.isForwardDialogOpen && this.chatViewModel.isPageVisible) {
@@ -787,6 +791,10 @@ export struct ChatTeamPage {
     if (this.translationOperationMode && this.aiSearchSelectionState.isAllSelected()) {
       return getTranslationOperateMenu()
     }
+    if (this.translationOperationMode) {
+      // Hide AI search for translated text
+      return getSelectedTextOperateMenu(this.aiSearchSelectionState.selectedText(), false)
+    }
     if (!this.aiSearchSelectionState.active || this.aiSearchSelectionState.isAllSelected()) {
       return getOperateMenu(this.operationMsg, this.chatViewModel.topMessage)
     }
@@ -822,6 +830,21 @@ export struct ChatTeamPage {
   private closeAISearchSelection(): void {
     this.aiSearchSelectionState.close()
     this.aiSearchSelectingMessageId = ''
+  }
+
+  private clearOperationMenuIfMatch(messageClientId?: string): void {
+    if (!messageClientId ||
+      (this.operationMsg?.getMessageClientId() !== messageClientId &&
+        this.aiSearchSelectingMessageId !== messageClientId)) {
+      return
+    }
+    this.showOperationView = false
+    this.operationMsg = undefined
+    this.translatedActionMsg = undefined
+    this.translationOperationMode = false
+    this.operationMenuItems = undefined
+    this.selectedOperationText = ''
+    this.closeAISearchSelection()
   }
 
   private openAISearchSelection(event: GestureEvent, msg: NIMMessageInfo | undefined): boolean {
@@ -1054,6 +1077,9 @@ export struct ChatTeamPage {
   async requestChatData() {
     this.chatTeamInfo.setConversationId(this.conversationId)
     this.chatViewModel.init(this.conversationId as string, this.chatTeamInfo);
+    this.chatViewModel.onOperateMessageInvalid = (messageClientId: string) => {
+      this.clearOperationMenuIfMatch(messageClientId)
+    }
     this.chatViewModel.loadData()
     this.chatViewModel.setTeamExitListener(() => {
       TeamExitWarningDialog.show(this.getUIContext(), new TeamExitDialogParam(
@@ -1104,39 +1130,29 @@ export struct ChatTeamPage {
    * @param senderId
    */
   async addAitUserById(senderId: string) {
-    //输入框添加@信息
-    let sendMember = await TeamMemberCache.getInstance().getMemberById(senderId)
-    if (sendMember && this.controller) {
-      const controller = this.controller;
-      let aitValue = '@' + sendMember.getAitName() + ' '
-      const offset = controller.getCaretOffset()
-      controller.addBuilderSpan(() => this.AtSpan(aitValue), {
-        offset: offset
-      });
-      let aitSpan: AitEditorSpan = {
-        spanIndex: offset,
-        accountId: senderId,
-        value: aitValue,
-      }
-      this.builderSpans.push(...[aitSpan])
+    if (!this.controller) {
       return
     }
 
-    const aiUser = NEAIUserCache.getAIUser(senderId)
-    if (aiUser && this.controller) {
-      const controller = this.controller
-      let aitValue = '@' + (aiUser.name ?? aiUser.accountId) + ' '
-      const offset = controller.getCaretOffset()
-      controller.addBuilderSpan(() => this.AtSpan(aitValue), {
-        offset: offset
-      })
-      let aitSpan: AitEditorSpan = {
-        spanIndex: offset,
-        accountId: aiUser.accountId,
-        value: aitValue,
-      }
-      this.builderSpans.push(...[aitSpan])
+    // 与 @ 弹窗保持同一候选范围：可 AI 聊数字人 + 群成员
+    const candidate = await resolveAitCandidateByAccountId(senderId, this.getAIChatUsers())
+    if (!candidate) {
+      Logger.warn('ChatKitUI', `ChatTeamPage addAitUserById miss ait candidate senderId=${senderId}`)
+      return
     }
+
+    const controller = this.controller
+    let aitValue = '@' + candidate.displayName + ' '
+    const offset = controller.getCaretOffset()
+    controller.addBuilderSpan(() => this.AtSpan(aitValue), {
+      offset: offset
+    })
+    let aitSpan: AitEditorSpan = {
+      spanIndex: offset,
+      accountId: candidate.accountId,
+      value: aitValue,
+    }
+    this.builderSpans.push(...[aitSpan])
   }
 
   private async handleAvatarLongPressAit(senderId: string) {
@@ -1486,9 +1502,8 @@ export struct ChatTeamPage {
             }
             this.listScrollEndPosition = end;
             this.listScrollStartPosition = start;
-            // 如果有新消息，发送已读回执
-            if (this.newMessageCount > 0) {
-              // 滑到底部时，对可见范围内的消息发送已读回执
+            // 只按当前可见区发送已读回执，避免把未进入视窗的消息提前标记。
+            if (this.chatViewModel.isPageVisible) {
               const allMessages = this.chatTeamInfo.msgList.getMessageList()
               const visibleMessages = allMessages.slice(this.listScrollStartPosition, this.listScrollEndPosition + 1)
               this.chatViewModel.getAndSendMessageReceipts(visibleMessages)
@@ -1525,6 +1540,7 @@ export struct ChatTeamPage {
               }
               // 非多行模式：收起 emoji/more/record 面板
               this.bottomHeight = this.getSingleLineInputHeight()
+              this.pendingExpandPanelAfterKeyboardHide = false
               this.expandHeight = 0;
               this.inputStyle = InputStyleType.None
               this.computeScrollHeight()
@@ -1596,10 +1612,12 @@ export struct ChatTeamPage {
                 PermissionsUtils.reqPermissionsFromUser(['ohos.permission.MICROPHONE'], context).then((result) => {
                   if (result.grantStatus == true) {
                     if (this.inputStyle == InputStyleType.Record) {
+                      this.pendingExpandPanelAfterKeyboardHide = false
                       this.expandHeight = 0
                       this.inputStyle = InputStyleType.None;
                       this.computeScrollHeight()
                     } else {
+                      this.pendingExpandPanelAfterKeyboardHide = this.keyboardHeight > 10
                       this.inputStyle = InputStyleType.Record
                       this.expandHeight = ChatConst.messageInputAreaHeight
                       this.computeScrollHeight()
@@ -1614,10 +1632,12 @@ export struct ChatTeamPage {
               onDidClickEmoji: () => {
                 this.showOperationView = false
                 if (this.inputStyle == InputStyleType.Emoji) {
+                  this.pendingExpandPanelAfterKeyboardHide = false
                   this.expandHeight = 0
                   this.inputStyle = InputStyleType.None;
                   this.computeScrollHeight()
                 } else {
+                  this.pendingExpandPanelAfterKeyboardHide = this.keyboardHeight > 10
                   this.inputStyle = InputStyleType.Emoji
                   this.expandHeight = ChatConst.messageInputAreaHeight
                   this.computeScrollHeight()
@@ -1626,10 +1646,12 @@ export struct ChatTeamPage {
               onDidClickMore: () => {
                 this.showOperationView = false
                 if (this.inputStyle == InputStyleType.More) {
+                  this.pendingExpandPanelAfterKeyboardHide = false
                   this.expandHeight = 0
                   this.inputStyle = InputStyleType.None;
                   this.computeScrollHeight()
                 } else {
+                  this.pendingExpandPanelAfterKeyboardHide = this.keyboardHeight > 10
                   this.inputStyle = InputStyleType.More
                   this.expandHeight = ChatConst.messageInputAreaHeight
                   this.computeScrollHeight()
@@ -2024,9 +2046,12 @@ export struct ChatTeamPage {
                   this.showDialogToRevoke(this.operationMsg)
                 } else if (item.operationType == MessageOperationType.Forward) {
                   // 转发
+                  // Keep forward content consistent during selection
+                  const useTranslatedText = this.translationOperationMode
+                  const translatedText = useTranslatedText ?
+                    MessageTranslationService.instance.getTranslatedDisplayText(this.operationMsg) : ''
                   this.forwardMessageAction = (selectedList: ConversationSelectModel[]) => {
-                    if (this.translationOperationMode) {
-                      const translatedText = MessageTranslationService.instance.getTranslatedDisplayText(this.operationMsg!)
+                    if (useTranslatedText) {
                       if (translatedText.length === 0) {
                         return
                       }
@@ -2176,10 +2201,12 @@ export struct ChatTeamPage {
     .onShown(() => {
       // 页面显示时设置为可见
       this.chatViewModel.isPageVisible = true
-      // 回到页面时，只对可见范围内的消息发送已读回执
-      const allMessages = this.chatTeamInfo?.msgList.getMessageList() ?? []
-      const visibleMessages = allMessages.slice(this.listScrollStartPosition, this.listScrollEndPosition + 1)
-      this.chatViewModel.getAndSendMessageReceipts(visibleMessages)
+      if (!this.firstLoadData) {
+        // 首屏滚动位置未稳定时不发回执，等列表完成首屏定位后再按可见区处理。
+        const allMessages = this.chatTeamInfo?.msgList.getMessageList() ?? []
+        const visibleMessages = allMessages.slice(this.listScrollStartPosition, this.listScrollEndPosition + 1)
+        this.chatViewModel.getAndSendMessageReceipts(visibleMessages)
+      }
     })
     .onHidden(() => {
       // 页面隐藏时设置为不可见
@@ -2274,7 +2301,7 @@ export struct ChatTeamPage {
       if (this.inputStyle !== InputStyleType.Multiline || !this.multiLineInputViewInstance) {
         return
       }
-      if (!this.replyMsg || this.replyMsg.message.senderId !== senderId) {
+      if (!this.replyMsg || this.replyMsg.getDisplaySenderId() !== senderId) {
         return
       }
       this.multiLineInputViewInstance.addAitUserById(senderId)
@@ -2284,14 +2311,15 @@ export struct ChatTeamPage {
   loadReplyInfo(msg: NIMMessageInfo, needAit: boolean) {
     this.replyMsg = msg
     this.clearPendingReplyTasks()
+    const aitAccountId = resolveAvatarLongPressAitAccountId(msg.getDisplaySenderId(), ChatKitClient.getLoginUserId())
     // 多行模式下调整 expandHeight
     if (this.inputStyle === InputStyleType.Multiline) {
       this.expandHeight = 186
       this.computeScrollHeight()
       
       // 多行模式下添加 @（需要等待组件实例准备好）
-      if (needAit && this.replyMsg.message.senderId !== ChatKitClient.getLoginUserId()) {
-        this.scheduleMultiLineReplyAit(this.replyMsg.message.senderId)
+      if (needAit && aitAccountId) {
+        this.scheduleMultiLineReplyAit(aitAccountId)
       }
       
       this.scheduleMultiLineFocus()
@@ -2299,8 +2327,8 @@ export struct ChatTeamPage {
     }
     this.bottomHeight = this.getSingleLineInputHeight()
     this.computeScrollHeight()
-    if (needAit && this.replyMsg.message.senderId !== ChatKitClient.getLoginUserId()) {
-      this.addAitUserById(this.replyMsg.message.senderId)
+    if (needAit && aitAccountId) {
+      this.addAitUserById(aitAccountId)
     }
     this.scheduleSingleLineFocus()
   }
@@ -2481,10 +2509,14 @@ export struct ChatTeamPage {
 
   showMessageDetail(msg: NIMMessageInfo | undefined, onlyShow?: boolean) {
     if (msg) {
-      if (onlyShow && msg.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
+      if (onlyShow &&
+        (msg.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT || isMultiLineMessage(msg.message))) {
         this.textMessageDetailDialog = new CustomDialogController({
           builder: TextMessageDetailDialog({
-            message: msg
+            message: msg,
+            onClose: () => {
+              this.closeTextMessageDetailDialog()
+            }
           }),
           cornerRadius: 0,
           alignment: DialogAlignment.Center,
@@ -2658,6 +2690,7 @@ export struct ChatTeamPage {
   aboutToDisappear(): void {
     MessageTranslationService.instance.removeTranslationFinishedListener(this.translationFinishedListener)
     this.chatViewModel.clearUnreadCount()
+    this.chatViewModel.onOperateMessageInvalid = undefined
     this.chatViewModel.onDestroy()
     AudioPlayerManager.instance.stopPlayAll()
     TeamMemberCache.getInstance().clear()

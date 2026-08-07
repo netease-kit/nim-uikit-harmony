@@ -9,7 +9,12 @@ import { Logger } from '@nimkit/common';
 import {
   AIRepo,
   ChatKitClient,
+  CONVERSATION_GROUP_DEFAULT_AIT_KEY,
+  CONVERSATION_GROUP_DEFAULT_ALL_KEY,
   ContactRepo,
+  ConversationGroupEventDisposer,
+  ConversationGroupEventRepo,
+  ConversationRepo,
   IMKitConfigCenter,
   NEAIUserCache,
   NEFriendUserCache,
@@ -17,6 +22,9 @@ import {
   UserAIBotManager
 } from '@nimkit/chatkit'
 import {
+  V2NIMConversation,
+  V2NIMConversationFilter,
+  V2NIMConversationOption,
   V2NIMConversationType,
   V2NIMFriendDeletionType,
   V2NIMTeam,
@@ -25,8 +33,16 @@ import {
 } from '@nimsdk/base'
 import { Constant } from '../loader/Constant'
 import { ConversationModel } from '../model/ConversationModel'
+import {
+  ConversationGroupDefaultCounts,
+  ConversationGroupInfo,
+  ConversationGroupKind,
+  createDefaultUnreadConversationFilter,
+  filterConversationsByDefaultGroup,
+  isDefaultUnreadConversationFilter
+} from '../model/ConversationGroupModel'
 import { AitServer, AitSession, AitSessionChangeEvent } from '../service/ait/AitService'
-import { ConversationItem, ConversationStrategy } from '../strategy/ConversationStrategy'
+import { ConversationItem, ConversationMode, ConversationStrategy } from '../strategy/ConversationStrategy'
 import ConversationData from './ConversationData'
 import {
   applyP2PUserProfileDisplayInfo,
@@ -39,19 +55,38 @@ import {
   resolveDeferredBatchDelay
 } from './ConversationUpdateUtils'
 
+class ConversationApplyResult {
+  displayChanged: boolean
+  sourceChanged: boolean
+
+  constructor(displayChanged: boolean, sourceChanged: boolean) {
+    this.displayChanged = displayChanged
+    this.sourceChanged = sourceChanged
+  }
+}
+
 @ObservedV2
 export class ConversationViewModel {
   @Trace isFinishedSyncLoad: boolean = false
   @Trace networkBroken: boolean = ChatKitClient.connectBroken()
   @Trace aitConversationList: Set<string> = new Set()
   @Trace userAIBotConversationList: Set<string> = new Set()
+  @Trace selectedConversationGroupKey: string = CONVERSATION_GROUP_DEFAULT_ALL_KEY
   public onUreadMessageChange?: (unreadCount?: number) => void = undefined
   public onConversationFirstReady?: (count: number) => void = undefined
   public onConversationListCountChange?: (count: number) => void = undefined
   public onConversationSyncFinished?: () => void = undefined
+  public onDefaultGroupCountChange?: (counts: ConversationGroupDefaultCounts) => void = undefined
   public data: ConversationData<ConversationItem> = new ConversationData<ConversationItem>()
   public isFinished: boolean = false
   private offset: number = 0
+  private defaultFinished: boolean = false
+  private customGroupOffset: number = 0
+  private customGroupFinished: boolean = false
+  private customGroupId: string = ''
+  private isLoadingCustomGroupConversation: boolean = false
+  private customGroupLoadSeq: number = 0
+  private customGroupLoadingSeq: number = 0
   private readonly INITIAL_DISPLAY_COUNT: number = 12
   private readonly LOAD_MORE_LIMIT: number = Constant.PAGE_SIZE
   private readonly DEFERRED_BATCH_SIZE: number = 20
@@ -71,10 +106,19 @@ export class ConversationViewModel {
   private pendingUpsertConversations: Map<string, ConversationItem> = new Map()
   private pendingDeletedConversationIds: Set<string> = new Set()
   private deferredLoadQueue: ConversationItem[] = []
+  private allConversationList: ConversationItem[] = []
   private hasAddedAitSessionListener: boolean = false
   private hasAddedAIUserListener: boolean = false
+  private hasAddedFriendCacheListener: boolean = false
+  private unreadGroupUnreadCount: number = 0
+  private hasLoadedUnreadGroupUnreadCount: boolean = false
+  private hasSubscribedUnreadGroupCount: boolean = false
+  private unreadGroupCountEventDisposer?: ConversationGroupEventDisposer = undefined
+  private readonly unreadGroupCountFilter: V2NIMConversationFilter = createDefaultUnreadConversationFilter()
   private model: ConversationModel
-  private readonly mode: string
+  private readonly mode: ConversationMode
+  private aitSessionLoadSeq: number = 0
+  private p2pUserInfoLoadGeneration: number = 0
 
   constructor(strategy: ConversationStrategy) {
     this.model = new ConversationModel(strategy)
@@ -83,6 +127,7 @@ export class ConversationViewModel {
 
   initConversation() {
     this.logPerf('conversation.vm.init.start')
+    this.setupUnreadGroupCount()
     if (this.hasLoadedConversationForReuse()) {
       this.setupEventHandler()
       this.logPerf('conversation.vm.init.skip_loaded')
@@ -103,6 +148,7 @@ export class ConversationViewModel {
 
   public async deleteConversation(conversationId: string) {
     await this.model.deleteConversation(conversationId)
+    this.removeFromAllConversationList([conversationId])
     const index = this.data.conversationList?.findIndex((m) => m.conversationId == conversationId)
     if (index > -1) {
       this.data.removeData(index)
@@ -131,6 +177,36 @@ export class ConversationViewModel {
     return this.model.requiresNetworkForDelete()
   }
 
+  public getDefaultConversationGroupCounts(): ConversationGroupDefaultCounts {
+    const totalUnreadCount = this.model.getTotalUnreadCount() ?? 0
+    const unreadGroupCount = this.mode === ConversationMode.CLOUD ?
+      (this.hasLoadedUnreadGroupUnreadCount ? this.unreadGroupUnreadCount : 0) : totalUnreadCount
+    return new ConversationGroupDefaultCounts(
+      totalUnreadCount,
+      this.getAitBadgeConversationCount(),
+      unreadGroupCount
+    )
+  }
+
+  public async selectConversationGroup(group: ConversationGroupInfo): Promise<void> {
+    if (group.kind === ConversationGroupKind.CUSTOM) {
+      await this.selectCustomConversationGroup(group.groupId)
+      return
+    }
+    this.customGroupLoadSeq++
+    this.customGroupId = ''
+    this.selectedConversationGroupKey = group.groupKey
+    this.isFinished = this.defaultFinished
+    this.reloadDefaultGroupDisplay()
+  }
+
+  public async reloadSelectedCustomGroupIfNeeded(groupId: string): Promise<void> {
+    if (this.customGroupId !== groupId) {
+      return
+    }
+    await this.selectCustomConversationGroup(groupId)
+  }
+
   public onDestroy(): void {
     this.logPerf('conversation.vm.destroy')
     if (this.hasAddedAitSessionListener) {
@@ -141,6 +217,11 @@ export class ConversationViewModel {
       AIRepo.listener.off('onLoadAIUserComplete', this.onAIUserChanged)
       this.hasAddedAIUserListener = false
     }
+    if (this.hasAddedFriendCacheListener) {
+      ContactRepo.listener.off('loadFriendCache', this.onFriendCacheLoaded)
+      this.hasAddedFriendCacheListener = false
+    }
+    this.releaseUnreadGroupCount()
     this.model.removeEventListener()
     if (this.pendingFlushTimer >= 0) {
       clearTimeout(this.pendingFlushTimer)
@@ -155,9 +236,20 @@ export class ConversationViewModel {
     this.deferredLoadQueue = []
     this.hasDeferredLoadScheduled = false
     this.userAIBotConversationList.clear()
+    this.unreadGroupUnreadCount = 0
+    this.hasLoadedUnreadGroupUnreadCount = false
+    this.customGroupId = ''
+    this.customGroupLoadSeq++
+    this.aitSessionLoadSeq++
+    this.p2pUserInfoLoadGeneration++
+    this.selectedConversationGroupKey = CONVERSATION_GROUP_DEFAULT_ALL_KEY
   }
 
   public async loadMoreConversation() {
+    if (this.isCustomGroupSelected()) {
+      await this.loadMoreCustomConversationGroup()
+      return
+    }
     if (!this.isFinishedSyncLoad) {
       this.logPerf('conversation.load_more.skip_sync')
       return
@@ -183,6 +275,7 @@ export class ConversationViewModel {
         `result=${result == null ? 'null' : result.conversationList.length.toString()} finished=${result?.finished ?? false}`)
       if (result) {
         this.offset = result.offset
+        this.defaultFinished = result.finished
         this.isFinished = result.finished
       }
       if (result && result.conversationList.length > 0) {
@@ -193,6 +286,10 @@ export class ConversationViewModel {
       this.isLoadingMoreConversation = false
       this.logPerf('conversation.load_more.end')
     }
+  }
+
+  public isLoadingMoreConversationActive(): boolean {
+    return this.isLoadingMoreConversation
   }
 
   private async updateConversationById(conversationId: string) {
@@ -248,6 +345,7 @@ export class ConversationViewModel {
     this.model.onSyncFinishedHandle = async () => {
       this.logPerf('conversation.event.sync_finished')
       await this.reloadInitialConversationAfterSyncWhenEmpty()
+      await this.reloadLoadedConversationsAfterSync()
       this.isFinishedSyncLoad = true
       this.onConversationSyncFinished?.()
       this.schedulePendingConversationFlush()
@@ -285,12 +383,17 @@ export class ConversationViewModel {
     this.model.onTeamLeftHandler = (team: V2NIMTeam) => {
       this.deleteConversation(this.model.teamConversationId(team.teamId))
     }
+    // 群名称、头像变化
+    this.model.onTeamInfoUpdatedHandler = async (team: V2NIMTeam) => {
+      await this.updateConversationById(this.model.teamConversationId(team.teamId))
+    }
     // 会话未读数变化
     this.model.onTotalUnreadCountChangedHandler = (unreadCount: number) => {
       this.logPerf('conversation.event.unread', `unread=${unreadCount}`)
       if (this.onUreadMessageChange) {
         this.onUreadMessageChange(unreadCount)
       }
+      this.notifyDefaultGroupCountChange()
     }
     this.model.onConversationCreatedHandler = (conversation: ConversationItem) => {
       this.logPerf('conversation.event.created',
@@ -325,6 +428,10 @@ export class ConversationViewModel {
       AIRepo.listener.on('onLoadAIUserComplete', this.onAIUserChanged)
       this.hasAddedAIUserListener = true
     }
+    if (!this.hasAddedFriendCacheListener) {
+      ContactRepo.listener.on('loadFriendCache', this.onFriendCacheLoaded)
+      this.hasAddedFriendCacheListener = true
+    }
 
     this.model.addEventListener()
     this.logPerf('conversation.vm.event_handler_ready')
@@ -334,12 +441,78 @@ export class ConversationViewModel {
     this.refreshLoadedConversationDisplayInfo()
   }
 
+  private onFriendCacheLoaded = () => {
+    this.refreshLoadedConversationDisplayInfo()
+  }
+
   private onAitSessionChange = (session: AitSession) => {
+    let changed = false
     if (session.isAit) {
-      this.aitConversationList.add(session.sessionId)
+      if (!this.aitConversationList.has(session.sessionId)) {
+        this.aitConversationList.add(session.sessionId)
+        changed = true
+      }
     } else if (this.aitConversationList.has(session.sessionId)) {
       this.aitConversationList.delete(session.sessionId)
+      changed = true
     }
+    if (changed) {
+      this.refreshDefaultGroupDisplayAfterAitChanged()
+    }
+  }
+
+  private onUnreadGroupCountChangedByFilter = (filter: V2NIMConversationFilter, unreadCount: number): void => {
+    if (!isDefaultUnreadConversationFilter(filter)) {
+      return
+    }
+    this.updateUnreadGroupUnreadCount(unreadCount)
+  }
+
+  private setupUnreadGroupCount(): void {
+    if (this.mode !== ConversationMode.CLOUD || this.hasSubscribedUnreadGroupCount) {
+      return
+    }
+    if (this.unreadGroupCountEventDisposer === undefined) {
+      this.unreadGroupCountEventDisposer =
+        ConversationGroupEventRepo.onUnreadCountChangedByFilter(this.onUnreadGroupCountChangedByFilter)
+    }
+    this.hasSubscribedUnreadGroupCount = ConversationRepo.safeSubscribeUnreadCountByFilter(this.unreadGroupCountFilter)
+    this.loadUnreadGroupUnreadCount()
+  }
+
+  private async loadUnreadGroupUnreadCount(): Promise<void> {
+    if (this.mode !== ConversationMode.CLOUD) {
+      return
+    }
+    try {
+      const unreadCount = await ConversationRepo.getUnreadCountByFilter(this.unreadGroupCountFilter)
+      this.updateUnreadGroupUnreadCount(unreadCount ?? 0)
+    } catch (e) {
+      Logger.error('ConversationKit', `loadUnreadGroupUnreadCount failed: ${e}`)
+    }
+  }
+
+  private updateUnreadGroupUnreadCount(unreadCount: number): void {
+    const nextUnreadCount = unreadCount < 0 ? 0 : unreadCount
+    if (this.hasLoadedUnreadGroupUnreadCount && this.unreadGroupUnreadCount === nextUnreadCount) {
+      return
+    }
+    this.unreadGroupUnreadCount = nextUnreadCount
+    this.hasLoadedUnreadGroupUnreadCount = true
+    this.notifyDefaultGroupCountChange()
+  }
+
+  private releaseUnreadGroupCount(): void {
+    if (this.hasSubscribedUnreadGroupCount) {
+      ConversationRepo.safeUnsubscribeUnreadCountByFilter(this.unreadGroupCountFilter)
+    }
+    this.hasSubscribedUnreadGroupCount = false
+    if (this.unreadGroupCountEventDisposer !== undefined) {
+      this.unreadGroupCountEventDisposer()
+      this.unreadGroupCountEventDisposer = undefined
+    }
+    this.hasLoadedUnreadGroupUnreadCount = false
+    this.unreadGroupUnreadCount = 0
   }
 
   private async loadConversation() {
@@ -372,7 +545,10 @@ export class ConversationViewModel {
 
       if (result != null && result.conversationList.length > 0) {
         this.offset = result.offset
-        this.isFinished = result.finished
+        this.defaultFinished = result.finished
+        if (!this.isCustomGroupSelected()) {
+          this.isFinished = result.finished
+        }
         const allConversations = this.snapshotConversations(result.conversationList)
         allConversations.sort((a, b) => this.sortConversation(a, b))
 
@@ -411,6 +587,47 @@ export class ConversationViewModel {
     this.logPerf('conversation.reload_after_sync.end')
   }
 
+  private async reloadLoadedConversationsAfterSync(): Promise<void> {
+    if (!this.model.shouldReloadInitialConversationAfterSyncWhenEmpty()) {
+      this.logPerf('conversation.reload_loaded_after_sync.skip_strategy')
+      return
+    }
+    if (this.isCustomGroupSelected()) {
+      if (!this.customGroupId || this.data.totalCount() <= 0) {
+        this.logPerf('conversation.reload_loaded_after_sync.skip_custom_empty')
+        return
+      }
+      // Re-query the selected custom group after reconnect when incremental updates were not emitted.
+      await this.selectCustomConversationGroup(this.customGroupId)
+      return
+    }
+    const loadedCount = Math.max(this.allConversationList.length, this.data.totalCount())
+    if (loadedCount <= 0) {
+      this.logPerf('conversation.reload_loaded_after_sync.skip_empty')
+      return
+    }
+    const limit = Math.max(loadedCount, this.INITIAL_DISPLAY_COUNT)
+    this.logPerf('conversation.reload_loaded_after_sync.start', `limit=${limit}`)
+    const result = await this.model.getConversationList(0, limit)
+    if (result == null) {
+      this.logPerf('conversation.reload_loaded_after_sync.skip_null')
+      return
+    }
+    this.offset = result.offset
+    this.defaultFinished = result.finished
+    this.isFinished = result.finished
+    const reloadedConversations = this.snapshotConversations(result.conversationList)
+    reloadedConversations.sort((a, b) => this.sortConversation(a, b))
+    this.pendingUpsertConversations.clear()
+    this.pendingDeletedConversationIds.clear()
+    this.deferredLoadQueue = []
+    this.allConversationList = reloadedConversations
+    this.reloadDefaultGroupDisplay()
+    this.reportConversationListCount()
+    this.ensureP2PUserInfo(reloadedConversations)
+    this.logPerf('conversation.reload_loaded_after_sync.end', `count=${reloadedConversations.length}`)
+  }
+
   private showInitialConversations(conversations: ConversationItem[]): void {
     this.logPerf('conversation.show_initial.start', `sourceCount=${conversations.length}`)
     const pendingUpsertConversations: ConversationItem[] = []
@@ -427,8 +644,11 @@ export class ConversationViewModel {
     this.pendingUpsertConversations.clear()
     this.pendingDeletedConversationIds.clear()
     this.deferredLoadQueue = []
-    this.data.conversationList = initialBatch
-    this.data.reloadData()
+    this.allConversationList = allConversations
+    if (!this.isCustomGroupSelected()) {
+      this.data.conversationList = initialBatch
+      this.reloadDefaultGroupDisplay()
+    }
     this.logPerf('conversation.show_initial.reload', `initialCount=${initialBatch.length}`)
     this.reportConversationListCount()
     this.ensureP2PUserInfo(initialBatch)
@@ -500,8 +720,27 @@ export class ConversationViewModel {
     )
 
     if (accountIds.length > 0) {
+      const loginUserId = ChatKitClient.getLoginUserId()
+      if (loginUserId.length <= 0) {
+        return
+      }
+      const friendUserCache = NEFriendUserCache.getInstance()
+      const loadGeneration = this.p2pUserInfoLoadGeneration
       try {
-        const users = await ContactRepo.getUserListFromCloud(accountIds)
+        // Load friend aliases for visible conversations even before the contact tab is created.
+        const userWithFriends = await ContactRepo.getUserWithFriendByIds(accountIds)
+        // Ignore profile loads from a destroyed view model or a previous account.
+        if (loadGeneration !== this.p2pUserInfoLoadGeneration ||
+          loginUserId !== ChatKitClient.getLoginUserId() ||
+          NEFriendUserCache.peekInstance() !== friendUserCache) {
+          return
+        }
+        const users: V2NIMUser[] = []
+        userWithFriends.forEach((userWithFriend) => {
+          if (userWithFriend.user !== undefined) {
+            users.push(userWithFriend.user)
+          }
+        })
         this.refreshLoadedP2PUserInfo(users)
       } catch (e) {
         Logger.error('ConversationKit', `ensureP2PUserInfo failed: ${e}`)
@@ -533,14 +772,8 @@ export class ConversationViewModel {
       const userAIBot = UserAIBotManager.getCachedUserAIBot(targetId)
       const aiUser = IMKitConfigCenter.enableAI ? NEAIUserCache.getAIUser(targetId) : undefined
       const isFriend = NEFriendUserCache.peekInstance()?.isFriend(targetId) ?? false
-      if (userAIBot || aiUser) {
-        resolveConversationDisplayInfo(
-          conversation,
-          targetId,
-          userAIBot ? { name: userAIBot.name, avatar: userAIBot.icon ?? '' } : undefined,
-          aiUser ? { name: aiUser.name, avatar: aiUser.avatar ?? '' } : undefined,
-          { replaceName: true, replaceAvatar: true }
-        )
+      if (userAIBot || aiUser || isFriend) {
+        this.resolveConversationDisplayInfo(conversation)
       } else if (!isFriend) {
         applyP2PUserProfileDisplayInfo(conversation, targetId, { name: user.name, avatar: user.avatar })
       }
@@ -558,28 +791,41 @@ export class ConversationViewModel {
     this.logPerf('conversation.add', `conversationId=${conversation.conversationId}`)
     const snapshotConversation = this.snapshotConversation(conversation)
     this.removeDeferredConversation(snapshotConversation.conversationId)
-    const existIndex = this.data.conversationList.findIndex(item => item.conversationId === snapshotConversation.conversationId)
-    if (existIndex > -1) {
-      this.upsertConversation(snapshotConversation)
-      return
+    const result = this.applyUpsertConversation(snapshotConversation)
+    if (result.displayChanged) {
+      if (this.isCustomGroupSelected()) {
+        this.data.reloadData()
+      } else {
+        this.reloadDefaultGroupDisplay()
+      }
     }
-    const insertIndex = this.findConversationInsertIndex(snapshotConversation)
-    this.data.addData(insertIndex, snapshotConversation)
-    this.reportConversationListCount()
-    this.ensureP2PUserInfo([snapshotConversation])
+    if (result.displayChanged || result.sourceChanged) {
+      this.reportConversationListCount()
+      this.notifyDefaultGroupCountChange()
+      this.ensureP2PUserInfo([snapshotConversation])
+    }
   }
 
   private upsertConversation(conversation: ConversationItem) {
     this.logPerf('conversation.upsert', `conversationId=${conversation.conversationId}`)
     this.removeDeferredConversation(conversation.conversationId)
-    if (this.applyUpsertConversation(conversation)) {
-      this.data.reloadData()
+    const result = this.applyUpsertConversation(conversation)
+    if (result.displayChanged) {
+      if (this.isCustomGroupSelected()) {
+        this.data.reloadData()
+      } else {
+        this.reloadDefaultGroupDisplay()
+      }
+    }
+    if (result.displayChanged || result.sourceChanged) {
+      this.notifyDefaultGroupCountChange()
       this.ensureP2PUserInfo([conversation])
     }
     this.reportConversationListCount()
   }
 
-  private upsertConversationBatch(conversations: ConversationItem[]): void {
+  private upsertConversationBatch(conversations: ConversationItem[],
+    syncAllListWhenCustomSelected: boolean = true): void {
     this.logPerf('conversation.upsert_batch.start', `count=${conversations.length}`)
     const snapshotConversations: ConversationItem[] = []
     conversations.forEach((conversation: ConversationItem) => {
@@ -589,33 +835,173 @@ export class ConversationViewModel {
         snapshotConversations.push(snapshotConversation)
       }
     })
+    const customGroupSelected = this.isCustomGroupSelected()
+    let sourceChanged = false
+    if (customGroupSelected && syncAllListWhenCustomSelected) {
+      sourceChanged = this.mergeAllConversationList(snapshotConversations, new Set<string>())
+    }
     const mergeResult = mergeConversationBatch(
-      this.data.conversationList,
+      customGroupSelected ? this.data.conversationList : this.allConversationList,
       snapshotConversations,
       new Set<string>(),
       (a: ConversationItem, b: ConversationItem): number => this.sortConversation(a, b)
     )
+    let displayChanged = mergeResult.changed
     if (mergeResult.changed) {
-      this.data.conversationList = mergeResult.conversations
-      this.data.reloadData()
+      if (customGroupSelected) {
+        const displayConversations = this.filterCustomGroupConversations(mergeResult.conversations)
+        displayChanged = !this.isSameConversationList(this.data.conversationList, displayConversations)
+        if (displayChanged) {
+          this.data.conversationList = displayConversations
+          this.data.reloadData()
+        }
+      } else {
+        this.allConversationList = mergeResult.conversations
+        this.reloadDefaultGroupDisplay()
+      }
       this.logPerf('conversation.upsert_batch.reload', `count=${conversations.length}`)
-      this.reportConversationListCount()
-      this.ensureP2PUserInfo(snapshotConversations)
     } else {
       this.logPerf('conversation.upsert_batch.no_reload', `count=${conversations.length}`)
     }
+    if (displayChanged || sourceChanged) {
+      this.reportConversationListCount()
+      this.notifyDefaultGroupCountChange()
+      this.ensureP2PUserInfo(snapshotConversations)
+    }
   }
 
-  private applyUpsertConversation(conversation: ConversationItem): boolean {
+  private applyUpsertConversation(conversation: ConversationItem): ConversationApplyResult {
     const snapshotConversation = this.snapshotConversation(conversation)
     this.removeDeferredConversation(snapshotConversation.conversationId)
-    const existIndex = this.data.conversationList.findIndex(item => item.conversationId === snapshotConversation.conversationId)
-    if (existIndex > -1) {
-      this.data.conversationList.splice(existIndex, 1)
+    if (!this.isCustomGroupSelected()) {
+      const existIndex = this.allConversationList.findIndex(item =>
+      item.conversationId === snapshotConversation.conversationId)
+      if (existIndex > -1) {
+        this.allConversationList.splice(existIndex, 1)
+      }
+      const insertIndex = this.findConversationInsertIndex(snapshotConversation, this.allConversationList)
+      this.allConversationList.splice(insertIndex, 0, snapshotConversation)
+      return new ConversationApplyResult(true, true)
     }
-    const insertIndex = this.findConversationInsertIndex(snapshotConversation)
-    this.data.conversationList.splice(insertIndex, 0, snapshotConversation)
+
+    const sourceChanged = this.mergeAllConversationList([snapshotConversation], new Set<string>())
+    const targetList = this.data.conversationList
+    const existIndex = targetList.findIndex(item => item.conversationId === snapshotConversation.conversationId)
+    if (existIndex > -1) {
+      targetList.splice(existIndex, 1)
+    }
+    if (!this.isConversationInCurrentCustomGroup(snapshotConversation)) {
+      return new ConversationApplyResult(existIndex > -1, sourceChanged)
+    }
+    const insertIndex = this.findConversationInsertIndex(snapshotConversation, targetList)
+    targetList.splice(insertIndex, 0, snapshotConversation)
+    return new ConversationApplyResult(true, sourceChanged)
+  }
+
+  private mergeAllConversationList(conversations: ConversationItem[], deletedConversationIds: Set<string>): boolean {
+    const mergeResult = mergeConversationBatch(
+      this.allConversationList,
+      conversations,
+      deletedConversationIds,
+      (a: ConversationItem, b: ConversationItem): number => this.sortConversation(a, b)
+    )
+    if (mergeResult.changed) {
+      this.allConversationList = mergeResult.conversations
+    }
+    return mergeResult.changed
+  }
+
+  private isSameConversationList(first: ConversationItem[], second: ConversationItem[]): boolean {
+    if (first.length !== second.length) {
+      return false
+    }
+    for (let i = 0; i < first.length; i++) {
+      if (first[i] !== second[i]) {
+        return false
+      }
+    }
     return true
+  }
+
+  private flushPendingConversationUpdates(): void {
+    this.logPerf('conversation.pending_flush.start',
+      `upserts=${this.pendingUpsertConversations.size} deletes=${this.pendingDeletedConversationIds.size}`)
+    if (this.pendingFlushTimer >= 0) {
+      clearTimeout(this.pendingFlushTimer)
+      this.pendingFlushTimer = -1
+    }
+
+    this.pendingDeletedConversationIds.forEach(conversationId => {
+      this.removeDeferredConversation(conversationId)
+    })
+    const deletedConversationIds: Set<string> = new Set()
+    this.pendingDeletedConversationIds.forEach((conversationId: string) => {
+      deletedConversationIds.add(conversationId)
+    })
+    this.pendingDeletedConversationIds.clear()
+
+    const conversations: ConversationItem[] = []
+    this.pendingUpsertConversations.forEach(conversation => {
+      this.removeDeferredConversation(conversation.conversationId)
+      conversations.push(conversation)
+    })
+    this.pendingUpsertConversations.clear()
+
+    const customGroupSelected = this.isCustomGroupSelected()
+    let sourceChanged = false
+    if (customGroupSelected) {
+      sourceChanged = this.mergeAllConversationList(conversations, deletedConversationIds)
+    }
+    const mergeResult = mergeConversationBatch(
+      customGroupSelected ? this.data.conversationList : this.allConversationList,
+      conversations,
+      deletedConversationIds,
+      (a: ConversationItem, b: ConversationItem): number => this.sortConversation(a, b)
+    )
+
+    let displayChanged = mergeResult.changed
+    if (mergeResult.changed) {
+      if (customGroupSelected) {
+        const displayConversations = this.filterCustomGroupConversations(mergeResult.conversations)
+        displayChanged = !this.isSameConversationList(this.data.conversationList, displayConversations)
+        if (displayChanged) {
+          this.data.conversationList = displayConversations
+          this.data.reloadData()
+        }
+      } else {
+        this.allConversationList = mergeResult.conversations
+        this.reloadDefaultGroupDisplay()
+      }
+      this.logPerf('conversation.pending_flush.reload')
+    } else {
+      this.logPerf('conversation.pending_flush.no_reload')
+    }
+    if (displayChanged || sourceChanged) {
+      this.reportConversationListCount()
+      this.notifyDefaultGroupCountChange()
+      this.ensureP2PUserInfo(conversations)
+    }
+  }
+
+  private getAitBadgeConversationCount(): number {
+    return filterConversationsByDefaultGroup(
+      this.allConversationList,
+      CONVERSATION_GROUP_DEFAULT_AIT_KEY,
+      this.aitConversationList
+    ).length
+  }
+
+  private reloadDefaultGroupDisplay(): void {
+    if (this.isCustomGroupSelected()) {
+      return
+    }
+    this.data.conversationList = filterConversationsByDefaultGroup(
+      this.allConversationList,
+      this.selectedConversationGroupKey,
+      this.aitConversationList
+    )
+    this.data.reloadData()
+    this.notifyDefaultGroupCountChange()
   }
 
   private reportConversationListCount(): void {
@@ -681,6 +1067,7 @@ export class ConversationViewModel {
       this.userAIBotConversationList.delete(conversationId)
       this.removeDeferredConversation(conversationId)
     })
+    this.removeFromAllConversationList(conversationIds)
     this.schedulePendingConversationFlush()
   }
 
@@ -695,47 +1082,6 @@ export class ConversationViewModel {
       this.pendingFlushTimer = -1
       this.flushPendingConversationUpdates()
     }, this.PENDING_EVENT_FLUSH_DELAY_MS)
-  }
-
-  private flushPendingConversationUpdates(): void {
-    this.logPerf('conversation.pending_flush.start',
-      `upserts=${this.pendingUpsertConversations.size} deletes=${this.pendingDeletedConversationIds.size}`)
-    if (this.pendingFlushTimer >= 0) {
-      clearTimeout(this.pendingFlushTimer)
-      this.pendingFlushTimer = -1
-    }
-
-    this.pendingDeletedConversationIds.forEach(conversationId => {
-      this.removeDeferredConversation(conversationId)
-    })
-    const deletedConversationIds: Set<string> = new Set()
-    this.pendingDeletedConversationIds.forEach((conversationId: string) => {
-      deletedConversationIds.add(conversationId)
-    })
-    this.pendingDeletedConversationIds.clear()
-
-    const conversations: ConversationItem[] = []
-    this.pendingUpsertConversations.forEach(conversation => {
-      this.removeDeferredConversation(conversation.conversationId)
-      conversations.push(conversation)
-    })
-    this.pendingUpsertConversations.clear()
-    const mergeResult = mergeConversationBatch(
-      this.data.conversationList,
-      conversations,
-      deletedConversationIds,
-      (a: ConversationItem, b: ConversationItem): number => this.sortConversation(a, b)
-    )
-
-    if (mergeResult.changed) {
-      this.data.conversationList = mergeResult.conversations
-      this.data.reloadData()
-      this.logPerf('conversation.pending_flush.reload')
-      this.reportConversationListCount()
-      this.ensureP2PUserInfo(conversations)
-    } else {
-      this.logPerf('conversation.pending_flush.no_reload')
-    }
   }
 
   private removeDeferredConversation(conversationId: string): void {
@@ -755,10 +1101,11 @@ export class ConversationViewModel {
     )
   }
 
-  private findConversationInsertIndex(conversation: ConversationItem): number {
-    let insertIndex = this.data.conversationList.length
-    for (let i = 0; i < this.data.conversationList.length; i++) {
-      if (conversation.sortOrder > this.data.conversationList[i].sortOrder) {
+  private findConversationInsertIndex(conversation: ConversationItem, source?: ConversationItem[]): number {
+    const targetList = source ?? this.data.conversationList
+    let insertIndex = targetList.length
+    for (let i = 0; i < targetList.length; i++) {
+      if (conversation.sortOrder > targetList[i].sortOrder) {
         insertIndex = i
         break
       }
@@ -767,12 +1114,28 @@ export class ConversationViewModel {
   }
 
   private loadAitSessions() {
-    AitServer.instance.getAllAitSession(ChatKitClient.getLoginUserId()).then((
+    const loginUserId = ChatKitClient.getLoginUserId()
+    if (loginUserId.length <= 0) {
+      return
+    }
+    const loadSeq = ++this.aitSessionLoadSeq
+    AitServer.instance.getAllAitSession(loginUserId, this.mode).then((
       aitSessions: string[]
     ) => {
+      // Ignore stale AIT load results after page destroy or account switch.
+      if (loadSeq !== this.aitSessionLoadSeq || ChatKitClient.getLoginUserId() !== loginUserId) {
+        return
+      }
+      let changed = false
       aitSessions.forEach((session) => {
-        this.aitConversationList.add(session)
+        if (!this.aitConversationList.has(session)) {
+          this.aitConversationList.add(session)
+          changed = true
+        }
       })
+      if (changed) {
+        this.refreshDefaultGroupDisplayAfterAitChanged()
+      }
     })
   }
 
@@ -811,18 +1174,32 @@ export class ConversationViewModel {
     const targetId = this.model.parseConversationTargetId(conversation.conversationId)
     const userAIBot = UserAIBotManager.getCachedUserAIBot(targetId)
     const aiUser = IMKitConfigCenter.enableAI ? NEAIUserCache.getAIUser(targetId) : undefined
+    if (userAIBot || aiUser) {
+      return resolveConversationDisplayInfo(
+        conversation,
+        targetId,
+        userAIBot ? { name: userAIBot.name, avatar: userAIBot.icon ?? '' } : undefined,
+        aiUser ? { name: aiUser.name, avatar: aiUser.avatar ?? '' } : undefined,
+        { replaceName: true, replaceAvatar: true }
+      )
+    }
+    const friendInfo = NEFriendUserCache.peekInstance()?.getFriendById(targetId)
+    if (friendInfo === undefined) {
+      return conversation
+    }
     return resolveConversationDisplayInfo(
       conversation,
       targetId,
-      userAIBot ? { name: userAIBot.name, avatar: userAIBot.icon ?? '' } : undefined,
-      aiUser ? { name: aiUser.name, avatar: aiUser.avatar ?? '' } : undefined,
-      userAIBot || aiUser ? { replaceName: true, replaceAvatar: true } : undefined
+      { name: friendInfo.showName(), avatar: friendInfo.getAvatar() },
+      undefined,
+      { replaceName: true }
     )
   }
 
   private refreshLoadedConversationDisplayInfo(conversationId?: string): void {
     let changed = false
-    this.data.conversationList.forEach((conversation: ConversationItem) => {
+    const sourceList = this.isCustomGroupSelected() ? this.data.conversationList : this.allConversationList
+    sourceList.forEach((conversation: ConversationItem) => {
       if (conversationId !== undefined && conversation.conversationId !== conversationId) {
         return
       }
@@ -834,7 +1211,11 @@ export class ConversationViewModel {
       }
     })
     if (changed) {
-      this.data.reloadData()
+      if (this.isCustomGroupSelected()) {
+        this.data.reloadData()
+      } else {
+        this.reloadDefaultGroupDisplay()
+      }
     }
 
     this.pendingUpsertConversations.forEach((conversation: ConversationItem, key: string) => {
@@ -851,5 +1232,88 @@ export class ConversationViewModel {
         return this.resolveConversationDisplayInfo(conversation)
       })
     }
+  }
+
+  private async selectCustomConversationGroup(groupId: string): Promise<void> {
+    const requestSeq = ++this.customGroupLoadSeq
+    this.selectedConversationGroupKey = groupId
+    this.customGroupId = groupId
+    this.customGroupOffset = 0
+    this.customGroupFinished = false
+    this.isFinished = false
+    this.isLoadingCustomGroupConversation = false
+    this.data.conversationList = []
+    this.data.reloadData()
+    await this.loadMoreCustomConversationGroup(requestSeq)
+  }
+
+  private async loadMoreCustomConversationGroup(requestSeq: number = this.customGroupLoadSeq): Promise<void> {
+    if (!this.customGroupId || requestSeq !== this.customGroupLoadSeq || this.customGroupFinished) {
+      return
+    }
+    if (this.isLoadingCustomGroupConversation && this.customGroupLoadingSeq === requestSeq) {
+      return
+    }
+    this.isLoadingCustomGroupConversation = true
+    this.customGroupLoadingSeq = requestSeq
+    try {
+      const option: V2NIMConversationOption = {
+        conversationGroupIds: [this.customGroupId]
+      }
+      const result = await this.model.getConversationListByOption(this.customGroupOffset, this.LOAD_MORE_LIMIT, option)
+      if (requestSeq !== this.customGroupLoadSeq) {
+        return
+      }
+      if (result !== undefined) {
+        this.customGroupOffset = result.offset
+        this.customGroupFinished = result.finished
+        this.isFinished = result.finished
+        if (result.conversationList.length > 0) {
+          this.upsertConversationBatch(result.conversationList, false)
+        }
+      }
+    } finally {
+      if (this.customGroupLoadingSeq === requestSeq) {
+        this.isLoadingCustomGroupConversation = false
+      }
+    }
+  }
+
+  private isCustomGroupSelected(): boolean {
+    return this.customGroupId.length > 0
+  }
+
+  private refreshDefaultGroupDisplayAfterAitChanged(): void {
+    if (this.isCustomGroupSelected()) {
+      this.notifyDefaultGroupCountChange()
+      return
+    }
+    this.reloadDefaultGroupDisplay()
+  }
+
+  private filterCustomGroupConversations(conversations: ConversationItem[]): ConversationItem[] {
+    return conversations.filter((conversation: ConversationItem): boolean =>
+    this.isConversationInCurrentCustomGroup(conversation))
+  }
+
+  private isConversationInCurrentCustomGroup(conversation: ConversationItem): boolean {
+    const cloudConversation = conversation as V2NIMConversation
+    return this.customGroupId.length <= 0 || (cloudConversation.groupIds?.includes(this.customGroupId) ?? false)
+  }
+
+  private removeFromAllConversationList(conversationIds: string[]): void {
+    if (conversationIds.length <= 0 || this.allConversationList.length <= 0) {
+      return
+    }
+    const deletedIds: Set<string> = new Set(conversationIds)
+    this.allConversationList = this.allConversationList.filter((conversation: ConversationItem): boolean =>
+    !deletedIds.has(conversation.conversationId))
+    if (!this.isCustomGroupSelected()) {
+      this.reloadDefaultGroupDisplay()
+    }
+  }
+
+  private notifyDefaultGroupCountChange(): void {
+    this.onDefaultGroupCountChange?.(this.getDefaultConversationGroupCounts())
   }
 }

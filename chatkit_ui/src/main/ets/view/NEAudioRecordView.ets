@@ -9,6 +9,7 @@ import { Animator as animator, AnimatorOptions, AnimatorResult } from '@kit.ArkU
 import { AudioManager } from '../manager/AudioManager';
 import { contextConstant } from '@kit.AbilityKit';
 import { AudioRecordManager } from '../manager/AudioRecordManager';
+import { AudioPlayerManager } from '../manager/AudioPlayerManager';
 import { NECommonUtils } from '@nimkit/common';
 
 @Entry
@@ -32,6 +33,7 @@ export struct NEAudioRecordView {
   @Local hei: number = 104
   @Local radius: number = 52
   @Local isRecording: boolean = false
+  @Local isPreparingRecord: boolean = false
   path: string = ""
   @Param @Require onRecordAudio?: (path: string, duration: number) => void;
   @Param @Require onRecordStart?: () => void;
@@ -44,6 +46,10 @@ export struct NEAudioRecordView {
 
   @Monitor('shouldStop')
   onShouldStopChanged() {
+    if (this.shouldStop && this.isPreparingRecord) {
+      this.isPreparingRecord = false
+      return
+    }
     if (this.shouldStop && this.isRecording) {
       Logger.info('ChatKitUI', "net ease record view received stop signal from parent")
       this.endRecord()
@@ -87,7 +93,53 @@ export struct NEAudioRecordView {
   aboutToDisappear() {
     // 由于backAnimator在onframe中引用了this, this中保存了backAnimator，
     // 在自定义组件消失时应该将保存在组件中的backAnimator置空，避免内存泄漏
+    this.isPreparingRecord = false
     this.backAnimator = undefined;
+  }
+
+  private async prepareAndStartRecord() {
+    if (this.isRecording || this.isPreparingRecord) {
+      return
+    }
+    this.isPreparingRecord = true
+    try {
+      await AudioPlayerManager.instance.stopPlayAll()
+    } catch (err) {
+      Logger.error('ChatKitUI', "net ease stop audio before record error", err.code, err.message)
+    }
+
+    if (!this.isPreparingRecord || this.isRecording) {
+      return
+    }
+    this.startRecord()
+  }
+
+  private startRecord() {
+    this.isPreparingRecord = false
+    Logger.info('ChatKitUI', "net ease record start")
+    if (this.backAnimator) {
+      this.backAnimator.play()
+    }
+    this.isRecording = true;
+    const context = getContext(this).getApplicationContext();
+    context.area = contextConstant.AreaMode.EL1;
+    const fileName = Date.now() + '.m4a'
+    const filePath = context.databaseDir + '/' + fileName
+    this.path = filePath
+    AudioRecordManager.instance.startRecordingProcess(filePath)
+    if (this.onRecordStart) {
+      this.onRecordStart()
+    }
+    this.duration = 0
+    this.intervalID = setInterval(() => {
+      Logger.info('ChatKitUI', 'net ease do every 1s. duration ' + this.duration);
+      this.duration += 1;
+      if (this.duration >= this.maxRecordTimer
+        && this.isRecording) {
+        this.endRecord()
+        this.isRecording = false;
+      }
+    }, 1000);
   }
 
   endRecord() {
@@ -152,31 +204,12 @@ export struct NEAudioRecordView {
         })
         .onTouch((event) => {
           if (event.type == TouchType.Down) {
-            Logger.info('ChatKitUI', "net ease record start")
-            if (this.backAnimator) {
-              this.backAnimator.play()
-            }
-            this.isRecording = true;
-            const context = getContext(this).getApplicationContext();
-            context.area = contextConstant.AreaMode.EL1;
-            const fileName = Date.now() + '.m4a'
-            const filePath = context.databaseDir + '/' + fileName
-            this.path = filePath
-            AudioRecordManager.instance.startRecordingProcess(filePath)
-            if (this.onRecordStart) {
-              this.onRecordStart()
-            }
-            this.duration = 0
-            this.intervalID = setInterval(() => {
-              Logger.info('ChatKitUI', 'net ease do every 1s. duration ' + this.duration);
-              this.duration += 1;
-              if (this.duration >= this.maxRecordTimer
-                && this.isRecording) {
-                this.endRecord()
-                this.isRecording = false;
-              }
-            }, 1000);
+            this.prepareAndStartRecord()
           } else if (event.type == TouchType.Up || event.type == TouchType.Cancel) {
+            if (this.isPreparingRecord) {
+              this.isPreparingRecord = false
+              return
+            }
             if (this.isRecording) {
               this.endRecord()
               this.isRecording = false;

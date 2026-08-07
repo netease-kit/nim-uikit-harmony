@@ -102,16 +102,17 @@ export class ContactViewModel {
   async getFriendList(filterList: string[] = []): Promise<NEContactSection[] | undefined> {
     try {
       let friendList: NEUserWithFriend[] = []
-      if (NEFriendUserCache.getInstance().isEmpty()) {
+      const friendUserCache = NEFriendUserCache.getInstance()
+      if (friendUserCache.isEmpty() || !friendUserCache.hasLoadedFriendList()) {
         await ContactRepo.getBlockList()
         await ContactRepo.getFriendList()
       }
 
-      friendList = NEFriendUserCache.getInstance().getFriendListNotInBlocklist()
+      friendList = friendUserCache.getFriendListNotInBlocklist()
       if (friendList) {
         this.friendList = friendList
         const contactList = this.formatFriends(friendList, filterList)
-        this.friendSection.pushList(contactList)
+        this.friendSection.replaceList(contactList)
         return contactList
       }
     } catch (err) {

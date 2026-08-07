@@ -44,7 +44,9 @@ export struct CommonAvatar {
   private fallbackAvatar() {
     Stack() {
       this.fallbackAvatarContent()
-    }.gesture(LongPressGesture().onAction(this.longPressGesture))
+    }
+    .draggable(false)
+    .gesture(LongPressGesture().onAction(this.longPressGesture))
   }
 
   @Builder
@@ -57,6 +59,7 @@ export struct CommonAvatar {
       Image(this.item?.avatarUrl)
         .width('100%')
         .height('100%')
+        .draggable(false)
         .objectFit(ImageFit.Cover)
         .syncLoad(false)
         .borderRadius(this.roundRadius)
@@ -67,7 +70,9 @@ export struct CommonAvatar {
         .onError(() => {
           this.failedAvatarKey = this.getAvatarFailureKey()
         })
-    }.gesture(LongPressGesture().onAction(this.longPressGesture))
+    }
+    .draggable(false)
+    .gesture(LongPressGesture().onAction(this.longPressGesture))
   }
 
   @Builder
@@ -75,6 +80,7 @@ export struct CommonAvatar {
     Image(this.item?.avatarUrl)
       .width('100%')
       .height('100%')
+      .draggable(false)
       .objectFit(ImageFit.Cover)
       .syncLoad(false)
       .borderRadius(this.roundRadius)
@@ -127,7 +133,8 @@ export struct CommonAvatar {
   }
 
   private getAvatarFailureKey(): string {
-    return `${this.getAvatarUrlKey()}|${this.item?.name ?? ''}|${this.item?.color ?? ''}`
+    // Keep loaded avatars stable when only the display name changes.
+    return this.getAvatarUrlKey()
   }
 }
 

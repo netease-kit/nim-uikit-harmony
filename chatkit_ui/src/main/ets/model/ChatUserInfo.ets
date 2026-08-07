@@ -7,14 +7,13 @@
 
 import { ChatKitClient, NEAIUserCache, NEFriendUserCache } from '@nimkit/chatkit';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
-import { V2NIMFriend, V2NIMMessage, V2NIMP2PMessageReadReceipt, V2NIMUser } from '@nimsdk/base';
+import { V2NIMMessage, V2NIMP2PMessageReadReceipt, V2NIMUser } from '@nimsdk/base';
 import { ChatInfo } from './ChatInfo';
 
 @ObservedV2
 export class ChatUserInfo extends ChatInfo {
   @Trace currentUser: V2NIMUser | undefined = undefined;
   @Trace chatUser: V2NIMUser | undefined = undefined;
-  @Trace chatFriend: V2NIMFriend | undefined = undefined;
   @Trace extraUserMap = new Map<string, V2NIMUser>();
   readReceipt: V2NIMP2PMessageReadReceipt | undefined = undefined;
   readReceiptMsg: NIMMessageInfo | undefined = undefined;
@@ -35,10 +34,6 @@ export class ChatUserInfo extends ChatInfo {
   setChatUser(user: V2NIMUser | undefined) {
     this.chatUser = user;
     this.conversationName = this.getConversationName();
-  }
-
-  setChatFriend(friend: V2NIMFriend | undefined) {
-    this.chatFriend = friend;
   }
 
   addExtraUsers(userList: V2NIMUser[]) {
@@ -99,14 +94,9 @@ export class ChatUserInfo extends ChatInfo {
     }
 
     let name = '';
-    if (this.chatFriend && this.chatFriend.accountId === accountId) {
-      name = this.chatFriend?.alias ?? '';
-    }
-    if (name === '' && NEFriendUserCache.getInstance().getFriendById(accountId)) {
-      let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
-      if (friendInfo !== undefined) {
-        name = friendInfo.showName()
-      }
+    let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
+    if (friendInfo !== undefined) {
+      name = friendInfo.showName()
     }
     if (name === '' && this.chatUser !== undefined && this.chatUser.accountId === accountId) {
       name = this.chatUser?.name ?? '';

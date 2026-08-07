@@ -205,6 +205,11 @@ export class NEContactSectionDataSource implements IDataSource {
     this.notifyDataAdd(this.contactSections.length - 1);
   }
 
+  public replaceList(data: NEContactSection[]): void {
+    this.contactSections = data
+    this.notifyDataReload()
+  }
+
   public delete(initial: string) {
     this.contactSections.forEach((value, index) => {
       if (initial === value.initial) {

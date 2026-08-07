@@ -86,20 +86,31 @@ export class AitServer {
     return mode === ConversationMode.LOCAL ? this.localConversationStrategy : this.cloudConversationStrategy
   }
 
+  private isSessionLoadActive(myId: string): boolean {
+    return myId.length > 0 && ChatKitClient.getLoginUserId() === myId
+  }
+
   /**
    * 处理会话未读数变化，当未读数为0时清除@消息
    * @param updateList 变化的会话列表
    */
   private handleConversationUnreadChanged(updateList: ConversationItem[]): void {
     updateList.forEach((conversation) => {
-      if (conversation.unreadCount === 0 &&
-      this.aitConversationMap.has(conversation.conversationId)) {
-        this.clearAitMessage(conversation.conversationId)
-        this.sendAitChange({
-          sessionId: conversation.conversationId,
-          isAit: false
-        })
+      if (conversation.unreadCount === 0) {
+        void this.clearAitSessionWhenRead(conversation.conversationId)
       }
+    })
+  }
+
+  private async clearAitSessionWhenRead(conversationId: string): Promise<void> {
+    const hasCachedAit = this.aitConversationMap.has(conversationId)
+    const clearedCount = await this.clearAitMessage(conversationId)
+    if (!hasCachedAit && (clearedCount ?? 0) <= 0) {
+      return
+    }
+    this.sendAitChange({
+      sessionId: conversationId,
+      isAit: false
     })
   }
 
@@ -259,8 +270,45 @@ export class AitServer {
     return false
   }
 
-  public async getAllAitSession(myId: string): Promise<string[]> {
-    return AitDatabase.instance.queryAllAitSession(myId);
+  public async getAllAitSession(myId: string, mode: ConversationMode): Promise<string[]> {
+    const aitSessions = await AitDatabase.instance.queryAllAitSession(myId)
+    if (!this.isSessionLoadActive(myId)) {
+      return []
+    }
+    const uniqueSessionIds: string[] = Array.from(new Set(aitSessions))
+    const validSessionIds: string[] = []
+    // Keep cloud/local lookup bound to the caller mode.
+    const conversationStrategy = this.getConversationStrategy(mode)
+
+    for (let i = 0; i < uniqueSessionIds.length; i++) {
+      if (!this.isSessionLoadActive(myId)) {
+        return []
+      }
+      const sessionId = uniqueSessionIds[i]
+      const messageIds = await AitDatabase.instance.queryMessageIdsBySessionId(sessionId, myId)
+      if (!this.isSessionLoadActive(myId)) {
+        return []
+      }
+      if (messageIds.length <= 0) {
+        this.aitConversationMap.delete(sessionId)
+        await AitDatabase.instance.clearSessionAitMessage(sessionId, myId)
+        continue
+      }
+
+      this.aitConversationMap.set(sessionId, new Set(messageIds))
+      const conversation = await conversationStrategy.getConversation(sessionId)
+      if (!this.isSessionLoadActive(myId)) {
+        return []
+      }
+      if (conversation !== undefined && conversation.unreadCount === 0) {
+        await this.clearAitMessage(sessionId)
+        continue
+      }
+
+      validSessionIds.push(sessionId)
+    }
+
+    return validSessionIds
   }
 }
 

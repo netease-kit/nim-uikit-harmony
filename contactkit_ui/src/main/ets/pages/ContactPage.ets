@@ -84,6 +84,12 @@ export function ContactItemBuilder(params: NEContactItem) {
     }
     .alignSelf(ItemAlign.Center)
     .height(59)
+
+    Row()
+      .width('100%')
+      .height(1)
+      .backgroundColor('#F5F8FC')
+      .margin({ left: 20 })
   }
   .width('100%')
   .height(60)
@@ -106,7 +112,10 @@ export struct ContactPage {
   @Local selectedIndex: number = 0; // 用于指定字母导航的选择项
   loadData = async () => {
     try {
-      await this.viewModel.getFriendList()
+      const contactList = await this.viewModel.getFriendList()
+      if (contactList !== undefined) {
+        this.isFinishedInit = true
+      }
       await this.loadCombinedUnreadCount()
     } catch (err) {
       Logger.error('ContactKit', err)
@@ -154,7 +163,7 @@ export struct ContactPage {
             }
           })
 
-          List() {
+          List({ scroller: this.listScroller }) {
             Repeat<NEContactItem>(this.headerItems).each((obj) => {
               ListItem() {
                 ContactItemBuilder(obj.item)
@@ -172,79 +181,84 @@ export struct ContactPage {
                 })
               })
             })
-          }
-          .width('100%')
-          .height(this.headerItems.length * 61)
-          .backgroundColor(Color.White)
-          .divider({
-            strokeWidth: 1,
-            startMargin: 20,
-            color: '#F5F8FC'
-          })
 
-          List({ scroller: this.listScroller }) {
-            LazyForEach(this.viewModel.friendSection, (item: NEContactSection, index) => {
-              ListItemGroup({
-                header: ListGroupHeader(item.initial)
-              }) {
-                LazyForEach(item.contacts, (item: NEUserWithFriend, index) => {
-                  ListItem() {
-                    ViewItemBuilder({
-                      avatarItem: new AvatarItem(item.user?.avatar, item.shortName(),
-                        AvatarColorUntil.getBackgroundColorById(item.user?.accountId ?? '')),
-                      title: item.showName(),
-                      itemHeight: 60,
-                      titleIconSize: 36,
-                      titleFontSize: 14,
-                      onlineState:
-                      (IMKitConfigCenter.enableShownOnlineState ?
-                        (this.subscriptViewModel.getOnlineState(item.user?.accountId) ? true : false) : undefined)
-                    })
-                  }
-                  .onAppear(() => {
-                    if (IMKitConfigCenter.enableShownOnlineState) {
-                      this.subscriptViewModel.subscribeUserStatusBatch([item.user?.accountId ?? ''])
-                    }
-                  })
-                  .onDisAppear(() => {
-                    if (IMKitConfigCenter.enableShownOnlineState &&
-                      this.subscriptViewModel.hasReachedSubscriptionLimit()) {
-                      this.subscriptViewModel.unsubscribeUserStatus([item.user?.accountId ?? ''])
-                    }
-                  })
+            if (this.headerItems.length > 0) {
+              ListItem() {
+                Row()
                   .width('100%')
-                  .height(60)
-                  .backgroundColor(Color.White)
-                  .onClick(() => {
-                    this.pathStack.pushPath({
-                      name: 'PersonInfoPage',
-                      param: item.user?.accountId
-                    })
-                  })
-                }, (item: NEUserWithFriend, index) => item.user?.accountId)
+                  .height(6)
+                  .backgroundColor('#EFF1F4')
               }
-            }, (item: NEContactSection, index) => item.initial)
+              .width('100%')
+              .height(6)
+            }
+
+            if (this.viewModel.friendSection.totalCount() <= 0 && this.isFinishedInit) {
+              ListItem() {
+                CommonEmptyResult({
+                  tips: $r('app.string.no_friend')
+                })
+                  .backgroundColor(Color.White)
+              }
+              .width('100%')
+              .height(360)
+              .backgroundColor(Color.White)
+            } else {
+              LazyForEach(this.viewModel.friendSection, (item: NEContactSection, index) => {
+                ListItemGroup({
+                  header: ListGroupHeader(item.initial)
+                }) {
+                  LazyForEach(item.contacts, (item: NEUserWithFriend, index) => {
+                    ListItem() {
+                      ViewItemBuilder({
+                        avatarItem: new AvatarItem(item.user?.avatar, item.shortName(),
+                          AvatarColorUntil.getBackgroundColorById(item.user?.accountId ?? '')),
+                        title: item.showName(),
+                        itemHeight: 60,
+                        titleIconSize: 36,
+                        titleFontSize: 14,
+                        onlineState:
+                        (IMKitConfigCenter.enableShownOnlineState ?
+                          (this.subscriptViewModel.getOnlineState(item.user?.accountId) ? true : false) : undefined)
+                      })
+                    }
+                    .onAppear(() => {
+                      if (IMKitConfigCenter.enableShownOnlineState) {
+                        this.subscriptViewModel.subscribeUserStatusBatch([item.user?.accountId ?? ''])
+                      }
+                    })
+                    .onDisAppear(() => {
+                      if (IMKitConfigCenter.enableShownOnlineState &&
+                        this.subscriptViewModel.hasReachedSubscriptionLimit()) {
+                        this.subscriptViewModel.unsubscribeUserStatus([item.user?.accountId ?? ''])
+                      }
+                    })
+                    .width('100%')
+                    .height(60)
+                    .backgroundColor(Color.White)
+                    .onClick(() => {
+                      this.pathStack.pushPath({
+                        name: 'PersonInfoPage',
+                        param: item.user?.accountId
+                      })
+                    })
+                  }, (item: NEUserWithFriend, index) => item.user?.accountId)
+                }
+              }, (item: NEContactSection, index) => item.initial)
+            }
           }
           .width('100%')
-          .margin({ top: 6 })
           .backgroundColor('#EFF1F4')
           .sticky(StickyStyle.Header)
           .cachedCount(7)
           .scrollBar(BarState.Off)
           // 获取联系人列表滑动位置的索引，并将索引通过selectedIndex同步给右侧字母导航
           .onScrollIndex((start: number, end: number, center: number) => {
-            this.selectedIndex = start
+            this.selectedIndex = this.getSelectedSectionIndex(start)
           })
-
-          if (this.viewModel.friendSection.totalCount() <= 0 && this.isFinishedInit) {
-            CommonEmptyResult({
-              tips: $r('app.string.no_friend')
-            })
-              .backgroundColor(Color.White)
-          }
         }
         .width('100%')
-        .margin({ bottom: this.headerItems.length * 60 + 58 })
+        .margin({ bottom: 58 })
         .backgroundColor('#EFF1F4')
 
         // 使用AlphabetIndexer组件实现右侧字母导航
@@ -263,7 +277,7 @@ export struct ContactPage {
           .font({ size: 10 })// 指定字母导航的选择项为selectedIndex，完成跟联系人列表的同步
           .selected(this.selectedIndex)// 获取选中字母的索引值，通过listScroller控制列表滑动到对应索引位置
           .onSelect((index: number) => {
-            this.listScroller.scrollToIndex(index)
+            this.listScroller.scrollToIndex(index + this.getListHeaderOffset())
           })
       }
     }
@@ -282,6 +296,26 @@ export struct ContactPage {
   private disposeEventListeners(): void {
     this.disposableBag.dispose()
     ContactRepo.listener.off('loadFriendCache', this.onLoadFriendCache)
+  }
+
+  private getListHeaderOffset(): number {
+    return this.headerItems.length + (this.headerItems.length > 0 ? 1 : 0)
+  }
+
+  private getSelectedSectionIndex(start: number): number {
+    const sectionCount = this.viewModel.initalList.length
+    if (sectionCount <= 0) {
+      return 0
+    }
+
+    const sectionIndex = start - this.getListHeaderOffset()
+    if (sectionIndex <= 0) {
+      return 0
+    }
+    if (sectionIndex >= sectionCount) {
+      return sectionCount - 1
+    }
+    return sectionIndex
   }
 
   private getContactHeaderItems(): NEContactItem[] {

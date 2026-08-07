@@ -87,6 +87,186 @@
     {
       "name": "fraud_tip_content",
       "value": "仅用于体验云信IM产品功能，请勿轻信汇款，中奖等涉及钱款的信息，勿轻易拨打陌生电话，谨防上当受骗。"
+    },
+    {
+      "name": "conversation_group_manage_title",
+      "value": "会话分组"
+    },
+    {
+      "name": "conversation_group_default_all",
+      "value": "全部"
+    },
+    {
+      "name": "conversation_group_default_ait",
+      "value": "@我"
+    },
+    {
+      "name": "conversation_group_default_unread",
+      "value": "未读"
+    },
+    {
+      "name": "conversation_group_create_action",
+      "value": "新建分组"
+    },
+    {
+      "name": "conversation_group_visible_section",
+      "value": "常用分组"
+    },
+    {
+      "name": "conversation_group_hidden_section",
+      "value": "隐藏分组"
+    },
+    {
+      "name": "conversation_group_hidden_empty",
+      "value": "暂无隐藏分组"
+    },
+    {
+      "name": "conversation_group_create_title",
+      "value": "新建分组"
+    },
+    {
+      "name": "conversation_group_rename_title",
+      "value": "修改分组名称"
+    },
+    {
+      "name": "conversation_group_name_placeholder",
+      "value": "设置分组名称"
+    },
+    {
+      "name": "conversation_group_name_empty_tips",
+      "value": "分组名称不能为空"
+    },
+    {
+      "name": "conversation_group_limit_tips",
+      "value": "会话分组超限"
+    },
+    {
+      "name": "conversation_group_save_failed",
+      "value": "保存失败，请重试"
+    },
+    {
+      "name": "conversation_group_done",
+      "value": "完成"
+    },
+    {
+      "name": "conversation_group_confirm",
+      "value": "确定"
+    },
+    {
+      "name": "conversation_group_name_item",
+      "value": "分组名称"
+    },
+    {
+      "name": "conversation_group_setting_title",
+      "value": "设置会话分组"
+    },
+    {
+      "name": "conversation_group_add_conversation",
+      "value": "添加会话"
+    },
+    {
+      "name": "conversation_group_add_conversation_title_count",
+      "value": "添加会话(%d/%d)"
+    },
+    {
+      "name": "conversation_group_member_section",
+      "value": "会话"
+    },
+    {
+      "name": "conversation_group_member_section_count",
+      "value": "(%d)"
+    },
+    {
+      "name": "conversation_group_detail_empty",
+      "value": "暂无会话"
+    },
+    {
+      "name": "conversation_group_remove_conversation",
+      "value": "移除"
+    },
+    {
+      "name": "conversation_group_delete_short",
+      "value": "删除"
+    },
+    {
+      "name": "conversation_group_remove_failed",
+      "value": "移除失败，请重试"
+    },
+    {
+      "name": "conversation_group_delete_action",
+      "value": "删除分组"
+    },
+    {
+      "name": "conversation_group_delete_title",
+      "value": "删除分组"
+    },
+    {
+      "name": "conversation_group_delete_message",
+      "value": "删除后不会删除分组内的会话"
+    },
+    {
+      "name": "conversation_group_delete_failed",
+      "value": "删除失败，请重试"
+    },
+    {
+      "name": "conversation_group_not_exist_tips",
+      "value": "会话分组不存在"
+    },
+    {
+      "name": "conversation_group_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "conversation_group_recent_conversation",
+      "value": "最近会话"
+    },
+    {
+      "name": "conversation_group_search_placeholder",
+      "value": "请输入你需要搜索的会话"
+    },
+    {
+      "name": "conversation_group_search_empty",
+      "value": "暂无搜索结果"
+    },
+    {
+      "name": "conversation_group_add_empty",
+      "value": "暂无可添加会话"
+    },
+    {
+      "name": "conversation_group_select_limit_tips",
+      "value": "最多选择100个会话"
+    },
+    {
+      "name": "conversation_group_partial_add_failed",
+      "value": "部分失败"
+    },
+    {
+      "name": "conversation_group_partial_add_success_tips",
+      "value": "部分失败，已成功的%s添加成功"
+    },
+    {
+      "name": "conversation_group_partial_add_name_separator",
+      "value": "、"
+    },
+    {
+      "name": "conversation_group_partial_add_name_overflow_suffix",
+      "value": "等"
+    },
+    {
+      "name": "conversation_group_add_failed",
+      "value": "添加失败，请重试"
+    },
+    {
+      "name": "conversation_group_belonged_group_limit_tips",
+      "value": "会话所属分组数量超限"
+    },
+    {
+      "name": "conversation_group_conversations_in_group_limit_tips",
+      "value": "会话分组中的会话数量超限"
+    },
+    {
+      "name": "conversation_group_conversation_not_exist_tips",
+      "value": "会话不存在"
     }
   ]
 }

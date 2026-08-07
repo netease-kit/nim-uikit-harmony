@@ -69,6 +69,10 @@ export class ChatTeamInfo extends ChatInfo {
     this.teamUserFriendMap.set(friend.accountId, friend);
   }
 
+  removeTeamFriend(accountId: string) {
+    this.teamUserFriendMap.delete(accountId);
+  }
+
   addTeamMember(member: V2NIMTeamMember[]) {
     member.forEach((member) => {
       this.teamMemberMap.set(member.accountId, member);

@@ -380,8 +380,8 @@ export class NIMMessageInfo {
   }
 
   canOperateInMultiSelect(): boolean {
+    // Keep failed messages available for local batch actions
     return !this.isRevokeMsg &&
-      this.message.sendingState !== V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED &&
       this.message.sendingState !== V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SENDING &&
       !this.isAIStreamInProgress()
   }

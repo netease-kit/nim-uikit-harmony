@@ -8,7 +8,7 @@
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { V2NIMConversationType, V2NIMErrorCode, V2NIMMessageSendingState, V2NIMMessageType } from '@nimsdk/base';
 import { ChatInfo } from '../model/ChatInfo';
-import { getNotificationMessageContent, getPinMessagesTips, getTipsMessageContent } from '../common/MessageHelper';
+import { getNotificationMessageContent, getPinMessageOperatorName, getTipsMessageContent } from '../common/MessageHelper';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
 import { messageContent } from './MessageComponentBuilder';
 import { MessageItemClick } from './MessageItemClick';
@@ -67,6 +67,42 @@ export struct MessageComponent {
       });
     }
   }
+}
+
+@Builder
+function PinMessageTipBuilder(message: NIMMessageInfo | undefined, chatUserInfo: ChatInfo | undefined,
+  alignEnd: boolean = false, tipMargin?: Margin) {
+  Row() {
+    Row() {
+      Image($r('app.media.ic_chat_message_pin'))
+        .height(12)
+        .width(12)
+        .margin({ top: 6 })
+
+      Text(message ? getPinMessageOperatorName(message, chatUserInfo) : '')
+        .fontSize(12)
+        .fontColor($r('app.color.color_chat_pin_tips'))
+        .margin({ top: 6, left: 6 })
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .ellipsisMode(EllipsisMode.END)
+        .constraintSize({ maxWidth: '50%' })
+        .flexShrink(1)
+
+      Text($r('app.string.chat_pin_message_suffix'))
+        .fontSize(12)
+        .fontColor($r('app.color.color_chat_pin_tips'))
+        .margin({ top: 6 })
+        .maxLines(1)
+        // Keep the fixed suffix visible while only the name shrinks.
+        .flexShrink(0)
+    }
+    .constraintSize({ maxWidth: '100%' })
+  }
+  .width('100%')
+  .height('26vp')
+  .justifyContent(alignEnd ? FlexAlign.End : FlexAlign.Start)
+  .margin(tipMargin)
 }
 
 // 发送消息组件
@@ -311,15 +347,8 @@ export struct SenderMessageComponent {
 
             // 仅当标记功能开启时显示标记提示
             if (IMKitConfigCenter.enablePin && this.message?.isPinMsg) {
-              Row() {
-                Image($r('app.media.ic_chat_message_pin')).height(12).width(12).margin({ top: 6 })
-                Text(getPinMessagesTips(this.message, this.chatUserInfo))
-                  .fontSize(12)
-                  .fontColor($r('app.color.color_chat_pin_tips'))
-                  .margin({ top: 6, left: 6 })
-                  .maxLines(1)
-                  .ellipsisMode(EllipsisMode.END)
-              }.width('100%').height('26vp').margin({ bottom: 6, right: 12 }).justifyContent(FlexAlign.End)
+              PinMessageTipBuilder(this.message, this.chatUserInfo, true,
+                { bottom: 6, right: 12 })
             }
           }.alignItems(HorizontalAlign.End).margin({ left: 8 }).width('75%')
           // 多选模式下的覆盖层 - 使用 TapGesture 只拦截点击，允许滑动穿透
@@ -557,15 +586,7 @@ export struct ReceiveMessageComponent {
 
             // 仅当标记功能开启时显示标记提示
             if (IMKitConfigCenter.enablePin && this.message?.isPinMsg) {
-              Row() {
-                Image($r('app.media.ic_chat_message_pin')).height(12).width(12).margin({ top: 6 })
-                Text(getPinMessagesTips(this.message, this.chatUserInfo))
-                  .fontSize(12)
-                  .fontColor($r('app.color.color_chat_pin_tips'))
-                  .margin({ top: 6, left: 6 })
-                  .maxLines(1)
-                  .ellipsisMode(EllipsisMode.CENTER)
-              }.width('100%').height('26vp')
+              PinMessageTipBuilder(this.message, this.chatUserInfo)
             }
           }.alignItems(HorizontalAlign.Start).margin({ left: 8, top: 6 }).width('68%')
 

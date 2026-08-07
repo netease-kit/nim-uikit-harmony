@@ -160,6 +160,7 @@ export enum TranslationLanguageCode {
   ES = 'es',
   RU = 'ru',
   PT = 'pt',
+  IT = 'it',
   AR = 'ar',
   HI = 'hi',
   VI = 'vi',
@@ -178,8 +179,8 @@ export const SUPPORTED_TRANSLATION_LANGUAGES: TranslationLanguageCode[] = [
   TranslationLanguageCode.ES,
   TranslationLanguageCode.RU,
   TranslationLanguageCode.PT,
-  TranslationLanguageCode.AR,
-  TranslationLanguageCode.HI,
+  // Keep the exposed language list aligned with product support
+  TranslationLanguageCode.IT,
   TranslationLanguageCode.VI,
   TranslationLanguageCode.TH,
   TranslationLanguageCode.ID

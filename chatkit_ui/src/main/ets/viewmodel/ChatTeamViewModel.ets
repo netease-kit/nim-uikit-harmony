@@ -20,6 +20,7 @@ import {
   keyExtensionLastOptType,
   keyExtensionSticky,
   keyExtensionTopSticky,
+  NEFriendUserCache,
   TeamEventRepo,
   TeamMemberCache,
   TeamRepo,
@@ -31,6 +32,7 @@ import {
   V2NIMConversationType,
   V2NIMErrorCode,
   V2NIMFriend,
+  V2NIMFriendDeletionType,
   V2NIMMessage,
   V2NIMMessageDeletedNotification,
   V2NIMMessageNotificationAttachment,
@@ -47,7 +49,6 @@ import {
   V2NIMUser
 } from '@nimsdk/base';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
-import { HashSet } from '@kit.ArkTS';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { ChatKitConfig } from '../ChatKitConfig';
 import { TopStickyMessage } from '../model/TopStickyMessage';
@@ -108,8 +109,10 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
     this.eventDisposers.dispose()
     this.eventDisposers.addAll([
       FriendEventRepo.onFriendInfoChanged(this.onFriendInfoChangedFun),
+      FriendEventRepo.onFriendDeleted(this.onFriendInfoDeleteFun),
       UserEventRepo.onUserProfileChanged(this.onUserProfileChangedFun),
       TeamEventRepo.onTeamInfoUpdated(this.teamUpdateFun),
+      TeamEventRepo.onTeamJoined(this.onTeamJoinedFun),
       TeamEventRepo.onTeamMemberJoined(this.onTeamMemberJoinedFun),
       TeamEventRepo.onTeamMemberInfoUpdated(this.onTeamMemberInfoUpdatedFun),
       TeamEventRepo.onTeamDismissed(this.onTeamDismissedFun),
@@ -130,9 +133,22 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
 
   onFriendInfoChangedFun = (friendInfo: V2NIMFriend) => {
     if (this.chatTeamInfo?.teamUserMap.has(friendInfo.accountId)) {
+      NEFriendUserCache.getInstance().updateFriendInfo({ friend: friendInfo })
       this.chatTeamInfo.addTeamFriend(friendInfo)
+      this.chatTeamInfo.msgList.notifyDataReload()
     }
 
+  }
+  onFriendInfoDeleteFun = (accountId: string, _deletionType?: V2NIMFriendDeletionType) => {
+    const friendCache = NEFriendUserCache.getInstance()
+    const hadFriend = this.chatTeamInfo?.teamUserFriendMap.has(accountId) || friendCache.getFriendById(accountId) !== undefined
+    friendCache.removeFriendInfo(accountId)
+    if (this.chatTeamInfo?.teamUserFriendMap.has(accountId)) {
+      this.chatTeamInfo.removeTeamFriend(accountId)
+    }
+    if (hadFriend) {
+      this.chatTeamInfo?.msgList.notifyDataReload()
+    }
   }
   onUserProfileChangedFun = (user: V2NIMUser[]) => {
     let updateUser: V2NIMUser[] = []
@@ -172,6 +188,14 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
       if (team.serverExtension) {
         this.handleTopMessagePermission(team.serverExtension)
       }
+    }
+  }
+  onTeamJoinedFun = (team: V2NIMTeam) => {
+    if (team.teamId === this.targetId) {
+      ChatKitClient.selfLeaveTeam = false
+      this.shouldShowTeamExitWarning = false
+      this.chatTeamInfo?.setTeam(team)
+      this.getTeamMemberListInfo([ChatKitClient.getLoginUserId()])
     }
   }
   onTeamMemberJoinedFun = (teamMembers: V2NIMTeamMember[]) => {
@@ -277,7 +301,6 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
 
   toHandleReceiveMessage(messages: NIMMessageInfo[]) {
     this.getTeamMemberInfoWithMessage(messages)
-    this.getAndSendMessageReceipts(messages)
   }
 
   /**
@@ -299,7 +322,6 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
       })
     }
     this.getTeamMemberInfoWithMessage(messages)
-    this.getAndSendMessageReceipts(messages)
   }
 
   toHandleDataSyncFinished(): void {
@@ -312,9 +334,6 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
         this.needUserMessageList = []
       }
       this.getPinList()
-      if (this.chatTeamInfo?.msgList.getMessageList() !== undefined) {
-        this.getAndSendMessageReceipts(this.chatTeamInfo?.msgList.getMessageList() ?? [])
-      }
     } else {
       this.loadData()
     }
@@ -410,10 +429,14 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
       const teamMembers = await TeamRepo.getTeamMemberListByIds(teamId,
         V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
         [ChatKitClient.getLoginUserId()])
-      return teamMembers.some(member => member.inTeam !== false)
+      const selfMember = teamMembers.find(member => member.accountId === ChatKitClient.getLoginUserId())
+      if (selfMember === undefined) {
+        return true
+      }
+      return selfMember.inTeam !== false
     } catch (err) {
       Logger.error('ChatKitUI', 'ChatTeamViewModel isCurrentUserStillInTeam error', err)
-      return false
+      return true
     }
   }
 
@@ -449,7 +472,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
 
   // 获取群成员信息，包括群成员信息、用户信息
   async getTeamMemberInfoWithMessage(msgList: NIMMessageInfo[]) {
-    let senderList = new HashSet<string>();
+    let senderList = new Set<string>();
     if (msgList.length < 1) {
       return
     }
@@ -468,6 +491,8 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
     })
     let requestAccountList: string[] = [];
     let requestUserAccountList: string[] = [];
+    let requestFriendAccountList: string[] = [];
+    let hasCachedFriendAdded = false
     senderList.forEach(account => {
       if (account !== undefined && !AIUserManager.isAIUser(account) && !this.chatTeamInfo?.teamMemberMap.has(account)) {
         requestAccountList.push(account)
@@ -475,7 +500,21 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
       if (account !== undefined && !AIUserManager.isAIUser(account) && !this.chatTeamInfo?.teamUserMap.has(account)) {
         requestUserAccountList.push(account)
       }
+      if (account !== undefined && !AIUserManager.isAIUser(account)) {
+        const cachedFriend = NEFriendUserCache.getInstance().getFriendById(account)?.friend
+        if (cachedFriend) {
+          if (!this.chatTeamInfo?.teamUserFriendMap.has(account)) {
+            this.chatTeamInfo?.addTeamFriend(cachedFriend)
+            hasCachedFriendAdded = true
+          }
+        } else if (!this.chatTeamInfo?.teamUserFriendMap.has(account)) {
+          requestFriendAccountList.push(account)
+        }
+      }
     })
+    if (hasCachedFriendAdded) {
+      this.chatTeamInfo?.msgList.notifyDataReload()
+    }
     if (requestAccountList.length > 0) {
       TeamRepo.getTeamMemberListByIds(this.targetId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, requestAccountList)
         .then((teamMemberList: V2NIMTeamMember[]) => {
@@ -493,6 +532,19 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
         this.chatTeamInfo?.addTeamUser(teamUserInfo)
       }).catch((error: Error) => {
         Logger.error('ChatKitUI', 'netease getTeamMemberInfoWithMessage:getUserListFromCloud ', error.name)
+      })
+    }
+    if (requestFriendAccountList.length > 0) {
+      ContactRepo.getFriendByIds(requestFriendAccountList).then((teamFriendInfo: V2NIMFriend[]) => {
+        teamFriendInfo.forEach((friend) => {
+          NEFriendUserCache.getInstance().updateFriendInfo({ friend: friend })
+          this.chatTeamInfo?.addTeamFriend(friend)
+        })
+        if (teamFriendInfo.length > 0) {
+          this.chatTeamInfo?.msgList.notifyDataReload()
+        }
+      }).catch((error: Error) => {
+        Logger.error('ChatKitUI', 'netease getTeamMemberInfoWithMessage:getFriendByIds ', error.name)
       })
     }
   }

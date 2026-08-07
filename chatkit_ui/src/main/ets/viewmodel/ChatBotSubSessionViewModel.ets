@@ -155,23 +155,19 @@ export class ChatBotSubSessionViewModel extends ChatP2PViewModel {
       }
       return text.length > CHAT_BOT_TOPIC_TITLE_MAX_LENGTH ? text.substring(0, CHAT_BOT_TOPIC_TITLE_MAX_LENGTH) : text
     }
-    const date = new Date(message.createTime > 0 ? message.createTime : Date.now())
-    const hour = date.getHours().toString().padStart(2, '0')
-    const minute = date.getMinutes().toString().padStart(2, '0')
-    const time = `${hour}:${minute}`
     if (message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
-      return `${resourceManager.getStringSync($r('app.string.chat_bot_sub_session_summary_image').id)} ${time}`
+      return resourceManager.getStringSync($r('app.string.chat_bot_sub_session_summary_image').id)
     }
     if (message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE) {
-      return `${resourceManager.getStringSync($r('app.string.chat_bot_sub_session_summary_file').id)} ${time}`
+      return resourceManager.getStringSync($r('app.string.chat_bot_sub_session_summary_file').id)
     }
     if (message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
-      return `${resourceManager.getStringSync($r('app.string.chat_bot_sub_session_summary_audio').id)} ${time}`
+      return resourceManager.getStringSync($r('app.string.chat_bot_sub_session_summary_audio').id)
     }
     if (message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
-      return `${resourceManager.getStringSync($r('app.string.chat_bot_sub_session_summary_video').id)} ${time}`
+      return resourceManager.getStringSync($r('app.string.chat_bot_sub_session_summary_video').id)
     }
-    return `${resourceManager.getStringSync($r('app.string.chat_bot_sub_session_summary_message').id)} ${time}`
+    return resourceManager.getStringSync($r('app.string.chat_bot_sub_session_summary_message').id)
   }
 
   private async updateAutoTopicName(topic: V2NIMTopic, message: V2NIMMessage): Promise<void> {
@@ -522,12 +518,10 @@ export class ChatBotSubSessionViewModel extends ChatP2PViewModel {
 
   toHandleReceiveMessage(messages: NIMMessageInfo[]): void {
     this.getUserInfo()
-    this.toHandleReceiptMessage(messages)
   }
 
   toHandleQueryMessage(messages: NIMMessageInfo[], originMsg: V2NIMMessage[]): void {
     this.getUserInfo()
-    this.toHandleReceiptMessage(messages)
   }
 
   private registerTopicListeners(): void {

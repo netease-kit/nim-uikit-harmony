@@ -11,7 +11,6 @@ import { ChatAitDialog } from './ChatAitDialog';
 import {
   accountAll,
   ContactRepo,
-  NEAIUserCache,
   normalizeMultiLineTitle,
   TeamMemberCache,
   TeamMemberWithUser
@@ -29,6 +28,7 @@ import {
   RichInputTransferNode,
   RichInputTransferNodeType
 } from '../common/InputTransferUtils';
+import { resolveAitCandidateByAccountId } from '../common/AitRoutingUtils';
 
 /**
  * 多行输入面板组件
@@ -300,20 +300,13 @@ export struct MultiLineInputView {
       return
     }
 
-    let sendMember = await TeamMemberCache.getInstance().getMemberById(senderId)
-    if (sendMember) {
-      let aitValue = '@' + sendMember.getAitName() + ' '
-      this.addAitSpan(senderId, aitValue.substring(1), false)
+    // 与 @ 弹窗保持同一候选范围：可 AI 聊数字人 + 群成员
+    const candidate = await resolveAitCandidateByAccountId(senderId, this.aiUsers)
+    if (candidate) {
+      this.addAitSpan(candidate.accountId, candidate.displayName + ' ', false)
       return
     }
-
-    const aiUser = NEAIUserCache.getAIUser(senderId)
-    if (!aiUser) {
-      return
-    }
-
-    const aitValue = (aiUser.name ?? aiUser.accountId) + ' '
-    this.addAitSpan(aiUser.accountId, aitValue, false)
+    Logger.warn('ChatKitUI', `MultiLineInputView addAitUserById miss ait candidate senderId=${senderId}`)
   }
 
   /**

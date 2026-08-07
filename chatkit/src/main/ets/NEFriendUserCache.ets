@@ -23,6 +23,8 @@ export class NEFriendUserCache {
   public blockAccountList: string[] = []
   // 好友列表,包括黑名单中好友
   public friendCache: Map<string, NEUserWithFriend> = new Map<string, NEUserWithFriend>()
+  // 是否已经完成全量好友列表加载
+  private friendListLoaded: boolean = false
 
   private constructor() {
     ContactRepo.addListener()
@@ -52,6 +54,11 @@ export class NEFriendUserCache {
     }
 
     return false
+  }
+
+  /// 全量好友列表是否已经加载完成
+  public hasLoadedFriendList(): boolean {
+    return this.friendListLoaded
   }
 
   /// 是否是好友
@@ -109,6 +116,7 @@ export class NEFriendUserCache {
       })
     })
 
+    this.friendListLoaded = true
     ContactRepo.listener.emit('loadFriendCache')
   }
 
@@ -159,14 +167,17 @@ export class NEFriendUserCache {
 
   /// 删除好友信息缓存
   public removeFriendInfo(accountId: string) {
-    this.friendCache.delete(accountId)
-    ContactRepo.listener.emit('removeFriendInfo', accountId)
+    if (this.friendCache.has(accountId)) {
+      this.friendCache.delete(accountId)
+      ContactRepo.listener.emit('removeFriendInfo', accountId)
+    }
   }
 
   /// 删除所有好友信息缓存
   public removeAllFriendInfo() {
     this.friendCache.clear()
     this.blockAccountList = []
+    this.friendListLoaded = false
     ContactRepo.removeListener()
     AppStorage.delete(NEFriendUserCache.name)
   }

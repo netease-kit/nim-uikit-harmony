@@ -7,8 +7,10 @@
 
 import {
   V2NIMConversation,
+  V2NIMConversationOption,
   V2NIMConversationResult,
   V2NIMLocalConversation,
+  V2NIMLocalConversationOption,
   V2NIMLocalConversationResult
 } from '@nimsdk/base'
 import { ConversationRepo } from '../repo/ConversationRepo'
@@ -27,6 +29,8 @@ export interface ConversationStrategy {
   readonly mode: ConversationMode
 
   getConversationList(offset: number, limit: number): Promise<ConversationResult | null>
+  getConversationListByOption(offset: number, limit: number,
+    option: V2NIMConversationOption): Promise<ConversationResult | undefined>
   getConversation(conversationId: string): Promise<ConversationItem | undefined>
   deleteConversation(conversationId: string): Promise<void>
   stickTopConversation(conversationId: string, stickTop: boolean): Promise<void>
@@ -57,6 +61,11 @@ export class CloudConversationStrategy implements ConversationStrategy {
 
   async getConversationList(offset: number, limit: number): Promise<ConversationResult | null> {
     return await ConversationRepo.getConversationList(offset, limit)
+  }
+
+  async getConversationListByOption(offset: number, limit: number,
+    option: V2NIMConversationOption): Promise<ConversationResult | undefined> {
+    return await ConversationRepo.getConversationListByOption(offset, limit, option)
   }
 
   async getConversation(conversationId: string): Promise<ConversationItem | undefined> {
@@ -149,6 +158,12 @@ export class LocalConversationStrategy implements ConversationStrategy {
 
   async getConversationList(offset: number, limit: number): Promise<ConversationResult | null> {
     return await LocalConversationRepo.getConversationList(offset, limit)
+  }
+
+  async getConversationListByOption(offset: number, limit: number,
+    option: V2NIMConversationOption): Promise<ConversationResult | undefined> {
+    return await LocalConversationRepo.getConversationListByOption(offset, limit,
+      option as V2NIMLocalConversationOption)
   }
 
   async getConversation(conversationId: string): Promise<ConversationItem | undefined> {

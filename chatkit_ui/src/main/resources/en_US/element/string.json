@@ -405,6 +405,10 @@
       "value": "Pined by %s"
     },
     {
+      "name": "chat_pin_message_suffix",
+      "value": " pinned this message"
+    },
+    {
       "name": "chat_team_all_mute",
       "value": "Mute"
     },
@@ -1079,6 +1083,10 @@
     {
       "name": "chat_bot_sub_session_summary_video",
       "value": "[Video]"
+    },
+    {
+      "name": "chat_bot_sub_session_summary_robot",
+      "value": "[Robot]"
     },
     {
       "name": "chat_bot_sub_session_summary_message",

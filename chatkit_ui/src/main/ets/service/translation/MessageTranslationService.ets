@@ -72,7 +72,9 @@ export class MessageTranslationService {
   }
 
   private isSupportedMessage(message: NIMMessageInfo): boolean {
-    return message.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT || message.isMultiLineMsg
+    // Skip revoke notices in translation
+    return !message.isRevokeMsg &&
+      (message.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT || message.isMultiLineMsg)
   }
 
   private getOriginalText(message: NIMMessageInfo): string {
@@ -213,18 +215,15 @@ export class MessageTranslationService {
 
     const payload = this.getPersistedPayload(message)
     if (payload) {
-      if (payload.targetLanguage === IMKitConfigCenter.translationTargetLanguage) {
-        this.applySuccessResult(
-          message,
-          payload.sourceLanguage ?? '',
-          payload.translatedText,
-          payload.translatedTitle,
-          payload.translatedBody
-        )
-      } else {
-        this.clearRuntimeResult(message)
-        message.translationLanguageMismatch = true
-      }
+      this.applySuccessResult(
+        message,
+        payload.sourceLanguage ?? '',
+        payload.translatedText,
+        payload.translatedTitle,
+        payload.translatedBody
+      )
+      message.translationLanguageMismatch =
+        payload.targetLanguage !== IMKitConfigCenter.translationTargetLanguage
     }
     message.translationHydrated = true
   }
@@ -249,6 +248,15 @@ export class MessageTranslationService {
 
   async translate(message: NIMMessageInfo): Promise<void> {
     if (!this.isSupportedMessage(message) || !message.isReceiveMessage() || message.translationLoading) {
+      return
+    }
+    // Avoid duplicate translation requests
+    await this.hydrate(message)
+    if (message.translatedText && !message.translationLanguageMismatch) {
+      message.translationLoading = false
+      message.translationFailed = false
+      message.showTranslatedText = true
+      message.showOriginalText = true
       return
     }
     const targetLanguage = IMKitConfigCenter.translationTargetLanguage

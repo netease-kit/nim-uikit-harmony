@@ -6,19 +6,39 @@
  */
 
 import { Logger } from '@nimkit/common';
-import { ChatKitClient, ChatRepo, ConversationRepo, IMKitConfigCenter, LocalConversationRepo, TopicRepo } from '@nimkit/chatkit';
 import {
+  ChatKitClient,
+  ChatRepo,
+  ConversationEventRepo,
+  ConversationIdUtilRepo,
+  ConversationRepo,
+  DisposableBag,
+  IMKitConfigCenter,
+  LoginEventRepo,
+  LocalConversationRepo,
+  CustomMessageUtils,
+  mergedMessageCustomType,
+  multiLineMessageCustomType,
+  getMultiLinePreviewFromAttachment,
+  TopicRepo
+} from '@nimkit/chatkit';
+import {
+  V2NIMConnectStatus,
+  V2NIMConversationType,
+  V2NIMLoginStatus,
   V2NIMMessage,
+  V2NIMMessageCallAttachment,
   V2NIMMessageFileAttachment,
+  V2NIMMessageRefer,
   V2NIMMessageSendingState,
   V2NIMMessageType,
   V2NIMQueryDirection,
   V2NIMRemoveTopicsParams,
-  V2NIMSortOrder,
   V2NIMTopic,
   V2NIMTopicListOption,
   V2NIMTopicListResult,
   V2NIMTopicRefer,
+  V2NIMThreadMessageListResult,
   V2NIMUpdateTopicParams
 } from '@nimsdk/base';
 import { DateUtils } from '../common/DateUtils';
@@ -33,6 +53,7 @@ export class ChatBotSubSessionItem {
   @Trace summary: string = ''
   @Trace timeText: string = ''
   @Trace latestMessageTime: number = 0
+  latestOtherMessageTime: number = 0
   @Trace showUnreadDot: boolean = false
 
   constructor(topic: V2NIMTopic) {
@@ -63,6 +84,8 @@ export class ChatBotSubSessionListViewModel {
   private didInitialLoad: boolean = false
   private reloadPromise?: Promise<void> = undefined
   private readTime: number = 0
+  private networkBroken: boolean = ChatKitClient.connectBroken()
+  private loginEventDisposers: DisposableBag = new DisposableBag()
 
   private onTopicAddedListener = (topic: V2NIMTopic): void => {
     if (topic.conversationId !== this.conversationId) {
@@ -103,10 +126,32 @@ export class ChatBotSubSessionListViewModel {
     })
   }
 
+  private onConversationReadTimeUpdated = (conversationId: string, readTime: number): void => {
+    if (conversationId !== this.conversationId) {
+      return
+    }
+    this.readTime = Math.max(this.readTime, readTime ?? 0)
+    this.updateUnreadDots()
+  }
+
+  private onConnectStatusListener = (status: V2NIMConnectStatus): void => {
+    if (status !== V2NIMConnectStatus.V2NIM_CONNECT_STATUS_CONNECTED) {
+      this.networkBroken = true
+    }
+  }
+
+  private onLoginStatusListener = async (status: V2NIMLoginStatus): Promise<void> => {
+    if (!this.networkBroken || status !== V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED) {
+      return
+    }
+    Logger.info('ChatKitUI', `${CHAT_BOT_TOPIC_LIST_TAG} loginStatus changed to logined, reload topic list`)
+    await this.reload()
+    this.networkBroken = false
+  }
+
   init(conversationId: string): void {
     this.conversationId = conversationId
     this.registerTopicListeners()
-    this.clearConversationUnread()
     this.refreshConversationReadTime()
     this.reload()
   }
@@ -133,6 +178,16 @@ export class ChatBotSubSessionListViewModel {
     TopicRepo.onTopicUpdated(this.onTopicUpdatedListener)
     ChatRepo.onSendMessage(this.onSendMessageListener)
     ChatRepo.onReceiverMessage(this.onReceiveMessagesListener)
+    this.loginEventDisposers.dispose()
+    this.loginEventDisposers.addAll([
+      LoginEventRepo.onConnectStatus(this.onConnectStatusListener),
+      LoginEventRepo.onLoginStatus(this.onLoginStatusListener)
+    ])
+    if (IMKitConfigCenter.enableLocalConversation) {
+      ConversationEventRepo.onLocalConversationReadTimeUpdated(this.onConversationReadTimeUpdated)
+    } else {
+      ConversationEventRepo.onCloudConversationReadTimeUpdated(this.onConversationReadTimeUpdated)
+    }
     this.listenerRegistered = true
   }
 
@@ -145,6 +200,12 @@ export class ChatBotSubSessionListViewModel {
     TopicRepo.offTopicUpdated(this.onTopicUpdatedListener)
     ChatRepo.offSendMessage(this.onSendMessageListener)
     ChatRepo.offReceiverMessage(this.onReceiveMessagesListener)
+    this.loginEventDisposers.dispose()
+    if (IMKitConfigCenter.enableLocalConversation) {
+      ConversationEventRepo.offLocalConversationReadTimeUpdated(this.onConversationReadTimeUpdated)
+    } else {
+      ConversationEventRepo.offCloudConversationReadTimeUpdated(this.onConversationReadTimeUpdated)
+    }
     this.listenerRegistered = false
   }
 
@@ -264,6 +325,7 @@ export class ChatBotSubSessionListViewModel {
       item.summary = this.allItems[index].summary
       item.timeText = this.allItems[index].timeText
       item.latestMessageTime = this.allItems[index].latestMessageTime
+      item.latestOtherMessageTime = this.allItems[index].latestOtherMessageTime
       item.showUnreadDot = this.allItems[index].showUnreadDot
       this.allItems.splice(index, 1)
       if (insertTop) {
@@ -310,21 +372,6 @@ export class ChatBotSubSessionListViewModel {
     return Math.max(item.topic.updateTime ?? 0, item.latestMessageTime)
   }
 
-  private async clearConversationUnread(): Promise<void> {
-    if (!this.conversationId) {
-      return
-    }
-    try {
-      if (IMKitConfigCenter.enableLocalConversation) {
-        await LocalConversationRepo.clearUnreadCountByIds([this.conversationId])
-      } else {
-        await ConversationRepo.clearUnreadCountByIds([this.conversationId])
-      }
-    } catch (err) {
-      Logger.error('ChatKitUI', 'ChatBotSubSessionListViewModel clearConversationUnread error: ' + JSON.stringify(err))
-    }
-  }
-
   private async refreshConversationReadTime(): Promise<void> {
     if (!this.conversationId) {
       return
@@ -344,7 +391,7 @@ export class ChatBotSubSessionListViewModel {
 
   private updateUnreadDots(): void {
     this.allItems.forEach((item: ChatBotSubSessionItem) => {
-      item.showUnreadDot = item.latestMessageTime > this.readTime
+      item.showUnreadDot = this.readTime > 0 && item.latestOtherMessageTime > this.readTime
     })
   }
 
@@ -354,27 +401,85 @@ export class ChatBotSubSessionListViewModel {
     })
   }
 
+  private canLoadLocalThreadMessages(topic: V2NIMTopic): boolean {
+    return ChatKitClient.getLoginUserId().length > 0 &&
+      ConversationIdUtilRepo.parseConversationTargetId(topic.conversationId).length > 0 &&
+      topic.messageClientId.length > 0 &&
+      topic.messageServerId.length > 0 &&
+      topic.messageTime > 0
+  }
+
+  private createLocalThreadRootMessageRefer(topic: V2NIMTopic): V2NIMMessageRefer {
+    const conversationType: V2NIMConversationType =
+      ConversationIdUtilRepo.parseConversationType(topic.conversationId)
+    return {
+      senderId: ChatKitClient.getLoginUserId(),
+      receiverId: ConversationIdUtilRepo.parseConversationTargetId(topic.conversationId),
+      messageClientId: topic.messageClientId,
+      messageServerId: topic.messageServerId,
+      createTime: topic.messageTime,
+      conversationType,
+      conversationId: topic.conversationId
+    }
+  }
+
+  private getLatestTopicSummaryMessage(result: V2NIMThreadMessageListResult): V2NIMMessage | undefined {
+    if (result.replyList.length > 0) {
+      return result.replyList[result.replyList.length - 1]
+    }
+    return result.message.messageType !== undefined ? result.message : undefined
+  }
+
+  private getLatestIncomingTopicMessage(result: V2NIMThreadMessageListResult): V2NIMMessage | undefined {
+    for (let index = result.replyList.length - 1; index >= 0; index--) {
+      const replyMessage = result.replyList[index]
+      if (!this.isSelfMessage(replyMessage)) {
+        return replyMessage
+      }
+    }
+    const rootMessage = result.message.messageType !== undefined ? result.message : undefined
+    if (rootMessage && !this.isSelfMessage(rootMessage)) {
+      return rootMessage
+    }
+    return undefined
+  }
+
+  private isSelfMessage(message: V2NIMMessage): boolean {
+    return message.senderId === ChatKitClient.getLoginUserId()
+  }
+
   private async fetchLatestMessage(item: ChatBotSubSessionItem): Promise<void> {
     try {
-      Logger.info('ChatKitUI', `${CHAT_BOT_TOPIC_LIST_TAG} topicService.getTopicMessageList latest topicId=${item.topic.topicId}`)
-      const result = await TopicRepo.getTopicMessageList({
-        topic: item.topic,
-        limit: 1,
-        direction: V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_DESC,
-        sortOrder: V2NIMSortOrder.V2NIM_SORT_ORDER_DESC
-      })
-      if (result.replyList.length <= 0) {
+      if (!this.canLoadLocalThreadMessages(item.topic)) {
         return
       }
-      const message: V2NIMMessage = result.replyList[0]
+      const messageRefer = this.createLocalThreadRootMessageRefer(item.topic)
+      Logger.info('ChatKitUI', `${CHAT_BOT_TOPIC_LIST_TAG} messageService.getLocalThreadMessageList latest topicId=${item.topic.topicId}`)
+      const result = await ChatRepo.getLocalThreadMessageList(messageRefer)
+      const message = this.getLatestTopicSummaryMessage(result)
+      if (!message) {
+        this.clearTopicSummary(item)
+        this.applyFilter()
+        return
+      }
+      const latestIncomingMessage = this.getLatestIncomingTopicMessage(result)
       item.summary = this.getMessageSummary(message)
       item.latestMessageTime = message.createTime
+      item.latestOtherMessageTime = latestIncomingMessage?.createTime ?? 0
       item.timeText = DateUtils.formatTime(message.createTime)
-      item.showUnreadDot = this.readTime > 0 && message.createTime > this.readTime
+      item.showUnreadDot = this.readTime > 0 && item.latestOtherMessageTime > this.readTime
       this.applyFilter()
     } catch (err) {
       Logger.error('ChatKitUI', 'ChatBotSubSessionListViewModel fetchLatestMessage error: ' + JSON.stringify(err))
     }
+  }
+
+  private clearTopicSummary(item: ChatBotSubSessionItem): void {
+    item.summary = ''
+    item.latestMessageTime = 0
+    item.latestOtherMessageTime = 0
+    item.timeText = ''
+    item.showUnreadDot = false
   }
 
   private refreshTopicSummaryByMessage(message: V2NIMMessage): void {
@@ -391,9 +496,11 @@ export class ChatBotSubSessionListViewModel {
     item.summary = this.getMessageSummary(message)
     item.latestMessageTime = message.createTime
     item.timeText = DateUtils.formatTime(message.createTime)
-    item.showUnreadDot = message.senderId !== ChatKitClient.getLoginUserId() &&
-      this.readTime > 0 &&
-      message.createTime > this.readTime
+    if (!this.isSelfMessage(message)) {
+      item.latestOtherMessageTime = message.createTime
+    }
+    // Keep unread dots based on the latest incoming reply instead of self replies.
+    item.showUnreadDot = this.readTime > 0 && item.latestOtherMessageTime > this.readTime
     this.applyFilter()
   }
 
@@ -425,6 +532,43 @@ export class ChatBotSubSessionListViewModel {
     if (message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
       return resourceManager.getStringSync($r('app.string.locationMessageType').id)
     }
+    if (message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_NOTIFICATION) {
+      return resourceManager.getStringSync($r('app.string.notificationMessageType').id)
+    }
+    if (message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TIPS) {
+      return resourceManager.getStringSync($r('app.string.tipMessageType').id)
+    }
+    if (message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_ROBOT) {
+      return resourceManager.getStringSync($r('app.string.chat_bot_sub_session_summary_robot').id)
+    }
+    if (message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL ||
+      message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_AVCHAT) {
+      if (message.attachment) {
+        const callAttachment = message.attachment as V2NIMMessageCallAttachment
+        if (callAttachment.type == 1) {
+          return resourceManager.getStringSync($r('app.string.msg_type_rtc_audio').id)
+        }
+        return resourceManager.getStringSync($r('app.string.msg_type_rtc_video').id)
+      }
+      return '[' + resourceManager.getStringSync($r('app.string.chat_send_call').id) + ']'
+    }
+    if (message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM && message.attachment) {
+      const customType = CustomMessageUtils.typeOfCustomMessage(message.attachment)
+      if (customType === mergedMessageCustomType) {
+        return resourceManager.getStringSync($r('app.string.chat_merge_history').id)
+      }
+      if (customType === multiLineMessageCustomType) {
+        const multiLinePreview = this.normalizePreviewText(getMultiLinePreviewFromAttachment(message.attachment))
+        if (multiLinePreview.length > 0) {
+          return multiLinePreview.length > CHAT_BOT_TOPIC_SUMMARY_MAX_LENGTH ?
+            multiLinePreview.substring(0, CHAT_BOT_TOPIC_SUMMARY_MAX_LENGTH) : multiLinePreview
+        }
+      }
+    }
     return resourceManager.getStringSync($r('app.string.chat_bot_sub_session_summary_message').id)
+  }
+
+  private normalizePreviewText(text: string): string {
+    return text.replace(/\r\n/g, ' ').replace(/[\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
   }
 }

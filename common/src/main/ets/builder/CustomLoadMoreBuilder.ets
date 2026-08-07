@@ -24,6 +24,6 @@ export function CustomLoadMoreBuilder(params: CustomLoadMoreBuilderParams) {
   }
   .width('100%')
   .height(40)
-  .backgroundColor('#f4f4f4')
+  .backgroundColor('#ffFFFFFF')
   .visibility(params.isVisibleLoadMore ? Visibility.Visible : Visibility.None)
 }

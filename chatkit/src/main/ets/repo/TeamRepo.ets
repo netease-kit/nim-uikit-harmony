@@ -690,33 +690,45 @@ export class TeamRepo {
       queryOption
     )
 
+    const friendUserCache = NEFriendUserCache.getInstance()
     let teamMembers: TeamMemberWithUser[] | undefined = teamMemberResult?.memberList.map((teamMember) => {
       return new TeamMemberWithUser(teamMember,
-        NEFriendUserCache.getInstance().getFriendById(teamMember.accountId)?.friend,
-        NEFriendUserCache.getInstance().getFriendById(teamMember.accountId)?.user)
+        friendUserCache.getFriendById(teamMember.accountId)?.friend,
+        friendUserCache.getFriendById(teamMember.accountId)?.user)
     })
 
-    let noUserAccIdList = teamMembers?.filter((member) => {
-      return !member.userInfo
-    }).map((teamMember) => {
-      return teamMember.teamMember.accountId
-    })
-
-    if (noUserAccIdList && noUserAccIdList.length > 0) {
-      let userList = await ContactRepo.getUserList(noUserAccIdList)
-
-      let userMap = userList.reduce((acc, cur, _index) => {
-        acc.set(cur.accountId, cur)
-        return acc
-      }, new Map<string, V2NIMUser>())
-
-      teamMembers?.forEach((member) => {
-        if (!member.userInfo) {
-          member.userInfo = userMap.get(member.teamMember.accountId)
-        }
+    if (teamMembers?.some((member) => !member.friendInfo) && !friendUserCache.hasLoadedFriendList()) {
+      await ContactRepo.getBlockList()
+      await ContactRepo.getFriendList()
+      teamMembers = teamMemberResult?.memberList.map((teamMember) => {
+        return new TeamMemberWithUser(teamMember,
+          friendUserCache.getFriendById(teamMember.accountId)?.friend,
+          friendUserCache.getFriendById(teamMember.accountId)?.user)
       })
     }
+
     if (teamMemberResult) {
+      let noUserAccIdList = teamMembers?.filter((member) => {
+        return !member.userInfo
+      }).map((teamMember) => {
+        return teamMember.teamMember.accountId
+      })
+
+      if (noUserAccIdList && noUserAccIdList.length > 0) {
+        let userList = await ContactRepo.getUserList(noUserAccIdList)
+
+        let userMap = userList.reduce((acc, cur, _index) => {
+          acc.set(cur.accountId, cur)
+          return acc
+        }, new Map<string, V2NIMUser>())
+
+        teamMembers?.forEach((member) => {
+          if (!member.userInfo) {
+            member.userInfo = userMap.get(member.teamMember.accountId)
+          }
+        })
+      }
+
       let result: TeamMemberResult = {
         finished: teamMemberResult?.finished,
         nextToken: teamMemberResult?.nextToken,
@@ -750,13 +762,22 @@ export class TeamRepo {
       Logger.error('ChatKit', `TeamRepo getTeamMembersByIds  ${e}`);
     }
 
+    const friendUserCache = NEFriendUserCache.getInstance()
     let teamMembers: TeamMemberWithUser[] = teamMemberList.map((teamMember) => {
-      return new TeamMemberWithUser(teamMember,
-        NEFriendUserCache.getInstance().getFriendById(teamMember.accountId)?.friend,
-        NEFriendUserCache.getInstance().getFriendById(teamMember.accountId)?.user)
+      const friendUser = friendUserCache.getFriendById(teamMember.accountId)
+      return new TeamMemberWithUser(teamMember, friendUser?.friend, friendUser?.user)
     })
 
-    let noUserAccIdList = teamMembers?.filter((member) => {
+    if (teamMembers.some((member) => !member.friendInfo) && !friendUserCache.hasLoadedFriendList()) {
+      await ContactRepo.getBlockList()
+      await ContactRepo.getFriendList()
+      teamMembers = teamMemberList.map((teamMember) => {
+        const friendUser = friendUserCache.getFriendById(teamMember.accountId)
+        return new TeamMemberWithUser(teamMember, friendUser?.friend, friendUser?.user)
+      })
+    }
+
+    let noUserAccIdList = teamMembers.filter((member) => {
       return !member.userInfo
     }).map((teamMember) => {
       return teamMember.teamMember.accountId
@@ -770,7 +791,7 @@ export class TeamRepo {
         return acc
       }, new Map<string, V2NIMUser>())
 
-      teamMembers?.forEach((member) => {
+      teamMembers.forEach((member) => {
         if (!member.userInfo) {
           member.userInfo = userMap.get(member.teamMember.accountId)
         }

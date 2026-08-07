@@ -8,9 +8,18 @@ import { getMultiLineBody, getMultiLineTitle, isMultiLineMessage } from '@nimkit
 
 @CustomDialog
 export struct TextMessageDetailDialog {
-  controller: CustomDialogController
+  controller?: CustomDialogController
+  onClose?: () => void
   @BuilderParam message: NIMMessageInfo | undefined
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
+
+  private closeDialog(): void {
+    if (this.onClose) {
+      this.onClose()
+      return
+    }
+    this.controller?.close()
+  }
 
   private onLinkClick(linkInfo: LinkInfo) {
     LinkClickUtils.handleLinkClick(this.context, linkInfo)
@@ -84,11 +93,11 @@ export struct TextMessageDetailDialog {
             if (this.isCurrentMultiLineMessage()) {
               if (this.getCurrentMultiLineTitle().length > 0) {
                 this.LinkableText(this.getCurrentMultiLineTitle(), $r('app.color.color_chat_title'),
-                  TextAlign.Start, 0, true)
+                  TextAlign.Center, 0, true)
               }
               if (this.getCurrentMultiLineBody().length > 0) {
                 this.LinkableText(this.getCurrentMultiLineBody(), $r('app.color.color_chat_title'),
-                  TextAlign.Start, this.getCurrentMultiLineTitle().length > 0 ? 8 : 0, false)
+                  TextAlign.Center, this.getCurrentMultiLineTitle().length > 0 ? 8 : 0, false)
               }
             } else {
               this.LinkableText(this.message.message.text ?? '', $r('app.color.color_chat_title'))
@@ -101,12 +110,15 @@ export struct TextMessageDetailDialog {
         .height('100%')
         .margin({ top: 56, bottom: 30 })
         .backgroundColor(Color.White)
+        .onClick(() => {
+          this.closeDialog()
+        })
       }
       .width('100%')
       .height('100%')
       .backgroundColor(Color.White)
       .onClick(() => {
-        this.controller.close()
+        this.closeDialog()
       })
     }
   }

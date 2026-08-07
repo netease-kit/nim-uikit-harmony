@@ -39,8 +39,7 @@ export struct TranslationLanguagePage {
     new TranslationLanguageOption($r('app.string.translation_lang_es'), TranslationLanguageCode.ES),
     new TranslationLanguageOption($r('app.string.translation_lang_ru'), TranslationLanguageCode.RU),
     new TranslationLanguageOption($r('app.string.translation_lang_pt'), TranslationLanguageCode.PT),
-    new TranslationLanguageOption($r('app.string.translation_lang_ar'), TranslationLanguageCode.AR),
-    new TranslationLanguageOption($r('app.string.translation_lang_hi'), TranslationLanguageCode.HI),
+    new TranslationLanguageOption($r('app.string.translation_lang_it'), TranslationLanguageCode.IT),
     new TranslationLanguageOption($r('app.string.translation_lang_vi'), TranslationLanguageCode.VI),
     new TranslationLanguageOption($r('app.string.translation_lang_th'), TranslationLanguageCode.TH),
     new TranslationLanguageOption($r('app.string.translation_lang_id'), TranslationLanguageCode.ID)

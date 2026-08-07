@@ -74,6 +74,7 @@ export class TeamMemberListViewModel {
 
   onTeamMemberInfoUpdated(members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
+      let needResort = false
       members.forEach((m) => {
         let index = this.memberList.findIndex((member) => {
           return member.getAccId() === m.accountId
@@ -83,11 +84,15 @@ export class TeamMemberListViewModel {
           this.memberList.splice(index, 1)
           memberInfo.teamMember = m
           this.memberList.splice(index, 0, memberInfo)
+          needResort = true
           if (m.accountId === ChatKitClient.getLoginUserId()) {
             this.mineTeamMember = m
           }
         }
       })
+      if (needResort) {
+        this.memberList.sort((a, b) => this.sortTeamMember(a, b))
+      }
     }
   }
 
@@ -107,10 +112,15 @@ export class TeamMemberListViewModel {
 
   onTeamMemberJoined(members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
+      const currentTeamId = this.teamId
       let accIds: string[] = members.map(m => m.accountId)
-      TeamRepo.getTeamMembersByIds(this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
+      TeamRepo.getTeamMembersByIds(currentTeamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
         accIds).then((newMembers) => {
-        this.memberList.push(...newMembers)
+          if (!currentTeamId || this.teamId !== currentTeamId) {
+            return
+          }
+          this.memberList.push(...newMembers)
+          this.memberList.sort((a, b) => this.sortTeamMember(a, b))
       })
     }
   }

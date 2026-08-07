@@ -19,6 +19,7 @@ import {
   UserEventRepo
 } from '@nimkit/chatkit'
 import {
+  V2NIMConversationOption,
   V2NIMConnectStatus,
   V2NIMFriend,
   V2NIMFriendDeletionType,
@@ -81,6 +82,8 @@ export class ConversationModel {
   }
   public onTeamLeftHandler: (team: V2NIMTeam) => void = (team: V2NIMTeam) => {
   }
+  public onTeamInfoUpdatedHandler: (team: V2NIMTeam) => void = (team: V2NIMTeam) => {
+  }
   public onTotalUnreadCountChangedHandler: (unreadCount: number) => void = (unreadCount: number) => {
   }
   public onConversationCreatedHandler: (conversation: ConversationItem) => void
@@ -102,6 +105,16 @@ export class ConversationModel {
     } catch (e) {
       ChatKitClient.logger?.error(TAG, 'getConversationList ', offset.toString(), limit.toString(), e)
       return null
+    }
+  }
+
+  public async getConversationListByOption(offset: number, limit: number,
+    option: V2NIMConversationOption): Promise<ConversationResult | undefined> {
+    try {
+      return await this.strategy.getConversationListByOption(offset, limit, option)
+    } catch (e) {
+      ChatKitClient.logger?.error(TAG, 'getConversationListByOption ', offset.toString(), limit.toString(), e)
+      return undefined
     }
   }
 
@@ -138,6 +151,10 @@ export class ConversationModel {
     return this.strategy.shouldReloadInitialConversationAfterSyncWhenEmpty()
   }
 
+  public getTotalUnreadCount(): number | undefined {
+    return this.strategy.getTotalUnreadCount()
+  }
+
   public addEventListener() {
     if (this.hasAddedEventListener) {
       return
@@ -153,6 +170,7 @@ export class ConversationModel {
       FriendEventRepo.onFriendDeleted(this.onFriendDeletedHandler),
       TeamEventRepo.onTeamDismissed(this.onTeamDismissedHandler),
       TeamEventRepo.onTeamLeft(this.onTeamLeftHandler),
+      TeamEventRepo.onTeamInfoUpdated(this.onTeamInfoUpdatedHandler),
       UserEventRepo.onUserProfileChanged(this.onUserProfileChanged)
     ])
     this.strategy.onTotalUnreadCountChanged(this.onTotalUnreadCountChangedHandler)

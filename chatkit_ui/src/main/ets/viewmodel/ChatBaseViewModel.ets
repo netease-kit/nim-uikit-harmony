@@ -96,6 +96,7 @@ export class ChatBaseViewModel {
   isLoading = false
   hasMore = false
   hasNew = false
+  onOperateMessageInvalid?: (messageClientId: string) => void = undefined
   revokeMsg: NIMMessageInfo | undefined = undefined
   sendingMsgClientId: string = ''
   saveRevokeClientId: string = ''
@@ -321,6 +322,7 @@ export class ChatBaseViewModel {
       if (msg.messageRefer.conversationId === this.conversationId) {
         this.removeReplyInfo(msg.messageRefer.messageClientId)
         this.chatInfo?.deleteMessage(msg.messageRefer.messageClientId)
+        this.onOperateMessageInvalid?.(msg.messageRefer.messageClientId)
         if (this.selectMsgMap.has(msg.messageRefer.messageClientId)) {
           this.selectMsgMap.delete(msg.messageRefer.messageClientId)
           this.selectMsgCount = this.selectMsgMap.size
@@ -341,6 +343,7 @@ export class ChatBaseViewModel {
         let revokeMsg = this.chatInfo?.getMessage(msg.messageRefer.messageClientId)
         this.removeReplyInfo(msg.messageRefer.messageClientId)
         this.chatInfo?.revokeMessage(msg.messageRefer.messageClientId)
+        this.onOperateMessageInvalid?.(msg.messageRefer.messageClientId)
         if (this.selectMsgMap.has(msg.messageRefer.messageClientId)) {
           this.selectMsgMap.delete(msg.messageRefer.messageClientId)
           this.selectMsgCount = this.selectMsgMap.size

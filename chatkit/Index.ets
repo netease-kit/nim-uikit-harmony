@@ -33,6 +33,12 @@ export type { LoginEventDisposer } from './src/main/ets/repo/LoginEventRepo'
 
 export { ConversationEventRepo } from './src/main/ets/repo/ConversationEventRepo'
 
+export { ConversationGroupRepo } from './src/main/ets/repo/ConversationGroupRepo'
+
+export { ConversationGroupEventRepo } from './src/main/ets/repo/ConversationGroupEventRepo'
+
+export type { ConversationGroupEventDisposer } from './src/main/ets/repo/ConversationGroupEventRepo'
+
 export {
   CloudConversationStrategy,
   ConversationMode,
@@ -62,6 +68,20 @@ export { NEFriendUserCache } from './src/main/ets/NEFriendUserCache'
 export { NEAIUserCache } from './src/main/ets/NEAIUserCache'
 
 export { ConversationRepo } from './src/main/ets/repo/ConversationRepo'
+
+export {
+  CONVERSATION_GROUP_DEFAULT_AIT_KEY,
+  CONVERSATION_GROUP_DEFAULT_ALL_KEY,
+  CONVERSATION_GROUP_DEFAULT_UNREAD_KEY,
+  ConversationGroupCreateSource,
+  ConversationGroupDisplayConfigStore,
+  PreferencesConversationGroupDisplayConfigStorage
+} from './src/main/ets/cache/ConversationGroupDisplayConfigStore'
+
+export type {
+  ConversationGroupDisplayConfig,
+  ConversationGroupDisplayConfigStorage
+} from './src/main/ets/cache/ConversationGroupDisplayConfigStore'
 
 export { ConversationIdUtilRepo } from './src/main/ets/repo/ConversationIdUtilRepo'
 

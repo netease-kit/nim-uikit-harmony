@@ -367,6 +367,31 @@ export struct NEChatInputView {
     }, 0);
   }
 
+  private getCurrentBuilderSpanOffsets(): number[] {
+    const offsets: number[] = []
+    const spans = this.controller?.getSpans() ?? []
+    spans.forEach((span, spanOrder) => {
+      if (!this.isAitEditorSpan(span)) {
+        return
+      }
+      const textSpan = span as RichEditorTextSpanResult
+      const spanRange = textSpan.spanPosition?.spanRange
+      offsets.push(spanRange ? spanRange[0] : spanOrder)
+    })
+    return offsets
+  }
+
+  private syncBuilderSpanOffsets(): void {
+    const offsets = this.getCurrentBuilderSpanOffsets()
+    const length = Math.min(offsets.length, this.builderSpans.length)
+    for (let index = 0; index < length; index++) {
+      this.builderSpans[index].spanIndex = offsets[index]
+    }
+    if (this.builderSpans.length > offsets.length) {
+      this.builderSpans.splice(offsets.length, this.builderSpans.length - offsets.length)
+    }
+  }
+
   /**
    * 删除操作
    */
@@ -384,8 +409,8 @@ export struct NEChatInputView {
    * 获取单行输入框的文本内容
    */
   getSingleLineTransferNodes(): RichInputTransferNode[] {
-    const spans = this.controller?.getSpans() ?? []
-    return collectRichInputTransferNodes(spans, this.builderSpans)
+    this.syncBuilderSpanOffsets()
+    return collectRichInputTransferNodes(this.controller?.getSpans() ?? [], this.builderSpans)
   }
 
   /**
@@ -557,6 +582,8 @@ export struct NEChatInputView {
             .aboutToDelete(this.aboutToDelete)
             .onDidChange((rangeBefore: TextRange, rangeAfter: TextRange) => {
               Logger.debug('ChatKitUI', `ChatInputView onDidChange before ${rangeBefore.start} ~ ${rangeBefore.end} after ${rangeAfter.start} ~ ${rangeAfter.end}`)
+              // Keep mention span offsets aligned after edits before them.
+              this.syncBuilderSpanOffsets()
               this.inputSpans = this.controller?.getSpans() ?? []
               // 通知输入状态变化（用于"正在输入"功能）
               if (this.onInputTextChange) {

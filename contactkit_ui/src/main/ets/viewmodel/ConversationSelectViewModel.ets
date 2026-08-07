@@ -6,8 +6,9 @@
  */
 
 import { Logger } from '@nimkit/common';
-import { ChatKitClient, ConversationRepo, IMKitConfigCenter, LocalConversationRepo } from '@nimkit/chatkit'
+import { ChatKitClient, ConversationRepo, IMKitConfigCenter, LocalConversationRepo, UserAIBotManager } from '@nimkit/chatkit'
 import { ConversationSelectModel } from '@nimkit/chatkit'
+import { V2NIMConversationType, V2NIMGetUserAIBotListResult, V2NIMUserAIBot } from '@nimsdk/base'
 import { ContactViewModel } from './ContactViewModel'
 import { MyTeamsViewModel } from './MyTeamsViewModel'
 
@@ -20,6 +21,7 @@ export class ConversationSelectViewModel {
   @Trace conversationList: ConversationSelectModel[] = [] // 最近会话缓存
   @Trace contactList: ConversationSelectModel[] = [] // 好友缓存
   @Trace teamList: ConversationSelectModel[] = [] // 群组缓存
+  private userAIBotAccids: Set<string> = new Set<string>()
 
   constructor() {
   }
@@ -29,6 +31,7 @@ export class ConversationSelectViewModel {
   ///   - filters: 需要过滤的会话id列表
   async loadData(filters?: string[]) {
     try {
+      await this.loadUserAIBotAccids()
       await this.getContactList(filters)
       await this.getTeamList(filters)
       await this.getConversationList(filters)
@@ -46,10 +49,9 @@ export class ConversationSelectViewModel {
         const conversationLocalResult = await LocalConversationRepo.getConversationList(0, this.conversationLimit)
         let localConversations = conversationLocalResult?.conversationList
         if (localConversations) {
-          // 过滤数据
-          if (filters) {
-            localConversations.filter(conversation => !filters.includes(conversation.conversationId))
-          }
+          localConversations =
+            localConversations.filter(conversation => !this.shouldFilterConversation(conversation.conversationId,
+              filters))
 
           for (const conversation of localConversations) {
             // 校验好友是否已存在
@@ -77,10 +79,8 @@ export class ConversationSelectViewModel {
         const conversationResult = await ConversationRepo.getConversationList(0, this.conversationLimit)
         let conversations = conversationResult?.conversationList
         if (conversations) {
-          // 过滤数据
-          if (filters) {
-            conversations.filter(conversation => !filters.includes(conversation.conversationId))
-          }
+          conversations =
+            conversations.filter(conversation => !this.shouldFilterConversation(conversation.conversationId, filters))
 
           for (const conversation of conversations) {
             // 校验好友是否已存在
@@ -115,17 +115,21 @@ export class ConversationSelectViewModel {
   ///   - filters: 需要过滤的好友id列表
   async getContactList(filters?: string[]) {
     try {
-      const contactSections = await this.contactViewModel.getFriendList()
+      const contactSections = await this.contactViewModel.getFriendList(this.mergeFiltersWithUserAIBots(filters))
 
       if (contactSections) {
+        const removedAccountIds: string[] = []
         for (const section of contactSections) {
           let contacts = section.contacts.contacts
-          // 过滤数据
-          if (filters) {
-            contacts.filter(contact => !filters.includes(contact.user?.accountId ?? ""))
-          }
 
           for (const contact of contacts) {
+            const accountId = contact.user?.accountId
+            if (this.shouldFilterAccount(accountId, filters)) {
+              if (accountId && !removedAccountIds.includes(accountId)) {
+                removedAccountIds.push(accountId)
+              }
+              continue
+            }
             let model = new ConversationSelectModel()
             model.conversationId = ChatKitClient.nim.conversationIdUtil.p2pConversationId(contact.user?.accountId)
             model.name = contact.showName()
@@ -133,6 +137,9 @@ export class ConversationSelectViewModel {
             this.contactList.push(model)
           }
         }
+        removedAccountIds.forEach((accountId: string) => {
+          this.contactViewModel.removeFromContact(accountId)
+        })
       }
     } catch (err) {
       Logger.error('ContactKit', err)
@@ -146,10 +153,7 @@ export class ConversationSelectViewModel {
     try {
       await this.teamViewModel.getJoinedTeamList()
       let teams = this.teamViewModel.teamList
-      // 过滤数据
-      if (filters) {
-        teams.filter(team => !filters.includes(team.teamId))
-      }
+      teams = teams.filter(team => !this.isFilteredId(team.teamId, filters))
 
       for (const team of teams) {
         let model = new ConversationSelectModel()
@@ -162,6 +166,86 @@ export class ConversationSelectViewModel {
     } catch (err) {
       Logger.error('ContactKit', err)
     }
+  }
+
+  private async loadUserAIBotAccids(): Promise<void> {
+    this.userAIBotAccids.clear()
+    try {
+      let pageToken: string | undefined = undefined
+      let hasMore = true
+
+      while (hasMore) {
+        const result: V2NIMGetUserAIBotListResult | undefined = await UserAIBotManager.getUserAIBotList(
+          pageToken ? { pageToken: pageToken, limit: 100 } : { limit: 100 }
+        )
+        if (result?.bots) {
+          for (const bot of result.bots) {
+            this.addUserAIBotAccid(bot)
+          }
+        }
+        hasMore = result?.hasMore ?? false
+        pageToken = result?.nextToken
+        if (hasMore && !pageToken) {
+          hasMore = false
+        }
+      }
+    } catch (err) {
+      Logger.error('ContactKit', 'ConversationSelectViewModel loadUserAIBotAccids error: ' + JSON.stringify(err))
+    }
+  }
+
+  private addUserAIBotAccid(bot?: V2NIMUserAIBot): void {
+    if (!bot?.accid) {
+      return
+    }
+    this.userAIBotAccids.add(bot.accid)
+  }
+
+  private isFilteredId(id?: string, filters?: string[]): boolean {
+    return !!id && !!filters && filters.includes(id)
+  }
+
+  private isUserAIBotAccount(accountId?: string): boolean {
+    if (!accountId) {
+      return false
+    }
+    return this.userAIBotAccids.has(accountId) ||
+      UserAIBotManager.hasCachedUserAIBot(accountId) ||
+      UserAIBotManager.isDeletedUserAIBot(accountId)
+  }
+
+  private shouldFilterAccount(accountId?: string, filters?: string[]): boolean {
+    return this.isFilteredId(accountId, filters) || this.isUserAIBotAccount(accountId)
+  }
+
+  private shouldFilterConversation(conversationId?: string, filters?: string[]): boolean {
+    if (!conversationId) {
+      return true
+    }
+    if (this.isFilteredId(conversationId, filters)) {
+      return true
+    }
+    const conversationType = ChatKitClient.nim.conversationIdUtil.parseConversationType(conversationId)
+    if (conversationType !== V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
+      return false
+    }
+    const targetId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversationId)
+    return this.isUserAIBotAccount(targetId)
+  }
+
+  private mergeFiltersWithUserAIBots(filters?: string[]): string[] {
+    const result: string[] = []
+    filters?.forEach((filter: string) => {
+      if (filter && !result.includes(filter)) {
+        result.push(filter)
+      }
+    })
+    this.userAIBotAccids.forEach((accid: string) => {
+      if (accid && !result.includes(accid)) {
+        result.push(accid)
+      }
+    })
+    return result
   }
 
   /// 在好友缓存中查找该会话

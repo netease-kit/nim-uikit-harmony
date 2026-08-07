@@ -128,4 +128,28 @@ export class ConversationEventRepo {
   static offLocalTotalUnreadCountChanged(callback: (unreadCount: number) => void): void {
     ChatKitClient.nim.localConversationService?.off('onTotalUnreadCountChanged', callback)
   }
+
+  static onCloudConversationReadTimeUpdated(
+    callback: (conversationId: string, readTime: number) => void
+  ): void {
+    ChatKitClient.nim.conversationService?.on('onConversationReadTimeUpdated', callback)
+  }
+
+  static offCloudConversationReadTimeUpdated(
+    callback: (conversationId: string, readTime: number) => void
+  ): void {
+    ChatKitClient.nim.conversationService?.off('onConversationReadTimeUpdated', callback)
+  }
+
+  static onLocalConversationReadTimeUpdated(
+    callback: (conversationId: string, readTime: number) => void
+  ): void {
+    ChatKitClient.nim.localConversationService?.on('onConversationReadTimeUpdated', callback)
+  }
+
+  static offLocalConversationReadTimeUpdated(
+    callback: (conversationId: string, readTime: number) => void
+  ): void {
+    ChatKitClient.nim.localConversationService?.off('onConversationReadTimeUpdated', callback)
+  }
 }

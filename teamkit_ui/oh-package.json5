@@ -1,6 +1,6 @@
 {
   "name": "@nimkit/teamkit_ui",
-  "version": "10.9.11",
+  "version": "10.9.50",
   "description": "Please describe the basic information.",
   "main": "Index.ets",
   "author": "",
@@ -8,6 +8,6 @@
   "dependencies": {
     "@nimkit/common": "file:../common",
     "@nimkit/chatkit": "../chatkit",
-    "@nimsdk/base": "10.10.1"
+    "@nimsdk/base": "10.10.10"
   }
 }

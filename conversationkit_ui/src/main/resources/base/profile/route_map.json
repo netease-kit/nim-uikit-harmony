@@ -15,6 +15,38 @@
       "data": {
         "description": "this is Local conversation list page"
       }
+    },
+    {
+      "name": "ConversationGroupManagePage",
+      "pageSourceFile": "src/main/ets/pages/ConversationGroupManagePage.ets",
+      "buildFunction": "ConversationGroupManagePageBuilder",
+      "data": {
+        "description": "this is conversation group manage page"
+      }
+    },
+    {
+      "name": "ConversationGroupSettingPage",
+      "pageSourceFile": "src/main/ets/pages/ConversationGroupSettingPage.ets",
+      "buildFunction": "ConversationGroupSettingPageBuilder",
+      "data": {
+        "description": "this is conversation group setting page"
+      }
+    },
+    {
+      "name": "ConversationGroupSelectConversationPage",
+      "pageSourceFile": "src/main/ets/pages/ConversationGroupSelectConversationPage.ets",
+      "buildFunction": "ConversationGroupSelectConversationPageBuilder",
+      "data": {
+        "description": "this is conversation group select conversation page"
+      }
+    },
+    {
+      "name": "ConversationGroupNameEditPage",
+      "pageSourceFile": "src/main/ets/pages/ConversationGroupNameEditPage.ets",
+      "buildFunction": "ConversationGroupNameEditPageBuilder",
+      "data": {
+        "description": "this is conversation group name edit page"
+      }
     }
   ]
 }

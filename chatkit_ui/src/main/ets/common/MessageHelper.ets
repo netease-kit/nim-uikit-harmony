@@ -205,24 +205,28 @@ export function getNotificationMessageContent(messageInfo: NIMMessageInfo, chatU
   return '';
 }
 
-export function getPinMessagesTips(messageInfo: NIMMessageInfo, chatUserInfo: ChatInfo | undefined): string {
-  let targetName = ''
-  if (messageInfo.pinInfo != null) {
-    if (messageInfo.pinInfo.operatorId == ChatKitClient.getLoginUserId()) {
-      targetName = getContext().resourceManager.getStringByNameSync('chat_current_user_name')
-    } else if (chatUserInfo !== undefined) {
-      targetName = chatUserInfo?.getChatUserShowName(messageInfo.pinInfo?.operatorId)
-    }
-    if (targetName.length > ChatConst.pinOperatorNameMaxLen) {
-      let targetIndex = ChatConst.pinOperatorNameMaxLen - 1
-      if (!isLastCharacterEmoji(targetName.charAt(targetIndex))) {
-        targetIndex++
-      }
-      targetName = targetName.substring(0, targetIndex + 1) + '...'
-    }
+export function getPinMessagesTips(messageInfo: NIMMessageInfo | undefined, chatUserInfo: ChatInfo | undefined): string {
+  if (messageInfo == null) {
+    return getContext().resourceManager.getStringByNameSync('chat_pin_message_tips', '');
+  }
+  return getContext().resourceManager.getStringByNameSync('chat_pin_message_tips',
+    getPinMessageOperatorName(messageInfo, chatUserInfo));
+}
+
+export function getPinMessageOperatorName(messageInfo: NIMMessageInfo, chatUserInfo: ChatInfo | undefined): string {
+  if (messageInfo.pinInfo == null) {
+    return ''
   }
 
-  return getContext().resourceManager.getStringByNameSync('chat_pin_message_tips', targetName);
+  if (messageInfo.pinInfo.operatorId == ChatKitClient.getLoginUserId()) {
+    return getContext().resourceManager.getStringByNameSync('chat_current_user_name')
+  }
+
+  if (chatUserInfo !== undefined) {
+    return chatUserInfo?.getChatUserShowName(messageInfo.pinInfo?.operatorId)
+  }
+
+  return ''
 }
 
 // 获取消息高度，单位为VP
