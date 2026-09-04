@@ -22,6 +22,8 @@ export struct MessageAudioItemView {
   onMessageClick: MessageItemClick | undefined
   @BuilderParam
   isReceiveStyle: boolean | undefined
+  @Param
+  showReactionBackground: boolean = false
   audioPlayerManager: AudioPlayerManager = AudioPlayerManager.instance
   @Local
   receiveSoundIndex: number = 2
@@ -67,73 +69,96 @@ export struct MessageAudioItemView {
     return this.message.isReceiveMessage() || (this.isReceiveStyle !== undefined && this.isReceiveStyle)
   }
 
-  build() {
-    Column() {
-      Row() {
-        if (this.showReceiveStyle()) {
-          Image(this.sendSoundImages[this.sendSoundIndex]).objectFit(ImageFit.Auto).width(28).height(28)
-          Text(getAudioMessageText(this.message))
-            .margin({ left: 8 }).maxLines(1)
-            .fontColor('#ff333333')
-            .fontSize(14)
-        } else {
-          Text(getAudioMessageText(this.message))
-            .margin({ right: 8 }).maxLines(1)
-            .fontColor('#ff333333')
-            .fontSize(14)
-          Image(this.receiveSoundImages[this.receiveSoundIndex]).objectFit(ImageFit.Auto).width(28).height(28)
-        }
-      }
-      .justifyContent(this.showReceiveStyle() ? FlexAlign.Start : FlexAlign.End)
-      .width(getAudioMessageWidth(this.message))
-      .height(ChatConst.audioMessageWidth)
-
-      // 语音转文字加载中
-      if (this.message.voiceToTextLoading) {
-        Row() {
-          LoadingProgress()
-            .width(16)
-            .height(16)
-            .color('#ff666666')
-          Text($r('app.string.chat_message_voice_to_text'))
-            .fontSize(14)
-            .fontColor('#ff666666')
-            .margin({ left: 4 })
-        }
-        .margin({ top: 12 })
-        .justifyContent(FlexAlign.Start)
-      } else if (this.message.voiceToText && this.message.voiceToText.length > 0) {
-        // 语音转文字结果
-        Text(this.message.voiceToText)
-          .fontSize(16)
-          .fontColor('#ff333333')
-          .margin({ top: 12 })
-          .width('100%')
-          .textAlign(TextAlign.JUSTIFY)
-          .lineHeight(24)
-      }
+  private playAudio(): void {
+    this.resetPlayState()
+    let audioManager = AudioPlayerManager.instance
+    if (this.message.message.attachment) {
+      audioManager.avPlayerLive((this.message.message.attachment as V2NIMMessageAudioAttachment).url ?? '',
+        this.onPlayStart,
+        this.onPlayFinished,
+        this.message.message.messageClientId
+      )
     }
-    .alignItems(this.showReceiveStyle() ? HorizontalAlign.Start : HorizontalAlign.End)
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.TopStart }) {
+      Column() {
+        Row() {
+          if (this.showReceiveStyle()) {
+            Image(this.sendSoundImages[this.sendSoundIndex])
+              .objectFit(ImageFit.Auto)
+              .width(28)
+              .height(28)
+              .draggable(false)
+            Text(getAudioMessageText(this.message))
+              .margin({ left: 8 }).maxLines(1)
+              .fontColor('#ff333333')
+              .fontSize(14)
+          } else {
+            Text(getAudioMessageText(this.message))
+              .margin({ right: 8 }).maxLines(1)
+              .fontColor('#ff333333')
+              .fontSize(14)
+            Image(this.receiveSoundImages[this.receiveSoundIndex])
+              .objectFit(ImageFit.Auto)
+              .width(28)
+              .height(28)
+              .draggable(false)
+          }
+        }
+        .justifyContent(this.showReceiveStyle() ? FlexAlign.Start : FlexAlign.End)
+        .width(getAudioMessageWidth(this.message))
+        .height(ChatConst.audioMessageWidth)
+
+        // 语音转文字加载中
+        if (this.message.voiceToTextLoading) {
+          Row() {
+            LoadingProgress()
+              .width(16)
+              .height(16)
+              .color('#ff666666')
+            Text($r('app.string.chat_message_voice_to_text'))
+              .fontSize(14)
+              .fontColor('#ff666666')
+              .margin({ left: 4 })
+          }
+          .margin({ top: 12 })
+          .justifyContent(FlexAlign.Start)
+        } else if (this.message.voiceToText && this.message.voiceToText.length > 0) {
+          // 语音转文字结果
+          Text(this.message.voiceToText)
+            .fontSize(16)
+            .fontColor('#ff333333')
+            .margin({ top: 12 })
+            .width('100%')
+            .textAlign(TextAlign.JUSTIFY)
+            .lineHeight(24)
+        }
+      }
+      .alignItems(this.showReceiveStyle() ? HorizontalAlign.Start : HorizontalAlign.End)
+      .gesture(
+        GestureGroup(
+          GestureMode.Exclusive,
+          LongPressGesture().onAction((event: GestureEvent) => {
+            this.onMessageClick?.onItemLongClick?.(event, this.message)
+          }),
+          TapGesture().onAction(() => {
+            this.playAudio()
+          })
+        )
+      )
+      .width(getAudioMessageWidth(this.message))
+    }
+    .backgroundColor(this.showReactionBackground ?
+      $r('app.color.color_chat_reaction_content_bg') : Color.Transparent)
+    .borderRadius(this.showReactionBackground ? 8 : 0)
     .margin({
-      left: 12,
+      left: 4,
       top: 4,
       bottom: 4,
-      right: 12
+      right: 4
     })
-    .onClick(() => {
-      this.resetPlayState()
-      let audioManager = AudioPlayerManager.instance
-      if (this.message.message.attachment) {
-        audioManager.avPlayerLive((this.message.message.attachment as V2NIMMessageAudioAttachment).url ?? '',
-          this.onPlayStart,
-          this.onPlayFinished,
-          this.message.message.messageClientId
-        )
-      }
-    })
-    // .gesture(LongPressGesture({ duration: 300 }).onAction((event: GestureEvent) => {
-    //   this.onMessageClick?.onItemLongClick?.(event, this.message)
-    // }))
     .width(getAudioMessageWidth(this.message))
   }
 

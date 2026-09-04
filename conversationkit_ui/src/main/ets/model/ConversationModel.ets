@@ -195,11 +195,11 @@ export class ConversationModel {
     this.hasAddedEventListener = false
   }
 
-  public p2pConversationId(accountId: string) {
+  public p2pConversationId(accountId: string): string {
     return ChatKitClient.nim.conversationIdUtil.p2pConversationId(accountId)
   }
 
-  public teamConversationId(teamId: string) {
+  public teamConversationId(teamId: string): string {
     return ChatKitClient.nim.conversationIdUtil.teamConversationId(teamId)
   }
 

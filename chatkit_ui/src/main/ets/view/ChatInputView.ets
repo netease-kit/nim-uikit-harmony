@@ -280,7 +280,8 @@ export struct NEChatInputView {
   async showAitDialog() {
     if (this.showTeamMemberAit && this.teamId && this.teamId.length > 0) {
       let teamMemberCache = TeamMemberCache.getInstance()
-      if (teamMemberCache.needFetchMember()) {
+      teamMemberCache.intTeamInfo(this.teamId, this.team)
+      if (teamMemberCache.needFetchMember(this.teamId)) {
         await teamMemberCache.getMemberList()
       }
       // 检查是否有成员缺失userInfo，如果有则从云端获取

@@ -115,7 +115,7 @@ export struct PersonSelectPage {
           ForEach(this.selectedList, (item: NEUserWithFriend) => {
             ListItem() {
               CommonAvatar({
-                item: new AvatarItem(item.user?.avatar, item.shortName(),
+                item: new AvatarItem(item.user?.avatar, item.getAvatarName(),
                   AvatarColorUntil.getBackgroundColorById(item.user?.accountId ?? "")),
                 roundRadius: 18
               })
@@ -190,7 +190,7 @@ export struct PersonSelectPage {
         })
 
       ViewItemBuilder({
-        avatarItem: new AvatarItem(item.user?.avatar, item.shortName(),
+        avatarItem: new AvatarItem(item.user?.avatar, item.getAvatarName(),
           AvatarColorUntil.getBackgroundColorById(item.user?.accountId ?? "")),
         title: item.showName(),
         itemHeight: 60,

@@ -485,6 +485,14 @@
       "value": "Everyone"
     },
     {
+      "name": "chat_team_ait_search_loading",
+      "value": "Searching..."
+    },
+    {
+      "name": "chat_team_ait_search_empty",
+      "value": "No matching members found"
+    },
+    {
       "name": "chat_forward_limit",
       "value": "%s limits %d messages"
     },
@@ -607,6 +615,22 @@
     {
       "name": "chat_new_message_count",
       "value": "%d new message"
+    },
+    {
+      "name": "chat_last_read_position",
+      "value": "Back to where you left off"
+    },
+    {
+      "name": "chat_last_read_message_count",
+      "value": "%d new messages"
+    },
+    {
+      "name": "chat_last_read_message_count_overflow",
+      "value": "99+ new messages"
+    },
+    {
+      "name": "chat_last_read_position_load_failed",
+      "value": "Failed to load messages. Try again."
     },
     {
       "name": "chat_message_loading",
@@ -791,6 +815,14 @@
     {
       "name": "chat_message_voice_to_text_failed",
       "value": "Text conversion failed."
+    },
+    {
+      "name": "chat_message_reaction_failed",
+      "value": "Operation failed. Please try again."
+    },
+    {
+      "name": "chat_message_reaction_limit",
+      "value": "The 100-reaction limit has been reached."
     },
     {
       "name": "chat_translation_loading",

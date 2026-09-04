@@ -8,7 +8,11 @@ import {
   ChatKitClient,
   DisposableBag,
   FriendEventRepo,
+  getTeamMemberSearchRenderKey,
+  matchesTeamMemberSearchKeyword,
+  normalizeSearchKeyword,
   TeamEventRepo,
+  TeamMemberCache,
   TeamMemberWithUser,
   TeamRepo,
   UserEventRepo
@@ -18,6 +22,7 @@ import {
   V2NIMQueryDirection,
   V2NIMTeamMember,
   V2NIMTeamMemberRole,
+  V2NIMTeamMemberRoleQueryType,
   V2NIMTeamType,
   V2NIMUser
 } from '@nimsdk/base'
@@ -33,12 +38,30 @@ export class TeamMemberListViewModel {
   //每次请求的条数限制
   teamMemberLimit = 100
   @Trace memberList: TeamMemberWithUser[] = []
+  // 搜索关键字
+  @Trace searchKeyword: string = ''
+  @Trace isSearching: boolean = false
+  @Trace searchLoadFailed: boolean = false
   //自己的群身份
   @Trace mineTeamMember: V2NIMTeamMember | undefined = undefined
   private disposableBag: DisposableBag = new DisposableBag()
+  private teamMemberCache: TeamMemberCache = TeamMemberCache.getInstance()
+  private visibleMemberLimit: number = 100
+  private searchGeneration: number = 0
+  private listSessionId: number = 0
+  private showManagerRole: boolean = true
 
-  init(teamId: string) {
+  init(teamId: string, showManagerRole: boolean = true) {
     this.teamId = teamId
+    this.showManagerRole = showManagerRole
+    this.memberList = []
+    this.searchKeyword = ''
+    this.isSearching = false
+    this.searchLoadFailed = false
+    this.visibleMemberLimit = this.teamMemberLimit
+    this.searchGeneration += 1
+    this.listSessionId += 1
+    this.teamMemberCache.intTeamInfo(teamId)
     this.initMemberChangeListener()
   }
 
@@ -112,16 +135,17 @@ export class TeamMemberListViewModel {
 
   onTeamMemberJoined(members: V2NIMTeamMember[]) {
     if (members[0].teamId === this.teamId) {
+      const currentSessionId = this.listSessionId
       const currentTeamId = this.teamId
       let accIds: string[] = members.map(m => m.accountId)
       TeamRepo.getTeamMembersByIds(currentTeamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
         accIds).then((newMembers) => {
-          if (!currentTeamId || this.teamId !== currentTeamId) {
+          if (!currentTeamId || !this.isCurrentSession(currentSessionId, currentTeamId)) {
             return
           }
           this.memberList.push(...newMembers)
           this.memberList.sort((a, b) => this.sortTeamMember(a, b))
-      })
+        })
     }
   }
 
@@ -159,12 +183,20 @@ export class TeamMemberListViewModel {
    */
   kickTeamMember(kickMemberId?: string) {
     if (this.teamId && kickMemberId) {
+      const currentSessionId = this.listSessionId
+      const currentTeamId = this.teamId
       TeamRepo.kickMember(
-        this.teamId,
+        currentTeamId,
         V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
         [kickMemberId]
       ).then(() => {
+        if (!this.isCurrentSession(currentSessionId, currentTeamId)) {
+          return
+        }
         this.memberList = this.memberList.filter(member => member.getAccId() !== kickMemberId)
+        if (this.teamMemberCache.teamId === currentTeamId) {
+          this.teamMemberCache.membersMap.delete(kickMemberId)
+        }
       })
     }
 
@@ -178,41 +210,104 @@ export class TeamMemberListViewModel {
     if (first === true) {
       this.isFinish = false
       this.nextToken = undefined
-    }
-    if (this.isFinish) {
-      return
+      this.visibleMemberLimit = this.teamMemberLimit
+    } else {
+      this.visibleMemberLimit += this.teamMemberLimit
     }
     if (this.teamId) {
+      const currentSessionId = this.listSessionId
+      const currentTeamId = this.teamId
       try {
-        let result = await TeamRepo.getTeamMembers(this.teamId,
-          V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, {
-            limit: this.teamMemberLimit,
-            nextToken: this.nextToken,
-            direction: V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_ASC
-          })
-        if (result) {
-          this.isFinish = result.finished
-          this.nextToken = result.nextToken
-          this.memberList.push(...result.memberList)
-          this.memberList.sort((a, b) => this.sortTeamMember(a, b))
-          if (first) {
-            let mineMember = result.memberList.find(member => member.getAccId() === ChatKitClient.getLoginUserId())
-            if (mineMember) {
-              this.mineTeamMember = mineMember.teamMember
-            } else {
-              this.mineTeamMember = (await TeamRepo.getTeamMembersByIds(
-                this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, [ChatKitClient.getLoginUserId()]
-              )
-              ).find(m => m.getAccId() === ChatKitClient.getLoginUserId())?.teamMember
-            }
+        this.teamMemberCache.intTeamInfo(currentTeamId)
+        if (first === true && this.showManagerRole) {
+          // 先合并群主和管理员，确保角色排序在分页前生效
+          await this.loadManagerMembers(currentTeamId, currentSessionId)
+          if (!this.isCurrentSession(currentSessionId, currentTeamId)) {
+            return
           }
         }
+        const cachedMembers = this.teamMemberCache.getAllMembers(currentTeamId)
+        if (cachedMembers.length < this.visibleMemberLimit &&
+          !this.teamMemberCache.haveLoadAllMember(currentTeamId)) {
+          await this.teamMemberCache.getMoreMemberList()
+        }
+        if (!this.isCurrentSession(currentSessionId, currentTeamId)) {
+          return
+        }
+        this.syncVisibleMembersFromCache()
+        if (first) {
+          const mineTeamMember = await this.teamMemberCache.getMineMember(currentTeamId)
+          if (!this.isCurrentSession(currentSessionId, currentTeamId)) {
+            return
+          }
+          this.mineTeamMember = mineTeamMember
+        }
+        if (this.isCurrentSession(currentSessionId, currentTeamId)) {
+        }
       } catch (e) {
-
+        // 页面保留当前缓存数据，后续触底或搜索可以再次触发加载。
       }
 
     }
 
+  }
+
+  /**
+   * 搜索当前群完整成员范围。
+   */
+  async searchTeamMembers(keyword: string): Promise<void> {
+    const normalizedKeyword = normalizeSearchKeyword(keyword)
+    this.searchKeyword = normalizedKeyword
+    this.searchGeneration += 1
+    const currentSearchGeneration = this.searchGeneration
+    this.searchLoadFailed = false
+    if (normalizedKeyword.length === 0) {
+      this.isSearching = false
+      return
+    }
+
+    this.isSearching = true
+    let searchSource = this.memberList
+    if (this.teamId) {
+      const currentTeamId = this.teamId
+      this.teamMemberCache.intTeamInfo(currentTeamId)
+      const loadedAll = await this.teamMemberCache.loadAllTeamMember()
+      if (currentSearchGeneration !== this.searchGeneration || normalizedKeyword !== this.searchKeyword ||
+        currentTeamId !== this.teamId) {
+        return
+      }
+      if (!loadedAll) {
+        this.isSearching = false
+        this.searchLoadFailed = true
+        return
+      }
+      searchSource = this.teamMemberCache.getAllMembers(currentTeamId)
+    }
+    this.memberList = searchSource
+    this.isSearching = false
+  }
+
+  clearSearch() {
+    this.searchGeneration += 1
+    this.searchKeyword = ''
+    this.isSearching = false
+    this.searchLoadFailed = false
+    this.syncVisibleMembersFromCache()
+  }
+
+  getDisplayList(): TeamMemberWithUser[] {
+    if (this.isSearching || this.searchLoadFailed) {
+      return []
+    }
+    if (this.searchKeyword.length === 0) {
+      return this.memberList
+    }
+    return this.memberList.filter((member: TeamMemberWithUser): boolean =>
+      matchesTeamMemberSearchKeyword(member, this.searchKeyword))
+  }
+
+  getMemberRenderKey(member: TeamMemberWithUser): string {
+    return getTeamMemberSearchRenderKey(member, this.searchKeyword)
   }
 
   //群成员排序
@@ -236,6 +331,38 @@ export class TeamMemberListViewModel {
   }
 
   onDestroy() {
+    this.searchGeneration += 1
+    this.listSessionId += 1
     this.disposableBag.dispose()
+  }
+
+  private isCurrentSession(sessionId: number, teamId: string): boolean {
+    return this.listSessionId === sessionId && this.teamId === teamId
+  }
+
+  private async loadManagerMembers(teamId: string, sessionId: number): Promise<void> {
+    const result = await TeamRepo.getTeamMembers(teamId,
+      V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, {
+        roleQueryType: V2NIMTeamMemberRoleQueryType.V2NIM_TEAM_MEMBER_ROLE_QUERY_TYPE_MANAGER,
+        limit: this.teamMemberLimit,
+        direction: V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_ASC
+      }).catch(() => undefined)
+    if (!result || !this.isCurrentSession(sessionId, teamId)) {
+      return
+    }
+    result.memberList.forEach((member: TeamMemberWithUser) => {
+      this.teamMemberCache.membersMap.set(member.getAccId(), member)
+    })
+  }
+
+  private syncVisibleMembersFromCache(): void {
+    if (!this.teamId) {
+      return
+    }
+    const cachedMembers = this.teamMemberCache.getAllMembers(this.teamId)
+    this.memberList = cachedMembers.slice(0, this.visibleMemberLimit)
+    this.nextToken = this.teamMemberCache.nextToken
+    this.isFinish = this.teamMemberCache.haveLoadAllMember(this.teamId) &&
+      this.memberList.length >= cachedMembers.length
   }
 }

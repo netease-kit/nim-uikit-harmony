@@ -46,6 +46,14 @@ export class ChatBotSubSessionViewModel extends ChatP2PViewModel {
   private pendingTopicMessageClientIds: string[] = []
   private topicListenerRegistered: boolean = false
 
+  enableLastReadPosition(): boolean {
+    return false
+  }
+
+  supportsMessageReaction(): boolean {
+    return true
+  }
+
   private onTopicsRemovedListener = (topics: V2NIMTopicRefer[]): void => {
     if (!this.currentTopic || topics.length <= 0) {
       return
@@ -522,6 +530,8 @@ export class ChatBotSubSessionViewModel extends ChatP2PViewModel {
 
   toHandleQueryMessage(messages: NIMMessageInfo[], originMsg: V2NIMMessage[]): void {
     this.getUserInfo()
+    // Topic 自定义分页完成后同步查询可见消息的 Reaction
+    this.refreshMessageReactionState()
   }
 
   private registerTopicListeners(): void {

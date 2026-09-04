@@ -120,23 +120,20 @@ export class ChatTeamInfo extends ChatInfo {
     let result = '';
     if (this.teamUserFriendMap.has(accountId)) {
       let friend = this.teamUserFriendMap.get(accountId)
-      if (friend && friend.alias !== undefined) {
-        result = friend.alias ?? ''
+      if (friend?.userProfile?.name) {
+        result = friend.userProfile.name
       }
-    } else if (NEFriendUserCache.getInstance().isFriend(accountId)) {
+    }
+    if (result === '' && NEFriendUserCache.getInstance().isFriend(accountId)) {
       let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
       if (friendInfo !== undefined) {
-        result = friendInfo.shortName(true)
+        result = friendInfo.getAvatarName()
       }
     }
 
     if (result == null || result.trim() === '') {
       result = this.teamUserMap.get(accountId)?.name ?? '';
     }
-    if (result == null || result.trim() === '') {
-      result = NEFriendUserCache.mineUserCache?.user?.name ?? '';
-    }
-
     if (result == null || result.trim() === '') {
       result = accountId;
     }

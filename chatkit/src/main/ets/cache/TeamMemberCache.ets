@@ -39,6 +39,10 @@ export class TeamMemberCache {
   nextToken = ''
   //是否拉完了
   isFinish = false
+  // 当前群加载代次，切群或清理时使旧请求失效
+  private generation: number = 0
+  private pageLoadingPromise?: Promise<boolean> = undefined
+  private loadAllPromise?: Promise<boolean> = undefined
   private static instance: TeamMemberCache
   private disposableBag: DisposableBag = new DisposableBag()
 
@@ -60,13 +64,23 @@ export class TeamMemberCache {
    */
   intTeamInfo(teamId: string, team?: V2NIMTeam) {
     if (this.teamId !== teamId) {
+      this.generation += 1
       this.clearMemberChangeListener()
       this.membersMap.clear()
       this.mineTeamMember = undefined
       this.teamId = teamId
       this.team = team
+      this.nextToken = ''
       this.isFinish = false
+      this.pageLoadingPromise = undefined
+      this.loadAllPromise = undefined
       this.initMemberChangeListener()
+    } else if (team) {
+      this.team = team
+      if (this.isFinish && this.membersMap.size < team.memberCount) {
+        this.isFinish = false
+        this.nextToken = ''
+      }
     }
   }
 
@@ -82,7 +96,10 @@ export class TeamMemberCache {
    * 是否需要拉取
    * @returns
    */
-  needFetchMember(): boolean {
+  needFetchMember(expectedTeamId?: string): boolean {
+    if (expectedTeamId !== undefined && expectedTeamId !== this.teamId) {
+      return false
+    }
     if (this.membersMap.size <= 0) {
       return true
     }
@@ -134,6 +151,8 @@ export class TeamMemberCache {
       removeIds.forEach((e) => {
         this.membersMap.delete(e)
       })
+      this.isFinish = false
+      this.nextToken = ''
     }
   }
 
@@ -148,6 +167,8 @@ export class TeamMemberCache {
       removeIds.forEach((e) => {
         this.membersMap.delete(e)
       })
+      this.isFinish = false
+      this.nextToken = ''
     }
   }
 
@@ -157,9 +178,14 @@ export class TeamMemberCache {
    */
   onTeamMemberJoined = (members: V2NIMTeamMember[]): void => {
     if (members[0].teamId === this.teamId) {
+      const currentGeneration = this.generation
+      const currentTeamId = this.teamId
       let accIds = members.map(m => m.accountId)
-      TeamRepo.getTeamMembersByIds(this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
+      TeamRepo.getTeamMembersByIds(currentTeamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
         accIds).then((newMembers) => {
+        if (!this.isCurrentTeam(currentTeamId, currentGeneration)) {
+          return
+        }
         newMembers.forEach((m) => {
           this.membersMap.set(m.getAccId(), m)
         })
@@ -179,7 +205,10 @@ export class TeamMemberCache {
    * 获取所有的成员列表
    * @returns
    */
-  getAllMembers(): TeamMemberWithUser[] {
+  getAllMembers(expectedTeamId?: string): TeamMemberWithUser[] {
+    if (expectedTeamId !== undefined && expectedTeamId !== this.teamId) {
+      return []
+    }
     return Array.from(this.membersMap.values()).sort((a, b) => this.sortTeamMember(a, b))
   }
 
@@ -194,15 +223,19 @@ export class TeamMemberCache {
    */
   onSyncFinished = (): void => {
     if (this.teamId) {
-      TeamRepo.getTeamInfo(this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL)
+      const currentGeneration = this.generation
+      const currentTeamId = this.teamId
+      TeamRepo.getTeamInfo(currentTeamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL)
         .then((team) => {
-          this.team = team
+          if (this.isCurrentTeam(currentTeamId, currentGeneration)) {
+            this.team = team
+          }
         })
       TeamRepo.getTeamMembersByIds(
-        this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, [ChatKitClient.getLoginUserId()]
+        currentTeamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, [ChatKitClient.getLoginUserId()]
       )
         .then((members: TeamMemberWithUser[]) => {
-          if (members.length > 0) {
+          if (members.length > 0 && this.isCurrentTeam(currentTeamId, currentGeneration)) {
             this.mineTeamMember = members[0].teamMember
           }
         })
@@ -249,9 +282,19 @@ export class TeamMemberCache {
   /**
    * 初始化群信息
    */
-  async getTeam(): Promise<V2NIMTeam | undefined> {
+  async getTeam(expectedTeamId?: string): Promise<V2NIMTeam | undefined> {
+    if (expectedTeamId !== undefined && expectedTeamId !== this.teamId) {
+      return undefined
+    }
     if (!this.team) {
-      this.team = await TeamRepo.getTeamInfo(this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL)
+      const currentGeneration = this.generation
+      const currentTeamId = this.teamId
+      const team = await TeamRepo.getTeamInfo(currentTeamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL)
+      if (this.isCurrentTeam(currentTeamId, currentGeneration)) {
+        this.team = team
+        return team
+      }
+      return undefined
     }
     return this.team
   }
@@ -259,40 +302,92 @@ export class TeamMemberCache {
   /**
    * 拉取全量成员
    */
-  async loadAllTeamMember() {
-    if (this.team) {
-      while (!this.isFinish) {
-        await this.getMemberList()
+  async loadAllTeamMember(): Promise<boolean> {
+    if (!this.teamId) {
+      return false
+    }
+    if (this.isFinish) {
+      return this.haveLoadAllMember(this.teamId)
+    }
+    if (this.loadAllPromise) {
+      return await this.loadAllPromise
+    }
+
+    const currentGeneration = this.generation
+    const currentTeamId = this.teamId
+    const loadingPromise = (async (): Promise<boolean> => {
+      while (this.isCurrentTeam(currentTeamId, currentGeneration) && !this.isFinish) {
+        const pageLoaded = await this.getMemberList()
+        if (!pageLoaded) {
+          return false
+        }
+      }
+      return this.isCurrentTeam(currentTeamId, currentGeneration) &&
+        this.haveLoadAllMember(currentTeamId)
+    })()
+    this.loadAllPromise = loadingPromise
+    try {
+      return await loadingPromise
+    } finally {
+      if (this.loadAllPromise === loadingPromise) {
+        this.loadAllPromise = undefined
       }
     }
   }
 
-  async getMoreMemberList() {
+  async getMoreMemberList(): Promise<boolean> {
     if (!this.isFinish) {
-      await this.getMemberList()
+      return await this.getMemberList()
     }
+    return this.haveLoadAllMember(this.teamId)
   }
 
-  async getMemberList() {
-    let result = await TeamRepo.getTeamMembers(this.teamId,
-      V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, {
-        nextToken: this.nextToken,
-        direction: V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_ASC
-      }).catch((e: V2NIMError) => {
-      Logger.debug('ChatKit', `${TeamMemberCache.logTag} getTeamMembers error code = ${e.code}`)
-    })
-    if (result) {
+  async getMemberList(): Promise<boolean> {
+    if (!this.teamId || this.isFinish) {
+      return this.haveLoadAllMember(this.teamId)
+    }
+    if (this.pageLoadingPromise) {
+      return await this.pageLoadingPromise
+    }
+
+    const currentGeneration = this.generation
+    const currentTeamId = this.teamId
+    const currentNextToken = this.nextToken
+    const loadingPromise = (async (): Promise<boolean> => {
+      let result = await TeamRepo.getTeamMembers(currentTeamId,
+        V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, {
+          nextToken: currentNextToken,
+          direction: V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_ASC
+        }).catch((e: V2NIMError) => {
+        Logger.debug('ChatKit', `${TeamMemberCache.logTag} getTeamMembers error code = ${e.code}`)
+      })
+      if (!result || !this.isCurrentTeam(currentTeamId, currentGeneration)) {
+        return false
+      }
+      if (!result.finished && result.nextToken === currentNextToken) {
+        Logger.debug('ChatKit', `${TeamMemberCache.logTag} next token did not advance`)
+        return false
+      }
+
       this.isFinish = result.finished
       this.nextToken = result.nextToken
-      result.memberList.forEach((e) => {
-        this.membersMap.set(e.getAccId(), e)
+      result.memberList.forEach((member: TeamMemberWithUser) => {
+        this.membersMap.set(member.getAccId(), member)
       })
       let mineMember = result.memberList.find(member => member.getAccId() === ChatKitClient.getLoginUserId())
       if (mineMember) {
         this.mineTeamMember = mineMember.teamMember
       }
+      return true
+    })()
+    this.pageLoadingPromise = loadingPromise
+    try {
+      return await loadingPromise
+    } finally {
+      if (this.pageLoadingPromise === loadingPromise) {
+        this.pageLoadingPromise = undefined
+      }
     }
-
   }
 
   //群成员排序
@@ -319,12 +414,23 @@ export class TeamMemberCache {
    * 获取自己的成员信息
    * @returns
    */
-  async getMineMember(): Promise<V2NIMTeamMember | undefined> {
+  async getMineMember(expectedTeamId?: string): Promise<V2NIMTeamMember | undefined> {
+    if (expectedTeamId !== undefined && expectedTeamId !== this.teamId) {
+      return undefined
+    }
     if (!this.mineTeamMember) {
+      const currentGeneration = this.generation
+      const currentTeamId = this.teamId
+      if (!currentTeamId) {
+        return undefined
+      }
       let mineMember = (await TeamRepo.getTeamMembersByIds(
-        this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, [ChatKitClient.getLoginUserId()]
+        currentTeamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, [ChatKitClient.getLoginUserId()]
       )
       ).find(m => m.getAccId() === ChatKitClient.getLoginUserId())
+      if (!this.isCurrentTeam(currentTeamId, currentGeneration)) {
+        return undefined
+      }
       if (mineMember) {
         this.membersMap.set(mineMember.getAccId(), mineMember)
         this.mineTeamMember = mineMember.teamMember
@@ -343,10 +449,12 @@ export class TeamMemberCache {
     if (member) {
       return member
     } else {
+      const currentGeneration = this.generation
+      const currentTeamId = this.teamId
       let result = (await TeamRepo.getTeamMembersByIds(
-        this.teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, [account]
+        currentTeamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, [account]
       ))
-      if (result.length > 0) {
+      if (result.length > 0 && this.isCurrentTeam(currentTeamId, currentGeneration)) {
         const m = result[0]
         this.membersMap.set(m.getAccId(), m)
         return m
@@ -356,6 +464,7 @@ export class TeamMemberCache {
   }
 
   clear() {
+    this.generation += 1
     this.clearMemberChangeListener()
     this.membersMap.clear()
     this.mineTeamMember = undefined
@@ -363,13 +472,22 @@ export class TeamMemberCache {
     this.team = undefined
     this.isFinish = false
     this.nextToken = ''
+    this.pageLoadingPromise = undefined
+    this.loadAllPromise = undefined
   }
 
   /**
    * 是否已经加载了所有成员
    * @returns
    */
-  haveLoadAllMember(): boolean {
-    return this.isFinish
+  haveLoadAllMember(expectedTeamId?: string): boolean {
+    if ((expectedTeamId !== undefined && expectedTeamId !== this.teamId) || !this.isFinish) {
+      return false
+    }
+    return !this.team || this.membersMap.size >= this.team.memberCount
+  }
+
+  private isCurrentTeam(teamId: string, generation: number): boolean {
+    return this.teamId === teamId && this.generation === generation
   }
 }

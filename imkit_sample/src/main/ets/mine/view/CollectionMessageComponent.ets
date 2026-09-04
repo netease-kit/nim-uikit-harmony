@@ -1,8 +1,14 @@
-import { DateUtils, MessageItemClick, NIMMessageInfo, pinMessageContent } from '@nimkit/chatkit_ui';
+import {
+  DateUtils,
+  getMessageBackgroundColor,
+  MessageItemClick,
+  NIMMessageInfo,
+  pinMessageContent
+} from '@nimkit/chatkit_ui';
 import { AvatarColorUntil, AvatarItem, CommonAvatar, TailString } from '@nimkit/common';
 import { V2NIMConversationType, V2NIMMessageType } from '@nimsdk/base';
-import { CollectionMessageModel } from '../model/CollectionMessageModel';
 import { isMultiLineMessage } from '@nimkit/chatkit';
+import { CollectionMessageModel } from '../model/CollectionMessageModel';
 
 @ComponentV2
 export struct CollectionMessageComponent {
@@ -76,9 +82,10 @@ export struct CollectionMessageComponent {
 
         Column() {
           pinMessageContent({ message: this.collection.message, onMessageClick: this.onMessageClick })
-            .backgroundColor((this.collection.message?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ||
-            isMultiLineMessage(this.collection.message!.message)) ?
-            Color.Transparent : $r('app.color.color_chat_receive_message_bg'))
+            .backgroundColor(this.collection.message?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ||
+              isMultiLineMessage(this.collection.message!.message) ?
+              Color.Transparent : getMessageBackgroundColor(this.collection.message,
+                $r('app.color.color_chat_receive_message_bg')))
             .borderRadius(6)
             .id("msgContainer")
             .alignRules(this.AlignLeft)

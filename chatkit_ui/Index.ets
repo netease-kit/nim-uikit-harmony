@@ -7,9 +7,20 @@
 
 export { NEEmojiManager } from './src/main/ets/manager/NEEmojiManager'
 
+export { NEStickerItem, NEStickerPackage } from './src/main/ets/model/NEStickerPackage'
+
+export { MessageReactionManager } from './src/main/ets/manager/MessageReactionManager'
+
+export {
+  MessageReactionEmoji,
+  MessageReactionEmojiProvider
+} from './src/main/ets/model/MessageReactionEmoji'
+
 export { ChatP2PPage } from './src/main/ets/pages/ChatP2PPage'
 
 export { ChatKitConfig } from './src/main/ets/ChatKitConfig'
+
+export { ChatBaseViewModel } from './src/main/ets/viewmodel/ChatBaseViewModel'
 
 export { NIMMessageInfo } from './src/main/ets/model/NIMMessageInfo'
 
@@ -37,7 +48,7 @@ export { buildSendMessageParams } from './src/main/ets/common/SendMessageParamsH
 
 export { showLocationDetail } from './src/main/ets/common/ChatUtils'
 
-export { pinMessageContent } from './src/main/ets/view/MessageComponentBuilder'
+export { getMessageBackgroundColor, pinMessageContent } from './src/main/ets/view/MessageComponentBuilder'
 
 export { ChatKitUIClient } from './src/main/ets/ChatKitUIClient'
 

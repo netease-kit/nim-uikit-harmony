@@ -11,11 +11,13 @@ import {
   ChatKitClient,
   CONVERSATION_GROUP_DEFAULT_AIT_KEY,
   CONVERSATION_GROUP_DEFAULT_ALL_KEY,
+  CONVERSATION_GROUP_DEFAULT_UNREAD_KEY,
   ContactRepo,
   ConversationGroupEventDisposer,
   ConversationGroupEventRepo,
   ConversationRepo,
   IMKitConfigCenter,
+  LocalConversationRepo,
   NEAIUserCache,
   NEFriendUserCache,
   TeamRepo,
@@ -27,6 +29,7 @@ import {
   V2NIMConversationOption,
   V2NIMConversationType,
   V2NIMFriendDeletionType,
+  V2NIMLocalConversationFilter,
   V2NIMTeam,
   V2NIMTeamType,
   V2NIMUser
@@ -54,6 +57,8 @@ import {
   resolveConversationDisplayInfo,
   resolveDeferredBatchDelay
 } from './ConversationUpdateUtils'
+
+const UNREAD_GROUP_QUERY_ID: string = '__default_unread__'
 
 class ConversationApplyResult {
   displayChanged: boolean
@@ -110,15 +115,17 @@ export class ConversationViewModel {
   private hasAddedAitSessionListener: boolean = false
   private hasAddedAIUserListener: boolean = false
   private hasAddedFriendCacheListener: boolean = false
-  private unreadGroupUnreadCount: number = 0
-  private hasLoadedUnreadGroupUnreadCount: boolean = false
-  private hasSubscribedUnreadGroupCount: boolean = false
-  private unreadGroupCountEventDisposer?: ConversationGroupEventDisposer = undefined
-  private readonly unreadGroupCountFilter: V2NIMConversationFilter = createDefaultUnreadConversationFilter()
+  private nonMutedUnreadCount: number = 0
+  private hasLoadedNonMutedUnreadCount: boolean = false
+  private hasSubscribedNonMutedUnreadCount: boolean = false
+  private nonMutedUnreadCountEventDisposer?: ConversationGroupEventDisposer = undefined
+  private readonly nonMutedUnreadCountFilter: V2NIMConversationFilter = createDefaultUnreadConversationFilter()
+  private readonly localNonMutedUnreadCountFilter: V2NIMLocalConversationFilter = { ignoreMuted: true }
   private model: ConversationModel
   private readonly mode: ConversationMode
   private aitSessionLoadSeq: number = 0
   private p2pUserInfoLoadGeneration: number = 0
+  @Trace private p2pAvatarNameMap: Map<string, string> = new Map()
 
   constructor(strategy: ConversationStrategy) {
     this.model = new ConversationModel(strategy)
@@ -127,7 +134,7 @@ export class ConversationViewModel {
 
   initConversation() {
     this.logPerf('conversation.vm.init.start')
-    this.setupUnreadGroupCount()
+    this.setupNonMutedUnreadCount()
     if (this.hasLoadedConversationForReuse()) {
       this.setupEventHandler()
       this.logPerf('conversation.vm.init.skip_loaded')
@@ -140,6 +147,26 @@ export class ConversationViewModel {
 
   public hasLoadedConversationForReuse(): boolean {
     return this.isFinishedSyncLoad && this.hasLoadedInitialConversation && this.data.totalCount() > 0
+  }
+
+  public getConversationAvatarName(conversation: ConversationItem): string {
+    if (conversation.type !== V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
+      return conversation.name ?? ''
+    }
+    const targetId = this.model.parseConversationTargetId(conversation.conversationId)
+    const userAIBot = UserAIBotManager.getCachedUserAIBot(targetId)
+    if (userAIBot?.name) {
+      return userAIBot.name
+    }
+    const aiUser = IMKitConfigCenter.enableAI ? NEAIUserCache.getAIUser(targetId) : undefined
+    if (aiUser?.name) {
+      return aiUser.name
+    }
+    const loadedAvatarName = this.p2pAvatarNameMap.get(targetId)
+    if (loadedAvatarName) {
+      return loadedAvatarName
+    }
+    return NEFriendUserCache.peekInstance()?.getFriendById(targetId)?.user?.name || targetId
   }
 
   public async stickTopConversation(conversationId: string, stickTop: boolean) {
@@ -178,13 +205,11 @@ export class ConversationViewModel {
   }
 
   public getDefaultConversationGroupCounts(): ConversationGroupDefaultCounts {
-    const totalUnreadCount = this.model.getTotalUnreadCount() ?? 0
-    const unreadGroupCount = this.mode === ConversationMode.CLOUD ?
-      (this.hasLoadedUnreadGroupUnreadCount ? this.unreadGroupUnreadCount : 0) : totalUnreadCount
+    const nonMutedUnreadCount = this.hasLoadedNonMutedUnreadCount ? this.nonMutedUnreadCount : 0
     return new ConversationGroupDefaultCounts(
-      totalUnreadCount,
+      nonMutedUnreadCount,
       this.getAitBadgeConversationCount(),
-      unreadGroupCount
+      nonMutedUnreadCount
     )
   }
 
@@ -195,6 +220,10 @@ export class ConversationViewModel {
     }
     this.customGroupLoadSeq++
     this.customGroupId = ''
+    if (this.mode === ConversationMode.CLOUD && group.kind === ConversationGroupKind.UNREAD) {
+      await this.selectCustomConversationGroup(UNREAD_GROUP_QUERY_ID)
+      return
+    }
     this.selectedConversationGroupKey = group.groupKey
     this.isFinished = this.defaultFinished
     this.reloadDefaultGroupDisplay()
@@ -221,7 +250,7 @@ export class ConversationViewModel {
       ContactRepo.listener.off('loadFriendCache', this.onFriendCacheLoaded)
       this.hasAddedFriendCacheListener = false
     }
-    this.releaseUnreadGroupCount()
+    this.releaseNonMutedUnreadCount()
     this.model.removeEventListener()
     if (this.pendingFlushTimer >= 0) {
       clearTimeout(this.pendingFlushTimer)
@@ -236,12 +265,13 @@ export class ConversationViewModel {
     this.deferredLoadQueue = []
     this.hasDeferredLoadScheduled = false
     this.userAIBotConversationList.clear()
-    this.unreadGroupUnreadCount = 0
-    this.hasLoadedUnreadGroupUnreadCount = false
+    this.nonMutedUnreadCount = 0
+    this.hasLoadedNonMutedUnreadCount = false
     this.customGroupId = ''
     this.customGroupLoadSeq++
     this.aitSessionLoadSeq++
     this.p2pUserInfoLoadGeneration++
+    this.p2pAvatarNameMap = new Map()
     this.selectedConversationGroupKey = CONVERSATION_GROUP_DEFAULT_ALL_KEY
   }
 
@@ -390,9 +420,6 @@ export class ConversationViewModel {
     // 会话未读数变化
     this.model.onTotalUnreadCountChangedHandler = (unreadCount: number) => {
       this.logPerf('conversation.event.unread', `unread=${unreadCount}`)
-      if (this.onUreadMessageChange) {
-        this.onUreadMessageChange(unreadCount)
-      }
       this.notifyDefaultGroupCountChange()
     }
     this.model.onConversationCreatedHandler = (conversation: ConversationItem) => {
@@ -461,58 +488,86 @@ export class ConversationViewModel {
     }
   }
 
-  private onUnreadGroupCountChangedByFilter = (filter: V2NIMConversationFilter, unreadCount: number): void => {
+  private onNonMutedUnreadCountChangedByFilter = (filter: V2NIMConversationFilter, unreadCount: number): void => {
     if (!isDefaultUnreadConversationFilter(filter)) {
       return
     }
-    this.updateUnreadGroupUnreadCount(unreadCount)
+    this.updateNonMutedUnreadCount(unreadCount)
   }
 
-  private setupUnreadGroupCount(): void {
-    if (this.mode !== ConversationMode.CLOUD || this.hasSubscribedUnreadGroupCount) {
+  private onLocalNonMutedUnreadCountChangedByFilter =
+    (filter: V2NIMLocalConversationFilter, unreadCount: number): void => {
+      const hasConversationTypes = (filter.conversationTypes?.length ?? 0) > 0
+      if (filter.ignoreMuted !== true || hasConversationTypes) {
+        return
+      }
+      this.updateNonMutedUnreadCount(unreadCount)
+    }
+
+  private setupNonMutedUnreadCount(): void {
+    if (this.hasSubscribedNonMutedUnreadCount) {
       return
     }
-    if (this.unreadGroupCountEventDisposer === undefined) {
-      this.unreadGroupCountEventDisposer =
-        ConversationGroupEventRepo.onUnreadCountChangedByFilter(this.onUnreadGroupCountChangedByFilter)
+    if (this.nonMutedUnreadCountEventDisposer === undefined) {
+      this.nonMutedUnreadCountEventDisposer = this.mode === ConversationMode.CLOUD ?
+        ConversationGroupEventRepo.onUnreadCountChangedByFilter(this.onNonMutedUnreadCountChangedByFilter) :
+        ConversationGroupEventRepo.onLocalUnreadCountChangedByFilter(this.onLocalNonMutedUnreadCountChangedByFilter)
     }
-    this.hasSubscribedUnreadGroupCount = ConversationRepo.safeSubscribeUnreadCountByFilter(this.unreadGroupCountFilter)
-    this.loadUnreadGroupUnreadCount()
+    if (this.mode === ConversationMode.CLOUD) {
+      this.hasSubscribedNonMutedUnreadCount =
+        ConversationRepo.safeSubscribeUnreadCountByFilter(this.nonMutedUnreadCountFilter)
+    } else {
+      try {
+        LocalConversationRepo.subscribeUnreadCountByFilter(this.localNonMutedUnreadCountFilter)
+        this.hasSubscribedNonMutedUnreadCount = true
+      } catch (e) {
+        Logger.error('ConversationKit', `subscribe local non-muted unread count failed: ${e}`)
+      }
+    }
+    this.loadNonMutedUnreadCount()
   }
 
-  private async loadUnreadGroupUnreadCount(): Promise<void> {
-    if (this.mode !== ConversationMode.CLOUD) {
-      return
-    }
+  private async loadNonMutedUnreadCount(): Promise<void> {
     try {
-      const unreadCount = await ConversationRepo.getUnreadCountByFilter(this.unreadGroupCountFilter)
-      this.updateUnreadGroupUnreadCount(unreadCount ?? 0)
+      const unreadCount = this.mode === ConversationMode.CLOUD ?
+        await ConversationRepo.getUnreadCountByFilter(this.nonMutedUnreadCountFilter) :
+        await LocalConversationRepo.getUnreadCountByFilter(this.localNonMutedUnreadCountFilter)
+      this.updateNonMutedUnreadCount(unreadCount ?? 0)
     } catch (e) {
-      Logger.error('ConversationKit', `loadUnreadGroupUnreadCount failed: ${e}`)
+      Logger.error('ConversationKit', `load non-muted unread count failed: ${e}`)
     }
   }
 
-  private updateUnreadGroupUnreadCount(unreadCount: number): void {
+  private updateNonMutedUnreadCount(unreadCount: number): void {
     const nextUnreadCount = unreadCount < 0 ? 0 : unreadCount
-    if (this.hasLoadedUnreadGroupUnreadCount && this.unreadGroupUnreadCount === nextUnreadCount) {
+    if (this.hasLoadedNonMutedUnreadCount && this.nonMutedUnreadCount === nextUnreadCount) {
       return
     }
-    this.unreadGroupUnreadCount = nextUnreadCount
-    this.hasLoadedUnreadGroupUnreadCount = true
+    this.nonMutedUnreadCount = nextUnreadCount
+    this.hasLoadedNonMutedUnreadCount = true
+    this.onUreadMessageChange?.(nextUnreadCount)
     this.notifyDefaultGroupCountChange()
   }
 
-  private releaseUnreadGroupCount(): void {
-    if (this.hasSubscribedUnreadGroupCount) {
-      ConversationRepo.safeUnsubscribeUnreadCountByFilter(this.unreadGroupCountFilter)
+  private releaseNonMutedUnreadCount(): void {
+    if (this.hasSubscribedNonMutedUnreadCount) {
+      if (this.mode === ConversationMode.CLOUD) {
+        ConversationRepo.safeUnsubscribeUnreadCountByFilter(this.nonMutedUnreadCountFilter)
+      } else {
+        try {
+          LocalConversationRepo.unsubscribeUnreadCountByFilter(this.localNonMutedUnreadCountFilter)
+        } catch (e) {
+          Logger.error('ConversationKit', `unsubscribe local non-muted unread count failed: ${e}`)
+        }
+      }
     }
-    this.hasSubscribedUnreadGroupCount = false
-    if (this.unreadGroupCountEventDisposer !== undefined) {
-      this.unreadGroupCountEventDisposer()
-      this.unreadGroupCountEventDisposer = undefined
+    this.hasSubscribedNonMutedUnreadCount = false
+    if (this.nonMutedUnreadCountEventDisposer !== undefined) {
+      this.nonMutedUnreadCountEventDisposer()
+      this.nonMutedUnreadCountEventDisposer = undefined
     }
-    this.hasLoadedUnreadGroupUnreadCount = false
-    this.unreadGroupUnreadCount = 0
+    this.hasLoadedNonMutedUnreadCount = false
+    this.nonMutedUnreadCount = 0
   }
 
   private async loadConversation() {
@@ -752,12 +807,23 @@ export class ConversationViewModel {
     if (users.length <= 0) {
       return
     }
+    let changed = false
+    const nextAvatarNameMap = new Map(this.p2pAvatarNameMap)
+    users.forEach((user: V2NIMUser) => {
+      const avatarName = user.name && user.name.length > 0 ? user.name : user.accountId
+      if (avatarName.length > 0 && nextAvatarNameMap.get(user.accountId) !== avatarName) {
+        nextAvatarNameMap.set(user.accountId, avatarName)
+        changed = true
+      }
+    })
+    if (changed) {
+      this.p2pAvatarNameMap = nextAvatarNameMap
+    }
     const userMap: Map<string, V2NIMUser> = new Map()
     users.forEach((user: V2NIMUser) => {
       userMap.set(user.accountId, user)
     })
 
-    let changed = false
     this.data.conversationList.forEach((conversation: ConversationItem) => {
       if (conversation.type !== V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
         return
@@ -1236,7 +1302,8 @@ export class ConversationViewModel {
 
   private async selectCustomConversationGroup(groupId: string): Promise<void> {
     const requestSeq = ++this.customGroupLoadSeq
-    this.selectedConversationGroupKey = groupId
+    this.selectedConversationGroupKey = groupId === UNREAD_GROUP_QUERY_ID ?
+      CONVERSATION_GROUP_DEFAULT_UNREAD_KEY : groupId
     this.customGroupId = groupId
     this.customGroupOffset = 0
     this.customGroupFinished = false
@@ -1257,19 +1324,25 @@ export class ConversationViewModel {
     this.isLoadingCustomGroupConversation = true
     this.customGroupLoadingSeq = requestSeq
     try {
-      const option: V2NIMConversationOption = {
+      const option: V2NIMConversationOption = this.isUnreadGroupSelected() ? {
+        onlyUnread: true
+      } : {
         conversationGroupIds: [this.customGroupId]
       }
-      const result = await this.model.getConversationListByOption(this.customGroupOffset, this.LOAD_MORE_LIMIT, option)
-      if (requestSeq !== this.customGroupLoadSeq) {
-        return
-      }
-      if (result !== undefined) {
+      let result = await this.model.getConversationListByOption(this.customGroupOffset, this.LOAD_MORE_LIMIT, option)
+      while (result !== undefined && requestSeq === this.customGroupLoadSeq) {
         this.customGroupOffset = result.offset
         this.customGroupFinished = result.finished
         this.isFinished = result.finished
         if (result.conversationList.length > 0) {
           this.upsertConversationBatch(result.conversationList, false)
+        }
+        if (!this.isUnreadGroupSelected() || result.finished || this.data.totalCount() > 0) {
+          break
+        }
+        result = await this.model.getConversationListByOption(this.customGroupOffset, this.LOAD_MORE_LIMIT, option)
+        if (requestSeq !== this.customGroupLoadSeq) {
+          return
         }
       }
     } finally {
@@ -1281,6 +1354,10 @@ export class ConversationViewModel {
 
   private isCustomGroupSelected(): boolean {
     return this.customGroupId.length > 0
+  }
+
+  private isUnreadGroupSelected(): boolean {
+    return this.mode === ConversationMode.CLOUD && this.customGroupId === UNREAD_GROUP_QUERY_ID
   }
 
   private refreshDefaultGroupDisplayAfterAitChanged(): void {
@@ -1297,6 +1374,9 @@ export class ConversationViewModel {
   }
 
   private isConversationInCurrentCustomGroup(conversation: ConversationItem): boolean {
+    if (this.isUnreadGroupSelected()) {
+      return conversation.unreadCount > 0 && conversation.mute !== true
+    }
     const cloudConversation = conversation as V2NIMConversation
     return this.customGroupId.length <= 0 || (cloudConversation.groupIds?.includes(this.customGroupId) ?? false)
   }

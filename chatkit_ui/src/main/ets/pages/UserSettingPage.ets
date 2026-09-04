@@ -201,7 +201,7 @@ export struct UserSettingPage {
             Column() {
               CommonAvatar({
                 item: new AvatarItem(this.userWithFriend?.user?.avatar,
-                  this.userWithFriend?.shortName(),
+                  this.userWithFriend?.getAvatarName(),
                   AvatarColorUntil.getBackgroundColorById(this.userWithFriend?.user?.accountId ?? "")),
                 roundRadius: 21,
                 textSize: 16

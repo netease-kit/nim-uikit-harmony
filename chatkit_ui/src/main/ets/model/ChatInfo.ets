@@ -23,6 +23,7 @@ export class ChatInfo {
   @Trace downloadProgressMap: Map<string, number> = new Map();
   @Trace isReceiveMsg: IsReceiveMsg = new IsReceiveMsg(false);
   @Trace scrollIndex: number = -1; // 是否需要滚动到指定位置
+  @Trace scrollIndexAlignStart: boolean = false; // 是否从消息头部对齐
   msgMap: Map<string, NIMMessageInfo> = new Map();
   @Trace msgPinMap: Map<string, V2NIMMessagePin> = new Map();
   conversationId: string = '';
@@ -51,7 +52,8 @@ export class ChatInfo {
     this.isReceiveMsg = new IsReceiveMsg(receiveMsg, messages, operation)
   }
 
-  setScrollIndex(index: number) {
+  setScrollIndex(index: number, alignStart: boolean = false) {
+    this.scrollIndexAlignStart = alignStart
     this.scrollIndex = index
   }
 
@@ -306,10 +308,13 @@ export class ChatInfo {
     return result;
   }
 
-  deleteMessage(msgClientId: string) {
+  deleteMessage(msgClientId: string, fallbackMessage?: V2NIMMessage) {
     const deletedMessage: NIMMessageInfo | undefined = this.getMessage(msgClientId)
     if (deletedMessage !== undefined) {
       this.setReceiveMsg(true, [deletedMessage.message], IsReceiveMsgOperation.DELETE)
+    } else if (fallbackMessage !== undefined) {
+      // Keep new-message count in sync when the revoked message is outside the loaded window.
+      this.setReceiveMsg(true, [fallbackMessage], IsReceiveMsgOperation.DELETE)
     }
     this.msgList.delete(msgClientId)
     this.msgMap.delete(msgClientId)
@@ -317,8 +322,8 @@ export class ChatInfo {
     this.voiceToTextCache.delete(msgClientId)
   }
 
-  revokeMessage(msgClientId: string) {
-    this.deleteMessage(msgClientId)
+  revokeMessage(msgClientId: string, fallbackMessage?: V2NIMMessage) {
+    this.deleteMessage(msgClientId, fallbackMessage)
   }
 
   getMessage(msgClientId: string): NIMMessageInfo | undefined {
@@ -327,6 +332,13 @@ export class ChatInfo {
 
   searchPosition(msgClientId: string): number {
     return this.msgList.searchPosition(msgClientId)
+  }
+
+  notifyMessageChange(msgClientId: string): void {
+    const index = this.msgList.searchPosition(msgClientId)
+    if (index >= 0) {
+      this.msgList.notifyDataChange(index)
+    }
   }
 
   public cleanMessage() {

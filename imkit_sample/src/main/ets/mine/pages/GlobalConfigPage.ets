@@ -12,7 +12,7 @@ import {
   ViewItemBuilder
 } from '@nimkit/common';
 import { IMKitConfigCenter } from '@nimkit/chatkit';
-import { ChatKitConfig } from '@nimkit/chatkit_ui';
+import { ChatBaseViewModel, ChatKitConfig } from '@nimkit/chatkit_ui';
 import { preferences } from '@kit.ArkData';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { resolveReadMessageEnabled, resolveTeamJoinAgreeModeEnabled } from '../../manager/GlobalConfigStorage';
@@ -28,8 +28,10 @@ export struct GlobalConfigPage {
   pathStack: NavPathStack = new NavPathStack()
   @Local aiStreamEnable: boolean = AppStorage.get(CommonConstants.KEY_SETTING_AI_STREAM) ?? true
   @Local richTextEnable: boolean = AppStorage.get(CommonConstants.KEY_SETTING_RICH_TEXT_MESSAGE) ?? true
+  @Local reactionEnable: boolean = AppStorage.get(CommonConstants.KEY_SETTING_REACTION_ENABLE) ?? true
   @Local teamEnable: boolean = AppStorage.get(CommonConstants.KEY_SETTING_TEAM_ENABLE) ?? true
   @Local readMessageEnable: boolean = true
+  @Local lastReadPositionEnable: boolean = AppStorage.get(CommonConstants.KEY_SETTING_LAST_READ_POSITION_ENABLE) ?? true
   @Local teamModeEnable: boolean = true
   @Local collectionEnable: boolean = AppStorage.get(CommonConstants.KEY_SETTING_COLLECTION_ENABLE) ?? true
   @Local pinEnable: boolean = AppStorage.get(CommonConstants.KEY_SETTING_PIN_ENABLE) ?? true
@@ -49,6 +51,11 @@ export struct GlobalConfigPage {
       this.dataPreferences?.getSync(CommonConstants.KEY_SETTING_TEAM_JOIN_AGREE_MODE, undefined) as boolean | undefined
     )
     IMKitConfigCenter.enableTeamJoinAgreeModelAuth = this.teamModeEnable
+
+    this.reactionEnable = AppStorage.get(CommonConstants.KEY_SETTING_REACTION_ENABLE) ?? true
+    ChatKitConfig.enableEmojiReaction = this.reactionEnable
+    this.lastReadPositionEnable = AppStorage.get(CommonConstants.KEY_SETTING_LAST_READ_POSITION_ENABLE) ?? true
+    ChatKitConfig.enableLastReadPosition = this.lastReadPositionEnable
 
     this.readMessageEnable = resolveReadMessageEnabled(
       this.dataPreferences?.getSync(CommonConstants.KEY_SETTING_READ_MESSAGE, undefined) as boolean | undefined,
@@ -160,6 +167,28 @@ export struct GlobalConfigPage {
         switchChange: (isOpen: boolean) => {
           AppStorage.set(CommonConstants.KEY_SETTING_CLOUD_SEARCH, isOpen)
           IMKitConfigCenter.enableCloudSearch = isOpen
+        }
+      },
+      {
+        title: $r('app.string.mine_setting_last_read_position'),
+        itemHeight: 48,
+        isOpen: this.lastReadPositionEnable,
+        switchChange: (isOpen: boolean) => {
+          this.lastReadPositionEnable = isOpen
+          AppStorage.set(CommonConstants.KEY_SETTING_LAST_READ_POSITION_ENABLE, isOpen)
+          ChatKitConfig.enableLastReadPosition = isOpen
+          ChatBaseViewModel.currentViewModel?.refreshLastReadPositionState()
+        }
+      },
+      {
+        title: $r('app.string.mine_setting_reaction'),
+        itemHeight: 48,
+        isOpen: this.reactionEnable,
+        switchChange: (isOpen: boolean) => {
+          this.reactionEnable = isOpen
+          AppStorage.set(CommonConstants.KEY_SETTING_REACTION_ENABLE, isOpen)
+          ChatKitConfig.enableEmojiReaction = isOpen
+          ChatBaseViewModel.currentViewModel?.refreshMessageReactionState()
         }
       },
     ]

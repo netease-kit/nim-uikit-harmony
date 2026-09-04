@@ -253,6 +253,14 @@
       "value": "Rich Text Message"
     },
     {
+      "name": "mine_setting_reaction",
+      "value": "Message Reaction"
+    },
+    {
+      "name": "mine_setting_last_read_position",
+      "value": "Last Read Message Position"
+    },
+    {
       "name": "mine_setting_team_enable",
       "value": "Team Feature"
     },

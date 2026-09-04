@@ -62,6 +62,14 @@ import {
 const AI_SEARCH_MARKDOWN_SELECT_DEBUG_TAG = 'AISearchMarkdownSelect'
 let aiMarkdownLinkifyRegistered = false
 
+export function getMessageBackgroundColor(message: NIMMessageInfo | undefined,
+  fallback: ResourceColor, hasReaction: boolean = false): ResourceColor {
+  if (message?.getMessageType() === V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE && !hasReaction) {
+    return Color.Transparent
+  }
+  return fallback
+}
+
 function debugAISearchMarkdownSelect(message: string): void {
   Logger.info('ChatKitUI', `[${AI_SEARCH_MARKDOWN_SELECT_DEBUG_TAG}] ${message}`)
 }
@@ -169,6 +177,8 @@ export struct messageContent {
   aiSearchSelectingMessageId: string = ''
   @Param
   aiSearchSelectingTranslation: boolean = false
+  @Param
+  showReaction: boolean = false
 
   private isAIStreamResponseMessage(): boolean {
     return this.message.isAiStreamMessage() &&
@@ -203,7 +213,11 @@ export struct messageContent {
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE) {
       fileBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
-      MessageAudioItemView({ message: this.message, onMessageClick: this.onMessageClick });
+      MessageAudioItemView({
+        message: this.message,
+        onMessageClick: this.onMessageClick,
+        showReactionBackground: this.showReaction
+      });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
       callBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM) {
@@ -473,6 +487,7 @@ export struct multiLineMessageBuilder {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .ellipsisMode(EllipsisMode.END)
           .margin({ bottom: 4 })
+          .alignSelf(ItemAlign.Start)
           .onClick((event) => this.onReplyClick(event))
         } else {
           Text(getContext().resourceManager.getStringSync($r('app.string.chat_reply_not_exist').id))
@@ -482,11 +497,13 @@ export struct multiLineMessageBuilder {
             .maxLines(1)
             .ellipsisMode(EllipsisMode.END)
             .margin({ bottom: 4 })
+            .alignSelf(ItemAlign.Start)
         }
       }
 
-      if (!this.message.isReceiveMessage() || !this.message.translatedText || this.message.translationLoading || this.message.translationFailed ||
-        this.isPinCollectionMode || this.message.showOriginalText) {
+      Column() {
+        if (!this.message.isReceiveMessage() || !this.message.translatedText || this.message.translationLoading ||
+          this.message.translationFailed || this.isPinCollectionMode || this.message.showOriginalText) {
         if (this.isPinCollectionMode) {
           // 列表模式保持标题、正文分开渲染，避免影响原有截断规则。
           if (this.getMultiLineTitleText().length > 0) {
@@ -537,7 +554,7 @@ export struct multiLineMessageBuilder {
         }
       }
 
-      if (!this.isPinCollectionMode && this.message.isReceiveMessage() && this.message.translationLoading) {
+        if (!this.isPinCollectionMode && this.message.isReceiveMessage() && this.message.translationLoading) {
         Row() {
           Image($r('app.media.ic_chat_menu_translate'))
             .width(12)
@@ -549,7 +566,7 @@ export struct multiLineMessageBuilder {
             .margin({ left: 4 })
         }
         .margin({ top: 8 })
-      } else if (!this.isPinCollectionMode && this.message.isReceiveMessage() && this.message.translationFailed) {
+        } else if (!this.isPinCollectionMode && this.message.isReceiveMessage() && this.message.translationFailed) {
         Row() {
           Image($r('app.media.ic_chat_message_status_fail'))
             .width(12)
@@ -563,8 +580,8 @@ export struct multiLineMessageBuilder {
         .onClick(() => {
           MessageTranslationService.instance.retry(this.message)
         })
-      } else if (!this.isPinCollectionMode && this.message.isReceiveMessage() &&
-        this.message.showTranslatedText && this.message.translatedText) {
+        } else if (!this.isPinCollectionMode && this.message.isReceiveMessage() &&
+          this.message.showTranslatedText && this.message.translatedText) {
         Column() {
           if (this.message.showOriginalText) {
             Divider()
@@ -609,7 +626,10 @@ export struct multiLineMessageBuilder {
         .gesture(LongPressGesture().onAction((event: GestureEvent) => {
           this.onMessageClick?.onTranslatedAreaLongClick?.(event, this.message)
         }))
+        }
       }
+      .alignItems(HorizontalAlign.Start)
+      .alignSelf(ItemAlign.Start)
     }
     .alignItems(HorizontalAlign.Start)
     .padding({
@@ -713,6 +733,7 @@ export struct richTextBuilder {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .ellipsisMode(EllipsisMode.END)
           .margin({ bottom: 4 })
+          .alignSelf(ItemAlign.Start)
           .onClick((event) => this.onItemClick(event))
         } else {
           Text(getContext().resourceManager.getStringSync($r('app.string.chat_reply_not_exist').id))
@@ -722,6 +743,7 @@ export struct richTextBuilder {
             .maxLines(1)
             .ellipsisMode(EllipsisMode.END)
             .margin({ bottom: 4 })
+            .alignSelf(ItemAlign.Start)
         }
 
       }
@@ -766,6 +788,8 @@ export struct richTextBuilder {
           })
         }
       }
+      .alignItems(HorizontalAlign.Start)
+      .alignSelf(ItemAlign.Start)
     }.alignItems(HorizontalAlign.Start)
     .padding({
       left: 12,
@@ -899,6 +923,7 @@ export struct textBuilder {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .ellipsisMode(EllipsisMode.END)
           .margin({ bottom: 4 })
+          .alignSelf(ItemAlign.Start)
           .onClick((event) => this.onItemClick(event))
         } else {
           Text(getContext().resourceManager.getStringSync($r('app.string.chat_reply_not_exist').id))
@@ -908,12 +933,13 @@ export struct textBuilder {
             .maxLines(1)
             .ellipsisMode(EllipsisMode.END)
             .margin({ bottom: 4 })
+            .alignSelf(ItemAlign.Start)
         }
 
       }
-      if (!this.message.isReceiveMessage() || !this.message.translatedText || this.message.translationLoading ||
-        this.message.translationFailed ||
-        this.message.showOriginalText) {
+      Column() {
+        if (!this.message.isReceiveMessage() || !this.message.translatedText || this.message.translationLoading ||
+          this.message.translationFailed || this.message.showOriginalText) {
         Text() {
           if (this.message.isRevokeMsg) {
             Span(this.message.message.text)
@@ -978,7 +1004,7 @@ export struct textBuilder {
         })
       }
 
-      if (this.message.isReceiveMessage() && this.message.translationLoading) {
+        if (this.message.isReceiveMessage() && this.message.translationLoading) {
         Row() {
           Image($r('app.media.ic_chat_menu_translate'))
             .width(12)
@@ -990,7 +1016,7 @@ export struct textBuilder {
             .margin({ left: 4 })
         }
         .margin({ top: 8 })
-      } else if (this.message.isReceiveMessage() && this.message.translationFailed) {
+        } else if (this.message.isReceiveMessage() && this.message.translationFailed) {
         Row() {
           Image($r('app.media.ic_chat_message_status_fail'))
             .width(12)
@@ -1004,7 +1030,7 @@ export struct textBuilder {
         .onClick(() => {
           MessageTranslationService.instance.retry(this.message)
         })
-      } else if (this.message.isReceiveMessage() && this.message.showTranslatedText && this.message.translatedText) {
+        } else if (this.message.isReceiveMessage() && this.message.showTranslatedText && this.message.translatedText) {
         Column() {
           if (this.message.showOriginalText) {
             Divider()
@@ -1042,7 +1068,10 @@ export struct textBuilder {
         .gesture(LongPressGesture().onAction((event: GestureEvent) => {
           this.onMessageClick?.onTranslatedAreaLongClick?.(event, this.message)
         }))
+        }
       }
+      .alignItems(HorizontalAlign.Start)
+      .alignSelf(ItemAlign.Start)
     }.alignItems(HorizontalAlign.Start)
     .padding({
       left: 12,

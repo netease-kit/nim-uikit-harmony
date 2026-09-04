@@ -13,7 +13,7 @@ import {
   MessageSendParams,
   PushConfigManager
 } from '@nimkit/chatkit';
-import { ChatKitConfig } from '@nimkit/chatkit_ui';
+import { ChatKitConfig, MessageReactionManager } from '@nimkit/chatkit_ui';
 import {
   AppLanguageCode,
   CommonConstants,
@@ -36,6 +36,7 @@ import {
 import { preferences } from '@kit.ArkData';
 import { V2NIMAIUser, V2NIMConversationType, V2NIMSendMessageParams } from '@nimsdk/base';
 import { StartupPerfDebugTimer } from '../uitrace/StartupPerfDebugTimer';
+import { registerSampleStickerPackages } from '../manager/StickerSampleConfig';
 
 const AI_SEARCH_USER_ACCOUNT: string = 'search'
 const AI_TRANSLATION_USER_ACCOUNT: string = 'translation'
@@ -176,6 +177,8 @@ PersistentStorage.persistProp(CommonConstants.KEY_SETTING_TEAM_ENABLE, true);
 PersistentStorage.persistProp(CommonConstants.KEY_SETTING_TOP_MESSAGE, true);
 PersistentStorage.persistProp(CommonConstants.KEY_SETTING_AI_STREAM, true);
 PersistentStorage.persistProp(CommonConstants.KEY_SETTING_RICH_TEXT_MESSAGE, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_REACTION_ENABLE, true);
+PersistentStorage.persistProp(CommonConstants.KEY_SETTING_LAST_READ_POSITION_ENABLE, true);
 PersistentStorage.persistProp(CommonConstants.KEY_SETTING_TEAM_MANAGER_MAX_COUNT, 10);
 PersistentStorage.persistProp(CommonConstants.KEY_SETTING_PUSH_CONFIG_ENABLED, false);
 PersistentStorage.persistProp(CommonConstants.KEY_SETTING_PUSH_CONFIG_CONTENT, '');
@@ -240,7 +243,9 @@ struct Index {
   }
 
   async onPageShow(): Promise<void> {
+    registerSampleStickerPackages()
     AIUserManager.setProvider(new AIUserAgentProviderImpl())
+    // MessageReactionManager.addCustomEmoji(1001, $r('app.media.custom_reaction'), 'sample_custom')
     let dataPreferences: preferences.Preferences | null = null;
     const options: preferences.Options = { name: 'imkit_data' };
     dataPreferences = preferences.getPreferencesSync(getContext(this), options);
@@ -269,6 +274,8 @@ struct Index {
     IMKitConfigCenter.enableTopMessage = AppStorage.get(CommonConstants.KEY_SETTING_TOP_MESSAGE) ?? true
     IMKitConfigCenter.enableAIStream = AppStorage.get(CommonConstants.KEY_SETTING_AI_STREAM) ?? true
     IMKitConfigCenter.enableRichTextMessage = AppStorage.get(CommonConstants.KEY_SETTING_RICH_TEXT_MESSAGE) ?? true
+    ChatKitConfig.enableEmojiReaction = AppStorage.get(CommonConstants.KEY_SETTING_REACTION_ENABLE) ?? true
+    ChatKitConfig.enableLastReadPosition = AppStorage.get(CommonConstants.KEY_SETTING_LAST_READ_POSITION_ENABLE) ?? true
     IMKitConfigCenter.teamManagerMaxCount = AppStorage.get(CommonConstants.KEY_SETTING_TEAM_MANAGER_MAX_COUNT) ?? 10
     IMKitConfigCenter.enableEarphoneMode = AppStorage.get(CommonConstants.KEY_SETTING_EARPIECE_MODE) ?? false
     const autoTranslationEnableTime = this.resolveAutoTranslationEnableTime()

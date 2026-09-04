@@ -485,6 +485,14 @@
       "value": "所有人"
     },
     {
+      "name": "chat_team_ait_search_loading",
+      "value": "检索中..."
+    },
+    {
+      "name": "chat_team_ait_search_empty",
+      "value": "未找到匹配的成员"
+    },
+    {
       "name": "chat_kit_select_call_type",
       "value": "选择通话方式"
     },
@@ -607,6 +615,22 @@
     {
       "name": "chat_new_message_count",
       "value": "%d 条新消息"
+    },
+    {
+      "name": "chat_last_read_position",
+      "value": "回到上次阅读位置"
+    },
+    {
+      "name": "chat_last_read_message_count",
+      "value": "%d 条新消息"
+    },
+    {
+      "name": "chat_last_read_message_count_overflow",
+      "value": "99+ 条新消息"
+    },
+    {
+      "name": "chat_last_read_position_load_failed",
+      "value": "消息加载失败，请重试"
     },
     {
       "name": "chat_message_loading",
@@ -791,6 +815,14 @@
     {
       "name": "chat_message_voice_to_text_failed",
       "value": "转文字失败"
+    },
+    {
+      "name": "chat_message_reaction_failed",
+      "value": "操作失败，请重试"
+    },
+    {
+      "name": "chat_message_reaction_limit",
+      "value": "已达 100 种表情上限"
     },
     {
       "name": "chat_translation_loading",

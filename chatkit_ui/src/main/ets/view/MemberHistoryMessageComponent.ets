@@ -5,8 +5,10 @@
  */
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { CommonAvatar, UserAvatarNameItem } from '@nimkit/common';
-import { memberHistoryMessageContent } from './MessageComponentBuilder';
-import { V2NIMMessageType } from '@nimsdk/base';
+import {
+  getMessageBackgroundColor,
+  memberHistoryMessageContent
+} from './MessageComponentBuilder';
 import { MessageItemClick } from './MessageItemClick';
 
 /**
@@ -59,7 +61,8 @@ export struct MemberHistoryMessageComponent {
               .ellipsisMode(EllipsisMode.END)
 
             memberHistoryMessageContent({ message: this.message, onMessageClick: this.onMessageClick })
-              .backgroundColor($r('app.color.color_chat_receive_message_bg'))
+              .backgroundColor(getMessageBackgroundColor(this.message,
+                $r('app.color.color_chat_receive_message_bg')))
               .borderRadius({
                 topLeft: 0,
                 topRight: 8,

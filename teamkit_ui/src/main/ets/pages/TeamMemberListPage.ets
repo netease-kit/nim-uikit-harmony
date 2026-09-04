@@ -5,10 +5,25 @@
  *
  */
 
-import { Logger } from '@nimkit/common';
-import { ChatKitClient, IMKitConfigCenter, NEAIUserCache } from '@nimkit/chatkit'
-import { AvatarColorUntil, AvatarItem, CommonAvatar, CommonConfirmDialog, NavigationBackBuilder } from '@nimkit/common'
-import { TeamMemberWithUser } from '@nimkit/chatkit'
+import {
+  ChatKitClient,
+  IMKitConfigCenter,
+  NEAIUserCache,
+  resolveTeamMemberSearchTextPresentation,
+  SearchTextPresentation,
+  TeamMemberWithUser
+} from '@nimkit/chatkit'
+import {
+  AvatarColorUntil,
+  AvatarItem,
+  CommonAvatar,
+  CommonConfirmDialog,
+  CommonEmptyResult,
+  CommonTextInput,
+  Logger,
+  MatchSearchText,
+  NavigationBackBuilder
+} from '@nimkit/common'
 import { TeamMemberListViewModel } from '../viewModel/TeamMemberListViewModel'
 import { V2NIMTeamMemberRole } from '@nimsdk/base'
 
@@ -39,6 +54,14 @@ struct TeamMemberListPage {
   })
   //要踢的成员Id
   kickMemberId?: string
+
+  onSearchSubmit = (_enterKey: EnterKeyType, event: SubmitEvent) => {
+    this.viewModel.searchTeamMembers(event.text)
+  }
+
+  onSearchTextChange = (value: string) => {
+    this.viewModel.searchTeamMembers(value)
+  }
 
   private async isAIUser(accountId: string): Promise<boolean> {
     if (!IMKitConfigCenter.enableAI) {
@@ -74,134 +97,198 @@ struct TeamMemberListPage {
 
   build() {
     NavDestination() {
-      NavigationBackBuilder({
-        title: $r('app.string.team_member'),
-        backgroundColor: '#ffffffff',
-        leftButtonAction: () => {
-          this.pathStack.pop()
-        }
-      })
-
-      List() {
-        ForEach(this.viewModel.memberList, (member: TeamMemberWithUser) => {
-          ListItem() {
-            Row() {
-              CommonAvatar({
-                item: new AvatarItem(
-                  member.getAvatar(),
-                  member.getAvatarName(),
-                  AvatarColorUntil.getBackgroundColorById(member.getAccId())
-                )
-              })
-                .width(42)
-                .height(42)
-                .margin({
-                  right: 14
-                })
-
-              Text(member.getNickname())
-                .fontColor('#ff333333')
-                .fontSize(16)
-                .width(member.isManager() && this.haveKickPermission(member) ? '45%' : '65%')
-
-              if (this.caseRole && member.isManager()) {
-                Blank().layoutWeight(1)
-
-                Text($r('app.string.manager'))
-                  .fontColor('#ff337EFF')
-                  .fontSize(12)
-                  .borderWidth(1)
-                  .borderRadius(4)
-                  .borderColor('#ffB9D3FF')
-                  .backgroundColor('#ffE0ECFF')
-                  .padding({
-                    top: 4,
-                    bottom: 6,
-                    left: 12,
-                    right: 12
-                  })
-              }
-
-              if (this.caseRole && member.isOwner()) {
-                Blank().layoutWeight(1)
-
-                Text($r('app.string.team_owner'))
-                  .fontColor('#ff337EFF')
-                  .fontSize(12)
-                  .borderWidth(1)
-                  .borderRadius(4)
-                  .borderColor('#ffB9D3FF')
-                  .backgroundColor('#ffE0ECFF')
-                  .padding({
-                    top: 4,
-                    bottom: 6,
-                    left: 12,
-                    right: 12
-                  })
-              }
-
-              if (this.haveKickPermission(member)) {
-                Blank().layoutWeight(1)
-
-                Text($r('app.string.team_remove_manager'))
-                  .fontColor('#ffE6605C')
-                  .fontSize(12)
-                  .borderWidth(1)
-                  .borderRadius(4)
-                  .borderColor('#ffE6605C')
-                  .backgroundColor(Color.White)
-                  .padding({
-                    top: 4,
-                    bottom: 6,
-                    left: 12,
-                    right: 12
-                  })
-                  .onClick(() => {
-                    this.kickMemberId = member.getAccId()
-                    this.dialogKickMemberDialogController.open()
-                  })
-              }
-
-            }
-            .padding({
-              left: 20,
-              right: 20,
-              top: 10,
-              bottom: 10
-            })
-            .onClick(() => {
-              this.openMemberInfo(member.teamMember.accountId)
-            })
+      Column() {
+        NavigationBackBuilder({
+          title: $r('app.string.team_member'),
+          backgroundColor: '#ffffffff',
+          leftButtonAction: () => {
+            this.pathStack.pop()
           }
         })
-        ListItem() {
-          Column() {
+
+        CommonTextInput({
+          placeHolderText: $r('app.string.team_member_search_placeholder'),
+          onSubmit: this.onSearchSubmit,
+          onTextChange: this.onSearchTextChange,
+          keepEditableState: false
+        })
+          .margin({
+            top: 16,
+            bottom: 8
+          })
+
+        if (this.viewModel.searchKeyword.length > 0 && this.viewModel.getDisplayList().length === 0 &&
+          !this.viewModel.isSearching && !this.viewModel.searchLoadFailed) {
+          CommonEmptyResult({
+            tips: $r('app.string.team_member_search_empty_tip')
+          })
+            .margin({
+              top: 56 + 74,
+            })
+        }
+
+        if (this.viewModel.isSearching) {
+          LoadingProgress()
+            .width(24)
+            .height(24)
+            .margin({ top: 56 })
+        }
+
+        List() {
+          ForEach(this.viewModel.getDisplayList(), (member: TeamMemberWithUser) => {
+            ListItem() {
+              Row() {
+                CommonAvatar({
+                  item: new AvatarItem(
+                    member.getAvatar(),
+                    member.getAvatarName(),
+                    AvatarColorUntil.getBackgroundColorById(member.getAccId())
+                  )
+                })
+                  .width(42)
+                  .height(42)
+                  .margin({
+                    right: 14
+                  })
+
+                this.searchResultTextBuilder(
+                  member.getNickname(),
+                  resolveTeamMemberSearchTextPresentation(member, this.viewModel.searchKeyword),
+                  member.isManager() && this.haveKickPermission(member) ? '45%' : '65%'
+                )
+
+                if (this.caseRole && member.isManager()) {
+                  Blank().layoutWeight(1)
+
+                  Text($r('app.string.manager'))
+                    .fontColor('#ff337EFF')
+                    .fontSize(12)
+                    .borderWidth(1)
+                    .borderRadius(4)
+                    .borderColor('#ffB9D3FF')
+                    .backgroundColor('#ffE0ECFF')
+                    .padding({
+                      top: 4,
+                      bottom: 6,
+                      left: 12,
+                      right: 12
+                    })
+                }
+
+                if (this.caseRole && member.isOwner()) {
+                  Blank().layoutWeight(1)
+
+                  Text($r('app.string.team_owner'))
+                    .fontColor('#ff337EFF')
+                    .fontSize(12)
+                    .borderWidth(1)
+                    .borderRadius(4)
+                    .borderColor('#ffB9D3FF')
+                    .backgroundColor('#ffE0ECFF')
+                    .padding({
+                      top: 4,
+                      bottom: 6,
+                      left: 12,
+                      right: 12
+                    })
+                }
+
+                if (this.haveKickPermission(member)) {
+                  Blank().layoutWeight(1)
+
+                  Text($r('app.string.team_remove_manager'))
+                    .fontColor('#ffE6605C')
+                    .fontSize(12)
+                    .borderWidth(1)
+                    .borderRadius(4)
+                    .borderColor('#ffE6605C')
+                    .backgroundColor(Color.White)
+                    .padding({
+                      top: 4,
+                      bottom: 6,
+                      left: 12,
+                      right: 12
+                    })
+                    .onClick(() => {
+                      this.kickMemberId = member.getAccId()
+                      this.dialogKickMemberDialogController.open()
+                    })
+                }
+
+              }
+              .padding({
+                left: 20,
+                right: 20,
+                top: 10,
+                bottom: 10
+              })
+              .onClick(() => {
+                this.openMemberInfo(member.teamMember.accountId)
+              })
+            }
+          }, (member: TeamMemberWithUser) => this.viewModel.getMemberRenderKey(member))
+          ListItem() {
+            Column() {
+            }
+            .height(42)
           }
-          .height(42)
         }
+        .listDirection(Axis.Vertical)
+        .onReachEnd(() => {
+          if (this.viewModel.searchKeyword.length === 0 &&
+            !this.viewModel.isFinish &&
+            this.viewModel.memberList.length > 0) {
+            this.viewModel.getTeamMemberList()
+          }
+        })
+        .scrollBar(BarState.Off)
+        .width('100%')
+        .layoutWeight(1)
+        .backgroundColor('#ffFFFFFF')
       }
-      .listDirection(Axis.Vertical)
-      .onReachEnd(() => {
-        if (!this.viewModel.isFinish &&
-          this.viewModel.memberList.length > 0) {
-          this.viewModel.getTeamMemberList()
-        }
-      })
-      .scrollBar(BarState.Off)
       .width('100%')
       .height('100%')
-      .backgroundColor('#ffFFFFFF')
-
     }
     .hideTitleBar(true)
     .backgroundColor('#ffffffff')
     .onReady((context: NavDestinationContext) => {
       this.pathStack = context.pathStack
       let params = context.pathStack.getParamByName('TeamMemberListPage')[0] as MemberListParams
-      this.viewModel.init(params.teamId)
+      this.viewModel.init(params.teamId, params.caseRole)
       this.caseRole = params.caseRole
       this.viewModel.getTeamMemberList(true)
     })
+  }
+
+  @Builder
+  searchResultTextBuilder(primaryText: string, presentation: SearchTextPresentation, textWidth: string) {
+    Column() {
+      if (presentation.primaryMatched) {
+        MatchSearchText({
+          allText: primaryText,
+          searchText: this.viewModel.searchKeyword,
+          fontSize: 16
+        })
+      } else {
+        Text(primaryText)
+          .fontColor('#ff333333')
+          .fontSize(16)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+
+      if (presentation.secondaryText.length > 0) {
+        MatchSearchText({
+          allText: presentation.secondaryText,
+          searchText: this.viewModel.searchKeyword,
+          fontSize: 13,
+          normalFontColor: '#999999',
+          highlightFontColor: '#337EFF'
+        })
+      }
+    }
+    .width(textWidth)
+    .alignItems(HorizontalAlign.Start)
   }
 
   /**

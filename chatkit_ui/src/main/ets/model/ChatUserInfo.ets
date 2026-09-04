@@ -96,7 +96,7 @@ export class ChatUserInfo extends ChatInfo {
     let name = '';
     let friendInfo = NEFriendUserCache.getInstance().getFriendById(accountId)
     if (friendInfo !== undefined) {
-      name = friendInfo.showName()
+      name = friendInfo.getAvatarName()
     }
     if (name === '' && this.chatUser !== undefined && this.chatUser.accountId === accountId) {
       name = this.chatUser?.name ?? '';

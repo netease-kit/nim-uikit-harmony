@@ -6,9 +6,10 @@ import teamProfilePageTest from './TeamProfilePage.test';
 import contactModelTest from './ContactModel.test';
 import teamVerifyInfoBeanTest from './TeamVerifyInfoBean.test';
 import contactLogicTest from './ContactLogic.test';
+import searchViewModelTest from './SearchViewModel.test';
 
 export default function testsuite() {
   abilityTest(); localUnitTest(); contactVerifyUnreadTest();
   teamVerifyViewModelTest(); teamProfilePageTest(); contactModelTest();
-  teamVerifyInfoBeanTest(); contactLogicTest();
+  teamVerifyInfoBeanTest(); contactLogicTest(); searchViewModelTest();
 }

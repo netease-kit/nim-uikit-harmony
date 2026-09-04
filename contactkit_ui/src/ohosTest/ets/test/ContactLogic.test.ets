@@ -37,18 +37,26 @@ class MockDataChangeListener implements DataChangeListener {
 
   onDataReloaded(): void { this.reloadCalled = true }
   onDataAdd(index: number): void { this.addCalled = true; this.lastAddIndex = index }
+  onDataAdded(index: number): void { this.onDataAdd(index) }
   onDataChange(index: number): void { this.changeCalled = true; this.lastChangeIndex = index }
+  onDataChanged(index: number): void { this.onDataChange(index) }
   onDataDelete(index: number): void { this.deleteCalled = true; this.lastDeleteIndex = index }
+  onDataDeleted(index: number): void { this.onDataDelete(index) }
   onDataMove(from: number, to: number): void { this.moveCalled = true; this.lastMoveFrom = from; this.lastMoveTo = to }
+  onDataMoved(from: number, to: number): void { this.onDataMove(from, to) }
   onDatasetChange(dataOperations: DataOperation[]): void { this.datasetChangeCalled = true }
 }
 
 class SimpleDataChangeListener implements DataChangeListener {
   onDataReloaded(): void {}
   onDataAdd(index: number): void {}
+  onDataAdded(index: number): void {}
   onDataChange(index: number): void {}
+  onDataChanged(index: number): void {}
   onDataDelete(index: number): void {}
+  onDataDeleted(index: number): void {}
   onDataMove(from: number, to: number): void {}
+  onDataMoved(from: number, to: number): void {}
   onDatasetChange(dataOperations: DataOperation[]): void {}
 }
 

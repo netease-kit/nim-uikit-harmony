@@ -1,3 +1,5 @@
+import { MatchSearchTextSegments, resolveMatchSearchTextSegments } from '../utils/MatchSearchTextUtils'
+
 @ComponentV2
 export struct MatchSearchText {
   @Param allText: string = ""
@@ -12,7 +14,7 @@ export struct MatchSearchText {
     if (!this.allText || !this.searchText) {
       return false
     }
-    return this.allText.toLowerCase().indexOf(this.searchText.toLowerCase()) >= 0
+    return this.getTextSegments().found
   }
 
   startOfSearchText() {
@@ -32,10 +34,7 @@ export struct MatchSearchText {
       }
       return this.allText
     }
-    const result = this.extractKeywordCenteredSubstring(this.allText, this.searchText, 16)
-    const index = result.toLowerCase().indexOf(this.searchText.toLowerCase())
-    const start = result.substring(0, index)
-    return start
+    return this.getTextSegments().startText
   }
 
   endText() {
@@ -47,10 +46,7 @@ export struct MatchSearchText {
       }
       return ""
     }
-    const result = this.extractKeywordCenteredSubstring(this.allText, this.searchText, 16)
-    const index = result.toLowerCase().indexOf(this.searchText.toLowerCase())
-    const end = result.substring(index + this.searchText.length, result.length)
-    return end
+    return this.getTextSegments().endText
   }
 
   // 获取实际匹配的文本（保持原始大小写）
@@ -63,12 +59,7 @@ export struct MatchSearchText {
       }
       return this.searchText
     }
-    const result = this.extractKeywordCenteredSubstring(this.allText, this.searchText, 16)
-    const index = result.toLowerCase().indexOf(this.searchText.toLowerCase())
-    if (index >= 0) {
-      return result.substring(index, index + this.searchText.length)
-    }
-    return this.searchText
+    return this.getTextSegments().matchedText
   }
 
   build() {
@@ -104,58 +95,11 @@ export struct MatchSearchText {
   }
 
   extractKeywordCenteredSubstring(str: string, keyword: string, length: number): string {
-    if (keyword.length === 0) {
-      throw new Error("Keyword cannot be empty");
-    }
-    if (length <= 0) {
-      throw new Error("Length must be positive");
-    }
-    if (keyword.length > length) {
-      // 如果 keyword 本身比 length 长，返回 keyword 的前 length 个字符
-      return keyword.substring(0, length);
-    }
+    const result = resolveMatchSearchTextSegments(str, keyword, length)
+    return result.startText + result.matchedText + result.endText
+  }
 
-    // 使用大小写不敏感的搜索
-    const keywordIndex = str.toLowerCase().indexOf(keyword.toLowerCase());
-    if (keywordIndex === -1) {
-      return ""; // 或 throw new Error("Keyword not found");
-    }
-
-    const remainingLength = length - keyword.length;
-    const halfLength = Math.floor(remainingLength / 2);
-
-    // 计算前后可用的字符数
-    const beforeStart = Math.max(0, keywordIndex - halfLength);
-    const afterEnd = keywordIndex + keyword.length +
-      (remainingLength - halfLength);
-
-    // 确保不越界
-    const start = Math.max(0, beforeStart);
-    const end = Math.min(str.length, afterEnd);
-
-    let result = str.substring(start, end);
-
-    // 如果结果长度不够（比如靠近字符串边界），从另一端补足
-    if (result.length < length) {
-      if (start === 0) {
-        // 如果前面已经到头了，从后面补
-        const extraNeeded = length - result.length;
-        result = str.substring(start, Math.min(str.length, end + extraNeeded));
-      } else {
-        // 如果后面到头了，从前面补
-        const extraNeeded = length - result.length;
-        result = str.substring(Math.max(0, start - extraNeeded), end);
-      }
-    }
-
-    if (start > 0) {
-      result = '...' + result.substring(1)
-    }
-
-    if (end < str.length) {
-      result = result.substring(0, result.length - 1) + "...";
-    }
-
-    return result;
+  private getTextSegments(): MatchSearchTextSegments {
+    return resolveMatchSearchTextSegments(this.allText, this.searchText, 16)
   }
 }

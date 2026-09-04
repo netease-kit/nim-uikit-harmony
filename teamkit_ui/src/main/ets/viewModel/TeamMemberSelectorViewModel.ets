@@ -4,16 +4,28 @@
  * found in the LICENSE file.
  *
  */
-import { DisposableBag, FriendEventRepo, IMKitConfigCenter, NEAIUserCache, TeamEventRepo, TeamMemberWithUser, TeamRepo } from '@nimkit/chatkit'
+import {
+  DisposableBag,
+  FriendEventRepo,
+  getTeamMemberSearchRenderKey,
+  IMKitConfigCenter,
+  matchesTeamMemberSearchKeyword,
+  NEAIUserCache,
+  normalizeSearchKeyword,
+  TeamEventRepo,
+  TeamMemberCache,
+  TeamMemberWithUser,
+  TeamRepo,
+  UserEventRepo
+} from '@nimkit/chatkit'
 import { TeamMemberSelectorMode } from '@nimkit/chatkit'
 import { Logger } from '@nimkit/common'
 import {
   V2NIMFriend,
-  V2NIMQueryDirection,
   V2NIMTeamMember,
   V2NIMTeamMemberRole,
-  V2NIMTeamMemberRoleQueryType,
-  V2NIMTeamType
+  V2NIMTeamType,
+  V2NIMUser
 } from '@nimsdk/base'
 
 @ObservedV2
@@ -41,7 +53,11 @@ export class TeamMemberSelectorViewModel {
   @Trace searchResultList: TeamMemberWithUser[] = []
   // 是否正在搜索
   @Trace isSearching: boolean = false
+  @Trace searchLoadFailed: boolean = false
   private disposableBag: DisposableBag = new DisposableBag()
+  private teamMemberCache: TeamMemberCache = TeamMemberCache.getInstance()
+  private visibleMemberLimit: number = 100
+  private searchGeneration: number = 0
   private hasLoadedAIUsers: boolean = false
   private aiUsersLoadingPromise: Promise<void> | undefined = undefined
   private selectorSessionId: number = 0
@@ -56,9 +72,17 @@ export class TeamMemberSelectorViewModel {
     this.teamId = teamId
     this.selectLimit = selectLimit
     this.mode = mode
+    this.memberList = []
+    this.searchResultList = []
+    this.searchKeyword = ''
+    this.isSearching = false
+    this.searchLoadFailed = false
+    this.visibleMemberLimit = this.teamMemberLimit
+    this.searchGeneration += 1
     this.hasLoadedAIUsers = false
     this.aiUsersLoadingPromise = undefined
     this.selectorSessionId += 1
+    this.teamMemberCache.intTeamInfo(teamId)
     this.initMemberChangeListener()
   }
 
@@ -106,30 +130,29 @@ export class TeamMemberSelectorViewModel {
     if (first === true) {
       this.isFinish = false
       this.nextToken = undefined
-    }
-    if (this.isFinish) {
-      return
+      this.visibleMemberLimit = this.teamMemberLimit
+    } else {
+      this.visibleMemberLimit += this.teamMemberLimit
     }
     if (this.teamId) {
       const currentSessionId = this.selectorSessionId
       const currentTeamId = this.teamId
       try {
         await this.ensureAIUsersLoaded()
-        let result = await TeamRepo.getTeamMembers(currentTeamId,
-          V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, {
-            roleQueryType: this.showManager ? undefined :
-              V2NIMTeamMemberRoleQueryType.V2NIM_TEAM_MEMBER_ROLE_QUERY_TYPE_NORMAL,
-            limit: this.teamMemberLimit,
-            nextToken: this.nextToken,
-            direction: V2NIMQueryDirection.V2NIM_QUERY_DIRECTION_ASC
-          })
-        if (result && this.isCurrentSession(currentSessionId, currentTeamId)) {
-          this.isFinish = result.finished
-          this.nextToken = result.nextToken
-          this.memberList.push(...this.filterVisibleMembers(result.memberList))
+        if (!this.isCurrentSession(currentSessionId, currentTeamId)) {
+          return
+        }
+        this.teamMemberCache.intTeamInfo(currentTeamId)
+        const cachedMembers = this.getSelectableMembers(this.teamMemberCache.getAllMembers(currentTeamId))
+        if (cachedMembers.length < this.visibleMemberLimit &&
+          !this.teamMemberCache.haveLoadAllMember(currentTeamId)) {
+          await this.teamMemberCache.getMoreMemberList()
+        }
+        if (this.isCurrentSession(currentSessionId, currentTeamId)) {
+          this.syncVisibleMembersFromCache()
         }
       } catch (e) {
-
+        Logger.error('TeamKit', e)
       }
 
     }
@@ -146,6 +169,40 @@ export class TeamMemberSelectorViewModel {
       memberInfo.friendInfo = friend
       this.memberList.splice(index, 0, memberInfo)
     }
+    let searchIndex = this.searchResultList.findIndex((member) => {
+      return member.getAccId() === friend.accountId
+    })
+    if (searchIndex >= 0) {
+      let memberInfo = this.searchResultList[searchIndex]
+      this.searchResultList.splice(searchIndex, 1)
+      memberInfo.friendInfo = friend
+      this.searchResultList.splice(searchIndex, 0, memberInfo)
+    }
+    this.refreshActiveSearchResults()
+  }
+
+  onUserProfileChanged(users: V2NIMUser[]) {
+    users.forEach((user: V2NIMUser) => {
+      let index = this.memberList.findIndex((member: TeamMemberWithUser): boolean => {
+        return member.getAccId() === user.accountId
+      })
+      if (index >= 0) {
+        let memberInfo = this.memberList[index]
+        this.memberList.splice(index, 1)
+        memberInfo.userInfo = user
+        this.memberList.splice(index, 0, memberInfo)
+      }
+      let searchIndex = this.searchResultList.findIndex((member: TeamMemberWithUser): boolean => {
+        return member.getAccId() === user.accountId
+      })
+      if (searchIndex >= 0) {
+        let memberInfo = this.searchResultList[searchIndex]
+        this.searchResultList.splice(searchIndex, 1)
+        memberInfo.userInfo = user
+        this.searchResultList.splice(searchIndex, 0, memberInfo)
+      }
+    })
+    this.refreshActiveSearchResults()
   }
 
   onTeamMemberInfoUpdated(members: V2NIMTeamMember[]) {
@@ -157,14 +214,14 @@ export class TeamMemberSelectorViewModel {
         if (index >= 0) {
           let memberInfo = this.memberList[index]
           this.memberList.splice(index, 1)
-          //是普通成员再添加
-          if (m.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL) {
+          if (this.showManager || m.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL) {
             memberInfo.teamMember = m
             this.memberList.splice(index, 0, memberInfo)
           }
 
         }
       })
+      this.refreshActiveSearchResults()
     }
   }
 
@@ -200,6 +257,9 @@ export class TeamMemberSelectorViewModel {
       FriendEventRepo.onFriendInfoChanged((friend: V2NIMFriend): void => {
         this.onFriendInfoChanged(friend)
       }),
+      UserEventRepo.onUserProfileChanged((users: V2NIMUser[]): void => {
+        this.onUserProfileChanged(users)
+      }),
       TeamEventRepo.onTeamMemberInfoUpdated((members: V2NIMTeamMember[]): void => {
         this.onTeamMemberInfoUpdated(members)
       }),
@@ -217,64 +277,57 @@ export class TeamMemberSelectorViewModel {
 
   onDestroy() {
     this.selectorSessionId += 1
+    this.searchGeneration += 1
     this.disposableBag.dispose()
   }
 
   /**
    * 搜索群成员（本地筛选）
    * 在已加载的群成员列表中进行字符串匹配搜索
-   * 匹配字段：群昵称、好友备注、用户昵称、accountId
+   * 匹配字段：好友备注、群昵称、用户昵称、accountId
    * @param keyword 搜索关键字
    */
-  searchTeamMembers(keyword: string) {
-    this.searchKeyword = keyword
-    if (!keyword || keyword.length === 0) {
+  async searchTeamMembers(keyword: string): Promise<void> {
+    const normalizedKeyword = normalizeSearchKeyword(keyword)
+    this.searchKeyword = normalizedKeyword
+    this.searchGeneration += 1
+    const currentSearchGeneration = this.searchGeneration
+    this.searchLoadFailed = false
+    if (normalizedKeyword.length === 0) {
       this.searchResultList = []
       this.isSearching = false
       return
     }
 
-    // 本地筛选，不需要 teamId 检查和网络请求
-    const lowerKeyword = keyword.toLowerCase()
-
-    // 在已加载的 memberList 中进行本地筛选
-    let filteredList = this.memberList.filter((member: TeamMemberWithUser) => {
-      // 匹配群昵称 (teamNick)
-      const teamNick = member.teamMember.teamNick?.toLowerCase() ?? ''
-      if (teamNick.includes(lowerKeyword)) {
-        return true
+    this.isSearching = true
+    this.searchResultList = []
+    let searchSource = this.memberList
+    if (this.teamId) {
+      const currentSessionId = this.selectorSessionId
+      const currentTeamId = this.teamId
+      await this.ensureAIUsersLoaded()
+      if (currentSearchGeneration !== this.searchGeneration || normalizedKeyword !== this.searchKeyword ||
+        !this.isCurrentSession(currentSessionId, currentTeamId)) {
+        return
       }
-
-      // 匹配好友备注 (alias)
-      const alias = member.friendInfo?.alias?.toLowerCase() ?? ''
-      if (alias.includes(lowerKeyword)) {
-        return true
+      this.teamMemberCache.intTeamInfo(currentTeamId)
+      const loadedAll = await this.teamMemberCache.loadAllTeamMember()
+      if (currentSearchGeneration !== this.searchGeneration || normalizedKeyword !== this.searchKeyword ||
+        !this.isCurrentSession(currentSessionId, currentTeamId)) {
+        return
       }
-
-      // 匹配用户昵称 (name)
-      const userName = member.userInfo?.name?.toLowerCase() ?? ''
-      if (userName.includes(lowerKeyword)) {
-        return true
+      if (!loadedAll) {
+        this.searchResultList = []
+        this.isSearching = false
+        this.searchLoadFailed = true
+        return
       }
-
-      // 匹配账户ID (accountId)
-      const accountId = member.teamMember.accountId.toLowerCase()
-      if (accountId.includes(lowerKeyword)) {
-        return true
-      }
-
-      return false
-    })
-
-    // 如果不显示管理员，过滤掉管理员和群主
-    if (!this.showManager) {
-      this.searchResultList = filteredList.filter((member) => {
-        return member.teamMember.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL
-      })
-    } else {
-      this.searchResultList = filteredList
+      searchSource = this.getSelectableMembers(this.teamMemberCache.getAllMembers(currentTeamId))
     }
 
+    this.searchResultList = searchSource.filter((member: TeamMemberWithUser) => {
+      return matchesTeamMemberSearchKeyword(member, normalizedKeyword)
+    })
     this.isSearching = false
   }
 
@@ -282,9 +335,11 @@ export class TeamMemberSelectorViewModel {
    * 清除搜索结果
    */
   clearSearch() {
+    this.searchGeneration += 1
     this.searchKeyword = ''
     this.searchResultList = []
     this.isSearching = false
+    this.searchLoadFailed = false
   }
 
   /**
@@ -299,10 +354,17 @@ export class TeamMemberSelectorViewModel {
    * 获取当前显示的列表（搜索结果或完整列表）
    */
   getDisplayList(): TeamMemberWithUser[] {
+    if (this.isSearching || this.searchLoadFailed) {
+      return []
+    }
     if (this.searchKeyword.length > 0) {
       return this.searchResultList
     }
     return this.memberList
+  }
+
+  getMemberRenderKey(member: TeamMemberWithUser): string {
+    return getTeamMemberSearchRenderKey(member, this.searchKeyword)
   }
 
   private isCurrentSession(sessionId: number, teamId: string): boolean {
@@ -350,5 +412,38 @@ export class TeamMemberSelectorViewModel {
     // 加管理员时不展示数字人。
     return members.filter((member: TeamMemberWithUser): boolean =>
       NEAIUserCache.getAIUser(member.getAccId()) === undefined)
+  }
+
+  private getSelectableMembers(members: TeamMemberWithUser[]): TeamMemberWithUser[] {
+    let selectableMembers = this.filterVisibleMembers(members)
+    if (!this.showManager) {
+      selectableMembers = selectableMembers.filter((member: TeamMemberWithUser): boolean =>
+        member.teamMember.memberRole === V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL)
+    }
+    return selectableMembers
+  }
+
+  private syncVisibleMembersFromCache(): void {
+    if (!this.teamId) {
+      return
+    }
+    const selectableMembers = this.getSelectableMembers(this.teamMemberCache.getAllMembers(this.teamId))
+    this.memberList = selectableMembers.slice(0, this.visibleMemberLimit)
+    this.nextToken = this.teamMemberCache.nextToken
+    this.isFinish = this.teamMemberCache.haveLoadAllMember(this.teamId) &&
+      this.memberList.length >= selectableMembers.length
+  }
+
+  private refreshActiveSearchResults(): void {
+    if (this.searchKeyword.length === 0 || this.isSearching || this.searchLoadFailed) {
+      return
+    }
+    let searchSource = this.getSelectableMembers(this.memberList)
+    if (this.teamId && this.teamMemberCache.haveLoadAllMember(this.teamId)) {
+      searchSource = this.getSelectableMembers(this.teamMemberCache.getAllMembers(this.teamId))
+    }
+    this.searchResultList = searchSource.filter((member: TeamMemberWithUser): boolean => {
+      return matchesTeamMemberSearchKeyword(member, this.searchKeyword)
+    })
   }
 }

@@ -5,6 +5,7 @@
  *
  */
 
+import { ConversationResult } from '@nimkit/chatkit'
 import { V2NIMConversation, V2NIMConversationOption } from '@nimsdk/base'
 import {
   CONVERSATION_GROUP_SELECT_CONVERSATION_LIMIT,
@@ -57,9 +58,9 @@ export class ConversationGroupSelectConversationViewModel {
     }
     this.isLoadingMembers = true
     try {
-      const result = await this.model.getConversationListByOption(this.memberOffset, this.PAGE_SIZE,
+      const result: ConversationResult | undefined = await this.model.getConversationListByOption(this.memberOffset, this.PAGE_SIZE,
         this.groupConversationOption())
-      if (result === undefined) {
+      if (!result) {
         this.isMemberFinished = true
         return
       }
@@ -97,7 +98,7 @@ export class ConversationGroupSelectConversationViewModel {
       let shouldContinue = true
       while (shouldContinue && !this.isCandidateFinished) {
         const beforeCount = this.candidateConversations.length
-        const result = await this.model.getConversationList(this.candidateOffset, this.PAGE_SIZE)
+        const result: ConversationResult | null = await this.model.getConversationList(this.candidateOffset, this.PAGE_SIZE)
         if (result === null) {
           this.isCandidateFinished = true
           return
@@ -221,7 +222,7 @@ export class ConversationGroupSelectConversationViewModel {
     let offset = 0
     let finished = false
     while (!finished) {
-      const result = await this.model.getConversationListByOption(offset, this.PAGE_SIZE, this.groupConversationOption())
+      const result: ConversationResult | undefined = await this.model.getConversationListByOption(offset, this.PAGE_SIZE, this.groupConversationOption())
       if (result === undefined) {
         break
       }

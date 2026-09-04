@@ -31,6 +31,11 @@ import { cameraPicker } from '@kit.CameraKit';
 import { LengthMetrics, promptAction, window } from '@kit.ArkUI';
 import { NERectData } from '../model/NERectData';
 import { MessageOperationView } from '../view/MessageOperationView';
+import {
+  canShowMessageReaction,
+  computeReactionMenuY,
+  shouldEnableReactionForSelection
+} from '../utils/MessageReactionUtils';
 import { MessageOperationItem, MessageOperationType } from '../model/MessageOperationItem';
 import { BusinessError, pasteboard } from '@kit.BasicServicesKit';
 import { DeviceUtils } from '../common/DeviceUtils';
@@ -145,6 +150,18 @@ export struct ChatP2PPage {
   // 多行输入面板组件实例引用
   multiLineInputViewInstance?: MultiLineInputView = undefined
   @Local operationRect: NERectData = new NERectData()
+  private reactionAnchorTop: number = 0
+  private reactionAnchorBottom: number = 0
+  private reactionMenuItemCount: number = 0
+  private reactionMenuPreferAbove: boolean = true
+  @Local private reactionMenuExpanded: boolean = false
+
+  @Monitor('showOperationView')
+  onOperationViewVisibilityChange(): void {
+    if (!this.showOperationView) {
+      this.reactionMenuExpanded = false
+    }
+  }
   screenHeight: number = 0;
   screenWidth: number = 0;
   keyboardHeight: number = 0
@@ -174,6 +191,7 @@ export struct ChatP2PPage {
   // 列表滚动位置
   listScrollStartPosition: number = 0
   listScrollEndPosition: number = 0
+  listScrollPositionReady: boolean = false
   //首次加载数据滚动到底部
   firstLoadData: boolean = true;
   // 新增：是否处于底部
@@ -406,20 +424,39 @@ export struct ChatP2PPage {
   onScrollIndex() {
     if (this.chatUserInfo.scrollIndex > -1) {
       this.toScroll = true
-      // 使用 ScrollAlign.CENTER 让消息居中显示
-      this.listScroller.scrollToIndex(this.chatUserInfo.scrollIndex, false, ScrollAlign.CENTER)
+      const scrollAlign = this.chatUserInfo.scrollIndexAlignStart ? ScrollAlign.START : ScrollAlign.CENTER
+      this.listScroller.scrollToIndex(this.chatUserInfo.scrollIndex, false, scrollAlign)
       this.chatViewModel.setAnchorMessage(undefined)
       this.chatUserInfo.setScrollIndex(-1)
     }
   }
 
+  private updateLastReadPositionByVisibleArea(): void {
+    const totalCount = this.chatUserInfo.msgList.totalCount()
+    if (!this.listScrollPositionReady) {
+      // 首次滚底完成后再消费入口，避免使用中间可见位置。
+      if (totalCount <= 0 || this.listScrollEndPosition < totalCount - 1) {
+        return
+      }
+      this.listScrollPositionReady = true
+    }
+    this.chatViewModel.updateLastReadPosition(this.listScrollStartPosition)
+  }
+
   @Monitor("chatViewModel.needScrollToBottom")
   onNeedScrollToBottom() {
-    if (this.chatViewModel.needScrollToBottom &&
-      this.listScrollEndPosition >= this.chatUserInfo.msgList.totalCount() - 1) {
-      this.listScroller.scrollEdge(Edge.Bottom)
-      this.chatViewModel.needScrollToBottom = false;
+    if (!this.chatViewModel.needScrollToBottom) {
+      return
     }
+    // 历史锚点定位期间保持当前位置，避免异步附加数据触发滚底
+    if (this.chatViewModel.hasNew) {
+      this.chatViewModel.needScrollToBottom = false
+      return
+    }
+    if (this.listScrollEndPosition >= this.chatUserInfo.msgList.totalCount() - 1) {
+      this.listScroller.scrollEdge(Edge.Bottom)
+    }
+    this.chatViewModel.needScrollToBottom = false;
   }
 
   @Monitor("chatViewModel.anchorMsg")
@@ -835,8 +872,16 @@ export struct ChatP2PPage {
     this.aiSearchSelectionState.selectedText()
     this.operationMenuItems = this.getSelectionOperationMenuItems()
     const itemCount = this.operationMenuItems.length
-    const opMenuWidth = computeOperateViewWidthByCount(itemCount)
-    const opMenuHeight = computeOperateViewHeightByCount(itemCount)
+    const showReaction = this.operationMsg !== undefined &&
+      this.chatViewModel.isMessageReactionEnabled() &&
+      shouldEnableReactionForSelection(this.aiSearchSelectionState.active,
+        this.aiSearchSelectionState.isAllSelected(), this.translationOperationMode) &&
+      canShowMessageReaction(this.operationMsg.message, this.operationMsg.isRevokeMsg)
+    if (!showReaction) {
+      this.reactionMenuExpanded = false
+    }
+    const opMenuWidth = showReaction ? 320 : computeOperateViewWidthByCount(itemCount)
+    const opMenuHeight = computeOperateViewHeightByCount(itemCount) + (showReaction ? 51 : 0)
     this.operationRect.x = this.aiSearchSelectionState.rectX +
       (this.aiSearchSelectionState.rectWidth - opMenuWidth) / 2
     if (this.operationRect.x < this.operationViewMargin) {
@@ -845,12 +890,29 @@ export struct ChatP2PPage {
     if (this.operationRect.x + opMenuWidth + this.operationViewMargin > this.screenWidth) {
       this.operationRect.x = this.screenWidth - opMenuWidth - this.operationViewMargin
     }
-    this.operationRect.y = this.aiSearchSelectionState.rectY - opMenuHeight - this.operationViewMargin
-    if (this.operationRect.y < 0) {
-      this.operationRect.y = this.aiSearchSelectionState.rectY + this.aiSearchSelectionState.rectHeight +
-        this.operationViewMargin
+    if (showReaction) {
+      this.reactionAnchorTop = this.aiSearchSelectionState.rectY
+      this.reactionAnchorBottom = this.aiSearchSelectionState.rectY + this.aiSearchSelectionState.rectHeight
+      this.reactionMenuItemCount = itemCount
+      this.reactionMenuPreferAbove = true
+      this.operationRect.y = computeReactionMenuY(this.reactionAnchorTop, this.reactionAnchorBottom,
+        opMenuHeight, this.scrollHeight, this.bottomHeight, this.operationViewMargin, true)
+    } else {
+      this.operationRect.y = this.aiSearchSelectionState.rectY - opMenuHeight - this.operationViewMargin
+      if (this.operationRect.y < 0) {
+        this.operationRect.y = this.aiSearchSelectionState.rectY + this.aiSearchSelectionState.rectHeight +
+          this.operationViewMargin
+      }
     }
-    this.showOperationView = itemCount > 0
+    this.showOperationView = itemCount > 0 || showReaction
+  }
+
+  private updateReactionMenuPosition(expanded: boolean): void {
+    this.reactionMenuExpanded = expanded
+    const operationHeight = computeOperateViewHeightByCount(this.reactionMenuItemCount)
+    const menuHeight = expanded ? Math.max(operationHeight, 251) : operationHeight + 51
+    this.operationRect.y = computeReactionMenuY(this.reactionAnchorTop, this.reactionAnchorBottom,
+      menuHeight, this.scrollHeight, this.bottomHeight, this.operationViewMargin, this.reactionMenuPreferAbove)
   }
 
   private closeAISearchSelection(): void {
@@ -915,6 +977,7 @@ export struct ChatP2PPage {
 
   private showOperationMenu(event: GestureEvent, msg: NIMMessageInfo | undefined,
     operationItems?: Array<MessageOperationItem>, selectedText: string = ''): void {
+    this.reactionMenuExpanded = false
     if (selectedText.length === 0) {
       this.closeAISearchSelection()
     }
@@ -923,8 +986,11 @@ export struct ChatP2PPage {
     this.operationMenuItems = operationItems
     this.selectedOperationText = selectedText
     const itemCount = operationItems ? operationItems.length : getOperateMenu(msg).length
-    let opMenuWidth = computeOperateViewWidthByCount(itemCount)
-    let opMenuHeight = computeOperateViewHeightByCount(itemCount)
+    const showReaction = selectedText.length === 0 && msg !== undefined &&
+      this.chatViewModel.isMessageReactionEnabled() &&
+      canShowMessageReaction(msg.message, msg.isRevokeMsg)
+    let opMenuWidth = showReaction ? 320 : computeOperateViewWidthByCount(itemCount)
+    let opMenuHeight = computeOperateViewHeightByCount(itemCount) + (showReaction ? 51 : 0)
     let marginSize = this.operationViewMargin
     if (event.target.area.position.x !== undefined) {
       let xPoint = Number(event.target.area.globalPosition.x) +
@@ -938,19 +1004,25 @@ export struct ChatP2PPage {
       this.operationRect.x = xPoint;
     }
     if (event.target.area.position.y !== undefined) {
-      let yPoint =
-        Number(event.target.area.globalPosition.y) - this.navBarHeight +
-        Number(event.target.area.height)
-      if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
-        yPoint =
-          yPoint - opMenuHeight - marginSize * 2 - Number(event.target.area.height);
+      this.reactionAnchorTop = Number(event.target.area.globalPosition.y) - this.navBarHeight
+      this.reactionAnchorBottom = this.reactionAnchorTop + Number(event.target.area.height)
+      this.reactionMenuItemCount = itemCount
+      if (showReaction) {
+        this.reactionMenuPreferAbove = true
+        this.operationRect.y = computeReactionMenuY(this.reactionAnchorTop, this.reactionAnchorBottom,
+          opMenuHeight, this.scrollHeight, this.bottomHeight, marginSize, true)
+      } else {
+        let yPoint = this.reactionAnchorBottom
+        if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
+          yPoint = this.reactionAnchorTop - opMenuHeight - marginSize
+        }
+        if (yPoint < 0) {
+          yPoint = this.scrollHeight / 2
+        }
+        this.operationRect.y = yPoint
       }
-      if (yPoint < 0) {
-        yPoint = this.scrollHeight / 2;
-      }
-      this.operationRect.y = yPoint
     }
-    this.showOperationView = itemCount > 0
+    this.showOperationView = itemCount > 0 || showReaction
   }
 
   private updateTextSelection(msg: NIMMessageInfo | undefined, text: string, start: number, end: number,
@@ -1099,6 +1171,13 @@ export struct ChatP2PPage {
 
   loadChatData() {
     this.chatUserInfo.setConversationId(this.conversationId)
+    this.listScrollPositionReady = false
+    this.chatViewModel.onLastReadTimeReady = () => {
+      // 首屏可见区就绪后补一次未读位置判断，避免异步状态更新错过首屏滚动。
+      if (this.listScrollPositionReady) {
+        this.updateLastReadPositionByVisibleArea()
+      }
+    }
     this.chatViewModel.init(this.conversationId, this.chatUserInfo);
     this.chatViewModel.onOperateMessageInvalid = (messageClientId: string) => {
       this.clearOperationMenuIfMatch(messageClientId)
@@ -1221,6 +1300,10 @@ export struct ChatP2PPage {
                   showSelect: this.showMultiSelect,
                   aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
                   aiSearchSelectingTranslation: this.translationOperationMode,
+                  enableReaction: this.chatViewModel.isMessageReactionEnabled(),
+                  onReactionClick: async (message: NIMMessageInfo, index: number): Promise<boolean> => {
+                    return await this.chatViewModel.toggleQuickComment(message, index)
+                  },
                   onMessageClick: {
                     onAvatarClick: ((msg: NIMMessageInfo | undefined) => {
                       if (this.showMultiSelect) {
@@ -1397,6 +1480,7 @@ export struct ChatP2PPage {
             }
             this.listScrollEndPosition = end;
             this.listScrollStartPosition = start;
+            this.updateLastReadPositionByVisibleArea()
             // 只按当前可见区发送已读回执，避免把未进入视窗的消息提前标记。
             if (this.chatViewModel.isPageVisible) {
               const allMessages = this.chatUserInfo.msgList.getMessageList()
@@ -1799,6 +1883,9 @@ export struct ChatP2PPage {
                 })
             } else if (this.inputStyle === InputStyleType.Emoji) {
               NEChatEmojiView({
+                onStickerClick: (sticker) => {
+                  this.chatViewModel.sendImageResourceMessage(sticker.image, sticker.fileName)
+                },
                 onDidClick: (emoji) => {
                   if (emoji.type === NIMEmoticonType.file) {
                     this.controller.addImageSpan($rawfile(`emoji/${emoji.file}`), { imageStyle: { size: [16, 16] } })
@@ -1956,6 +2043,50 @@ export struct ChatP2PPage {
           .backgroundColor($r('app.color.chat_input_background'))
 
           // 滚动到新消息按钮
+          if (this.chatViewModel.shouldShowLastReadPosition && !this.showMultiSelect) {
+            Row() {
+              Image($r('app.media.ic_chat_scroll_down'))
+                .width(16)
+                .height(16)
+                .fillColor('#007AFF')
+                .rotate({ angle: 180 })
+                .margin({ right: 8 })
+
+              Text(this.chatViewModel.lastReadUnreadOverflow ?
+                $r('app.string.chat_last_read_message_count_overflow') :
+                $r('app.string.chat_last_read_message_count', this.chatViewModel.lastReadUnreadCount))
+                .fontSize(14)
+                .fontColor('#007AFF')
+            }
+            .backgroundColor(Color.White)
+            .borderRadius({
+              topLeft: 20,
+              bottomLeft: 20,
+              topRight: 0,
+              bottomRight: 0
+            })
+            .padding(12)
+            .alignRules({
+              right: { anchor: "__container__", align: HorizontalAlign.End },
+              top: { anchor: "tipBannerArea", align: VerticalAlign.Bottom }
+            })
+            .margin({ top: 18 })
+            .enabled(!this.chatViewModel.isLastReadPositionLocating)
+            .opacity(this.chatViewModel.isLastReadPositionLocating ? 0.6 : 1)
+            .accessibilityText(this.chatViewModel.lastReadUnreadOverflow ?
+              $r('app.string.chat_last_read_message_count_overflow') :
+              $r('app.string.chat_last_read_message_count', this.chatViewModel.lastReadUnreadCount))
+            .onClick(() => {
+              this.chatViewModel.jumpToLastReadPosition()
+            })
+            .shadow({
+              radius: 20,
+              color: '#20000000',
+              offsetX: 0,
+              offsetY: 4
+            })
+          }
+
           if (this.showScrollToNewMessageButton && !this.showMultiSelect) {
             Row() {
               Image($r('app.media.ic_chat_scroll_down'))
@@ -2000,6 +2131,21 @@ export struct ChatP2PPage {
             MessageOperationView({
               operateMsg: this.operationMsg,
               operationItems: this.operationMenuItems,
+              enableReaction: this.chatViewModel.isMessageReactionEnabled() &&
+                shouldEnableReactionForSelection(this.aiSearchSelectionState.active,
+                this.aiSearchSelectionState.isAllSelected(), this.translationOperationMode),
+              reactionExpanded: this.reactionMenuExpanded,
+              onReactionExpandedChange: (expanded: boolean): void => {
+                this.updateReactionMenuPosition(expanded)
+              },
+              didClickReaction: (index: number): void => {
+                this.showOperationView = false
+                this.reactionMenuExpanded = false
+                this.closeAISearchSelection()
+                if (this.operationMsg !== undefined) {
+                  this.chatViewModel.toggleQuickComment(this.operationMsg, index)
+                }
+              },
               didClickItem: (item: MessageOperationItem) => {
                 this.showOperationView = false
                 if (this.operationMsg == undefined) {

@@ -7,6 +7,8 @@ export class ConversationSelectModel {
   name?: string
   // 会话头像
   avatar?: ResourceStr
+  // 头像兜底文字（用户资料名 > 账号）
+  avatarName?: string
   // 是否已选中
   @Trace isSelected: boolean = false
   // 会话人数，用于展示群人数（单聊默认为 0，群聊为群人数）

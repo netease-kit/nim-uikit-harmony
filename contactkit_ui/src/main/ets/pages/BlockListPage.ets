@@ -27,7 +27,7 @@ export function BlockListItemBuilder(params: BlockListItemBuilderParams) {
       Column() {
         Row() {
           CommonAvatar({
-            item: new AvatarItem(item.user?.avatar, item.shortName(),
+            item: new AvatarItem(item.user?.avatar, item.getAvatarName(),
               AvatarColorUntil.getBackgroundColorById(item.user?.accountId ?? ''))
           })
             .width(params.titleIconSize ?? 36)

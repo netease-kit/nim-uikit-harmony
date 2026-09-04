@@ -5,7 +5,7 @@
  *
  */
 
-import { ConversationIdUtilRepo, ErrorUtils } from '@nimkit/chatkit'
+import { ConversationIdUtilRepo, ErrorUtils, NEFriendUserCache } from '@nimkit/chatkit'
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -15,7 +15,7 @@ import {
   NavigationBackBuilder,
   NECommonUtils
 } from '@nimkit/common'
-import { V2NIMConversation, V2NIMError } from '@nimsdk/base'
+import { V2NIMConversation, V2NIMConversationType, V2NIMError } from '@nimsdk/base'
 import {
   buildConversationGroupSuccessNameList,
   CONVERSATION_GROUP_SELECT_CONVERSATION_LIMIT,
@@ -308,7 +308,7 @@ struct ConversationGroupCandidateConversationItem {
       CommonAvatar({
         item: new AvatarItem(
           this.conversation?.avatar,
-          this.getAvatarShowName(this.conversationName()),
+          this.getAvatarShowName(this.conversationAvatarName()),
           AvatarColorUntil.getBackgroundColorById(this.conversationTargetId())
         )
       })
@@ -345,6 +345,14 @@ struct ConversationGroupCandidateConversationItem {
 
   private conversationName(): string {
     return this.conversation?.name ?? this.conversationTargetId()
+  }
+
+  private conversationAvatarName(): string {
+    const targetId = this.conversationTargetId()
+    if (this.conversation?.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
+      return NEFriendUserCache.peekInstance()?.getFriendById(targetId)?.user?.name || targetId
+    }
+    return this.conversationName()
   }
 
   private conversationTargetId(): string {

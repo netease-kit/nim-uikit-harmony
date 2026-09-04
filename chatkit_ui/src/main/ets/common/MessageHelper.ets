@@ -170,7 +170,12 @@ export function getNotificationMessageContent(messageInfo: NIMMessageInfo, chatU
           notifyContent = getContext().resourceManager.getStringByNameSync('chat_team_join_mode_on')
         }
       } else if (teamInfo?.serverExtension !== undefined) {
-        let extensionObj = JSON.parse(teamInfo.serverExtension) as object | null
+        let extensionObj: object | null = null
+        try {
+          extensionObj = JSON.parse(teamInfo.serverExtension) as object | null
+        } catch (_e) {
+          // Ignore malformed extensions and keep the default notification content
+        }
         if (extensionObj != null && extensionObj[keyExtensionLastOptType] == keyExtensionAtAll) {
           if (extensionObj[keyExtensionAtAll] === typeExtensionAllowAll) {
             notifyContent = getContext().resourceManager.getStringByNameSync('chat_team_at_permission_all_tips')
@@ -1242,21 +1247,29 @@ export async function getMessageImageUrl(message?: NIMMessageInfo, chatInfo?: Ch
  * @param msg
  * @param context
  */
-export function downLoadAndOpenFile(msg: NIMMessageInfo, context: Context, chatInfo?: ChatInfo) {
+export async function downLoadAndOpenFile(msg: NIMMessageInfo, context: Context, chatInfo?: ChatInfo): Promise<void> {
   let path = getMessageAttachmentPath(msg)
-  if (path !== '') {
-    fs.stat(path).then((stat: fs.Stat) => {
-      let uri = fileUri.getUriFromPath(path);
-      let fileName = getFileMessageAttachmentName(msg);
-      let fileExt = getFileMessageAttachmentExt(msg);
-      openFileWithApp(uri, fileName, fileExt, context)
-    }).catch((err: BusinessError) => {
-      Logger.error('ChatKitUI', "netease get file info failed with error message: " + err.message + ", error code: " + err.code);
-      downloadAttachment(msg, path, chatInfo)
+  if (path === '') {
+    return
+  }
+  try {
+    await fs.stat(path)
+  } catch (err) {
+    const businessError = err as BusinessError
+    Logger.error('ChatKitUI', "netease get file info failed with error message: " + businessError.message + ", error code: " + businessError.code)
+    await downloadAttachment(msg, path, chatInfo)
+    try {
+      await fs.stat(path)
+    } catch (downloadError) {
+      Logger.error('ChatKitUI', 'netease downloaded file is unavailable', downloadError)
       NECommonUtils.showToast($r('app.string.chat_msg_download_tips'))
       return
-    });
+    }
   }
+  const uri = fileUri.getUriFromPath(path)
+  const fileName = getFileMessageAttachmentName(msg)
+  const fileExt = getFileMessageAttachmentExt(msg)
+  openFileWithApp(uri, fileName, fileExt, context)
 }
 
 /**

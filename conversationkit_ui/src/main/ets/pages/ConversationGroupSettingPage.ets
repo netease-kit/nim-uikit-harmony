@@ -5,7 +5,7 @@
  *
  */
 
-import { ConversationIdUtilRepo, ErrorUtils } from '@nimkit/chatkit'
+import { ConversationIdUtilRepo, ErrorUtils, NEFriendUserCache } from '@nimkit/chatkit'
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -14,7 +14,7 @@ import {
   NavigationBackBuilder,
   NECommonUtils
 } from '@nimkit/common'
-import { V2NIMConversation, V2NIMError } from '@nimsdk/base'
+import { V2NIMConversation, V2NIMConversationType, V2NIMError } from '@nimsdk/base'
 import {
   ConversationGroupInfo,
   isConversationGroupNotExistError,
@@ -198,7 +198,7 @@ export struct ConversationGroupSettingPage {
       CommonAvatar({
         item: new AvatarItem(
           conversation.avatar,
-          this.getAvatarShowName(conversation.name ?? this.getConversationTargetId(conversation)),
+          this.getAvatarShowName(this.getConversationAvatarName(conversation)),
           AvatarColorUntil.getBackgroundColorById(this.getConversationTargetId(conversation))
         )
       })
@@ -420,6 +420,14 @@ export struct ConversationGroupSettingPage {
 
   private getConversationTargetId(conversation: V2NIMConversation): string {
     return ConversationIdUtilRepo.parseConversationTargetId(conversation.conversationId)
+  }
+
+  private getConversationAvatarName(conversation: V2NIMConversation): string {
+    const targetId = this.getConversationTargetId(conversation)
+    if (conversation.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
+      return NEFriendUserCache.peekInstance()?.getFriendById(targetId)?.user?.name || targetId
+    }
+    return conversation.name || targetId
   }
 
   private getAvatarShowName(sourceName: string): string {

@@ -10,14 +10,15 @@ import {
   AitModel,
   ChatKitClient,
   ChatRepo,
+  CloudConversationStrategy,
   collectionTypeOffset,
-  ConversationRepo,
+  ConversationStrategy,
   createMultiLineAttachment,
   DisposableBag,
   ErrorUtils,
   IMKitConfigCenter,
   LoginEventRepo,
-  LocalConversationRepo,
+  LocalConversationStrategy,
   NEAIUserCache,
   normalizeMultiLineTitle,
   PushConfigManager,
@@ -36,6 +37,8 @@ import {
   V2NIMErrorMap,
   V2NIMLoginStatus,
   V2NIMMessage,
+  V2NIMMessageListOption,
+  V2NIMMessageListResult,
   V2NIMMessageAIConfigParams,
   V2NIMMessageAIRegenOpType,
   V2NIMMessageAIRegenParams,
@@ -48,6 +51,8 @@ import {
   V2NIMMessageFileAttachment,
   V2NIMMessagePinNotification,
   V2NIMMessagePinState,
+  V2NIMMessageQuickComment,
+  V2NIMMessageQuickCommentNotification,
   V2NIMMessageRevokeNotification,
   V2NIMMessageSendingState,
   V2NIMMessageType,
@@ -81,6 +86,28 @@ import {
   resolveAIMessageContentForForward,
   resolveAIMessageContentForSend
 } from '../common/AIChatUtils';
+import {
+  buildLastReadMessageQueryOption,
+  canShowLastReadPosition,
+  createLastReadPositionStatus,
+  finishLastReadPositionJump,
+  LastReadUnreadDisplayCount,
+  LastReadPositionStatus,
+  queryLocalUnreadDisplayCount,
+  resolveLastReadPositionAfterUnreadCount,
+  startLastReadPositionJump,
+  updateLastReadPositionStatus
+} from '../utils/LastReadPositionUtils';
+import {
+  applyQuickCommentNotification,
+  buildQuickCommentBatches,
+  canShowMessageReaction,
+  isMessageReactionEnabled,
+  isQuickCommentLimitErrorCode,
+  quickCommentResultToMap
+} from '../utils/MessageReactionUtils';
+import { ChatKitConfig } from '../ChatKitConfig';
+import { buildStickerTempFileName, toExactArrayBuffer, writeStickerBufferSync } from '../utils/StickerFileUtils';
 
 @ObservedV2
 export class ChatBaseViewModel {
@@ -93,10 +120,16 @@ export class ChatBaseViewModel {
   @Trace selectMsgMap: Map<string, NIMMessageInfo> = new Map()
   @Trace selectMsgCount = 0
   @Trace needScrollToBottom = false
+  @Trace lastReadTime: number = 0
+  @Trace lastReadPositionStatus: LastReadPositionStatus = LastReadPositionStatus.DISABLED
+  @Trace lastReadUnreadCount: number = 0
+  @Trace lastReadUnreadOverflow: boolean = false
+  @Trace lastReadVisibleStateReady: boolean = false
   isLoading = false
   hasMore = false
   hasNew = false
   onOperateMessageInvalid?: (messageClientId: string) => void = undefined
+  onLastReadTimeReady?: () => void = undefined
   revokeMsg: NIMMessageInfo | undefined = undefined
   sendingMsgClientId: string = ''
   saveRevokeClientId: string = ''
@@ -108,6 +141,27 @@ export class ChatBaseViewModel {
   // 流式 ing 缓存数据
   private streamingMessageMap: HashMap<string, StreamMessage> = new HashMap();
   private loginEventDisposers: DisposableBag = new DisposableBag()
+  private conversationReadReadyPromise: Promise<void> = Promise.resolve()
+  private conversationLifecycleVersion: number = 0
+  private lastReadConfigVersion: number = 0
+  private lastReadTimeFrozen: boolean = false
+  private lastReadTargetMessageClientId: string = ''
+  private lastReadTargetMessageCreateTime: number = 0
+  private useLocalConversation: boolean = false
+  private readonly cloudConversationStrategy: ConversationStrategy = new CloudConversationStrategy()
+  private readonly localConversationStrategy: ConversationStrategy = new LocalConversationStrategy()
+  private conversationStrategy: ConversationStrategy = this.cloudConversationStrategy
+  private queriedQuickCommentMessageIds: Set<string> = new Set<string>()
+  private inFlightQuickCommentMessageIds: Set<string> = new Set<string>()
+  private quickCommentNotificationsDuringQuery: Map<string, V2NIMMessageQuickCommentNotification[]> =
+    new Map<string, V2NIMMessageQuickCommentNotification[]>()
+  private quickCommentRetryConnectionVersions: Map<string, number> = new Map<string, number>()
+  private pendingQuickCommentKeys: Set<string> = new Set<string>()
+  private quickCommentQueryGeneration: number = 0
+  private quickCommentConnectionVersion: number = 0
+  private messageReactionListenerRegistered: boolean = false
+  // 最早未读定位期间收到的消息需要在 cleanMessage 后重新合并。
+  private pendingReceivedMessages: V2NIMMessage[] = []
   // 发送消息
   onSendFun = async (message: V2NIMMessage): Promise<void> => {
     if (message.conversationId === this.conversationId) {
@@ -125,6 +179,10 @@ export class ChatBaseViewModel {
           this.chatInfo?.setReceiveMsg(true, [message])
         }
         if (message.sendingState == V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_SUCCEEDED) {
+          const messageInfo = this.chatInfo?.getMessage(message.messageClientId)
+          if (messageInfo !== undefined) {
+            this.loadQuickComments([messageInfo])
+          }
           // 调用钩子方法，子类可以实现自定义逻辑（如获取群消息已读回执）
           this.toHandleSendMessageSuccess(message)
         }
@@ -135,6 +193,13 @@ export class ChatBaseViewModel {
 
   setAnchorMessage(msg: NIMMessageInfo | undefined) {
     this.anchorMsg = msg
+    if (msg !== undefined) {
+      this.lastReadPositionStatus = updateLastReadPositionStatus(
+        this.lastReadPositionStatus,
+        this.lastReadTime,
+        msg.message.createTime
+      )
+    }
   }
 
   jumpToMessage(msg: NIMMessageInfo | undefined): void {
@@ -156,11 +221,30 @@ export class ChatBaseViewModel {
   }
 
   init(conversationId: string, chatInfo: ChatInfo) {
+    const lifecycleVersion = ++this.conversationLifecycleVersion
+    const lastReadConfigVersion = ++this.lastReadConfigVersion
     this.conversationId = conversationId
     this.targetId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversationId)
     this.chatInfo = chatInfo;
-    // 设置当前会话
-    ChatKitClient.setCurrentConversationId(this.conversationId)
+    this.lastReadTime = 0
+    this.lastReadPositionStatus = LastReadPositionStatus.DISABLED
+    this.lastReadUnreadCount = 0
+    this.lastReadUnreadOverflow = false
+    this.lastReadVisibleStateReady = false
+    this.lastReadTimeFrozen = false
+    this.lastReadTargetMessageClientId = ''
+    this.lastReadTargetMessageCreateTime = 0
+    this.useLocalConversation = IMKitConfigCenter.enableLocalConversation
+    this.conversationStrategy = this.useLocalConversation ? this.localConversationStrategy : this.cloudConversationStrategy
+    this.queriedQuickCommentMessageIds.clear()
+    this.inFlightQuickCommentMessageIds.clear()
+    this.quickCommentNotificationsDuringQuery.clear()
+    this.quickCommentRetryConnectionVersions.clear()
+    this.pendingQuickCommentKeys.clear()
+    this.quickCommentQueryGeneration++
+    this.pendingReceivedMessages = []
+    // UIKit 当前会话需立即生效；本地 SDK current conversation 在旧 read time 冻结后再同步。
+    ChatKitClient.registerCurrentConversationId(this.conversationId)
     // 注册消息接受监听
     ChatRepo.onReceiverMessage(this.onReceiveFun)
     // 注册消息更新监听
@@ -173,6 +257,10 @@ export class ChatBaseViewModel {
     ChatRepo.onRevokeMessage(this.onRevokeFun)
     // 注册消息置顶监听
     ChatRepo.onMessagePinNotification(this.onPinFun)
+    if (this.isMessageReactionEnabled()) {
+      ChatRepo.onMessageQuickCommentNotification(this.onQuickCommentFun)
+      this.messageReactionListenerRegistered = true
+    }
 
     // 监听数据同步完成监听
     this.loginEventDisposers.dispose()
@@ -183,18 +271,123 @@ export class ChatBaseViewModel {
     ])
 
     ChatBaseViewModel.currentViewModel = this
-    // 清理未读数
-    this.clearUnreadCount()
+    if (this.enableLastReadPosition()) {
+      this.conversationReadReadyPromise = this.prepareConversationReadState(lifecycleVersion, lastReadConfigVersion)
+    } else {
+      ChatKitClient.setCurrentConversationId(this.conversationId)
+      this.conversationReadReadyPromise = this.clearUnread()
+    }
+  }
+
+  enableLastReadPosition(): boolean {
+    return ChatKitConfig.enableLastReadPosition
+  }
+
+  refreshLastReadPositionState(): void {
+    const configVersion = ++this.lastReadConfigVersion
+    if (!this.enableLastReadPosition()) {
+      this.lastReadPositionStatus = LastReadPositionStatus.DISABLED
+      this.lastReadUnreadCount = 0
+      this.lastReadUnreadOverflow = false
+      this.lastReadVisibleStateReady = false
+      this.lastReadTime = 0
+      this.lastReadTimeFrozen = false
+      this.conversationReadReadyPromise = Promise.resolve()
+      return
+    }
+    this.lastReadTimeFrozen = false
+    this.lastReadPositionStatus = LastReadPositionStatus.DISABLED
+    this.lastReadUnreadCount = 0
+    this.lastReadUnreadOverflow = false
+    this.lastReadVisibleStateReady = false
+    this.lastReadTargetMessageClientId = ''
+    this.lastReadTargetMessageCreateTime = 0
+    this.conversationReadReadyPromise = this.prepareConversationReadState(
+      this.conversationLifecycleVersion, configVersion)
+  }
+
+  private isCurrentConversationLifecycle(lifecycleVersion: number): boolean {
+    return lifecycleVersion === this.conversationLifecycleVersion
+  }
+
+  private async prepareConversationReadState(lifecycleVersion: number, configVersion: number): Promise<void> {
+    let readTime: number | undefined = undefined
+    try {
+      readTime = await this.conversationStrategy.getConversationReadTime(this.conversationId)
+    } catch (err) {
+      Logger.error('ChatKitUI', '[LastReadPosition] getConversationReadTime failed', `${err}`)
+    }
+
+    if (!this.isCurrentConversationLifecycle(lifecycleVersion) ||
+      configVersion !== this.lastReadConfigVersion || !this.enableLastReadPosition()) {
+      return
+    }
+    if (!this.lastReadTimeFrozen) {
+      this.lastReadTimeFrozen = true
+      this.lastReadPositionStatus = createLastReadPositionStatus(readTime)
+      this.lastReadTime = readTime ?? 0
+      Logger.debug('ChatKitUI', '[LastReadPosition] read time frozen', this.conversationId, this.lastReadTime,
+        this.useLocalConversation)
+    }
+
+    if (readTime !== undefined && readTime >= 0) {
+      try {
+        const unreadDisplayCount: LastReadUnreadDisplayCount = await queryLocalUnreadDisplayCount(
+          this.conversationId,
+          readTime,
+          async (option: V2NIMMessageListOption): Promise<V2NIMMessageListResult> => {
+            return await ChatRepo.getMessageListEx(option)
+          }
+        )
+        if (!this.isCurrentConversationLifecycle(lifecycleVersion) ||
+          configVersion !== this.lastReadConfigVersion || !this.enableLastReadPosition()) {
+          return
+        }
+        this.lastReadUnreadCount = unreadDisplayCount.count
+        this.lastReadUnreadOverflow = unreadDisplayCount.overflow
+        this.lastReadTargetMessageClientId = unreadDisplayCount.targetMessageClientId
+        this.lastReadTargetMessageCreateTime = unreadDisplayCount.targetMessageCreateTime
+        this.lastReadPositionStatus = resolveLastReadPositionAfterUnreadCount(
+          this.lastReadPositionStatus,
+          unreadDisplayCount.count
+        )
+        Logger.debug('ChatKitUI', '[LastReadPosition] local unread count frozen', this.conversationId,
+          unreadDisplayCount.count, unreadDisplayCount.overflow)
+        this.onLastReadTimeReady?.()
+      } catch (err) {
+        if (!this.isCurrentConversationLifecycle(lifecycleVersion) ||
+          configVersion !== this.lastReadConfigVersion || !this.enableLastReadPosition()) {
+          return
+        }
+        this.lastReadUnreadCount = 0
+        this.lastReadUnreadOverflow = false
+        this.lastReadPositionStatus = LastReadPositionStatus.DISABLED
+        Logger.error('ChatKitUI', '[LastReadPosition] query local unread count failed', `${err}`)
+      }
+    }
+
+    await this.clearUnread()
+    if (!this.isCurrentConversationLifecycle(lifecycleVersion) ||
+      configVersion !== this.lastReadConfigVersion || !this.enableLastReadPosition()) {
+      return
+    }
+    ChatKitClient.setCurrentConversationId(this.conversationId)
   }
 
   onConnectStatusChange = (status: V2NIMConnectStatus) => {
-    if (status !== V2NIMConnectStatus.V2NIM_CONNECT_STATUS_CONNECTED) {
+    if (status === V2NIMConnectStatus.V2NIM_CONNECT_STATUS_CONNECTED) {
+      this.networkBroken = false
+      this.quickCommentConnectionVersion++
+      this.loadVisibleQuickComments()
+    } else {
       this.networkBroken = true
     }
   }
   onLoginStatusChange = (status: V2NIMLoginStatus) => {
     if (status === V2NIMLoginStatus.V2NIM_LOGIN_STATUS_LOGINED) {
       this.networkBroken = false
+      this.quickCommentConnectionVersion++
+      this.loadVisibleQuickComments()
     }
   }
   // 处理数据同步完成
@@ -212,11 +405,31 @@ export class ChatBaseViewModel {
 
   handleReceiveMessages(messages: V2NIMMessage[]): void {
     if (this.hasNew) {
-      // 最后一条消息判断不准的情况下，只要 conversationId 对得上的，都认为是新消息记录下来
+      // 定位历史消息时保留新消息在列表尾部，避免手动滚动后仍无法看到消息。
       const messagesWhenHasNew: V2NIMMessage[] = messages.filter((msg: V2NIMMessage) => {
         return msg.conversationId == this.conversationId
       })
-      this.chatInfo?.setReceiveMsg(true, messagesWhenHasNew);
+      const newMessages: V2NIMMessage[] = messagesWhenHasNew.filter((msg: V2NIMMessage) => {
+        return this.chatInfo?.getMessage(msg.messageClientId) === undefined &&
+          !this.pendingReceivedMessages.some((pending: V2NIMMessage) => {
+            return pending.messageClientId === msg.messageClientId
+          })
+      })
+      if (this.isLastReadPositionLocating) {
+        this.pendingReceivedMessages.push(...newMessages)
+      }
+      const receiveMessages: NIMMessageInfo[] = []
+      newMessages.forEach((message: V2NIMMessage): void => {
+        const messageInfo = this.chatInfo?.pushMessage(message)
+        if (messageInfo !== undefined) {
+          receiveMessages.push(messageInfo)
+        }
+      })
+      if (receiveMessages.length > 0) {
+        this.toHandleReceiveMessage(receiveMessages)
+        this.loadQuickComments(receiveMessages)
+      }
+      this.chatInfo?.setReceiveMsg(true, newMessages)
       return
     }
     let hasNew = false
@@ -233,7 +446,8 @@ export class ChatBaseViewModel {
     }
     if (hasNew) {
       this.toHandleReceiveMessage(receiveMsgs)
-      this.clearUnreadCount()
+      this.loadQuickComments(receiveMsgs)
+      // this.clearUnreadCount()
       this.chatInfo?.setReceiveMsg(true, receiveMsgs.map((receiveMsg: NIMMessageInfo) => { return receiveMsg.message}));
     }
   }
@@ -265,6 +479,7 @@ export class ChatBaseViewModel {
     }
     if (hasNew) {
       this.toHandleReceiveMessage(receiveMsgs)
+      this.loadQuickComments(receiveMsgs)
       // this.clearUnreadCount() // 更新消息不做 clear 动作
       this.chatInfo?.setReceiveMsg(true, receiveMsgs.map((receiveMsg: NIMMessageInfo) => { return receiveMsg.message}));
     }
@@ -342,7 +557,7 @@ export class ChatBaseViewModel {
       if (msg.messageRefer.conversationId === this.conversationId) {
         let revokeMsg = this.chatInfo?.getMessage(msg.messageRefer.messageClientId)
         this.removeReplyInfo(msg.messageRefer.messageClientId)
-        this.chatInfo?.revokeMessage(msg.messageRefer.messageClientId)
+        this.chatInfo?.revokeMessage(msg.messageRefer.messageClientId, msg.messageRefer as V2NIMMessage)
         this.onOperateMessageInvalid?.(msg.messageRefer.messageClientId)
         if (this.selectMsgMap.has(msg.messageRefer.messageClientId)) {
           this.selectMsgMap.delete(msg.messageRefer.messageClientId)
@@ -382,6 +597,203 @@ export class ChatBaseViewModel {
 
   })
 
+  onQuickCommentFun = (notification: V2NIMMessageQuickCommentNotification): void => {
+    if (!this.isMessageReactionEnabled()) {
+      return
+    }
+    const quickComment = notification.quickComment
+    if (quickComment.messageRefer.conversationId !== this.conversationId) {
+      return
+    }
+    const messageInfo = this.chatInfo?.getMessage(quickComment.messageRefer.messageClientId)
+    if (messageInfo === undefined) {
+      return
+    }
+    messageInfo.setQuickComments(applyQuickCommentNotification(messageInfo.quickComments, notification))
+    if (this.inFlightQuickCommentMessageIds.has(messageInfo.getMessageClientId())) {
+      const notifications = this.quickCommentNotificationsDuringQuery.get(messageInfo.getMessageClientId()) ?? []
+      notifications.push(notification)
+      this.quickCommentNotificationsDuringQuery.set(messageInfo.getMessageClientId(), notifications)
+    }
+    if (quickComment.operatorId === ChatKitClient.getLoginUserId()) {
+      this.pendingQuickCommentKeys.delete(this.buildQuickCommentOperationKey(messageInfo, quickComment.index))
+    }
+    this.chatInfo?.notifyMessageChange(messageInfo.getMessageClientId())
+    // Reaction 高度变化后，保持底部用户能看到最新内容
+    this.needScrollToBottom = true
+  }
+
+  supportsMessageReaction(): boolean {
+    return false
+  }
+
+  isMessageReactionEnabled(): boolean {
+    return isMessageReactionEnabled(ChatKitConfig.enableEmojiReaction, this.supportsMessageReaction())
+  }
+
+  /** 同步全局开关变化到当前会话的 QuickComment 监听和缓存。 */
+  refreshMessageReactionState(): void {
+    if (this.isMessageReactionEnabled()) {
+      if (!this.messageReactionListenerRegistered) {
+        ChatRepo.onMessageQuickCommentNotification(this.onQuickCommentFun)
+        this.messageReactionListenerRegistered = true
+      }
+      this.loadVisibleQuickComments()
+      return
+    }
+    if (this.messageReactionListenerRegistered) {
+      ChatRepo.offMessageQuickCommentNotification(this.onQuickCommentFun)
+      this.messageReactionListenerRegistered = false
+    }
+    this.resetQuickCommentQueryState()
+    const messages = this.chatInfo?.msgList.getMessageList() ?? []
+    messages.forEach((messageInfo: NIMMessageInfo): void => {
+      if (messageInfo.quickComments.length > 0) {
+        messageInfo.setQuickComments([])
+        this.chatInfo?.notifyMessageChange(messageInfo.getMessageClientId())
+      }
+    })
+  }
+
+  private buildQuickCommentOperationKey(messageInfo: NIMMessageInfo, index: number): string {
+    return `${messageInfo.getMessageClientId()}:${index}`
+  }
+
+  async toggleQuickComment(messageInfo: NIMMessageInfo, index: number): Promise<boolean> {
+    if (!this.isMessageReactionEnabled() || !canShowMessageReaction(messageInfo.message, messageInfo.isRevokeMsg)) {
+      return false
+    }
+    const operationKey = this.buildQuickCommentOperationKey(messageInfo, index)
+    if (this.pendingQuickCommentKeys.has(operationKey)) {
+      return false
+    }
+    this.pendingQuickCommentKeys.add(operationKey)
+    const lifecycleVersion = this.conversationLifecycleVersion
+    const hasSelf = messageInfo.quickComments.some((comment: V2NIMMessageQuickComment): boolean => {
+      return comment.index === index && comment.operatorId === ChatKitClient.getLoginUserId()
+    })
+    try {
+      if (hasSelf) {
+        await ChatRepo.removeQuickComment(messageInfo.message, index)
+      } else {
+        await ChatRepo.addQuickComment(messageInfo.message, index)
+      }
+      return true
+    } catch (err) {
+      if (!this.isCurrentConversationLifecycle(lifecycleVersion)) {
+        return false
+      }
+      this.pendingQuickCommentKeys.delete(operationKey)
+      Logger.error('ChatKitUI', '[MessageReaction] toggle failed', messageInfo.getMessageClientId(), index, `${err}`)
+      const errorCode = (err as V2NIMError).code
+      NECommonUtils.showToast(isQuickCommentLimitErrorCode(errorCode) ?
+        $r('app.string.chat_message_reaction_limit') : $r('app.string.chat_message_reaction_failed'))
+      return false
+    }
+  }
+
+  private loadQuickComments(messages: NIMMessageInfo[]): void {
+    if (!this.isMessageReactionEnabled()) {
+      return
+    }
+    const lifecycleVersion = this.conversationLifecycleVersion
+    const queryGeneration = this.quickCommentQueryGeneration
+    const queryMessages: NIMMessageInfo[] = messages.filter((messageInfo: NIMMessageInfo): boolean => {
+      const messageClientId = messageInfo.getMessageClientId()
+      if (this.queriedQuickCommentMessageIds.has(messageClientId) ||
+        !canShowMessageReaction(messageInfo.message, messageInfo.isRevokeMsg)) {
+        return false
+      }
+      this.queriedQuickCommentMessageIds.add(messageClientId)
+      return true
+    })
+    if (queryMessages.length === 0) {
+      return
+    }
+    queryMessages.forEach((messageInfo: NIMMessageInfo): void => {
+      this.inFlightQuickCommentMessageIds.add(messageInfo.getMessageClientId())
+      this.quickCommentNotificationsDuringQuery.delete(messageInfo.getMessageClientId())
+    })
+    const messageInfoMap: Map<string, NIMMessageInfo> = new Map<string, NIMMessageInfo>()
+    queryMessages.forEach((messageInfo: NIMMessageInfo): void => {
+      messageInfoMap.set(messageInfo.getMessageClientId(), messageInfo)
+    })
+    const batches: V2NIMMessage[][] = buildQuickCommentBatches(queryMessages.map(
+      (messageInfo: NIMMessageInfo): V2NIMMessage => {
+        return messageInfo.message
+      }))
+    this.queryQuickCommentBatches(batches, messageInfoMap, lifecycleVersion, queryGeneration)
+  }
+
+  private loadVisibleQuickComments(): void {
+    this.loadQuickComments(this.chatInfo?.msgList.getMessageList() ?? [])
+  }
+
+  private async queryQuickCommentBatches(
+    batches: V2NIMMessage[][],
+    messageInfoMap: Map<string, NIMMessageInfo>,
+    lifecycleVersion: number,
+    queryGeneration: number
+  ): Promise<void> {
+    for (const batch of batches) {
+      try {
+        const result: Map<string, V2NIMMessageQuickComment[]> = quickCommentResultToMap(await ChatRepo.getQuickCommentList(batch) ?? {})
+        if (!this.isCurrentConversationLifecycle(lifecycleVersion) ||
+          queryGeneration !== this.quickCommentQueryGeneration) {
+          return
+        }
+        batch.forEach((message: V2NIMMessage): void => {
+          const messageInfo = messageInfoMap.get(message.messageClientId)
+          if (messageInfo === undefined) {
+            return
+          }
+          const current = this.chatInfo?.getMessage(messageInfo.getMessageClientId())
+          if (current === undefined) {
+            return
+          }
+          let comments = result.get(current.getMessageClientId()) ?? []
+          const notifications = this.quickCommentNotificationsDuringQuery.get(current.getMessageClientId()) ?? []
+          notifications.forEach((notification: V2NIMMessageQuickCommentNotification): void => {
+            comments = applyQuickCommentNotification(comments, notification)
+          })
+          current.setQuickComments(comments)
+          this.inFlightQuickCommentMessageIds.delete(current.getMessageClientId())
+          this.quickCommentNotificationsDuringQuery.delete(current.getMessageClientId())
+          this.quickCommentRetryConnectionVersions.delete(current.getMessageClientId())
+          this.chatInfo?.notifyMessageChange(current.getMessageClientId())
+        })
+        this.needScrollToBottom = true
+      } catch (err) {
+        if (!this.isCurrentConversationLifecycle(lifecycleVersion) ||
+          queryGeneration !== this.quickCommentQueryGeneration) {
+          return
+        }
+        const retryMessages: NIMMessageInfo[] = []
+        batch.forEach((message: V2NIMMessage): void => {
+          this.queriedQuickCommentMessageIds.delete(message.messageClientId)
+          this.inFlightQuickCommentMessageIds.delete(message.messageClientId)
+          this.quickCommentNotificationsDuringQuery.delete(message.messageClientId)
+          const lastRetryVersion = this.quickCommentRetryConnectionVersions.get(message.messageClientId) ?? -1
+          const current = this.chatInfo?.getMessage(message.messageClientId)
+          if (!this.networkBroken && current !== undefined && lastRetryVersion !== this.quickCommentConnectionVersion) {
+            this.quickCommentRetryConnectionVersions.set(message.messageClientId, this.quickCommentConnectionVersion)
+            retryMessages.push(current)
+          }
+        })
+        Logger.error('ChatKitUI', '[MessageReaction] getQuickCommentList failed', `${err}`)
+        this.loadQuickComments(retryMessages)
+      }
+    }
+  }
+
+  private resetQuickCommentQueryState(): void {
+    this.quickCommentQueryGeneration++
+    this.queriedQuickCommentMessageIds.clear()
+    this.inFlightQuickCommentMessageIds.clear()
+    this.quickCommentNotificationsDuringQuery.clear()
+    this.quickCommentRetryConnectionVersions.clear()
+  }
+
   loadAnchorMsg(msg: NIMMessageInfo) {
     this.loadMessageListWithAnchor(msg)
   }
@@ -409,6 +821,7 @@ export class ChatBaseViewModel {
     } else {
       this.hasMore = false;
     }
+    this.resetQuickCommentQueryState()
     this.chatInfo?.cleanMessage()
     this.setAnchorMessage(undefined)
     for (let index = messageList.length - 1; index >= 0; index--) {
@@ -420,11 +833,18 @@ export class ChatBaseViewModel {
     // 修改接受消息标志，如果有新消息则更新接受消息标志，否则列表滚动到底部
     this.chatInfo?.setReceiveMsg(true, result.map((receiveMsg: NIMMessageInfo) => { return receiveMsg.message}));
     this.toHandleQueryMessage(result, messageList)
+    this.loadQuickComments(result)
     this.hasLoadData = true
     return result;
   }
 
-  async loadMessageListWithAnchor(anchorMsg: NIMMessageInfo): Promise<NIMMessageInfo[]> {
+  async loadMessageListWithAnchor(anchorMsg: NIMMessageInfo,
+    preserveHistoryOnReceive: boolean = false,
+    scrollIndexAlignStart: boolean = false): Promise<NIMMessageInfo[]> {
+    if (preserveHistoryOnReceive) {
+      // Keep incoming messages outside the anchored history window.
+      this.hasNew = true
+    }
     let errorCount = 0
     let result: NIMMessageInfo[] = [];
     const messageBeforList: V2NIMMessage[] = await ChatRepo.getMessageList({
@@ -446,9 +866,11 @@ export class ChatBaseViewModel {
       return []
     })
     if (errorCount > 1) {
+      this.appendPendingReceivedMessages(result)
       return result
     }
     // clear
+    this.resetQuickCommentQueryState()
     this.chatInfo?.cleanMessage()
 
     // push before message
@@ -479,7 +901,8 @@ export class ChatBaseViewModel {
         }
       }
     }
-    if (messageAfterList.length > ChatConst.chatMessagePageSize - 5 || this.networkBroken) {
+    this.appendPendingReceivedMessages(result)
+    if (preserveHistoryOnReceive || messageAfterList.length > ChatConst.chatMessagePageSize - 5 || this.networkBroken) {
       this.hasNew = true
     } else if (!this.networkBroken) {
       this.hasNew = false;
@@ -487,11 +910,26 @@ export class ChatBaseViewModel {
     // // 修改接受消息标志，如果有新消息则更新接受消息标志，否则列表滚动到底部
     // this.chatInfo?.setReceiveMsg(true)
     this.toHandleQueryMessage(result, messageAfterList)
+    this.loadQuickComments(result)
     if (anchorIndex >= 0) {
-      this.chatInfo?.setScrollIndex(anchorIndex)
+      this.chatInfo?.setScrollIndex(anchorIndex, scrollIndexAlignStart)
     }
     this.hasLoadData = true
     return result;
+  }
+
+  private appendPendingReceivedMessages(result: NIMMessageInfo[]): void {
+    const pendingMessages = this.pendingReceivedMessages
+    this.pendingReceivedMessages = []
+    pendingMessages.forEach((message: V2NIMMessage): void => {
+      if (message.conversationId !== this.conversationId || this.chatInfo?.getMessage(message.messageClientId) !== undefined) {
+        return
+      }
+      const messageInfo = this.chatInfo?.pushMessage(message)
+      if (messageInfo !== undefined) {
+        result.push(messageInfo)
+      }
+    })
   }
 
   /**
@@ -551,6 +989,7 @@ export class ChatBaseViewModel {
         result = this.chatInfo.unshiftMessage(messageList)
       }
       this.toHandleQueryMessage(result, messageList)
+      this.loadVisibleQuickComments()
       this.isLoading = false
     }).catch((err: BusinessError) => {
       this.isLoading = false
@@ -593,6 +1032,7 @@ export class ChatBaseViewModel {
         }
       }
       this.toHandleQueryMessage(result, messageList)
+      this.loadVisibleQuickComments()
       this.isLoading = false
     }).catch((err: BusinessError) => {
       this.isLoading = false
@@ -725,14 +1165,108 @@ export class ChatBaseViewModel {
     }
   }
 
-  // 清理未读数
-  clearUnreadCount() {
-    if (IMKitConfigCenter.enableLocalConversation) {
-      // 已经通过 set current conversation了，可以不需要自己 clear
-      LocalConversationRepo.clearUnreadCountByIds([this.conversationId])
-    } else {
-      ConversationRepo.clearUnreadCountByIds([this.conversationId])
+  @Computed
+  get shouldShowLastReadPosition(): boolean {
+    return this.enableLastReadPosition() &&
+      canShowLastReadPosition(this.lastReadPositionStatus, this.lastReadUnreadCount,
+        this.lastReadVisibleStateReady)
+  }
+
+  updateLastReadPosition(topVisibleIndex: number): void {
+    if (!this.enableLastReadPosition() || topVisibleIndex < 0 || this.lastReadTargetMessageCreateTime <= 0) {
+      return
     }
+    const topVisibleMessage = this.chatInfo?.msgList.getData(topVisibleIndex)
+    if (!topVisibleMessage) {
+      return
+    }
+    this.lastReadVisibleStateReady = true
+    const targetIndex = this.lastReadTargetMessageClientId.length > 0 ?
+      this.chatInfo?.msgList.searchPosition(this.lastReadTargetMessageClientId) ?? -1 : -1
+    const targetAtOrBelowTop = targetIndex >= 0 ? targetIndex >= topVisibleIndex : undefined
+    this.lastReadPositionStatus = updateLastReadPositionStatus(
+      this.lastReadPositionStatus,
+      this.lastReadTargetMessageCreateTime,
+      topVisibleMessage.getCreateTime(),
+      targetAtOrBelowTop
+    )
+  }
+
+  @Computed
+  get isLastReadPositionLocating(): boolean {
+    return this.lastReadPositionStatus === LastReadPositionStatus.LOCATING
+  }
+
+  async jumpToLastReadPosition(): Promise<boolean> {
+    if (!this.enableLastReadPosition() || this.lastReadPositionStatus !== LastReadPositionStatus.VISIBLE) {
+      return false
+    }
+    const lifecycleVersion = this.conversationLifecycleVersion
+    this.lastReadPositionStatus = startLastReadPositionJump(this.lastReadPositionStatus)
+    // Keep incoming messages outside the anchored history window while locating.
+    this.hasNew = true
+    try {
+      const queryResult = await ChatRepo.getMessageListEx(
+        buildLastReadMessageQueryOption(this.conversationId, this.lastReadTime)
+      )
+      if (!this.isCurrentConversationLifecycle(lifecycleVersion)) {
+        return false
+      }
+      const targetMessage = queryResult.messages.find((message: V2NIMMessage) => {
+        return message.createTime > this.lastReadTime
+      })
+      if (!targetMessage) {
+        this.lastReadPositionStatus = finishLastReadPositionJump(this.lastReadPositionStatus, false)
+        this.hasNew = false
+        this.pendingReceivedMessages = []
+        NECommonUtils.showToast($r('app.string.chat_last_read_position_load_failed'))
+        return false
+      }
+      Logger.debug('ChatKitUI', '[LastReadPosition] target message found', this.conversationId,
+        targetMessage.messageClientId, targetMessage.createTime)
+
+      const loadedMessages = await this.loadMessageListWithAnchor(new NIMMessageInfo(targetMessage), true, true)
+      if (!this.isCurrentConversationLifecycle(lifecycleVersion)) {
+        return false
+      }
+      const success = loadedMessages.length > 0
+      this.lastReadPositionStatus = finishLastReadPositionJump(this.lastReadPositionStatus, success)
+      if (!success) {
+        this.hasNew = false
+        NECommonUtils.showToast($r('app.string.chat_last_read_position_load_failed'))
+      }
+      return success
+    } catch (err) {
+      if (this.isCurrentConversationLifecycle(lifecycleVersion)) {
+        this.lastReadPositionStatus = finishLastReadPositionJump(this.lastReadPositionStatus, false)
+        this.hasNew = false
+        this.pendingReceivedMessages = []
+        Logger.error('ChatKitUI', '[LastReadPosition] jump failed', `${err}`)
+        NECommonUtils.showToast($r('app.string.chat_last_read_position_load_failed'))
+      }
+      return false
+    }
+  }
+
+  private async clearUnread(): Promise<void> {
+    try {
+      await this.conversationStrategy.clearUnreadCountById(this.conversationId)
+      Logger.debug('ChatKitUI', '[LastReadPosition] clear completed', this.conversationId,
+        this.useLocalConversation)
+    } catch (err) {
+      Logger.error('ChatKitUI', '[LastReadPosition] clear unread failed', `${err}`)
+      return
+    }
+
+  }
+
+  // 清理未读数并推进会话已读时间。调用方无需处理异常。
+  clearUnreadCount(): void {
+    this.conversationReadReadyPromise.then(async () => {
+      await this.clearUnread()
+    }).catch((err: BusinessError) => {
+      Logger.error('ChatKitUI', '[LastReadPosition] clear unread queue failed', `${err}`)
+    })
   }
 
   /**
@@ -931,15 +1465,63 @@ export class ChatBaseViewModel {
         let imageInfo = imageSource.getImageInfoSync()
         const message = await ChatRepo.createImageMessage(copyFilePath, file.name, undefined, imageInfo?.size.width,
           imageInfo?.size.height);
-        const fn: Function = () => {
-          this.sendMessageAndSetProgress(message, this.buildAIConfigForCurrentConversation(message))
-        }
-        ChatKitClient.runAfterLoggedIn(fn)
+        this.sendMessageAndSetProgress(message, this.buildAIConfigForCurrentConversation(message))
 
         await fs.close(file)
       }
     } catch (err) {
       Logger.info('ChatKitUI', 'net ease send image error', err);
+    }
+  }
+
+  /**
+   * 发送应用资源中的 Sticker 图片消息
+   */
+  async sendImageResourceMessage(resource: Resource, fileName: string): Promise<void> {
+    let file: fs.File | undefined = undefined
+    let filePath: string = ''
+    let messageCreated: boolean = false
+    try {
+      const context = getContext(this)
+      const data = await context.resourceManager.getMediaContent(resource)
+      const imageBuffer = toExactArrayBuffer(data)
+      const fileDir = DeviceUtils.rootDirPath + '/temp/'
+      if (!fs.accessSync(fileDir)) {
+        await fs.mkdir(fileDir)
+      }
+      const tempFileName = buildStickerTempFileName(fileName)
+      filePath = fileDir + tempFileName
+      file = fs.openSync(filePath, fs.OpenMode.CREATE | fs.OpenMode.READ_WRITE | fs.OpenMode.TRUNC)
+      writeStickerBufferSync(file.fd, imageBuffer, (fd: number, buffer: ArrayBuffer): number => {
+        return fs.writeSync(fd, buffer)
+      })
+      fs.closeSync(file)
+      file = undefined
+
+      const imageSource = image.createImageSource(imageBuffer)
+      let imageInfo: image.ImageInfo
+      try {
+        imageInfo = imageSource.getImageInfoSync()
+      } finally {
+        await imageSource.release()
+      }
+      const message = await ChatRepo.createImageMessage(filePath, fileName, undefined, imageInfo?.size.width,
+        imageInfo?.size.height)
+      messageCreated = true
+      this.sendMessageAndSetProgress(message, this.buildAIConfigForCurrentConversation(message))
+    } catch (err) {
+      Logger.error('ChatKitUI', 'net ease send sticker image error', err)
+      try {
+        if (!messageCreated && filePath.length > 0 && fs.accessSync(filePath)) {
+          fs.unlinkSync(filePath)
+        }
+      } catch (cleanupErr) {
+        Logger.error('ChatKitUI', 'net ease cleanup sticker image error', cleanupErr)
+      }
+    } finally {
+      if (file !== undefined) {
+        fs.closeSync(file)
+      }
     }
   }
 
@@ -969,10 +1551,7 @@ export class ChatBaseViewModel {
       }
       await fs.copyFile(file.fd, copyFilePath)
       const message = await ChatRepo.createVideoMessage(copyFilePath, file.name, undefined, duration, width, height);
-      const fn: Function = () => {
-        this.sendMessageAndSetProgress(message, this.buildAIConfigForCurrentConversation(message))
-      }
-      ChatKitClient.runAfterLoggedIn(fn)
+      this.sendMessageAndSetProgress(message, this.buildAIConfigForCurrentConversation(message))
 
       await fs.close(file)
     } catch (err) {
@@ -1539,17 +2118,37 @@ export class ChatBaseViewModel {
    * 销毁
    */
   onDestroy(): void {
+    this.conversationLifecycleVersion++
+    this.lastReadConfigVersion++
+    if (ChatBaseViewModel.currentViewModel === this) {
+      ChatBaseViewModel.currentViewModel = undefined
+    }
+    this.lastReadPositionStatus = LastReadPositionStatus.DISABLED
+    this.lastReadVisibleStateReady = false
     ChatRepo.offReceiverMessage(this.onReceiveFun)
     ChatRepo.offReceiveMessagesModified(this.onModifyFun)
     ChatRepo.offSendMessage(this.onSendFun)
     ChatRepo.offDeleteMessage(this.onDeleteFun)
     ChatRepo.offRevokeMessage(this.onRevokeFun)
     ChatRepo.offMessagePinNotification(this.onPinFun)
+    if (this.messageReactionListenerRegistered) {
+      ChatRepo.offMessageQuickCommentNotification(this.onQuickCommentFun)
+      this.messageReactionListenerRegistered = false
+    }
+    this.queriedQuickCommentMessageIds.clear()
+    this.inFlightQuickCommentMessageIds.clear()
+    this.quickCommentNotificationsDuringQuery.clear()
+    this.quickCommentRetryConnectionVersions.clear()
+    this.pendingQuickCommentKeys.clear()
+    this.quickCommentQueryGeneration++
     this.loginEventDisposers.dispose()
+    this.onLastReadTimeReady = undefined
     // 清理未读数
     this.clearUnreadCount()
     // 设置当前聊天账号
-    ChatKitClient.clearCurrentConversationId()
+    if (ChatKitClient.getCurrentConversationId() === this.conversationId) {
+      ChatKitClient.clearCurrentConversationId()
+    }
   }
 }
 

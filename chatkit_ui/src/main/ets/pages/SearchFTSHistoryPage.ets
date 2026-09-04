@@ -9,7 +9,10 @@ import { ChatKitClient, getMultiLineBody, getMultiLineTitle, IMKitConfigCenter, 
 import { ChatBaseViewModel } from '../viewmodel/ChatBaseViewModel';
 import { AvatarColorUntil, AvatarItem, CommonAvatar, CommonEmptyResult, CommonTextInput, NavigationBackBuilder, NECommonUtils, TailString } from '@nimkit/common';
 import { EmojiParseType, NEEmojiManager, NEEmojiParseResult, NIMInputEmoticon } from '../manager/NEEmojiManager';
-import { memberHistoryMessageContent } from '../view/MessageComponentBuilder';
+import {
+  getMessageBackgroundColor,
+  memberHistoryMessageContent
+} from '../view/MessageComponentBuilder';
 import { DateUtil } from '@nimkit/common';
 import { SearchFTSHistoryViewModel } from '../viewmodel/SearchFTSHistoryViewModel';
 import { V2NIMConversationType, V2NIMMessageType } from '@nimsdk/base';
@@ -295,7 +298,8 @@ export struct SearchFTSHistoryPage {
                           message: new NIMMessageInfo(item.message),
                           onMessageClick: undefined
                         })
-                          .backgroundColor($r('app.color.color_chat_receive_message_bg'))
+                          .backgroundColor(getMessageBackgroundColor(new NIMMessageInfo(item.message),
+                            $r('app.color.color_chat_receive_message_bg')))
                           .borderRadius({
                             topLeft: 0,
                             topRight: 8,

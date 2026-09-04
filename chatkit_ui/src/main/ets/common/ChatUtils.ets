@@ -117,56 +117,76 @@ export function setupMoreOperationData(isP2P: boolean, isBot: boolean = false) {
 }
 
 export function getOpenFileType(fileExt: string): string {
+  const normalizedExt = fileExt.trim().toLowerCase()
+  const dotIndex = normalizedExt.lastIndexOf('.')
+  const ext = dotIndex >= 0 ? normalizedExt.substring(dotIndex + 1) : normalizedExt
 
-  if (fileExt.includes('txt')) {
+  if (ext === 'txt') {
     return 'text/plain'
-  } else if (fileExt.includes('cpp')) {
+  } else if (ext === 'cpp') {
     return 'text/x-c++src'
-  } else if (fileExt.includes('c')) {
+  } else if (ext === 'c') {
     return 'text/x-csrc'
-  } else if (fileExt.includes('h')) {
+  } else if (ext === 'h') {
     return 'text/x-chdr'
-  } else if (fileExt.includes('java')) {
+  } else if (ext === 'java') {
     return 'text/x-java'
-  } else if (fileExt.includes('xhtml')) {
+  } else if (ext === 'xhtml') {
     return 'application/xhtml+xml'
-  } else if (fileExt.includes('xml')) {
+  } else if (ext === 'xml') {
     return 'text/xml'
-  } else if (fileExt.includes('html') || fileExt.includes('htm')) {
+  } else if (ext === 'html' || ext === 'htm') {
     return 'text/html'
-  } else if (fileExt.includes('pdf')) {
+  } else if (ext === 'pdf') {
     return 'application/pdf'
-  } else if (fileExt.includes('jpg')) {
+  } else if (ext === 'jpg' || ext === 'jpeg') {
     return 'image/jpeg'
-  } else if (fileExt.includes('png')) {
+  } else if (ext === 'png') {
     return 'image/png'
-  } else if (fileExt.includes('gif')) {
+  } else if (ext === 'gif') {
     return 'image/gif'
-  } else if (fileExt.includes('webp')) {
+  } else if (ext === 'webp') {
     return 'image/webp'
-  } else if (fileExt.includes('bmp')) {
+  } else if (ext === 'bmp') {
     return 'image/bmp'
-  } else if (fileExt.includes('svg')) {
+  } else if (ext === 'svg') {
     return 'image/svg+xml'
-  } else if (fileExt.includes('m4a')) {
+  } else if (ext === 'heic' || ext === 'heif') {
+    return 'image/heic'
+  } else if (ext === 'm4a') {
     return 'audio/mp4a-latm'
-  } else if (fileExt.includes('mp3')) {
+  } else if (ext === 'mp3') {
     return 'audio/mpeg'
-  } else if (fileExt.includes('aac')) {
+  } else if (ext === 'aac') {
     return 'audio/aac'
-  } else if (fileExt.includes('ogg')) {
+  } else if (ext === 'ogg') {
     return 'audio/ogg'
-  } else if (fileExt.includes('wav')) {
+  } else if (ext === 'wav') {
     return 'audio/x-wav'
-  } else if (fileExt.includes('mp4')) {
+  } else if (ext === 'mp4') {
     return 'video/mp4'
-  } else if (fileExt.includes('mkv')) {
+  } else if (ext === 'mkv') {
     return 'video/x-matroska'
-  } else if (fileExt.includes('ts')) {
+  } else if (ext === 'mov') {
+    return 'video/quicktime'
+  } else if (ext === 'avi') {
+    return 'video/x-msvideo'
+  } else if (ext === 'ts') {
     return 'video/mp2ts'
+  } else if (ext === 'doc') {
+    return 'application/msword'
+  } else if (ext === 'docx') {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  } else if (ext === 'xls') {
+    return 'application/vnd.ms-excel'
+  } else if (ext === 'xlsx') {
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  } else if (ext === 'ppt') {
+    return 'application/vnd.ms-powerpoint'
+  } else if (ext === 'pptx') {
+    return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
   }
-
-  return ' '
+  return 'application/octet-stream'
 }
 
 export function sliceContent(content: string | undefined, maxsize: number, isCenter: boolean): string {

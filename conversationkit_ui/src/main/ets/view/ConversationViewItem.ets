@@ -14,6 +14,7 @@ import { ConversationItem } from '../strategy/ConversationStrategy';
 @ComponentV2
 export struct ConversationViewItem {
   @Param conversationInfo: ConversationItem | null = null
+  @Param avatarName: string = ''
   @Param haveBeanAit: boolean = false
   @Param isUserAIBot: boolean = false
   @Param isAIUser: boolean = false
@@ -29,7 +30,7 @@ export struct ConversationViewItem {
         }) {
           CommonAvatar({
             item: new AvatarItem(this.conversationInfo.avatar,
-              this.getAvatarShowName(this.conversationInfo.name ?? ''),
+              this.getAvatarShowName(this.avatarName || this.conversationInfo.name || ''),
               AvatarColorUntil.getBackgroundColorById(
                 ChatKitClient.nim.conversationIdUtil
                   .parseConversationTargetId(this.conversationInfo.conversationId)
@@ -39,21 +40,34 @@ export struct ConversationViewItem {
           //未读数显示
           RelativeContainer() {
             //未读数显示
-            if (this.conversationInfo.mute !== true && this.conversationInfo.unreadCount > 0) {
-              Text(this.getUnreadCountStr(this.conversationInfo.unreadCount))
-                .fontSize(12)
-                .fontColor('#ffFFFFFF')
-                .textAlign(TextAlign.Center)
-                .backgroundColor('#ffF24957')
-                .alignRules({
-                  'top': { 'anchor': '__container__', 'align': VerticalAlign.Top },
-                  'right': { 'anchor': '__container__', 'align': HorizontalAlign.End }
-                })
-                .borderRadius(20)
-                .height(18)
-                .width(18 +
-                  (this.getUnreadCountStr(this.conversationInfo.unreadCount).length - 1) * 4)
-                .offset({ x: 1, y: 1 })
+            if (this.conversationInfo.unreadCount > 0) {
+              if (this.conversationInfo.mute === true) {
+                Column()
+                  .width(8)
+                  .height(8)
+                  .borderRadius(4)
+                  .backgroundColor('#ffF24957')
+                  .alignRules({
+                    'top': { 'anchor': '__container__', 'align': VerticalAlign.Top },
+                    'right': { 'anchor': '__container__', 'align': HorizontalAlign.End }
+                  })
+                  .offset({ x: 1, y: 1 })
+              } else {
+                Text(this.getUnreadCountStr(this.conversationInfo.unreadCount))
+                  .fontSize(12)
+                  .fontColor('#ffFFFFFF')
+                  .textAlign(TextAlign.Center)
+                  .backgroundColor('#ffF24957')
+                  .alignRules({
+                    'top': { 'anchor': '__container__', 'align': VerticalAlign.Top },
+                    'right': { 'anchor': '__container__', 'align': HorizontalAlign.End }
+                  })
+                  .borderRadius(20)
+                  .height(18)
+                  .width(18 +
+                    (this.getUnreadCountStr(this.conversationInfo.unreadCount).length - 1) * 4)
+                  .offset({ x: 1, y: 1 })
+              }
             }
             //在线状态
             if (this.conversationInfo.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P &&

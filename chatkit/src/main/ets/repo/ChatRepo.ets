@@ -6,6 +6,7 @@
  */
 
 import {
+  NIMEStrAnyObj,
   V2NIMAddCollectionParams,
   V2NIMCollection,
   V2NIMCollectionOption,
@@ -18,6 +19,8 @@ import {
   V2NIMMessageListResult,
   V2NIMMessagePin,
   V2NIMMessagePinNotification,
+  V2NIMMessageQuickComment,
+  V2NIMMessageQuickCommentNotification,
   V2NIMMessageRefer,
   V2NIMMessageRevokeNotification,
   V2NIMMessageRevokeParams,
@@ -435,6 +438,51 @@ export class ChatRepo {
   }
 
   /**
+   * 添加一个快捷回复
+   * @param message
+   * @param index
+   * @returns
+   */
+  static async addQuickComment(message: V2NIMMessage, index: number): Promise<void> {
+    return await ChatKitClient.nim.messageService?.addQuickComment(message, index)
+  }
+
+  /**
+   * 删除一个快捷回复
+   * @param messageRefer
+   * @param index
+   * @returns
+   */
+  static async removeQuickComment(messageRefer: V2NIMMessageRefer, index: number): Promise<void> {
+    return await ChatKitClient.nim.messageService?.removeQuickComment(messageRefer, index)
+  }
+
+  /**
+   * 获取快捷回复列表
+   * @param messages
+   * @returns
+   */
+  static async getQuickCommentList(messages: V2NIMMessage[]): Promise<NIMEStrAnyObj | undefined> {
+    return await ChatKitClient.nim.messageService?.getQuickCommentList(messages)
+  }
+
+  /**
+   * 监听快捷回复
+   * @param listener
+   */
+  static onMessageQuickCommentNotification(listener: (notification: V2NIMMessageQuickCommentNotification) => void): void {
+    ChatKitClient.nim.messageService?.on('onMessageQuickCommentNotification', listener)
+  }
+
+  /**
+   * 取消监听快捷回复
+   * @param listener
+   */
+  static offMessageQuickCommentNotification(listener: (notification: V2NIMMessageQuickCommentNotification) => void): void {
+    ChatKitClient.nim.messageService?.off('onMessageQuickCommentNotification', listener)
+  }
+
+  /**
    * 添加一个收藏
    *
    * @param params 添加收藏的相关参数
@@ -560,8 +608,6 @@ export class ChatRepo {
 
   /**
    * 构造转发消息，消息内容与原消息一样
-   *
-   * https://overmind.hz.netease.com/206/requirement/issues/OMIM-50521
    *
    * 其它端怕抛 error 导致应用崩溃，所以这里不抛 error，而是返回 null
    *

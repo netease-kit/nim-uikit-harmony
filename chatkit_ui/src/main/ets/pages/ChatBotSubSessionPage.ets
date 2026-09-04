@@ -76,6 +76,11 @@ import {
   getTranslationOperateMenu,
   setupMoreOperationData
 } from '../common/ChatUtils';
+import {
+  canShowMessageReaction,
+  computeReactionMenuY,
+  shouldEnableReactionForSelection
+} from '../utils/MessageReactionUtils';
 import { ChatMultiSelectView } from '../view/ChatMultiSelectView';
 import { TextMessageDetailDialog } from '../view/TextMessageDetailDialog';
 import { ChatKitUIClient } from '../ChatKitUIClient';
@@ -291,6 +296,18 @@ export struct ChatBotSubSessionPage {
   // 多行输入面板组件实例引用
   multiLineInputViewInstance?: MultiLineInputView = undefined
   @Local operationRect: NERectData = new NERectData()
+  private reactionAnchorTop: number = 0
+  private reactionAnchorBottom: number = 0
+  private reactionMenuItemCount: number = 0
+  private reactionMenuPreferAbove: boolean = true
+  @Local private reactionMenuExpanded: boolean = false
+
+  @Monitor('showOperationView')
+  onOperationViewVisibilityChange(): void {
+    if (!this.showOperationView) {
+      this.reactionMenuExpanded = false
+    }
+  }
   screenHeight: number = 0;
   screenWidth: number = 0;
   keyboardHeight: number = 0
@@ -559,11 +576,18 @@ export struct ChatBotSubSessionPage {
 
   @Monitor("chatViewModel.needScrollToBottom")
   onNeedScrollToBottom() {
-    if (this.chatViewModel.needScrollToBottom &&
-      this.listScrollEndPosition >= this.chatUserInfo.msgList.totalCount() - 1) {
-      this.listScroller.scrollEdge(Edge.Bottom)
-      this.chatViewModel.needScrollToBottom = false;
+    if (!this.chatViewModel.needScrollToBottom) {
+      return
     }
+    if (this.chatViewModel.hasNew) {
+      // 锚点消息窗口内不消费异步 Reaction 的滚底请求
+      this.chatViewModel.needScrollToBottom = false
+      return
+    }
+    if (this.listScrollEndPosition >= this.chatUserInfo.msgList.totalCount() - 1) {
+      this.listScroller.scrollEdge(Edge.Bottom)
+    }
+    this.chatViewModel.needScrollToBottom = false;
   }
 
   @Monitor("chatViewModel.anchorMsg")
@@ -916,8 +940,16 @@ export struct ChatBotSubSessionPage {
     this.aiSearchSelectionState.selectedText()
     this.operationMenuItems = this.getSelectionOperationMenuItems()
     const itemCount = this.operationMenuItems.length
-    const opMenuWidth = computeOperateViewWidthByCount(itemCount)
-    const opMenuHeight = computeOperateViewHeightByCount(itemCount)
+    const showReaction = this.operationMsg !== undefined &&
+      this.chatViewModel.isMessageReactionEnabled() &&
+      shouldEnableReactionForSelection(this.aiSearchSelectionState.active,
+        this.aiSearchSelectionState.isAllSelected(), this.translationOperationMode) &&
+      canShowMessageReaction(this.operationMsg.message, this.operationMsg.isRevokeMsg)
+    if (!showReaction) {
+      this.reactionMenuExpanded = false
+    }
+    const opMenuWidth = showReaction ? 320 : computeOperateViewWidthByCount(itemCount)
+    const opMenuHeight = computeOperateViewHeightByCount(itemCount) + (showReaction ? 51 : 0)
     this.operationRect.x = this.aiSearchSelectionState.rectX +
       (this.aiSearchSelectionState.rectWidth - opMenuWidth) / 2
     if (this.operationRect.x < this.operationViewMargin) {
@@ -926,12 +958,29 @@ export struct ChatBotSubSessionPage {
     if (this.operationRect.x + opMenuWidth + this.operationViewMargin > this.screenWidth) {
       this.operationRect.x = this.screenWidth - opMenuWidth - this.operationViewMargin
     }
-    this.operationRect.y = this.aiSearchSelectionState.rectY - opMenuHeight - this.operationViewMargin
-    if (this.operationRect.y < 0) {
-      this.operationRect.y = this.aiSearchSelectionState.rectY + this.aiSearchSelectionState.rectHeight +
-        this.operationViewMargin
+    if (showReaction) {
+      this.reactionAnchorTop = this.aiSearchSelectionState.rectY
+      this.reactionAnchorBottom = this.aiSearchSelectionState.rectY + this.aiSearchSelectionState.rectHeight
+      this.reactionMenuItemCount = itemCount
+      this.reactionMenuPreferAbove = true
+      this.operationRect.y = computeReactionMenuY(this.reactionAnchorTop, this.reactionAnchorBottom,
+        opMenuHeight, this.scrollHeight, this.bottomHeight, this.operationViewMargin, true)
+    } else {
+      this.operationRect.y = this.aiSearchSelectionState.rectY - opMenuHeight - this.operationViewMargin
+      if (this.operationRect.y < 0) {
+        this.operationRect.y = this.aiSearchSelectionState.rectY + this.aiSearchSelectionState.rectHeight +
+          this.operationViewMargin
+      }
     }
-    this.showOperationView = itemCount > 0
+    this.showOperationView = itemCount > 0 || showReaction
+  }
+
+  private updateReactionMenuPosition(expanded: boolean): void {
+    this.reactionMenuExpanded = expanded
+    const operationHeight = computeOperateViewHeightByCount(this.reactionMenuItemCount)
+    const menuHeight = expanded ? Math.max(operationHeight, 251) : operationHeight + 51
+    this.operationRect.y = computeReactionMenuY(this.reactionAnchorTop, this.reactionAnchorBottom,
+      menuHeight, this.scrollHeight, this.bottomHeight, this.operationViewMargin, this.reactionMenuPreferAbove)
   }
 
   private closeAISearchSelection(): void {
@@ -996,6 +1045,7 @@ export struct ChatBotSubSessionPage {
 
   private showOperationMenu(event: GestureEvent, msg: NIMMessageInfo | undefined,
     operationItems?: Array<MessageOperationItem>, selectedText: string = ''): void {
+    this.reactionMenuExpanded = false
     if (selectedText.length === 0) {
       this.closeAISearchSelection()
     }
@@ -1005,12 +1055,15 @@ export struct ChatBotSubSessionPage {
       this.filterSubSessionOperationItems(getOperateMenu(msg))
     this.selectedOperationText = selectedText
     const itemCount = this.operationMenuItems.length
-    if (itemCount <= 0) {
+    const showReaction = selectedText.length === 0 && msg !== undefined &&
+      this.chatViewModel.isMessageReactionEnabled() &&
+      canShowMessageReaction(msg.message, msg.isRevokeMsg)
+    if (itemCount <= 0 && !showReaction) {
       this.showOperationView = false
       return
     }
-    let opMenuWidth = computeOperateViewWidthByCount(itemCount)
-    let opMenuHeight = computeOperateViewHeightByCount(itemCount)
+    let opMenuWidth = showReaction ? 320 : computeOperateViewWidthByCount(itemCount)
+    let opMenuHeight = computeOperateViewHeightByCount(itemCount) + (showReaction ? 51 : 0)
     let marginSize = this.operationViewMargin
     if (event.target.area.position.x !== undefined) {
       let xPoint = Number(event.target.area.globalPosition.x) +
@@ -1024,19 +1077,25 @@ export struct ChatBotSubSessionPage {
       this.operationRect.x = xPoint;
     }
     if (event.target.area.position.y !== undefined) {
-      let yPoint =
-        Number(event.target.area.globalPosition.y) - this.navBarHeight +
-        Number(event.target.area.height)
-      if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
-        yPoint =
-          yPoint - opMenuHeight - marginSize * 2 - Number(event.target.area.height);
+      this.reactionAnchorTop = Number(event.target.area.globalPosition.y) - this.navBarHeight
+      this.reactionAnchorBottom = this.reactionAnchorTop + Number(event.target.area.height)
+      this.reactionMenuItemCount = itemCount
+      if (showReaction) {
+        this.reactionMenuPreferAbove = true
+        this.operationRect.y = computeReactionMenuY(this.reactionAnchorTop, this.reactionAnchorBottom,
+          opMenuHeight, this.scrollHeight, this.bottomHeight, marginSize, true)
+      } else {
+        let yPoint = this.reactionAnchorBottom
+        if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
+          yPoint = this.reactionAnchorTop - opMenuHeight - marginSize
+        }
+        if (yPoint < 0) {
+          yPoint = this.scrollHeight / 2
+        }
+        this.operationRect.y = yPoint
       }
-      if (yPoint < 0) {
-        yPoint = this.scrollHeight / 2;
-      }
-      this.operationRect.y = yPoint
     }
-    this.showOperationView = itemCount > 0
+    this.showOperationView = itemCount > 0 || showReaction
   }
 
   private updateTextSelection(msg: NIMMessageInfo | undefined, text: string, start: number, end: number,
@@ -1337,6 +1396,10 @@ export struct ChatBotSubSessionPage {
                   showSelect: this.showMultiSelect,
                   aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
                   aiSearchSelectingTranslation: this.translationOperationMode,
+                  enableReaction: this.chatViewModel.isMessageReactionEnabled(),
+                  onReactionClick: async (message: NIMMessageInfo, index: number): Promise<boolean> => {
+                    return await this.chatViewModel.toggleQuickComment(message, index)
+                  },
                   onMessageClick: {
                     onAvatarClick: ((msg: NIMMessageInfo | undefined) => {
                       if (this.showMultiSelect) {
@@ -1916,6 +1979,9 @@ export struct ChatBotSubSessionPage {
                 })
             } else if (this.inputStyle === InputStyleType.Emoji) {
               NEChatEmojiView({
+                onStickerClick: (sticker) => {
+                  this.chatViewModel.sendImageResourceMessage(sticker.image, sticker.fileName)
+                },
                 onDidClick: (emoji) => {
                   if (emoji.type === NIMEmoticonType.file) {
                     this.controller.addImageSpan($rawfile(`emoji/${emoji.file}`), { imageStyle: { size: [16, 16] } })
@@ -2121,6 +2187,21 @@ export struct ChatBotSubSessionPage {
             MessageOperationView({
               operateMsg: this.operationMsg,
               operationItems: this.operationMenuItems,
+              enableReaction: this.chatViewModel.isMessageReactionEnabled() &&
+                shouldEnableReactionForSelection(this.aiSearchSelectionState.active,
+                this.aiSearchSelectionState.isAllSelected(), this.translationOperationMode),
+              reactionExpanded: this.reactionMenuExpanded,
+              onReactionExpandedChange: (expanded: boolean): void => {
+                this.updateReactionMenuPosition(expanded)
+              },
+              didClickReaction: (index: number): void => {
+                this.showOperationView = false
+                this.reactionMenuExpanded = false
+                this.closeAISearchSelection()
+                if (this.operationMsg !== undefined) {
+                  this.chatViewModel.toggleQuickComment(this.operationMsg, index)
+                }
+              },
               didClickItem: (item: MessageOperationItem) => {
                 this.showOperationView = false
                 if (this.operationMsg == undefined) {

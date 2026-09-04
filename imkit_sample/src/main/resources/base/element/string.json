@@ -337,6 +337,14 @@
       "value": "换行消息"
     },
     {
+      "name": "mine_setting_reaction",
+      "value": "消息表情快捷回复"
+    },
+    {
+      "name": "mine_setting_last_read_position",
+      "value": "上次阅读消息提示"
+    },
+    {
       "name": "mine_setting_team_enable",
       "value": "群聊功能"
     },

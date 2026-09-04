@@ -256,7 +256,7 @@ export struct BindBotPage {
                 CommonAvatar({
                   item: new AvatarItem(
                     bot.icon,
-                    TailString(bot.name ?? bot.accid),
+                    TailString(bot.name || bot.accid),
                     AvatarColorUntil.getBackgroundColorById(bot.accid)
                   ),
                   roundRadius: 18,

@@ -11,8 +11,7 @@ import {
   AvatarItem,
   CommonAvatar,
   NavigationBackBuilder,
-  StringIsEmpty,
-  TailString
+  StringIsEmpty
 } from '@nimkit/common';
 import { EditType, PersonInfoArrowItem, PersonInfoItem, PersonInfoSwitchItem } from '../model/MineInfoItem';
 import { PersonInfoViewModel } from '../viewmodel/PersonInfoViewModel';
@@ -150,7 +149,7 @@ export struct AIPersonInfoPage {
         Row() {
           CommonAvatar({
             item: new AvatarItem(this.viewModel.userWithFriend?.user?.avatar,
-              (this.alias?.length ?? 0) > 0 ? TailString(this.alias) : this.viewModel.userWithFriend?.shortName(),
+              this.viewModel.userWithFriend?.getAvatarName(),
               AvatarColorUntil.getBackgroundColorById(this.viewModel.accountId)),
             roundRadius: 30,
             textSize: 22

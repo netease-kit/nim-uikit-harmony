@@ -78,7 +78,7 @@ export class SearchFTSHistory implements SearchFTSHistoryAbs {
     }
     // 最后使用 user
     if (this.user) {
-      let avatarName = this.user.name ?? this.user.accountId
+      let avatarName = this.user.name || this.user.accountId
       return avatarName.length > 2 ? avatarName.substring(avatarName.length - 2, avatarName.length) : avatarName
     }
     return ''

@@ -59,7 +59,7 @@ export class SearchDateMessage implements SearchFTSHistoryAbs {
       return this.teamMember.getAvatarName()
     }
     if (this.user) {
-      avatarName = this.user.name ?? this.user.accountId
+      avatarName = this.user.name || this.user.accountId
     }
     return avatarName.length > 2 ? avatarName.substring(avatarName.length - 2, avatarName.length) : avatarName
   }

@@ -171,12 +171,13 @@ struct FileMessageItemWithSender {
         if (friendUserInfo) {
           // 从好友缓存获取
           avatarUrl = friendUserInfo.user?.avatar
-          avatarName = friendUserInfo.shortName() ?? ''
+          avatarName = friendUserInfo.getAvatarName()
           nick = friendUserInfo.showName() ?? senderId ?? ''
         } else if (this.userInfo) {
           // 从传入的用户信息获取
           avatarUrl = this.userInfo.avatar
-          avatarName = this.userInfo.name?.substring(Math.max(0, (this.userInfo.name?.length ?? 0) - 2)) ?? ''
+          const userName = this.userInfo.name ?? senderId ?? ''
+          avatarName = userName.substring(Math.max(0, userName.length - 2))
           nick = this.userInfo.name ?? senderId ?? ''
         } else {
           // 兜底：使用 accountId

@@ -132,7 +132,7 @@ export struct BotInfoPage {
             CommonAvatar({
               item: new AvatarItem(
                 this.viewModel.bot?.icon,
-                TailString(this.viewModel.bot?.name ?? this.viewModel.accid),
+                TailString(this.viewModel.bot?.name || this.viewModel.accid),
                 AvatarColorUntil.getBackgroundColorById(this.viewModel.accid)
               ),
               roundRadius: 20,

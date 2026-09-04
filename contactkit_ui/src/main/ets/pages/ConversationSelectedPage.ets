@@ -51,7 +51,7 @@ export struct ConversationSelectedPage {
                   Column() {
                     Row() {
                       CommonAvatar({
-                        item: new AvatarItem(item.avatar, TailString(item.name),
+                        item: new AvatarItem(item.avatar, TailString(item.avatarName ?? item.name),
                           AvatarColorUntil.getBackgroundColorById(item.conversationId ?? ""))
                       })
                         .width(42)

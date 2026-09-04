@@ -12,10 +12,15 @@ import {
   CommonAvatar,
   CommonEmptyResult,
   CommonTextInput,
+  MatchSearchText,
   NavigationBackBuilder,
   NECommonUtils
 } from '@nimkit/common'
-import { TeamMemberWithUser } from '@nimkit/chatkit'
+import {
+  resolveTeamMemberSearchTextPresentation,
+  SearchTextPresentation,
+  TeamMemberWithUser
+} from '@nimkit/chatkit'
 import { TeamMemberSelectorViewModel } from '../viewModel/TeamMemberSelectorViewModel'
 import { ManagerSelectorParams } from '@nimkit/chatkit'
 
@@ -34,7 +39,6 @@ struct TeamMemberSelectorPage {
     if (keyword.length > 0) {
       this.viewModel.searchTeamMembers(keyword)
     }
-    this.viewModel.clearSelectedMembers()
   }
 
   // 搜索文本变化 - 实时搜索
@@ -45,7 +49,6 @@ struct TeamMemberSelectorPage {
     } else {
       this.viewModel.searchTeamMembers(keyword)
     }
-    this.viewModel.clearSelectedMembers()
   }
 
   build() {
@@ -69,7 +72,7 @@ struct TeamMemberSelectorPage {
         // 搜索框
         CommonTextInput({
           placeHolderText: $r('app.string.team_member_search_placeholder'),
-          onSubmit: this.onSearchSubmit.bind(this),
+          onSubmit: this.onSearchSubmit,
           onTextChange: this.onSearchTextChange,
           keepEditableState: false
         })
@@ -79,14 +82,23 @@ struct TeamMemberSelectorPage {
           })
 
         if (this.viewModel.getDisplayList().length <= 0 && !this.viewModel.isSearching) {
-          CommonEmptyResult({
-            tips: this.viewModel.searchKeyword.length > 0 ?
-              $r('app.string.team_member_search_empty_tip') :
-              $r('app.string.team_add_manager_empty_tip')
-          })
-            .margin({
-              top: 56 + 74,
+          if (!this.viewModel.searchLoadFailed) {
+            CommonEmptyResult({
+              tips: this.viewModel.searchKeyword.length > 0 ?
+                $r('app.string.team_member_search_empty_tip') :
+                $r('app.string.team_add_manager_empty_tip')
             })
+              .margin({
+                top: 56 + 74,
+              })
+          }
+        }
+
+        if (this.viewModel.isSearching) {
+          LoadingProgress()
+            .width(24)
+            .height(24)
+            .margin({ top: 56 })
         }
 
         List() {
@@ -115,12 +127,10 @@ struct TeamMemberSelectorPage {
                     right: 14
                   })
 
-                Text(member.getNickname())
-                  .fontColor('#ff333333')
-                  .fontSize(16)
-                  .layoutWeight(1)
-                  .maxLines(1)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                this.searchResultTextBuilder(
+                  member.getNickname(),
+                  resolveTeamMemberSearchTextPresentation(member, this.viewModel.searchKeyword)
+                )
 
               }
               .padding({
@@ -133,7 +143,7 @@ struct TeamMemberSelectorPage {
                 this.viewModel.onMemberItemClick(member.getAccId())
               })
             }
-          }, (member: TeamMemberWithUser) => member.getAccId())
+          }, (member: TeamMemberWithUser) => this.viewModel.getMemberRenderKey(member))
 
           ListItem() {
             Column() {
@@ -187,6 +197,37 @@ struct TeamMemberSelectorPage {
       let selectIds: string[] = Array.from(this.viewModel.selectedMembers)
       this.pathStack.pop(selectIds)
     }
+  }
+
+  @Builder
+  searchResultTextBuilder(primaryText: string, presentation: SearchTextPresentation) {
+    Column() {
+      if (presentation.primaryMatched) {
+        MatchSearchText({
+          allText: primaryText,
+          searchText: this.viewModel.searchKeyword.trim(),
+          fontSize: 16
+        })
+      } else {
+        Text(primaryText)
+          .fontColor('#ff333333')
+          .fontSize(16)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+
+      if (presentation.secondaryText.length > 0) {
+        MatchSearchText({
+          allText: presentation.secondaryText,
+          searchText: this.viewModel.searchKeyword.trim(),
+          fontSize: 13,
+          normalFontColor: '#999999',
+          highlightFontColor: '#337EFF'
+        })
+      }
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Start)
   }
 
   aboutToDisappear(): void {

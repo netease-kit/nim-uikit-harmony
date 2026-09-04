@@ -33,6 +33,7 @@ import {
   V2NIMMessageAIStatus,
   V2NIMMessageAIStreamStatus,
   V2NIMMessagePin,
+  V2NIMMessageQuickComment,
   V2NIMMessageSendingState
 } from '@nimsdk/base'
 import { ChatKitConfig } from '../ChatKitConfig'
@@ -120,6 +121,7 @@ export class NIMMessageInfo {
   isServerAntiSpam: boolean = false
   // 是否为 anchor 高亮消息（用于跳转定位时的高亮动画）
   @Trace isAnchorHighlight: boolean = false
+  @Trace quickComments: V2NIMMessageQuickComment[] = []
   // 缓存的缩略图 PixelMap（用于图片预览时作为占位图，避免网络不可用时预览黑屏）
   cachedThumbPixelMap: image.PixelMap | undefined = undefined
   // 语音转文字结果（运行时数据，不持久化）
@@ -264,6 +266,11 @@ export class NIMMessageInfo {
 
   setSelected(isSelected: boolean) {
     this.isSelectedMsg = isSelected
+  }
+
+  setQuickComments(comments: V2NIMMessageQuickComment[]): void {
+    this.quickComments = comments
+    this.messageHeight = -1
   }
 
   getMessageHeight(context: UIContext): number {

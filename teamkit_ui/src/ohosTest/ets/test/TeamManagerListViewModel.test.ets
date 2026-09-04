@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from '@ohos/hypium';
-import { V2NIMTeamMemberRole } from '@nimsdk/base';
+import { V2NIMTeamMember, V2NIMTeamMemberRole } from '@nimsdk/base';
 import { TeamMemberWithUser } from '@nimkit/chatkit';
 import { TeamMangerListViewModel } from '../../../main/ets/viewModel/TeamManagerListViewModel';
 

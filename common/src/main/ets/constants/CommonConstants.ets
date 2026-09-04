@@ -119,6 +119,10 @@ export class CommonConstants {
    * 消息已读未读开关 存储 key
    */
   static readonly KEY_SETTING_READ_MESSAGE: string = 'KEY_SETTING_READ_MESSAGE';
+  /** 消息表情快捷回复开关存储 key */
+  static readonly KEY_SETTING_REACTION_ENABLE: string = 'KEY_SETTING_REACTION_ENABLE';
+  /** 上次阅读消息提示开关存储 key */
+  static readonly KEY_SETTING_LAST_READ_POSITION_ENABLE: string = 'KEY_SETTING_LAST_READ_POSITION_ENABLE';
   /**
    * 推送配置开关 存储 key
    */

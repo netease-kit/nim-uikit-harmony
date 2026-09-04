@@ -113,7 +113,7 @@ function TeamVerifyItemBuilder($$: TeamVerifyItemBuilderParams) {
       Stack({ alignContent: Alignment.TopEnd }) {
         CommonAvatar({
           item: new AvatarItem($$.bean.operatorUser?.user?.avatar,
-            $$.bean.operatorUser?.shortName() ?? '',
+            $$.bean.operatorUser?.getAvatarName() ?? '',
             AvatarColorUntil.getBackgroundColorById($$.bean.actionInfo.operatorAccountId ?? ''))
         })
           .width(36)

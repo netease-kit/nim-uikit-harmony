@@ -211,7 +211,7 @@ export struct ContactPage {
                   LazyForEach(item.contacts, (item: NEUserWithFriend, index) => {
                     ListItem() {
                       ViewItemBuilder({
-                        avatarItem: new AvatarItem(item.user?.avatar, item.shortName(),
+                        avatarItem: new AvatarItem(item.user?.avatar, item.getAvatarName(),
                           AvatarColorUntil.getBackgroundColorById(item.user?.accountId ?? '')),
                         title: item.showName(),
                         itemHeight: 60,

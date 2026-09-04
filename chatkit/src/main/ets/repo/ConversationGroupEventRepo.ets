@@ -8,7 +8,8 @@
 import {
   V2NIMConversation,
   V2NIMConversationFilter,
-  V2NIMConversationGroup
+  V2NIMConversationGroup,
+  V2NIMLocalConversationFilter
 } from '@nimsdk/base'
 import { ChatKitClient } from '../ChatKitClient'
 import { EventDisposer } from '../utils/DisposableBag'
@@ -87,6 +88,21 @@ export class ConversationGroupEventRepo {
         service?.on('onUnreadCountChangedByFilter', listener)
       },
       (listener: (filter: V2NIMConversationFilter, unreadCount: number) => void): void => {
+        service?.off('onUnreadCountChangedByFilter', listener)
+      },
+      callback
+    )
+  }
+
+  static onLocalUnreadCountChangedByFilter(
+    callback: (filter: V2NIMLocalConversationFilter, unreadCount: number) => void
+  ): ConversationGroupEventDisposer {
+    const service = ChatKitClient.nim.localConversationService
+    return createEventListenerHandle(
+      (listener: (filter: V2NIMLocalConversationFilter, unreadCount: number) => void): void => {
+        service?.on('onUnreadCountChangedByFilter', listener)
+      },
+      (listener: (filter: V2NIMLocalConversationFilter, unreadCount: number) => void): void => {
         service?.off('onUnreadCountChangedByFilter', listener)
       },
       callback

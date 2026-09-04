@@ -78,8 +78,11 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
   dialogToExit?: () => void
   private needUserMessageList: NIMMessageInfo[] = []
   private eventDisposers: DisposableBag = new DisposableBag()
-  //拉取全量成员的阈值
-  private static allMemberLimit = 500
+  private teamSessionId: number = 0
+
+  supportsMessageReaction(): boolean {
+    return true
+  }
 
   /**
    * 是否展示禁言模式
@@ -102,6 +105,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
 
   //初始化，获取会话ID和页面UI需要群相关信息ChatTeamInfo
   init(conversationId: string, chatInfo: ChatTeamInfo): void {
+    this.teamSessionId += 1
     super.init(conversationId, chatInfo);
     this.chatTeamInfo = chatInfo;
     ChatRepo.onDeleteMessage(this.onTopMessageDeleteFun)
@@ -126,9 +130,6 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
     let teamMemberCache = TeamMemberCache.getInstance()
     let teamId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversationId)
     teamMemberCache.intTeamInfo(teamId, chatInfo.team)
-    if (chatInfo.team && chatInfo.team.memberCount < ChatTeamViewModel.allMemberLimit) {
-      teamMemberCache.loadAllTeamMember()
-    }
   }
 
   onFriendInfoChangedFun = (friendInfo: V2NIMFriend) => {
@@ -190,12 +191,17 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
       }
     }
   }
-  onTeamJoinedFun = (team: V2NIMTeam) => {
+  onTeamJoinedFun = async (team: V2NIMTeam): Promise<void> => {
     if (team.teamId === this.targetId) {
+      const currentTeamSessionId = this.teamSessionId
       ChatKitClient.selfLeaveTeam = false
       this.shouldShowTeamExitWarning = false
       this.chatTeamInfo?.setTeam(team)
-      this.getTeamMemberListInfo([ChatKitClient.getLoginUserId()])
+      await this.getTeamMemberListInfo([ChatKitClient.getLoginUserId()])
+      // 成员信息同步完成后再刷新历史标记状态
+      if (currentTeamSessionId === this.teamSessionId) {
+        this.getPinList()
+      }
     }
   }
   onTeamMemberJoinedFun = (teamMembers: V2NIMTeamMember[]) => {
@@ -383,16 +389,24 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
 
   //获取群信息
   async getTeamInfo(): Promise<V2NIMTeam | undefined> {
+    const currentTeamSessionId = this.teamSessionId
     let teamId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(this.conversationId);
     let teamInfo = await TeamRepo.getTeamInfo(teamId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL);
     ChatKitClient.selfLeaveTeam = false
     const invalidTeamResolution = await this.resolveInvalidTeam(teamId, teamInfo)
+    if (currentTeamSessionId !== this.teamSessionId) {
+      return undefined
+    }
     teamInfo = invalidTeamResolution.teamInfo
     this.shouldShowTeamExitWarning = invalidTeamResolution.shouldShowExitWarning
     if (!invalidTeamResolution.shouldShowExitWarning && teamInfo) {
       this.getTeamMemberListInfo([ChatKitClient.getLoginUserId()])
     }
     this.chatTeamInfo?.setTeam(teamInfo)
+    if (teamInfo && currentTeamSessionId === this.teamSessionId) {
+      const teamMemberCache = TeamMemberCache.getInstance()
+      teamMemberCache.intTeamInfo(teamId, teamInfo)
+    }
     if (!IMKitConfigCenter.enableTopMessage) {
       this.topMessage = undefined
     } else if (teamInfo?.serverExtension) {
@@ -441,8 +455,10 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
   }
 
   //获取群信息和群成员信息，包括群成员信息、用户信息
-  getTeamMemberListInfo(accountList: string[]) {
-    TeamRepo.getTeamMemberListByIds(this.targetId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, accountList)
+  async getTeamMemberListInfo(accountList: string[]): Promise<void> {
+    const teamMemberPromise = TeamRepo.getTeamMemberListByIds(
+      this.targetId, V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL, accountList
+    )
       .then((teamMemberList: V2NIMTeamMember[]) => {
         this.chatTeamInfo?.addTeamMember(teamMemberList)
         this.updateTopPermission()
@@ -450,12 +466,13 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
       .catch((error: Error) => {
         Logger.error('ChatKitUI', 'netease getTeamMemberListInfo:getUserList ', error.name)
       });
-    ContactRepo.getUserList(accountList).then((users) => {
+    const userPromise = ContactRepo.getUserList(accountList).then((users) => {
       this.chatTeamInfo?.addTeamUser(users)
 
     }).catch((error: Error) => {
       Logger.error('ChatKitUI', 'netease getTeamMemberListInfo:getUserList ', error.name)
     });
+    await Promise.all([teamMemberPromise, userPromise])
   }
 
   //获取群信息和群成员信息，包括群成员信息、用户信息
@@ -733,6 +750,7 @@ export class ChatTeamViewModel extends ChatBaseViewModel {
   }
 
   onDestroy(): void {
+    this.teamSessionId += 1
     super.onDestroy()
     ChatRepo.offDeleteMessage(this.onTopMessageDeleteFun)
     ChatRepo.offRevokeMessage(this.onTopMessageRevokeFun)

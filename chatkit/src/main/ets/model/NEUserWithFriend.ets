@@ -84,13 +84,9 @@ export class NEUserWithFriend {
    * @returns
    */
   getAvatarName(): string {
-    let avatarName = ''
-    if (this.friend && this.friend.alias &&
-      this.friend.alias.length > 0) {
-      avatarName = this.friend.alias
-    } else if (this.user && this.user.name && this.user.name.length > 0) {
-      avatarName = this.user.name
-    } else {
+    // Avatar fallback uses the user's profile name, never a local friend alias.
+    let avatarName = this.user?.name ?? ''
+    if (avatarName.length <= 0) {
       avatarName = this.getAccId()
     }
     return avatarName.length > 2 ? avatarName.substring(avatarName.length - 2, avatarName.length) : avatarName

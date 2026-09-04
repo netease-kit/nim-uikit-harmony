@@ -6,7 +6,16 @@
  */
 
 import { Logger } from '@nimkit/common';
-import { IsDiscussion, NEFriendUserCache, TeamRepo } from '@nimkit/chatkit'
+import {
+  ContactRepo,
+  containsSearchKeyword,
+  IsDiscussion,
+  matchesContactSearchKeyword,
+  NEFriendUserCache,
+  normalizeSearchKeyword,
+  TeamRepo
+} from '@nimkit/chatkit'
+import { V2NIMFriend, V2NIMUser } from '@nimsdk/base'
 import { SearchListModel } from '../model/SearchListModel'
 
 @ObservedV2
@@ -31,27 +40,44 @@ export class SearchViewModel {
    *  高级群搜索结果
    */
   @Trace seniorData: SearchListModel[] = []
+  private searchKeyword: string = ''
+  private destroyed: boolean = false
+
+  updateUserInfoFun = (_users: V2NIMUser[]): void => {
+    this.refreshFriendSearchResults()
+  }
+
+  updateFriendInfoFun = (_friend: V2NIMFriend): void => {
+    this.refreshFriendSearchResults()
+  }
+
+  removeFriendInfoFun = (_accountId: string): void => {
+    this.refreshFriendSearchResults()
+  }
+
+  blockListChangedFun = (_accountId: string): void => {
+    this.refreshFriendSearchResults()
+  }
+
+  loadFriendCacheFun = (): void => {
+    this.refreshFriendSearchResults()
+  }
 
   constructor() {
+    this.addListener()
     this.loadSearchData()
   }
 
   // 加载本地搜索需要的数据
   async loadSearchData(reloadTeamData = false) {
-    // 加载好友数据
-    const userFriends = NEFriendUserCache.getInstance().getFriendListNotInBlocklist()
-    for (const item of userFriends) {
-      if (item.user?.accountId) {
-        let model = new SearchListModel({
-          userInfo: item
-        })
-        this.friendDic.set(item.user?.accountId, model)
-      }
-    }
+    this.reloadFriendData()
 
     // 加载群聊数据
     try {
       const teams = await TeamRepo.getJoinedTeamList()
+      if (this.destroyed) {
+        return
+      }
       if (reloadTeamData) {
         this.teamDic.clear()
       }
@@ -62,6 +88,7 @@ export class SearchViewModel {
         })
         this.teamDic.set(item.teamId, model)
       }
+      this.doSearch(this.searchKeyword)
     } catch (err) {
       Logger.info('ContactKit', err)
     }
@@ -74,13 +101,13 @@ export class SearchViewModel {
     this.discussData = []
     this.seniorData = []
 
-    if (text) {
+    const keyword = normalizeSearchKeyword(text)
+    this.searchKeyword = keyword
+    if (keyword.length > 0) {
       // 搜索好友
       this.friendDic.forEach((value, key) => {
         if (value.userInfo) {
-          if (value.userInfo.showName().includes(text)) {
-            this.friendData.push(value)
-          } else if (value.userInfo.user?.accountId.includes(text)) {
+          if (matchesContactSearchKeyword(value.userInfo, keyword)) {
             this.friendData.push(value)
           }
         }
@@ -89,7 +116,7 @@ export class SearchViewModel {
       // 搜索群组
       this.teamDic.forEach((value, key) => {
         const teamName = value.team?.name
-        if (teamName?.includes(text)) {
+        if (containsSearchKeyword(teamName, keyword)) {
           if (IsDiscussion(value.team)) {
             this.discussData.push(value)
           } else {
@@ -134,5 +161,44 @@ export class SearchViewModel {
     if (searchText) {
       allText?.indexOf(searchText)
     }
+  }
+
+  onDestroy(): void {
+    this.destroyed = true
+    ContactRepo.listener.off('updateUserInfo', this.updateUserInfoFun)
+    ContactRepo.listener.off('updateFriendInfo', this.updateFriendInfoFun)
+    ContactRepo.listener.off('removeFriendInfo', this.removeFriendInfoFun)
+    ContactRepo.listener.off('addBlockAccount', this.blockListChangedFun)
+    ContactRepo.listener.off('removeBlockAccount', this.blockListChangedFun)
+    ContactRepo.listener.off('loadFriendCache', this.loadFriendCacheFun)
+  }
+
+  private addListener(): void {
+    ContactRepo.listener.on('updateUserInfo', this.updateUserInfoFun)
+    ContactRepo.listener.on('updateFriendInfo', this.updateFriendInfoFun)
+    ContactRepo.listener.on('removeFriendInfo', this.removeFriendInfoFun)
+    ContactRepo.listener.on('addBlockAccount', this.blockListChangedFun)
+    ContactRepo.listener.on('removeBlockAccount', this.blockListChangedFun)
+    ContactRepo.listener.on('loadFriendCache', this.loadFriendCacheFun)
+  }
+
+  private reloadFriendData(): void {
+    this.friendDic.clear()
+    const userFriends = NEFriendUserCache.getInstance().getFriendListNotInBlocklist()
+    userFriends.forEach((item): void => {
+      if (item.user?.accountId) {
+        this.friendDic.set(item.user.accountId, new SearchListModel({
+          userInfo: item
+        }))
+      }
+    })
+  }
+
+  private refreshFriendSearchResults(): void {
+    if (this.destroyed) {
+      return
+    }
+    this.reloadFriendData()
+    this.doSearch(this.searchKeyword)
   }
 }

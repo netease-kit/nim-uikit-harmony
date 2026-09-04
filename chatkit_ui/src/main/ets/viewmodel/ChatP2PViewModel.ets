@@ -63,6 +63,10 @@ export class ChatP2PViewModel extends ChatBaseViewModel {
   private hasCheckedAIWelcomeMessage: boolean = false
   private eventDisposers: DisposableBag = new DisposableBag()
 
+  supportsMessageReaction(): boolean {
+    return true
+  }
+
   init(conversationId: string, chatInfo: ChatUserInfo): void {
     super.init(conversationId, chatInfo)
     this.chatUserInfo = chatInfo

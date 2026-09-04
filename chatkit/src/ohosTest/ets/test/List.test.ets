@@ -17,6 +17,8 @@ import aiUserManagerTest from './AIUserManager.test';
 import loggerTest from './Logger.test';
 import subscriptionRepoTest from './SubscriptionRepo.test';
 import conversationGroupDisplayConfigStoreTest from './ConversationGroupDisplayConfigStore.test';
+import searchTextUtilsTest from './SearchTextUtils.test';
+import teamMemberCacheTest from './TeamMemberCache.test';
 
 export default function testsuite() {
   abilityTest(); localUnitTest(); deferredStartupTaskTest();
@@ -26,4 +28,6 @@ export default function testsuite() {
   multiLineTest(); eventRepoTest(); serviceRepoTest();
   aiUserManagerTest(); loggerTest(); subscriptionRepoTest();
   conversationGroupDisplayConfigStoreTest();
+  searchTextUtilsTest();
+  teamMemberCacheTest();
 }

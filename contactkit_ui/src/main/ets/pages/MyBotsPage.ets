@@ -109,7 +109,7 @@ export struct MyBotsPage {
             ForEach(this.viewModel.botList, (item: V2NIMUserAIBot) => {
               ListItem() {
                 ViewItemBuilder({
-                  avatarItem: new AvatarItem(item.icon, TailString(item.name ?? item.accid),
+                  avatarItem: new AvatarItem(item.icon, TailString(item.name || item.accid),
                     AvatarColorUntil.getBackgroundColorById(item.accid)),
                   title: item.name ?? item.accid,
                   titleIconSize: 40,

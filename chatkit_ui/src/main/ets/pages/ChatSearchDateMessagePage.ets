@@ -21,7 +21,10 @@ import { NIMMessageInfo } from '../model/NIMMessageInfo'
 import { ChatBaseViewModel } from '../viewmodel/ChatBaseViewModel'
 import { V2NIMConversationType, V2NIMMessageType } from '@nimsdk/base'
 import { DateUtil } from '@nimkit/common'
-import { memberHistoryMessageContent } from '../view/MessageComponentBuilder'
+import {
+  getMessageBackgroundColor,
+  memberHistoryMessageContent
+} from '../view/MessageComponentBuilder'
 import { ChatKitClient } from '@nimkit/chatkit'
 
 // 跳转页面入口函数
@@ -277,7 +280,8 @@ struct DateMessageItem {
               message: this.getMessageInfo()!,
               onMessageClick: undefined
             })
-              .backgroundColor($r('app.color.color_chat_receive_message_bg'))
+              .backgroundColor(getMessageBackgroundColor(this.getMessageInfo(),
+                $r('app.color.color_chat_receive_message_bg')))
               .borderRadius({
                 topLeft: 0,      // 左上角直角
                 topRight: 8,     // 右上角圆角

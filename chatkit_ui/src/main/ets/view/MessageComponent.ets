@@ -10,10 +10,22 @@ import { V2NIMConversationType, V2NIMErrorCode, V2NIMMessageSendingState, V2NIMM
 import { ChatInfo } from '../model/ChatInfo';
 import { getNotificationMessageContent, getPinMessageOperatorName, getTipsMessageContent } from '../common/MessageHelper';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
-import { messageContent } from './MessageComponentBuilder';
+import {
+  getMessageBackgroundColor as resolveMessageBackgroundColor,
+  messageContent
+} from './MessageComponentBuilder';
 import { MessageItemClick } from './MessageItemClick';
 import { ChatKitConfig } from '../ChatKitConfig';
-import { IMKitConfigCenter } from '@nimkit/chatkit';
+import { ChatKitClient, IMKitConfigCenter } from '@nimkit/chatkit';
+import { MessageReactionView } from './MessageReactionView';
+import { MessageReactionManager } from '../manager/MessageReactionManager';
+import {
+  buildReactionSummaries,
+  getSendMessageComboFlexShrink,
+  isReactionMediaMessageType,
+  ReactionSummary,
+  shouldRightAlignSendMessageContent
+} from '../utils/MessageReactionUtils';
 
 /**
  * 消息组件按照UI样式，划分为发送消息组件、接收消息组件、通知消息组件和提示消息组件
@@ -32,6 +44,10 @@ export struct MessageComponent {
   onMoreButtonClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void = undefined
   @Param
   onPinItemClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void = undefined
+  @Param
+  onReactionClick?: (msg: NIMMessageInfo, index: number) => Promise<boolean> = undefined
+  @Param
+  enableReaction: boolean = false
   @Param
   showSelect: boolean = false;
   @Param
@@ -54,7 +70,9 @@ export struct MessageComponent {
         onMessageClick: this.onMessageClick,
         showRadio: this.showSelect,
         aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
-        aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
+        aiSearchSelectingTranslation: this.aiSearchSelectingTranslation,
+        onReactionClick: this.onReactionClick,
+        enableReaction: this.enableReaction
       });
     } else {
       SenderMessageComponent({
@@ -63,7 +81,9 @@ export struct MessageComponent {
         onMessageClick: this.onMessageClick,
         showRadio: this.showSelect,
         aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
-        aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
+        aiSearchSelectingTranslation: this.aiSearchSelectingTranslation,
+        onReactionClick: this.onReactionClick,
+        enableReaction: this.enableReaction
       });
     }
   }
@@ -130,6 +150,10 @@ export struct SenderMessageComponent {
   aiSearchSelectingMessageId: string = ''
   @Param
   aiSearchSelectingTranslation: boolean = false
+  @Param
+  onReactionClick?: (msg: NIMMessageInfo, index: number) => Promise<boolean> = undefined
+  @Param
+  enableReaction: boolean = false
   @Local
   radioOn: boolean = false
   // anchor 高亮动画透明度（0 = 透明，1 = 完全显示高亮）
@@ -187,6 +211,28 @@ export struct SenderMessageComponent {
     } else {
       return $r('app.color.color_chat_page_bg')
     }
+  }
+
+  private getReactionSummaries(): ReactionSummary[] {
+    return buildReactionSummaries(this.message?.quickComments ?? [], ChatKitClient.getLoginUserId())
+      .filter((summary: ReactionSummary): boolean => MessageReactionManager.getEmoji(summary.index) !== undefined)
+  }
+
+  private shouldShowReaction(): boolean {
+    return this.enableReaction && !this.showRadio && this.getReactionSummaries().length > 0
+  }
+
+  private getMessageBackgroundColor(): ResourceColor {
+    return resolveMessageBackgroundColor(this.message, $r('app.color.color_chat_send_message_bg'),
+      this.shouldShowReaction())
+  }
+
+  private getMessageContentPadding(): Padding {
+    if (this.shouldShowReaction() && this.message !== undefined &&
+      isReactionMediaMessageType(this.message.getMessageType())) {
+      return { left: 4, top: 4, right: 4, bottom: 0 }
+    }
+    return { left: 0, top: 0, right: 0, bottom: 0 }
   }
 
   build() {
@@ -316,24 +362,51 @@ export struct SenderMessageComponent {
                   }
                 }
               }
-              messageContent({
-                message: this.message,
-                onMessageClick: this.onMessageClick,
-                chatInfo: this.chatUserInfo,
-                aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
-                aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
-              })
-                .backgroundColor($r('app.color.color_chat_send_message_bg'))
-                .borderRadius(6)
-                .onClick((event: ClickEvent) => {
-                  if (this.showRadio) {
-                    this.radioOn = !this.radioOn
-                  }
-                  this.onMessageClick?.onItemClick?.(event, this.message)
-                })
-                .margin({ top: 4, right: 6 })
-                .flexShrink(1)
-                .id("msgContainer")
+              Column() {
+                Row() {
+                  messageContent({
+                    message: this.message,
+                    onMessageClick: this.onMessageClick,
+                    chatInfo: this.chatUserInfo,
+                    aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
+                    aiSearchSelectingTranslation: this.aiSearchSelectingTranslation,
+                    showReaction: this.shouldShowReaction()
+                  })
+                }
+                  .justifyContent(FlexAlign.Start)
+                  .padding(this.getMessageContentPadding())
+                  .onClick((event: ClickEvent) => {
+                    if (this.showRadio) {
+                      this.radioOn = !this.radioOn
+                    }
+                    this.onMessageClick?.onItemClick?.(event, this.message)
+                  })
+                  .constraintSize({ maxWidth: '100%' })
+                  .alignSelf(this.message !== undefined &&
+                    shouldRightAlignSendMessageContent(this.message.getMessageType()) ?
+                    ItemAlign.End : ItemAlign.Start)
+                  .id("msgContainer")
+
+                if (this.shouldShowReaction()) {
+                  MessageReactionView({
+                    summaries: this.getReactionSummaries(),
+                    isReceiveStyle: false,
+                    onReactionClick: async (index: number): Promise<boolean> => {
+                      if (this.message !== undefined) {
+                        return await this.onReactionClick?.(this.message, index) ?? false
+                      }
+                      return false
+                    }
+                  })
+                  .constraintSize({ maxWidth: '100%' })
+                }
+              }
+              .alignItems(HorizontalAlign.Start)
+              .backgroundColor(this.getMessageBackgroundColor())
+              .borderRadius(6)
+              .margin({ top: 4, right: 6 })
+              .constraintSize({ maxWidth: '100%' })
+              .flexShrink(getSendMessageComboFlexShrink(this.shouldShowReaction()))
             }
             .justifyContent(FlexAlign.End)
             .alignItems(VerticalAlign.Bottom)
@@ -350,7 +423,7 @@ export struct SenderMessageComponent {
               PinMessageTipBuilder(this.message, this.chatUserInfo, true,
                 { bottom: 6, right: 12 })
             }
-          }.alignItems(HorizontalAlign.End).margin({ left: 8 }).width('75%')
+          }.alignItems(HorizontalAlign.End).margin({ left: 8 }).width('68%')
           // 多选模式下的覆盖层 - 使用 TapGesture 只拦截点击，允许滑动穿透
           if (this.showRadio && this.message.canOperateInMultiSelect()) {
             Column() {}
@@ -416,6 +489,10 @@ export struct ReceiveMessageComponent {
   aiSearchSelectingMessageId: string = ''
   @Param
   aiSearchSelectingTranslation: boolean = false
+  @Param
+  onReactionClick?: (msg: NIMMessageInfo, index: number) => Promise<boolean> = undefined
+  @Param
+  enableReaction: boolean = false
   @Local
   radioOn: boolean = false
   // anchor 高亮动画透明度（0 = 透明，1 = 完全显示高亮）
@@ -474,6 +551,28 @@ export struct ReceiveMessageComponent {
     } else {
       return $r('app.color.color_chat_page_bg')
     }
+  }
+
+  private getReactionSummaries(): ReactionSummary[] {
+    return buildReactionSummaries(this.message?.quickComments ?? [], ChatKitClient.getLoginUserId())
+      .filter((summary: ReactionSummary): boolean => MessageReactionManager.getEmoji(summary.index) !== undefined)
+  }
+
+  private shouldShowReaction(): boolean {
+    return this.enableReaction && !this.showRadio && this.getReactionSummaries().length > 0
+  }
+
+  private getMessageBackgroundColor(): ResourceColor {
+    return resolveMessageBackgroundColor(this.message, $r('app.color.color_chat_receive_message_bg'),
+      this.shouldShowReaction())
+  }
+
+  private getMessageContentPadding(): Padding {
+    if (this.shouldShowReaction() && this.message !== undefined &&
+      isReactionMediaMessageType(this.message.getMessageType())) {
+      return { left: 4, top: 4, right: 4, bottom: 0 }
+    }
+    return { left: 0, top: 0, right: 0, bottom: 0 }
   }
 
   build() {
@@ -537,24 +636,46 @@ export struct ReceiveMessageComponent {
 
             Row() {
               Column() {
-                messageContent({
-                  message: this.message,
-                  onMessageClick: this.onMessageClick,
-                  chatInfo: this.chatUserInfo,
-                  aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
-                  aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
-                })
-                  .backgroundColor($r('app.color.color_chat_receive_message_bg'))
-                  .borderRadius(6)
+                Row() {
+                  messageContent({
+                    message: this.message,
+                    onMessageClick: this.onMessageClick,
+                    chatInfo: this.chatUserInfo,
+                    aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
+                    aiSearchSelectingTranslation: this.aiSearchSelectingTranslation,
+                    showReaction: this.shouldShowReaction()
+                  })
+                }
+                  .justifyContent(FlexAlign.Start)
+                  .padding(this.getMessageContentPadding())
+                  .onClick((event: ClickEvent) => {
+                    if (this.showRadio) {
+                      this.radioOn = !this.radioOn
+                    }
+                    this.onMessageClick?.onItemClick?.(event, this.message)
+                  })
+                  .constraintSize({ maxWidth: '100%' })
                   .id("msgContainer")
                   .alignRules(this.AlignLeft)
-              }
-              .onClick((event: ClickEvent) => {
-                if (this.showRadio) {
-                  this.radioOn = !this.radioOn
+
+                if (this.shouldShowReaction()) {
+                  MessageReactionView({
+                    summaries: this.getReactionSummaries(),
+                    isReceiveStyle: true,
+                    onReactionClick: async (index: number): Promise<boolean> => {
+                      if (this.message !== undefined) {
+                        return await this.onReactionClick?.(this.message, index) ?? false
+                      }
+                      return false
+                    }
+                  })
+                  .constraintSize({ maxWidth: '100%' })
                 }
-                this.onMessageClick?.onItemClick?.(event, this.message)
-              })
+              }
+              .alignItems(HorizontalAlign.Start)
+              .backgroundColor(this.getMessageBackgroundColor())
+              .borderRadius(6)
+              .constraintSize({ maxWidth: '100%' })
 
               // AI 回复消息控制按钮：流式中 → Stop，其他 → Refresh
               if (this.message?.canOperateAIResponse() && !this.message?.isRevokeMsg) {
@@ -767,7 +888,8 @@ export struct MergeDetailMessageComponent {
                 aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
                 aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
               })
-                .backgroundColor($r('app.color.color_chat_receive_message_bg'))
+                .backgroundColor(resolveMessageBackgroundColor(this.message,
+                  $r('app.color.color_chat_receive_message_bg')))
                 .borderRadius(6)
                 .id("msgContainer")
                 .alignRules(this.AlignLeft)

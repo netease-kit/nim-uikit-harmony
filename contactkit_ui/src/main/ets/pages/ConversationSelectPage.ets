@@ -166,7 +166,7 @@ export struct ConversationSelectPage {
                   ForEach(this.selectedList, (item: ConversationSelectModel) => {
                     ListItem() {
                       CommonAvatar({
-                        item: new AvatarItem(item.avatar, NECommonUtils.shortName(item.name),
+                        item: new AvatarItem(item.avatar, NECommonUtils.shortName(item.avatarName ?? item.name),
                           AvatarColorUntil.getBackgroundColorById(item.conversationId ?? "")),
                         roundRadius: 16
                       })
@@ -232,7 +232,7 @@ export struct ConversationSelectPage {
 
                           Row() {
                             CommonAvatar({
-                              item: new AvatarItem(item.avatar, NECommonUtils.shortName(item.name),
+                              item: new AvatarItem(item.avatar, NECommonUtils.shortName(item.avatarName ?? item.name),
                                 AvatarColorUntil.getBackgroundColorById(item.conversationId ?? ""))
                             })
                               .width(36)
@@ -340,7 +340,7 @@ export struct ConversationSelectPage {
                               }
 
                               ViewItemBuilder({
-                                avatarItem: new AvatarItem(item.user?.avatar, item.shortName(),
+                                avatarItem: new AvatarItem(item.user?.avatar, item.getAvatarName(),
                                   AvatarColorUntil.getBackgroundColorById(
                                     ChatKitClient.nim.conversationIdUtil.p2pConversationId(item.user?.accountId)
                                   )
@@ -433,7 +433,7 @@ export struct ConversationSelectPage {
 
                           Row() {
                             CommonAvatar({
-                              item: new AvatarItem(item.avatar, NECommonUtils.shortName(item.name),
+                              item: new AvatarItem(item.avatar, NECommonUtils.shortName(item.avatarName ?? item.name),
                                 AvatarColorUntil.getBackgroundColorById(item.conversationId ?? ""))
                             })
                               .width(36)

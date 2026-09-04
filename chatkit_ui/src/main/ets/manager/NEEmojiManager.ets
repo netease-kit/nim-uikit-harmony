@@ -7,6 +7,9 @@
 import { Logger } from '@nimkit/common';
 import common from '@ohos.app.ability.common';
 import util from '@ohos.util';
+import { NEStickerItem, NEStickerPackage } from '../model/NEStickerPackage';
+
+const MEDIA_RESOURCE_TYPE: number = 20000
 
 export enum NIMEmoticonType {
   file = 1,
@@ -42,9 +45,12 @@ export class EmojiDataModel {
   sourceData: Array<NIMInputEmoticon> = [];
 }
 
+@ObservedV2
 export class NEEmojiManager {
   public static instance: NEEmojiManager = new NEEmojiManager()
-  dataModel: EmojiDataModel = new EmojiDataModel();
+  @Trace dataModel: EmojiDataModel = new EmojiDataModel();
+  @Trace private registeredStickerPackages: NEStickerPackage[] = []
+  @Trace private registeredStickerPackageRevision: number = 0
   public deleteEmoji: NIMInputEmoticon = new NIMInputEmoticon();
   // 根据文件名获取表情
   private fileEmojiCache: Map<string, NIMInputEmoticon> = new Map();
@@ -53,6 +59,88 @@ export class NEEmojiManager {
   private pattern = /\[([^\]]+)\]/g;
 
   private constructor() {
+  }
+
+  public get stickerPackages(): NEStickerPackage[] {
+    return this.registeredStickerPackages.slice()
+  }
+
+  public get stickerPackageRevision(): number {
+    return this.registeredStickerPackageRevision
+  }
+
+  private isValidMediaResource(resource: Resource): boolean {
+    return resource.id > 0 && resource.bundleName.length > 0 && resource.moduleName.length > 0
+      && resource.type === MEDIA_RESOURCE_TYPE
+  }
+
+  private normalizeStickerPackage(stickerPackage: NEStickerPackage): NEStickerPackage | undefined {
+    const packageId = stickerPackage.id.trim()
+    if (packageId.length === 0 || stickerPackage.stickers.length === 0
+      || !this.isValidMediaResource(stickerPackage.tabIcon)
+      || !this.isValidMediaResource(stickerPackage.selectedTabIcon)) {
+      return undefined
+    }
+    const stickers: NEStickerItem[] = []
+    const positions: Map<string, number> = new Map<string, number>()
+    for (const sticker of stickerPackage.stickers) {
+      const stickerId = sticker.id.trim()
+      const fileName = sticker.fileName.trim()
+      if (stickerId.length === 0 || fileName.length === 0 || !this.isValidMediaResource(sticker.image)) {
+        return undefined
+      }
+      const normalizedSticker = new NEStickerItem(stickerId, sticker.image, fileName)
+      const position = positions.get(stickerId)
+      if (position === undefined) {
+        positions.set(stickerId, stickers.length)
+        stickers.push(normalizedSticker)
+      } else {
+        stickers[position] = normalizedSticker
+      }
+    }
+    return new NEStickerPackage(packageId, stickerPackage.tabIcon, stickerPackage.selectedTabIcon, stickers)
+  }
+
+  public setStickerPackages(packages: NEStickerPackage[]): void {
+    const result: NEStickerPackage[] = []
+    const positions: Map<string, number> = new Map<string, number>()
+    for (const stickerPackage of packages) {
+      const normalizedPackage = this.normalizeStickerPackage(stickerPackage)
+      if (normalizedPackage === undefined) {
+        continue
+      }
+      const position = positions.get(normalizedPackage.id)
+      if (position === undefined) {
+        positions.set(normalizedPackage.id, result.length)
+        result.push(normalizedPackage)
+      } else {
+        result[position] = normalizedPackage
+      }
+    }
+    this.registeredStickerPackages = result
+    this.registeredStickerPackageRevision++
+  }
+
+  public addStickerPackage(stickerPackage: NEStickerPackage): boolean {
+    const normalizedPackage = this.normalizeStickerPackage(stickerPackage)
+    if (normalizedPackage === undefined) {
+      return false
+    }
+    const packages = this.registeredStickerPackages.slice()
+    const index = packages.findIndex((item: NEStickerPackage): boolean => item.id === normalizedPackage.id)
+    if (index >= 0) {
+      packages[index] = normalizedPackage
+    } else {
+      packages.push(normalizedPackage)
+    }
+    this.registeredStickerPackages = packages
+    this.registeredStickerPackageRevision++
+    return true
+  }
+
+  public clearStickerPackages(): void {
+    this.registeredStickerPackages = []
+    this.registeredStickerPackageRevision++
   }
 
   // 初始化表情管理器

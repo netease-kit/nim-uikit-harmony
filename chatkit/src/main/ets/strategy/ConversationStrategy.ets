@@ -34,7 +34,8 @@ export interface ConversationStrategy {
   getConversation(conversationId: string): Promise<ConversationItem | undefined>
   deleteConversation(conversationId: string): Promise<void>
   stickTopConversation(conversationId: string, stickTop: boolean): Promise<void>
-  clearUnreadCount(conversationIds: string[]): Promise<void>
+  getConversationReadTime(conversationId: string): Promise<number | undefined>
+  clearUnreadCountById(conversationId: string): Promise<void>
   getTotalUnreadCount(): number | undefined
   shouldReloadInitialConversationAfterSyncWhenEmpty(): boolean
 
@@ -80,8 +81,13 @@ export class CloudConversationStrategy implements ConversationStrategy {
     await ConversationRepo.stickTopConversation(conversationId, stickTop)
   }
 
-  async clearUnreadCount(conversationIds: string[]): Promise<void> {
-    await ConversationRepo.clearUnreadCountByIds(conversationIds)
+  async getConversationReadTime(conversationId: string): Promise<number | undefined> {
+    const conversation = await ConversationRepo.getConversation(conversationId)
+    return conversation?.lastReadTime
+  }
+
+  async clearUnreadCountById(conversationId: string): Promise<void> {
+    await ConversationRepo.clearUnreadCountByIds([conversationId])
   }
 
   getTotalUnreadCount(): number | undefined {
@@ -178,8 +184,12 @@ export class LocalConversationStrategy implements ConversationStrategy {
     await LocalConversationRepo.stickTopConversation(conversationId, stickTop)
   }
 
-  async clearUnreadCount(conversationIds: string[]): Promise<void> {
-    await LocalConversationRepo.clearUnreadCountByIds(conversationIds)
+  async getConversationReadTime(conversationId: string): Promise<number | undefined> {
+    return await LocalConversationRepo.getConversationReadTime(conversationId)
+  }
+
+  async clearUnreadCountById(conversationId: string): Promise<void> {
+    await LocalConversationRepo.clearUnreadCountByIds([conversationId])
   }
 
   getTotalUnreadCount(): number | undefined {
@@ -187,7 +197,7 @@ export class LocalConversationStrategy implements ConversationStrategy {
   }
 
   shouldReloadInitialConversationAfterSyncWhenEmpty(): boolean {
-    return false
+    return true
   }
 
   onSyncStarted(callback: () => void): void {

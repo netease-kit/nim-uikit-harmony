@@ -13,6 +13,7 @@ import DateConstTest from './DateConst.test';
 import BreakpointConstantsTest from './BreakpointConstants.test';
 import CommonUtilsTest from './CommonUtils.test';
 import AppLanguageUtilsTest from './AppLanguageUtils.test';
+import MatchSearchTextUtilsTest from './MatchSearchTextUtils.test';
 
 export default function testsuite() {
   localUnitTest();
@@ -24,4 +25,5 @@ export default function testsuite() {
   BreakpointConstantsTest();
   CommonUtilsTest();
   AppLanguageUtilsTest();
+  MatchSearchTextUtilsTest();
 }

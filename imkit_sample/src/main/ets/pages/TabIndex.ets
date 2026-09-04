@@ -88,18 +88,20 @@ struct TabIndex {
     }
   }
   //获取会话列表未读数
-  loadUnreadMessageCount = () => {
+  loadUnreadMessageCount = async () => {
     this.logPerf('tab.unread_message_count.start', `local=${this.useLocalConversation}`)
-     let unreadCount = 0
-    if (this.useLocalConversation) {
-       unreadCount = LocalConversationRepo.getTotalUnreadCount() ?? 0
-    }else {
-       unreadCount = ConversationRepo.getTotalUnreadCount() ?? 0
+    let unreadCount = 0
+    try {
+      if (this.useLocalConversation) {
+        unreadCount = await LocalConversationRepo.getUnreadCountByFilter({ ignoreMuted: true }) ?? 0
+      } else {
+        unreadCount = await ConversationRepo.getUnreadCountByFilter({ ignoreMuted: true }) ?? 0
+      }
+    } catch (err) {
+      this.logPerf('tab.unread_message_count.failed', `${err}`)
+      console.log(err)
     }
-
-    if (unreadCount) {
-      this.tabs[0].showRedPoint = unreadCount > 0
-    }
+    this.tabs[0].showRedPoint = unreadCount > 0
     this.logPerf('tab.unread_message_count.end', `unread=${unreadCount}`)
   }
   // 加载配置信息
@@ -187,7 +189,7 @@ struct TabIndex {
       console.log(err)
     }
     this.loadConfig()
-    this.loadUnreadMessageCount()
+    await this.loadUnreadMessageCount()
 
     // 检查是否有通知点击跳转
     this.checkPendingNotification()

@@ -106,13 +106,22 @@ export class ChatKitClient {
   }
 
   /**
-   * 设置当前会话id
+   * 仅注册 UIKit 当前会话，不推进本地会话 SDK 的已读时间
+   * @param conversationId 当前会话id
+   */
+  static registerCurrentConversationId(conversationId: string) {
+    ChatKitClient.currentConversationId = conversationId
+    getContext().eventHub.emit(currentConversationChanged, conversationId)
+  }
+
+  /**
+   * 在旧 read time 冻结后同步 SDK 当前会话
    * @param conversationId 当前会话id
    */
   static setCurrentConversationId(conversationId: string) {
-    ChatKitClient.currentConversationId = conversationId
-    getContext().eventHub.emit(currentConversationChanged, conversationId)
-    // 设置 SDK 当前聊天账号
+    if (ChatKitClient.currentConversationId !== conversationId) {
+      return
+    }
     ChatKitClient.switchCurrentConversation(true)
   }
 

@@ -26,7 +26,7 @@ export struct ConversationAIUserViewItem {
           }) {
             CommonAvatar({
               item: new AvatarItem(this.aiUserInfo.avatar,
-                this.getAvatarShowName(this.aiUserInfo.name ?? ''),
+                this.getAvatarShowName(this.aiUserInfo.name || this.aiUserInfo.accountId),
                 AvatarColorUntil.getBackgroundColorById(this.aiUserInfo.accountId)
               )
             })

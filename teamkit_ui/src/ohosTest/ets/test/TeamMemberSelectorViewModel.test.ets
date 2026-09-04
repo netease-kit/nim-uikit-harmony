@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from '@ohos/hypium';
-import { V2NIMTeamMemberRole } from '@nimsdk/base';
-import { TeamMemberSelectorMode, TeamMemberWithUser } from '@nimkit/chatkit';
+import { V2NIMFriend, V2NIMTeamMember, V2NIMTeamMemberRole, V2NIMUser } from '@nimsdk/base';
+import { TeamMemberCache, TeamMemberSelectorMode, TeamMemberWithUser } from '@nimkit/chatkit';
 import { TeamMemberSelectorViewModel } from '../../../main/ets/viewModel/TeamMemberSelectorViewModel';
 
 /**
@@ -22,6 +22,16 @@ class MockTeamMemberData {
   teamType: number = 0
   inTeam: boolean = true
   teamNick?: string = undefined
+}
+
+class MockFriendData {
+  accountId: string = ''
+  alias?: string = undefined
+}
+
+class MockUserData {
+  accountId: string = ''
+  name?: string = undefined
 }
 
 function createMember(accountId: string, memberRole: V2NIMTeamMemberRole, teamNick?: string): TeamMemberWithUser {
@@ -162,76 +172,139 @@ export default function teamMemberSelectorViewModelTest() {
       expect(result[0].getAccId()).assertEqual("user_a")
     })
 
-    it('should_return_member_list_when_keyword_only_spaces', 0, () => {
+    it('should_return_member_list_when_keyword_only_spaces', 0, async () => {
       let vm = new TeamMemberSelectorViewModel()
-      vm.searchKeyword = "   "
-
       let a = createMember("user_a", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL)
       vm.memberList = [a]
-      vm.searchResultList = []
+
+      await vm.searchTeamMembers("   ")
 
       let result = vm.getDisplayList()
+      expect(vm.searchKeyword).assertEqual("")
       expect(result.length).assertEqual(1)
     })
   })
 
+  describe('TeamMemberSelectorViewModel_getMemberRenderKey', () => {
+    it('should_change_member_render_key_when_search_keyword_changes', 0, () => {
+      let vm = new TeamMemberSelectorViewModel()
+      let member = createMember("user_a", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL, "群昵称8")
+
+      const initialKey = vm.getMemberRenderKey(member)
+      vm.searchKeyword = "8"
+      const searchKey = vm.getMemberRenderKey(member)
+      const stableSearchKey = vm.getMemberRenderKey(member)
+
+      expect(initialKey === searchKey).assertFalse()
+      expect(searchKey).assertEqual(stableSearchKey)
+    })
+
+    it('should_change_member_render_key_when_member_name_changes', 0, () => {
+      let vm = new TeamMemberSelectorViewModel()
+      vm.searchKeyword = "8"
+      let member = createMember("user_a", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL, "群昵称8")
+      let updatedMember = createMember(
+        "user_a",
+        V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL,
+        "新群昵称8"
+      )
+
+      const searchKey = vm.getMemberRenderKey(member)
+      const updatedProfileKey = vm.getMemberRenderKey(updatedMember)
+
+      expect(searchKey === updatedProfileKey).assertFalse()
+    })
+  })
+
   describe('TeamMemberSelectorViewModel_searchTeamMembers', () => {
+    it('should_search_all_cached_members_before_they_are_revealed_by_paging', 0, async () => {
+      const cache = TeamMemberCache.getInstance()
+      cache.clear()
+      cache.intTeamInfo('test_team')
+      cache.membersMap.set('visible_user',
+        createMember('visible_user', V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL))
+      cache.membersMap.set('HiddenAccount101',
+        createMember('HiddenAccount101', V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL))
+      cache.isFinish = true
+
+      let vm = new TeamMemberSelectorViewModel()
+      vm.teamId = 'test_team'
+      vm.mode = TeamMemberSelectorMode.FTS_SEARCH
+      vm.memberList = [createMember('visible_user', V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL)]
+
+      await vm.searchTeamMembers('hiddenaccount101')
+
+      expect(vm.searchResultList.length).assertEqual(1)
+      expect(vm.searchResultList[0].getAccId()).assertEqual('HiddenAccount101')
+      cache.clear()
+    })
+
     /**
      * 空 keyword：清空搜索结果（空字符串和 falsy 值走同一分支）
      */
-    it('should_clear_search_when_keyword_empty', 0, () => {
+    it('should_clear_search_when_keyword_empty', 0, async () => {
       let vm = new TeamMemberSelectorViewModel()
       vm.searchResultList = [createMember("stale", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL)]
       vm.isSearching = true
 
-      vm.searchTeamMembers("")
+      await vm.searchTeamMembers("")
       expect(vm.searchResultList.length).assertEqual(0)
       expect(vm.isSearching).assertFalse()
     })
 
-    /**
-     * 按 accountId 匹配（大小写不敏感）
-     */
-    it('should_match_by_account_id_case_insensitive', 0, () => {
+    it('should_match_account_id_in_fts_search_mode', 0, async () => {
       let vm = new TeamMemberSelectorViewModel()
       vm.mode = TeamMemberSelectorMode.FTS_SEARCH
       vm.memberList = [createMember("HelloWorld", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_OWNER)]
 
-      vm.searchTeamMembers("hello")
+      await vm.searchTeamMembers("hello")
       expect(vm.searchResultList.length).assertEqual(1)
       expect(vm.searchResultList[0].getAccId()).assertEqual("HelloWorld")
     })
 
+    it('should_match_account_id_and_keep_role_filter_in_add_manager_mode', 0, async () => {
+      let vm = new TeamMemberSelectorViewModel()
+      vm.mode = TeamMemberSelectorMode.ADD_MANAGER
+      vm.memberList = [
+        createMember("NormalAccount", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL),
+        createMember("OwnerAccount", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_OWNER)
+      ]
+
+      await vm.searchTeamMembers("account")
+      expect(vm.searchResultList.length).assertEqual(1)
+      expect(vm.searchResultList[0].getAccId()).assertEqual("NormalAccount")
+    })
+
     /**
-     * 按 accountId 不匹配
+     * 无关 accountId 不匹配
      */
-    it('should_not_match_irrelevant_account_id', 0, () => {
+    it('should_not_match_irrelevant_account_id', 0, async () => {
       let vm = new TeamMemberSelectorViewModel()
       vm.mode = TeamMemberSelectorMode.FTS_SEARCH
       vm.memberList = [createMember("abc", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL)]
 
-      vm.searchTeamMembers("xyz")
+      await vm.searchTeamMembers("xyz")
       expect(vm.searchResultList.length).assertEqual(0)
     })
 
     /**
      * 按 teamNick (群昵称) 匹配
      */
-    it('should_match_by_team_nick', 0, () => {
+    it('should_match_by_team_nick', 0, async () => {
       let vm = new TeamMemberSelectorViewModel()
       vm.mode = TeamMemberSelectorMode.FTS_SEARCH
 
       let m = createMember("user_a", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL, "张三")
       vm.memberList = [m]
 
-      vm.searchTeamMembers("张")
+      await vm.searchTeamMembers("张")
       expect(vm.searchResultList.length).assertEqual(1)
     })
 
     /**
      * 不显示管理员模式：过滤掉管理员和群主
      */
-    it('should_filter_out_manager_and_owner_when_not_show_manager', 0, () => {
+    it('should_filter_out_manager_and_owner_when_not_show_manager', 0, async () => {
       let vm = new TeamMemberSelectorViewModel()
       vm.mode = TeamMemberSelectorMode.ADD_MANAGER
 
@@ -240,7 +313,7 @@ export default function teamMemberSelectorViewModelTest() {
       let manager = createMember("mgr_u", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_MANAGER, "尼克")
       vm.memberList = [normal, owner, manager]
 
-      vm.searchTeamMembers("尼克")
+      await vm.searchTeamMembers("尼克")
       expect(vm.searchResultList.length).assertEqual(1)
       expect(vm.searchResultList[0].getAccId()).assertEqual("normal_u")
     })
@@ -248,7 +321,7 @@ export default function teamMemberSelectorViewModelTest() {
     /**
      * 显示管理员模式：保留管理员和群主
      */
-    it('should_include_manager_and_owner_when_show_manager', 0, () => {
+    it('should_include_manager_and_owner_when_show_manager', 0, async () => {
       let vm = new TeamMemberSelectorViewModel()
       vm.mode = TeamMemberSelectorMode.FTS_SEARCH
 
@@ -257,20 +330,90 @@ export default function teamMemberSelectorViewModelTest() {
       let manager = createMember("mgr_u", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_MANAGER, "测试")
       vm.memberList = [normal, owner, manager]
 
-      vm.searchTeamMembers("测试")
+      await vm.searchTeamMembers("测试")
       expect(vm.searchResultList.length).assertEqual(3)
     })
 
     /**
      * 搜索无匹配
      */
-    it('should_return_empty_when_no_match', 0, () => {
+    it('should_return_empty_when_no_match', 0, async () => {
       let vm = new TeamMemberSelectorViewModel()
       vm.mode = TeamMemberSelectorMode.FTS_SEARCH
       vm.memberList = [createMember("u1", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL, "张三")]
 
-      vm.searchTeamMembers("nonexistent")
+      await vm.searchTeamMembers("nonexistent")
       expect(vm.searchResultList.length).assertEqual(0)
+    })
+
+    it('should_keep_selected_members_when_searching_and_clearing_search', 0, async () => {
+      let vm = new TeamMemberSelectorViewModel()
+      vm.mode = TeamMemberSelectorMode.FTS_SEARCH
+      vm.memberList = [createMember("user_a", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL, "张三")]
+      vm.onMemberItemClick("user_a")
+
+      await vm.searchTeamMembers("张")
+      vm.clearSearch()
+
+      expect(vm.selectedMembers.has("user_a")).assertTrue()
+      expect(vm.selectedCount).assertEqual(1)
+    })
+
+    it('should_recalculate_active_search_when_user_name_changes', 0, async () => {
+      let vm = new TeamMemberSelectorViewModel()
+      vm.mode = TeamMemberSelectorMode.FTS_SEARCH
+      let member = createMember('user_a', V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL)
+      let oldUser = new MockUserData()
+      oldUser.accountId = 'user_a'
+      oldUser.name = '旧名称'
+      member.userInfo = oldUser as V2NIMUser
+      vm.memberList = [member]
+
+      await vm.searchTeamMembers('新名称')
+      expect(vm.searchResultList.length).assertEqual(0)
+
+      let updatedUser = new MockUserData()
+      updatedUser.accountId = 'user_a'
+      updatedUser.name = '新名称'
+      vm.onUserProfileChanged([updatedUser as V2NIMUser])
+
+      expect(vm.searchResultList.length).assertEqual(1)
+      expect(vm.searchResultList[0].getAccId()).assertEqual('user_a')
+    })
+
+    it('should_recalculate_active_search_when_friend_alias_changes', 0, async () => {
+      let vm = new TeamMemberSelectorViewModel()
+      vm.mode = TeamMemberSelectorMode.ADD_MANAGER
+      let member = createMember('user_a', V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL)
+      vm.memberList = [member]
+
+      await vm.searchTeamMembers('新备注')
+      expect(vm.searchResultList.length).assertEqual(0)
+
+      let updatedFriend = new MockFriendData()
+      updatedFriend.accountId = 'user_a'
+      updatedFriend.alias = '新备注'
+      vm.onFriendInfoChanged(updatedFriend as V2NIMFriend)
+
+      expect(vm.searchResultList.length).assertEqual(1)
+      expect(vm.selectedMembers.size).assertEqual(0)
+    })
+
+    it('should_keep_manager_visible_after_profile_update_in_fts_mode', 0, () => {
+      let vm = new TeamMemberSelectorViewModel()
+      vm.teamId = 'test_team'
+      vm.mode = TeamMemberSelectorMode.FTS_SEARCH
+      let manager = createMember('manager', V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_MANAGER, '旧群昵称')
+      vm.memberList = [manager]
+
+      let updatedMember = new MockTeamMemberData()
+      updatedMember.accountId = 'manager'
+      updatedMember.memberRole = V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_MANAGER
+      updatedMember.teamNick = '新群昵称'
+      vm.onTeamMemberInfoUpdated([updatedMember as V2NIMTeamMember])
+
+      expect(vm.memberList.length).assertEqual(1)
+      expect(vm.memberList[0].teamMember.teamNick).assertEqual('新群昵称')
     })
   })
 

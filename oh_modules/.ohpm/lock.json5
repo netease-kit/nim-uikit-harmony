@@ -6,10 +6,10 @@
     "installAll": true
   },
   "overrides": {
-    "@nimsdk/base": "10.10.1",
-    "@nimsdk/nim": "10.10.1",
-    "@nimsdk/user": "10.10.1",
-    "@nimsdk/signalling": "10.10.1"
+    "@nimsdk/base": "10.10.14",
+    "@nimsdk/nim": "10.10.14",
+    "@nimsdk/user": "10.10.14",
+    "@nimsdk/signalling": "10.10.14"
   },
   "overrideDependencyMap": {},
   "modules": {
@@ -37,32 +37,32 @@
       "name": "chatkit",
       "dependencies": {
         "@nimsdk/conversation": {
-          "specifier": "10.10.10",
-          "version": "10.10.10"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/message": {
-          "specifier": "10.10.10",
-          "version": "10.10.10"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/team": {
-          "specifier": "10.10.10",
-          "version": "10.10.10"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/user": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/friend": {
-          "specifier": "10.10.10",
-          "version": "10.10.10"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/nim": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/base": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimkit/corekit": {
           "specifier": "file:corekit",
@@ -101,24 +101,24 @@
           "version": "file:corekit"
         },
         "@nimsdk/base": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/nim": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/user": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/signalling": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/search": {
-          "specifier": "10.10.10",
-          "version": "10.10.10"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "class-transformer": {
           "specifier": "^0.5.1",
@@ -161,8 +161,8 @@
           "version": "file:chatkit"
         },
         "@nimsdk/base": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         }
       },
       "devDependencies": {},
@@ -181,8 +181,8 @@
           "version": "file:chatkit"
         },
         "@nimsdk/base": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         }
       },
       "devDependencies": {},
@@ -228,44 +228,44 @@
           "version": "file:corekit"
         },
         "@nimsdk/conversation": {
-          "specifier": "10.10.10",
-          "version": "10.10.10"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/localconversation": {
-          "specifier": "10.10.10",
-          "version": "10.10.10"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/message": {
-          "specifier": "10.10.10",
-          "version": "10.10.10"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/team": {
-          "specifier": "10.10.10",
-          "version": "10.10.10"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/user": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/friend": {
-          "specifier": "10.10.10",
-          "version": "10.10.10"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/signalling": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/search": {
-          "specifier": "10.10.10",
-          "version": "10.10.10"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/nim": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@nimsdk/base": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         },
         "@yunxin/callkit": {
           "specifier": "4.0.2",
@@ -296,8 +296,8 @@
           "version": "file:chatkit"
         },
         "@nimsdk/base": {
-          "specifier": "10.10.10",
-          "version": "10.10.1"
+          "specifier": "10.10.14",
+          "version": "10.10.14"
         }
       },
       "devDependencies": {},
@@ -360,37 +360,16 @@
       "dynamic": false,
       "maskedByOverrideDependencyMap": false
     },
-    "@nimkit/conversationkit_ui@file:conversationkit_ui": {
-      "storePath": "conversationkit_ui",
-      "dependencies": {
-        "@nimkit/common": "common",
-        "@nimkit/chatkit": "chatkit",
-        "@nimsdk/base": "10.10.1"
-      },
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
-    "@nimsdk/base@10.10.1": {
-      "integrity": "sha512-A3jKDCdLHwgGq1FkJlUgjM5J7O4CPVTtkK9fvvL+4pVbhPaMxR0ORvP2tQeAeI2akjXuigXCeYSRsUq02GIWUA==",
-      "storePath": "oh_modules/.ohpm/@nimsdk+base@10.10.1",
-      "dependencies": {},
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
     "@nimkit/chatkit@file:chatkit": {
       "storePath": "chatkit",
       "dependencies": {
-        "@nimsdk/conversation": "10.10.10",
-        "@nimsdk/message": "10.10.10",
-        "@nimsdk/team": "10.10.10",
-        "@nimsdk/user": "10.10.1",
-        "@nimsdk/friend": "10.10.10",
-        "@nimsdk/nim": "10.10.1",
-        "@nimsdk/base": "10.10.1",
+        "@nimsdk/conversation": "10.10.14",
+        "@nimsdk/message": "10.10.14",
+        "@nimsdk/team": "10.10.14",
+        "@nimsdk/user": "10.10.14",
+        "@nimsdk/friend": "10.10.14",
+        "@nimsdk/nim": "10.10.14",
+        "@nimsdk/base": "10.10.14",
         "@nimkit/corekit": "corekit",
         "@nimkit/common": "common",
         "class-transformer": "0.5.1",
@@ -401,66 +380,31 @@
       "dynamic": false,
       "maskedByOverrideDependencyMap": false
     },
-    "@nimsdk/conversation@10.10.10": {
-      "integrity": "sha512-v0N/F8NEGFmQRK9Mt/Osqhp88vTZXOuT3VEpsqO5t73lW5W70cbKK5SvxPtEjxMfFvuB3kQaZQYHFf2H1001gw==",
-      "storePath": "oh_modules/.ohpm/@nimsdk+conversation@10.10.10",
+    "@nimsdk/base@10.10.14": {
+      "integrity": "sha512-Fi5YkeoHontv9LGdIWbWXv6S9eBcdYRxRhPP1i96ERhupfwueNZgIhO6LtxiAZyqN7yIqkCbkXX2W9Q4bxvG0Q==",
+      "storePath": "oh_modules/.ohpm/@nimsdk+base@10.10.14",
+      "dependencies": {},
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "@nimsdk/nim@10.10.14": {
+      "integrity": "sha512-3wNRAWEZNGCIagDr/WrMzeGfkI2AXOxj24SFcrlNV2MWseU3N5N4OdR+kFRqCTRk5X6Tt6e6w2ltf9/siEEruQ==",
+      "storePath": "oh_modules/.ohpm/@nimsdk+nim@10.10.14",
       "dependencies": {
-        "@nimsdk/base": "10.10.1"
+        "@nimsdk/base": "10.10.14"
       },
       "dynamicDependencies": {},
       "dev": false,
       "dynamic": false,
       "maskedByOverrideDependencyMap": false
     },
-    "@nimsdk/message@10.10.10": {
-      "integrity": "sha512-DI5lnmV8+B4pin5c4Ha5OQsru6ev9ORomDO6xJ/HIyFRATpuqVZwFFG5q3pEPt/U6RDtc0IczuqUr/moHHdf9A==",
-      "storePath": "oh_modules/.ohpm/@nimsdk+message@10.10.10",
+    "@nimsdk/user@10.10.14": {
+      "integrity": "sha512-cHdBgrpNN7JmIjTV/YwQmDZZBx5a+2+a/GuO0j0rHu3ohWf972gGc+geLbB7Z305RQOM5LEkSe7XOhWf/srUxQ==",
+      "storePath": "oh_modules/.ohpm/@nimsdk+user@10.10.14",
       "dependencies": {
-        "@nimsdk/base": "10.10.1"
-      },
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
-    "@nimsdk/team@10.10.10": {
-      "integrity": "sha512-vbJRD5+YLafER01CW11Abc/x0iwaKWV6Zt9TkpGCG055NOvwQxCJ5/+59ax/RmEVLahzCFDK+pLjQfhtHpKbFA==",
-      "storePath": "oh_modules/.ohpm/@nimsdk+team@10.10.10",
-      "dependencies": {
-        "@nimsdk/base": "10.10.1"
-      },
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
-    "@nimsdk/user@10.10.1": {
-      "integrity": "sha512-eQRh3wKzp9+H/5cHX5u96wmB9gtlOH1WID/Ny0L8ftPSUlGw2OjTRNxlBMbbon0NoSb0tVkM6fuEb7VCpYwKKA==",
-      "storePath": "oh_modules/.ohpm/@nimsdk+user@10.10.1",
-      "dependencies": {
-        "@nimsdk/base": "10.10.1"
-      },
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
-    "@nimsdk/friend@10.10.10": {
-      "integrity": "sha512-2MUnoLgVi5QFekq34MYoHv6FTgYVIyJfsDr+piy7guyK/E5CWeFFXijnHYxc8SAnz0FK+/l2Ln3wi0mdpdWe0Q==",
-      "storePath": "oh_modules/.ohpm/@nimsdk+friend@10.10.10",
-      "dependencies": {
-        "@nimsdk/base": "10.10.1"
-      },
-      "dynamicDependencies": {},
-      "dev": false,
-      "dynamic": false,
-      "maskedByOverrideDependencyMap": false
-    },
-    "@nimsdk/nim@10.10.1": {
-      "integrity": "sha512-SVUfhvi/c76/j8Q0I5+Ol8nrbqSo5pr8qk0SaB9KDHo0qER2UVjTIY1IRAriwaKcFiUdTe6V9afor7O39MKSBg==",
-      "storePath": "oh_modules/.ohpm/@nimsdk+nim@10.10.1",
-      "dependencies": {
-        "@nimsdk/base": "10.10.1"
+        "@nimsdk/base": "10.10.14"
       },
       "dynamicDependencies": {},
       "dev": false,
@@ -485,12 +429,56 @@
       "dynamic": false,
       "maskedByOverrideDependencyMap": false
     },
-    "@nimkit/contactkit_ui@file:contactkit_ui": {
-      "storePath": "contactkit_ui",
+    "@nimsdk/conversation@10.10.14": {
+      "integrity": "sha512-U2065CeE1b0BypLQPx+G02jfbgbJToAXDcD4ZygcAAlIf0f8ugG7HeU0ArQEPjg0yejJxHAHjrNoVAV97V+Lpg==",
+      "storePath": "oh_modules/.ohpm/@nimsdk+conversation@10.10.14",
+      "dependencies": {
+        "@nimsdk/base": "10.10.14"
+      },
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "@nimsdk/message@10.10.14": {
+      "integrity": "sha512-diZvdGYrK+aYZUCo9EJewBoYv+zWhFr2EmrbkZL3JD2hY5g96vwcY32iBUaZAiBDVogc6lJN/o7HSI4lH/QDCw==",
+      "storePath": "oh_modules/.ohpm/@nimsdk+message@10.10.14",
+      "dependencies": {
+        "@nimsdk/base": "10.10.14"
+      },
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "@nimsdk/team@10.10.14": {
+      "integrity": "sha512-rmsf8ZJSme4Ts6AI8kdToQ5fqRo892bvTfHo0h5f0IysEbuZEXRwVuCZZvhXrTeQqj17CVimPN0smjpMeDvK8w==",
+      "storePath": "oh_modules/.ohpm/@nimsdk+team@10.10.14",
+      "dependencies": {
+        "@nimsdk/base": "10.10.14"
+      },
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "@nimsdk/friend@10.10.14": {
+      "integrity": "sha512-fu+G4TxV3Tj44RaoAm3h9D8xI86rsE67nqqaGRwBV7azqWFwnDd0aa+hfuZ0yaAaWZCpN8Z4QemFbWRv8uxKow==",
+      "storePath": "oh_modules/.ohpm/@nimsdk+friend@10.10.14",
+      "dependencies": {
+        "@nimsdk/base": "10.10.14"
+      },
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "@nimkit/conversationkit_ui@file:conversationkit_ui": {
+      "storePath": "conversationkit_ui",
       "dependencies": {
         "@nimkit/common": "common",
         "@nimkit/chatkit": "chatkit",
-        "@nimsdk/base": "10.10.1"
+        "@nimsdk/base": "10.10.14"
       },
       "dynamicDependencies": {},
       "dev": false,
@@ -502,7 +490,19 @@
       "dependencies": {
         "@nimkit/common": "common",
         "@nimkit/chatkit": "chatkit",
-        "@nimsdk/base": "10.10.1"
+        "@nimsdk/base": "10.10.14"
+      },
+      "dynamicDependencies": {},
+      "dev": false,
+      "dynamic": false,
+      "maskedByOverrideDependencyMap": false
+    },
+    "@nimkit/contactkit_ui@file:contactkit_ui": {
+      "storePath": "contactkit_ui",
+      "dependencies": {
+        "@nimkit/common": "common",
+        "@nimkit/chatkit": "chatkit",
+        "@nimsdk/base": "10.10.14"
       },
       "dynamicDependencies": {},
       "dev": false,
@@ -515,11 +515,11 @@
         "@nimkit/common": "common",
         "@nimkit/chatkit": "chatkit",
         "@nimkit/corekit": "corekit",
-        "@nimsdk/base": "10.10.1",
-        "@nimsdk/nim": "10.10.1",
-        "@nimsdk/user": "10.10.1",
-        "@nimsdk/signalling": "10.10.1",
-        "@nimsdk/search": "10.10.10",
+        "@nimsdk/base": "10.10.14",
+        "@nimsdk/nim": "10.10.14",
+        "@nimsdk/user": "10.10.14",
+        "@nimsdk/signalling": "10.10.14",
+        "@nimsdk/search": "10.10.14",
         "class-transformer": "0.5.1",
         "reflect-metadata": "0.2.1",
         "@nimkit/markdown": "1.2.0"
@@ -529,22 +529,22 @@
       "dynamic": false,
       "maskedByOverrideDependencyMap": false
     },
-    "@nimsdk/signalling@10.10.1": {
-      "integrity": "sha512-DRZ5hZX0M5WShFbSZgS4V8urHsWbZLeRXR5yLiTwZyDePDCRcct9Ujc4ilr455yOD8/4hA7kWt/vf2Jt3A6KRQ==",
-      "storePath": "oh_modules/.ohpm/@nimsdk+signalling@10.10.1",
+    "@nimsdk/signalling@10.10.14": {
+      "integrity": "sha512-n0lA2vkt56YoqzmsFDzqo+Az/uPsvXMTvg6lQ4V/Mm2HLF6kXccOaqnugcoC927pnxSapM9yznMPGiEAfprC0w==",
+      "storePath": "oh_modules/.ohpm/@nimsdk+signalling@10.10.14",
       "dependencies": {
-        "@nimsdk/base": "10.10.1"
+        "@nimsdk/base": "10.10.14"
       },
       "dynamicDependencies": {},
       "dev": false,
       "dynamic": false,
       "maskedByOverrideDependencyMap": false
     },
-    "@nimsdk/search@10.10.10": {
-      "integrity": "sha512-6Nrn8JYZV8eGZfVAUOhbyxy8zJWfaOj8nK25CiLnSAkmI+9LJzBwXcE6KrLkkDKAroI80swBUUJ56rBzcTE1+g==",
-      "storePath": "oh_modules/.ohpm/@nimsdk+search@10.10.10",
+    "@nimsdk/search@10.10.14": {
+      "integrity": "sha512-0qRAJ+ykFI76aWvi1SmNnBFaxo6GwTBOuJr1tFe15rb7hCVsaixrG66wHhqhf/aNKWC6VoUPkIMQKuWb5CoSlA==",
+      "storePath": "oh_modules/.ohpm/@nimsdk+search@10.10.14",
       "dependencies": {
-        "@nimsdk/base": "10.10.1"
+        "@nimsdk/base": "10.10.14"
       },
       "dynamicDependencies": {},
       "dev": false,
@@ -560,11 +560,11 @@
       "dynamic": false,
       "maskedByOverrideDependencyMap": false
     },
-    "@nimsdk/localconversation@10.10.10": {
-      "integrity": "sha512-LIac28WLfWLgiIOD2dg27RzA+2yLxQvkMEM75xAsOKGpFBB5FEfBCu4gkmUowKdtrrIXfWzjls8UCodHCPPPzg==",
-      "storePath": "oh_modules/.ohpm/@nimsdk+localconversation@10.10.10",
+    "@nimsdk/localconversation@10.10.14": {
+      "integrity": "sha512-CMezyQjk26fdOKOxKIdaKiW/0vMWgoCZ+PNm0PeS4DoD9AXSVbtUhS0AYp/QvOWATviaBRE7YP11JR8Q+BFuZg==",
+      "storePath": "oh_modules/.ohpm/@nimsdk+localconversation@10.10.14",
       "dependencies": {
-        "@nimsdk/base": "10.10.1"
+        "@nimsdk/base": "10.10.14"
       },
       "dynamicDependencies": {},
       "dev": false,
@@ -576,9 +576,9 @@
       "storePath": "oh_modules/.ohpm/@yunxin+callkit@4.0.2",
       "dependencies": {
         "@nertc/nertc_sdk": "5.9.11",
-        "@nimsdk/base": "10.10.1",
-        "@nimsdk/nim": "10.10.1",
-        "@nimsdk/signalling": "10.10.1",
+        "@nimsdk/signalling": "10.10.14",
+        "@nimsdk/nim": "10.10.14",
+        "@nimsdk/base": "10.10.14",
         "@yunxin/xkit_base": "1.0.0"
       },
       "dynamicDependencies": {},
@@ -590,12 +590,12 @@
       "integrity": "sha512-gOn+WNninJ1wXRtCZKPZxrqQIp7hhuQsCtVkO+YviO8Vhs3Hl0szEv/zGw0I6PmZGyEroO6e6wlgfeEghxuZAg==",
       "storePath": "oh_modules/.ohpm/@yunxin+callkit_ui@4.0.3",
       "dependencies": {
+        "@yunxin/callkit": "4.0.2",
         "@nertc/nertc_sdk": "5.9.11",
         "@nertc/person_segment_plugin": "1.0.0",
-        "@nimsdk/base": "10.10.1",
-        "@nimsdk/nim": "10.10.1",
-        "@nimsdk/user": "10.10.1",
-        "@yunxin/callkit": "4.0.2"
+        "@nimsdk/user": "10.10.14",
+        "@nimsdk/nim": "10.10.14",
+        "@nimsdk/base": "10.10.14"
       },
       "dynamicDependencies": {},
       "dev": false,
@@ -624,8 +624,8 @@
       "integrity": "sha512-y6UYiDXE834BCdKu3GtBSEOSaX9vk7t7WfhNyyazBkMnn4WWbY2ldFoc9MkH/6kKX4TvBIrvlMX+QM3MEhzdrw==",
       "storePath": "oh_modules/.ohpm/@nertc+nertc_sdk@5.9.11",
       "dependencies": {
-        "pako": "2.1.0",
-        "wrapper": "oh_modules/.ohpm/@nertc+nertc_sdk@5.9.11/oh_modules/@nertc/nertc_sdk/src/main/libs/wrapper.har"
+        "wrapper": "oh_modules/.ohpm/@nertc+nertc_sdk@5.9.11/oh_modules/@nertc/nertc_sdk/src/main/libs/wrapper.har",
+        "pako": "2.1.0"
       },
       "dynamicDependencies": {},
       "dev": false,

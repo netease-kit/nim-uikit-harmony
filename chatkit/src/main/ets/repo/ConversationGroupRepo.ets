@@ -54,13 +54,15 @@ export class ConversationGroupRepo {
 
   static async getUnreadCountByGroupId(groupId: string): Promise<number | undefined> {
     return await ChatKitClient.nim.conversationService?.getUnreadCountByFilter({
-      conversationGroupId: groupId
+      conversationGroupId: groupId,
+      ignoreMuted: true
     })
   }
 
   static subscribeUnreadCountByGroupId(groupId: string): void {
     const filter: V2NIMConversationFilter = {
-      conversationGroupId: groupId
+      conversationGroupId: groupId,
+      ignoreMuted: true
     }
     ChatKitClient.nim.conversationService?.subscribeUnreadCountByFilter(filter)
   }
@@ -77,7 +79,8 @@ export class ConversationGroupRepo {
 
   static unsubscribeUnreadCountByGroupId(groupId: string): void {
     const filter: V2NIMConversationFilter = {
-      conversationGroupId: groupId
+      conversationGroupId: groupId,
+      ignoreMuted: true
     }
     ChatKitClient.nim.conversationService?.unsubscribeUnreadCountByFilter(filter)
   }

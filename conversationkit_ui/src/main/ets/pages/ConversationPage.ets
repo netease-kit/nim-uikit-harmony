@@ -265,6 +265,7 @@ struct ConversationPageContent {
     ListItem() {
       ConversationViewItem({
         conversationInfo: item,
+        avatarName: this.activeViewModel().getConversationAvatarName(item),
         haveBeanAit: this.activeViewModel().aitConversationList.has(item.conversationId),
         isUserAIBot: this.activeViewModel().userAIBotConversationList.has(item.conversationId),
         isAIUser: this.isAIUserConversation(item),

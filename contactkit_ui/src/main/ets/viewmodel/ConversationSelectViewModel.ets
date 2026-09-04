@@ -6,7 +6,14 @@
  */
 
 import { Logger } from '@nimkit/common';
-import { ChatKitClient, ConversationRepo, IMKitConfigCenter, LocalConversationRepo, UserAIBotManager } from '@nimkit/chatkit'
+import {
+  ChatKitClient,
+  ConversationRepo,
+  IMKitConfigCenter,
+  LocalConversationRepo,
+  NEFriendUserCache,
+  UserAIBotManager
+} from '@nimkit/chatkit'
 import { ConversationSelectModel } from '@nimkit/chatkit'
 import { V2NIMConversationType, V2NIMGetUserAIBotListResult, V2NIMUserAIBot } from '@nimsdk/base'
 import { ContactViewModel } from './ContactViewModel'
@@ -72,6 +79,8 @@ export class ConversationSelectViewModel {
             model.conversationId = conversation.conversationId
             model.name = conversation.name
             model.avatar = conversation.avatar
+            model.avatarName = this.getConversationAvatarName(conversation.conversationId, conversation.name,
+              conversation.type)
             this.conversationList.push(model)
           }
         }
@@ -101,6 +110,8 @@ export class ConversationSelectViewModel {
             model.conversationId = conversation.conversationId
             model.name = conversation.name
             model.avatar = conversation.avatar
+            model.avatarName = this.getConversationAvatarName(conversation.conversationId, conversation.name,
+              conversation.type)
             this.conversationList.push(model)
           }
         }
@@ -134,6 +145,7 @@ export class ConversationSelectViewModel {
             model.conversationId = ChatKitClient.nim.conversationIdUtil.p2pConversationId(contact.user?.accountId)
             model.name = contact.showName()
             model.avatar = contact.user?.avatar
+            model.avatarName = contact.getAvatarName()
             this.contactList.push(model)
           }
         }
@@ -260,6 +272,16 @@ export class ConversationSelectViewModel {
   /// - Returns: 存在则返回该回话，不存在返回 nil
   findTeam(conversationId: string): ConversationSelectModel | undefined {
     return this.teamList.find(teamModel => teamModel.conversationId === conversationId)
+  }
+
+  private getConversationAvatarName(conversationId: string, conversationName?: string,
+    conversationType?: V2NIMConversationType): string {
+    const targetId = ChatKitClient.nim.conversationIdUtil.parseConversationTargetId(conversationId)
+    const userName = NEFriendUserCache.peekInstance()?.getFriendById(targetId)?.user?.name
+    if (conversationType === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
+      return userName || targetId
+    }
+    return conversationName || targetId
   }
 
   onDestroy() {

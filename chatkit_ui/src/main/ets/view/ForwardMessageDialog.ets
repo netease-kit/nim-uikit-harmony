@@ -34,7 +34,7 @@ export struct ForwardMessageDialog {
           ForEach(this.conversationList, (item: ConversationSelectModel) => {
             ListItem() {
               CommonAvatar({
-                item: new AvatarItem(item.avatar, NECommonUtils.shortName(item.name),
+                item: new AvatarItem(item.avatar, NECommonUtils.shortName(item.avatarName ?? item.name),
                   AvatarColorUntil.getBackgroundColorById(item.conversationId ?? "")),
                 roundRadius: 16
               })

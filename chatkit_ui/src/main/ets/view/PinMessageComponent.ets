@@ -7,10 +7,13 @@
 import { ChatInfo } from '../model/ChatInfo';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
-import { pinMessageContent } from './MessageComponentBuilder';
 import { V2NIMMessageType } from '@nimsdk/base';
-import { MessageItemClick } from './MessageItemClick';
 import { isMultiLineMessage } from '@nimkit/chatkit';
+import {
+  getMessageBackgroundColor,
+  pinMessageContent
+} from './MessageComponentBuilder';
+import { MessageItemClick } from './MessageItemClick';
 
 /**
  * 标记页面中的消息组件
@@ -100,9 +103,10 @@ export struct PinMessageComponent {
 
         Column() {
           pinMessageContent({ message: this.message, onMessageClick: this.onMessageClick })
-            .backgroundColor((this.message?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ||
-            isMultiLineMessage(this.message!.message)) ?
-            Color.Transparent : $r('app.color.color_chat_receive_message_bg'))
+            .backgroundColor(this.message?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT ||
+              isMultiLineMessage(this.message!.message) ?
+              Color.Transparent : getMessageBackgroundColor(this.message,
+                $r('app.color.color_chat_receive_message_bg')))
             .borderRadius(6)
             .id("msgContainer")
             .alignRules(this.AlignLeft)

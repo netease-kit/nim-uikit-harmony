@@ -93,6 +93,20 @@ export { LocalConversationRepo } from './src/main/ets/repo/LocalConversationRepo
 
 export { IsDiscussion } from './src/main/ets/utils/Utils'
 
+export {
+  containsSearchKeyword,
+  getContactSearchRenderKey,
+  getTeamMemberSearchRenderKey,
+  matchesContactSearchKeyword,
+  matchesSearchKeyword,
+  matchesTeamMemberSearchKeyword,
+  normalizeSearchKeyword,
+  resolveContactSearchTextPresentation,
+  resolveSearchTextPresentation,
+  resolveTeamMemberSearchTextPresentation,
+  SearchTextPresentation
+} from './src/main/ets/utils/SearchTextUtils'
+
 export { ErrorUtils } from './src/main/ets/utils/ErrorUtils'
 
 export { NotificationHelper, NotificationWantParams } from './src/main/ets/utils/NotificationHelper'

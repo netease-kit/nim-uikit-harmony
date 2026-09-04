@@ -38,6 +38,12 @@ import { cameraPicker } from '@kit.CameraKit';
 import { LengthMetrics, window } from '@kit.ArkUI';
 import { NERectData } from '../model/NERectData';
 import { MessageOperationView } from '../view/MessageOperationView';
+import {
+  canShowMessageReaction,
+  computeReactionMenuY,
+  shouldEnableReactionForSelection
+} from '../utils/MessageReactionUtils';
+import { createCollapsedChatInputLayout } from '../utils/ChatTeamMuteStateUtils';
 import { TopMessageBar } from '../view/TopMessageBar';
 import { MessageOperationItem, MessageOperationType } from '../model/MessageOperationItem';
 import { BusinessError, pasteboard } from '@kit.BasicServicesKit';
@@ -77,6 +83,7 @@ import {
 } from '@nimkit/chatkit';
 import { TeamExitDialogParam, TeamExitWarningDialog } from '../view/TeamExitWarningDialog';
 import { AudioPlayerManager } from '../manager/AudioPlayerManager';
+import { AudioRecordManager } from '../manager/AudioRecordManager';
 import { ConversationSelectModel } from '@nimkit/chatkit';
 import { ForwardMessageDialog } from '../view/ForwardMessageDialog';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
@@ -137,6 +144,7 @@ export struct ChatTeamPage {
   @Local showTranslateView: boolean = false
   @Local translateResetKey: number = 0
   @Local hideInput: boolean = false;
+  @Local shouldStopRecord: boolean = false;
   @Local scrollHeight: number = 0;
   @Local showOperationView: boolean = false;
   conversationId: string = '';
@@ -167,6 +175,18 @@ export struct ChatTeamPage {
     this.textMessageDetailDialog?.close()
   }
   operationRect: NERectData = new NERectData();
+  private reactionAnchorTop: number = 0
+  private reactionAnchorBottom: number = 0
+  private reactionMenuItemCount: number = 0
+  private reactionMenuPreferAbove: boolean = true
+  @Local private reactionMenuExpanded: boolean = false
+
+  @Monitor('showOperationView')
+  onOperationViewVisibilityChange(): void {
+    if (!this.showOperationView) {
+      this.reactionMenuExpanded = false
+    }
+  }
   screenHeight: number = 0;
   screenWidth: number = 0;
   keyboardHeight: number = 0
@@ -189,6 +209,7 @@ export struct ChatTeamPage {
   // 列表滚动位置
   listScrollStartPosition: number = 0;
   listScrollEndPosition: number = 0;
+  listScrollPositionReady: boolean = false;
   //首次加载数据滚动到底部
   firstLoadData: boolean = true;
   // 新增：是否处于底部
@@ -415,11 +436,18 @@ export struct ChatTeamPage {
   }
   @Monitor("chatViewModel.needScrollToBottom")
   onNeedScrollToBottom() {
-    if (this.chatViewModel.needScrollToBottom &&
-      this.listScrollEndPosition >= this.chatTeamInfo.msgList.totalCount() - 1) {
-      this.listScroller.scrollEdge(Edge.Bottom)
-      this.chatViewModel.needScrollToBottom = false;
+    if (!this.chatViewModel.needScrollToBottom) {
+      return
     }
+    // 历史锚点定位期间保持当前位置，避免异步附加数据触发滚底
+    if (this.chatViewModel.hasNew) {
+      this.chatViewModel.needScrollToBottom = false
+      return
+    }
+    if (this.listScrollEndPosition >= this.chatTeamInfo.msgList.totalCount() - 1) {
+      this.listScroller.scrollEdge(Edge.Bottom)
+    }
+    this.chatViewModel.needScrollToBottom = false;
   }
 
   @Monitor("chatViewModel.shouldShowTeamExitWarning")
@@ -441,11 +469,23 @@ export struct ChatTeamPage {
   onScrollIndex() {
     if (this.chatTeamInfo.scrollIndex > -1) {
       this.toScroll = true
-      // 使用 ScrollAlign.CENTER 让消息居中显示
-      this.listScroller.scrollToIndex(this.chatTeamInfo.scrollIndex, false, ScrollAlign.CENTER)
+      const scrollAlign = this.chatTeamInfo.scrollIndexAlignStart ? ScrollAlign.START : ScrollAlign.CENTER
+      this.listScroller.scrollToIndex(this.chatTeamInfo.scrollIndex, false, scrollAlign)
       this.chatViewModel.setAnchorMessage(undefined)
       this.chatTeamInfo.setScrollIndex(-1)
     }
+  }
+
+  private updateLastReadPositionByVisibleArea(): void {
+    const totalCount = this.chatTeamInfo.msgList.totalCount()
+    if (!this.listScrollPositionReady) {
+      // 首次滚底完成后再消费入口，避免使用中间可见位置。
+      if (totalCount <= 0 || this.listScrollEndPosition < totalCount - 1) {
+        return
+      }
+      this.listScrollPositionReady = true
+    }
+    this.chatViewModel.updateLastReadPosition(this.listScrollStartPosition)
   }
 
   @Monitor("chatViewModel.anchorMsg")
@@ -458,16 +498,24 @@ export struct ChatTeamPage {
   @Monitor("chatViewModel.isMuteModel")
   onMuteModel() {
     if (this.chatViewModel.isMuteModel) {
-      this.clearInput(true)
-      // 被禁言时清空多行输入框并缩小
-      // 注意：multiLineBody 由 MultiLineInputView 组件内部管理
-      if (this.expandHeight > 0) {
-        this.multiLineTitle = ''
-        this.expandHeight = 0
-        this.inputStyle = InputStyleType.None
-        this.bottomHeight = 105
-        this.computeScrollHeight()
+      if (this.inputStyle === InputStyleType.Record || this.hideInput) {
+        AudioRecordManager.instance.setCancelled(true)
       }
+      this.clearInput(true)
+      this.resetMultiLineDraft()
+      this.aitManager.cleanAit()
+      this.builderSpans.splice(0, this.builderSpans.length)
+      this.controller.stopEditing()
+      const collapsedLayout = createCollapsedChatInputLayout(this.getSingleLineInputHeight())
+      this.pendingExpandPanelAfterKeyboardHide = collapsedLayout.pendingExpandPanelAfterKeyboardHide
+      this.hideInput = collapsedLayout.hideInput
+      this.shouldStopRecord = collapsedLayout.shouldStopRecord
+      this.expandHeight = collapsedLayout.expandHeight
+      this.inputStyle = InputStyleType.None
+      this.bottomHeight = collapsedLayout.bottomHeight
+      this.computeScrollHeight()
+    } else {
+      this.shouldStopRecord = false
     }
   }
 
@@ -809,8 +857,15 @@ export struct ChatTeamPage {
     this.aiSearchSelectionState.selectedText()
     this.operationMenuItems = this.getSelectionOperationMenuItems()
     const itemCount = this.operationMenuItems.length
-    const opMenuWidth = computeOperateViewWidthByCount(itemCount)
-    const opMenuHeight = computeOperateViewHeightByCount(itemCount)
+    const showReaction = this.operationMsg !== undefined
+      && this.chatViewModel.isMessageReactionEnabled()
+      && shouldEnableReactionForSelection(this.aiSearchSelectionState.active, this.aiSearchSelectionState.isAllSelected(), this.translationOperationMode)
+      && canShowMessageReaction(this.operationMsg.message, this.operationMsg.isRevokeMsg)
+    if (!showReaction) {
+      this.reactionMenuExpanded = false
+    }
+    const opMenuWidth = showReaction ? 320 : computeOperateViewWidthByCount(itemCount)
+    const opMenuHeight = computeOperateViewHeightByCount(itemCount) + (showReaction ? 51 : 0)
     this.operationRect.x = this.aiSearchSelectionState.rectX +
       (this.aiSearchSelectionState.rectWidth - opMenuWidth) / 2
     if (this.operationRect.x < this.operationViewMargin) {
@@ -819,12 +874,29 @@ export struct ChatTeamPage {
     if (this.operationRect.x + opMenuWidth + this.operationViewMargin > this.screenWidth) {
       this.operationRect.x = this.screenWidth - opMenuWidth - this.operationViewMargin
     }
-    this.operationRect.y = this.aiSearchSelectionState.rectY - opMenuHeight - this.operationViewMargin
-    if (this.operationRect.y < 0) {
-      this.operationRect.y = this.aiSearchSelectionState.rectY + this.aiSearchSelectionState.rectHeight +
-        this.operationViewMargin
+    if (showReaction) {
+      this.reactionAnchorTop = this.aiSearchSelectionState.rectY
+      this.reactionAnchorBottom = this.aiSearchSelectionState.rectY + this.aiSearchSelectionState.rectHeight
+      this.reactionMenuItemCount = itemCount
+      this.reactionMenuPreferAbove = true
+      this.operationRect.y = computeReactionMenuY(this.reactionAnchorTop, this.reactionAnchorBottom,
+        opMenuHeight, this.scrollHeight, this.bottomHeight, this.operationViewMargin, true)
+    } else {
+      this.operationRect.y = this.aiSearchSelectionState.rectY - opMenuHeight - this.operationViewMargin
+      if (this.operationRect.y < 0) {
+        this.operationRect.y = this.aiSearchSelectionState.rectY + this.aiSearchSelectionState.rectHeight +
+          this.operationViewMargin
+      }
     }
-    this.showOperationView = itemCount > 0
+    this.showOperationView = itemCount > 0 || showReaction
+  }
+
+  private updateReactionMenuPosition(expanded: boolean): void {
+    this.reactionMenuExpanded = expanded
+    const operationHeight = computeOperateViewHeightByCount(this.reactionMenuItemCount)
+    const menuHeight = expanded ? Math.max(operationHeight, 251) : operationHeight + 51
+    this.operationRect.y = computeReactionMenuY(this.reactionAnchorTop, this.reactionAnchorBottom,
+      menuHeight, this.scrollHeight, this.bottomHeight, this.operationViewMargin, this.reactionMenuPreferAbove)
   }
 
   private closeAISearchSelection(): void {
@@ -889,6 +961,7 @@ export struct ChatTeamPage {
 
   private showOperationMenu(event: GestureEvent, msg: NIMMessageInfo | undefined,
     operationItems?: Array<MessageOperationItem>, selectedText: string = ''): void {
+    this.reactionMenuExpanded = false
     if (selectedText.length === 0) {
       this.closeAISearchSelection()
     }
@@ -897,8 +970,11 @@ export struct ChatTeamPage {
     this.operationMenuItems = operationItems
     this.selectedOperationText = selectedText
     const itemCount = operationItems ? operationItems.length : getOperateMenu(msg, this.chatViewModel.topMessage).length
-    let opMenuWidth = computeOperateViewWidthByCount(itemCount)
-    let opMenuHeight = computeOperateViewHeightByCount(itemCount)
+    const showReaction = selectedText.length === 0 && msg !== undefined &&
+      this.chatViewModel.isMessageReactionEnabled() &&
+      canShowMessageReaction(msg.message, msg.isRevokeMsg)
+    let opMenuWidth = showReaction ? 320 : computeOperateViewWidthByCount(itemCount)
+    let opMenuHeight = computeOperateViewHeightByCount(itemCount) + (showReaction ? 51 : 0)
     let marginSize = this.operationViewMargin
     if (event.target.area.position.x !== undefined) {
       let xPoint = Number(event.target.area.globalPosition.x) +
@@ -912,19 +988,25 @@ export struct ChatTeamPage {
       this.operationRect.x = xPoint;
     }
     if (event.target.area.position.y !== undefined) {
-      let yPoint =
-        Number(event.target.area.globalPosition.y) - this.navBarHeight +
-        Number(event.target.area.height)
-      if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
-        yPoint =
-          yPoint - opMenuHeight - marginSize * 2 - Number(event.target.area.height);
+      this.reactionAnchorTop = Number(event.target.area.globalPosition.y) - this.navBarHeight
+      this.reactionAnchorBottom = this.reactionAnchorTop + Number(event.target.area.height)
+      this.reactionMenuItemCount = itemCount
+      if (showReaction) {
+        this.reactionMenuPreferAbove = true
+        this.operationRect.y = computeReactionMenuY(this.reactionAnchorTop, this.reactionAnchorBottom,
+          opMenuHeight, this.scrollHeight, this.bottomHeight, marginSize, true)
+      } else {
+        let yPoint = this.reactionAnchorBottom
+        if (yPoint + opMenuHeight + marginSize + this.bottomHeight > this.scrollHeight) {
+          yPoint = this.reactionAnchorTop - opMenuHeight - marginSize
+        }
+        if (yPoint < 0) {
+          yPoint = this.scrollHeight / 2
+        }
+        this.operationRect.y = yPoint
       }
-      if (yPoint < 0) {
-        yPoint = this.scrollHeight / 2;
-      }
-      this.operationRect.y = yPoint
     }
-    this.showOperationView = itemCount > 0
+    this.showOperationView = itemCount > 0 || showReaction
   }
 
   private updateTextSelection(msg: NIMMessageInfo | undefined, text: string, start: number, end: number,
@@ -1076,6 +1158,13 @@ export struct ChatTeamPage {
 
   async requestChatData() {
     this.chatTeamInfo.setConversationId(this.conversationId)
+    this.listScrollPositionReady = false
+    this.chatViewModel.onLastReadTimeReady = () => {
+      // 首屏可见区就绪后补一次未读位置判断，避免异步状态更新错过首屏滚动。
+      if (this.listScrollPositionReady) {
+        this.updateLastReadPositionByVisibleArea()
+      }
+    }
     this.chatViewModel.init(this.conversationId as string, this.chatTeamInfo);
     this.chatViewModel.onOperateMessageInvalid = (messageClientId: string) => {
       this.clearOperationMenuIfMatch(messageClientId)
@@ -1268,6 +1357,10 @@ export struct ChatTeamPage {
                   showSelect: this.showMultiSelect,
                   aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
                   aiSearchSelectingTranslation: this.translationOperationMode,
+                  enableReaction: this.chatViewModel.isMessageReactionEnabled(),
+                  onReactionClick: async (message: NIMMessageInfo, index: number): Promise<boolean> => {
+                    return await this.chatViewModel.toggleQuickComment(message, index)
+                  },
                   onMessageClick: {
                     onAvatarClick: (msg: NIMMessageInfo | undefined) => {
                       if (this.showMultiSelect) {
@@ -1502,6 +1595,7 @@ export struct ChatTeamPage {
             }
             this.listScrollEndPosition = end;
             this.listScrollStartPosition = start;
+            this.updateLastReadPositionByVisibleArea()
             // 只按当前可见区发送已读回执，避免把未进入视窗的消息提前标记。
             if (this.chatViewModel.isPageVisible) {
               const allMessages = this.chatTeamInfo.msgList.getMessageList()
@@ -1610,6 +1704,9 @@ export struct ChatTeamPage {
                 this.showOperationView = false
                 this.getUIContext().getFocusController().clearFocus()
                 PermissionsUtils.reqPermissionsFromUser(['ohos.permission.MICROPHONE'], context).then((result) => {
+                  if (this.chatViewModel.isMuteModel) {
+                    return
+                  }
                   if (result.grantStatus == true) {
                     if (this.inputStyle == InputStyleType.Record) {
                       this.pendingExpandPanelAfterKeyboardHide = false
@@ -1771,12 +1868,21 @@ export struct ChatTeamPage {
           Column() {
             if (this.inputStyle === InputStyleType.Record) {
               NEAudioRecordView({
+                shouldStop: this.shouldStopRecord,
                 onRecordAudio: (filepath, duration) => {
+                  if (this.chatViewModel.isMuteModel) {
+                    return
+                  }
                   Logger.info('ChatKitUI', "net ease record audio " + filepath);
                   this.chatViewModel.sendAudioMessage(filepath, duration)
 
                 },
                 onRecordStart: () => {
+                  if (this.chatViewModel.isMuteModel) {
+                    AudioRecordManager.instance.setCancelled(true)
+                    this.shouldStopRecord = true
+                    return
+                  }
                   this.hideInput = true
                 },
                 onRecordEnd: () => {
@@ -1849,6 +1955,9 @@ export struct ChatTeamPage {
                 })
             } else if (this.inputStyle === InputStyleType.Emoji) {
               NEChatEmojiView({
+                onStickerClick: (sticker) => {
+                  this.chatViewModel.sendImageResourceMessage(sticker.image, sticker.fileName)
+                },
                 onDidClick: (emoji) => {
                   Logger.info('ChatKitUI', "net ease click emoji", emoji);
                   if (emoji.type === NIMEmoticonType.file) {
@@ -1981,6 +2090,50 @@ export struct ChatTeamPage {
           .backgroundColor($r('app.color.chat_input_background'))
 
           // 滚动到新消息按钮
+          if (this.chatViewModel.shouldShowLastReadPosition && !this.showMultiSelect) {
+            Row() {
+              Image($r('app.media.ic_chat_scroll_down'))
+                .width(16)
+                .height(16)
+                .fillColor('#007AFF')
+                .rotate({ angle: 180 })
+                .margin({ right: 8 })
+
+              Text(this.chatViewModel.lastReadUnreadOverflow ?
+                $r('app.string.chat_last_read_message_count_overflow') :
+                $r('app.string.chat_last_read_message_count', this.chatViewModel.lastReadUnreadCount))
+                .fontSize(14)
+                .fontColor('#007AFF')
+            }
+            .backgroundColor(Color.White)
+            .borderRadius({
+              topLeft: 20,
+              bottomLeft: 20,
+              topRight: 0,
+              bottomRight: 0
+            })
+            .padding(12)
+            .alignRules({
+              right: { anchor: "__container__", align: HorizontalAlign.End },
+              top: { anchor: "tipBannerArea", align: VerticalAlign.Bottom }
+            })
+            .margin({ top: 18 })
+            .enabled(!this.chatViewModel.isLastReadPositionLocating)
+            .opacity(this.chatViewModel.isLastReadPositionLocating ? 0.6 : 1)
+            .accessibilityText(this.chatViewModel.lastReadUnreadOverflow ?
+              $r('app.string.chat_last_read_message_count_overflow') :
+              $r('app.string.chat_last_read_message_count', this.chatViewModel.lastReadUnreadCount))
+            .onClick(() => {
+              this.chatViewModel.jumpToLastReadPosition()
+            })
+            .shadow({
+              radius: 20,
+              color: '#20000000',
+              offsetX: 0,
+              offsetY: 4
+            })
+          }
+
           if (this.showScrollToNewMessageButton && !this.showMultiSelect) {
             Row() {
               Image($r('app.media.ic_chat_scroll_down'))
@@ -2026,6 +2179,21 @@ export struct ChatTeamPage {
               operateMsg: this.operationMsg,
               operationItems: this.operationMenuItems,
               topMessage: this.chatViewModel.topMessage,
+              enableReaction: this.chatViewModel.isMessageReactionEnabled() &&
+                shouldEnableReactionForSelection(this.aiSearchSelectionState.active,
+                this.aiSearchSelectionState.isAllSelected(), this.translationOperationMode),
+              reactionExpanded: this.reactionMenuExpanded,
+              onReactionExpandedChange: (expanded: boolean): void => {
+                this.updateReactionMenuPosition(expanded)
+              },
+              didClickReaction: (index: number): void => {
+                this.showOperationView = false
+                this.reactionMenuExpanded = false
+                this.closeAISearchSelection()
+                if (this.operationMsg !== undefined) {
+                  this.chatViewModel.toggleQuickComment(this.operationMsg, index)
+                }
+              },
               didClickItem: (item: MessageOperationItem) => {
                 Logger.info('ChatKitUI', 'net ease click operation item event')
                 this.showOperationView = false

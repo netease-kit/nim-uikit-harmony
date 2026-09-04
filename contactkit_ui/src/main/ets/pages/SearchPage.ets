@@ -19,7 +19,13 @@ import {
 } from '@nimkit/common';
 import { SearchViewModel } from '../viewmodel/SearchViewModel';
 import { SearchListModel } from '../model/SearchListModel';
-import { ChatKitClient } from '@nimkit/chatkit';
+import {
+  ChatKitClient,
+  getContactSearchRenderKey,
+  normalizeSearchKeyword,
+  resolveContactSearchTextPresentation,
+  SearchTextPresentation
+} from '@nimkit/chatkit';
 
 // 跳转页面入口函数
 @Builder
@@ -32,14 +38,11 @@ export struct SearchPage {
   pathStack: NavPathStack = new NavPathStack()
   @Local viewModel: SearchViewModel = new SearchViewModel()
   @Local searchText: string = ""
-  @Local isEmpty: boolean = false
   onTextChange = (value: string, previewText?: PreviewText) => {
     try {
-      this.searchText = value
-      this.viewModel.doSearch(value)
-      this.isEmpty =
-        value.length > 0 && this.viewModel.friendData.length === 0 && this.viewModel.discussData.length === 0 &&
-          this.viewModel.seniorData.length === 0
+      const keyword = normalizeSearchKeyword(value)
+      this.searchText = keyword
+      this.viewModel.doSearch(keyword)
     } catch (err) {
       Logger.error('ContactKit', err)
     }
@@ -61,7 +64,7 @@ export struct SearchPage {
           keepEditableState: false
         })
 
-        if (this.isEmpty) {
+        if (this.isSearchResultEmpty()) {
           CommonEmptyResult()
             .margin({
               top: 74
@@ -79,7 +82,7 @@ export struct SearchPage {
                   Row() {
                     CommonAvatar({
                       item: new AvatarItem(item.userInfo?.user?.avatar,
-                        item.userInfo?.shortName(),
+                        item.userInfo?.getAvatarName(),
                         AvatarColorUntil.getBackgroundColorById(item.userInfo?.user?.accountId ?? "")),
                       roundRadius: 18
                     })
@@ -90,23 +93,11 @@ export struct SearchPage {
                       })
 
                     Column() {
-                      if (item.userInfo?.showName().includes(this.searchText)) {
-                        MatchSearchText({
-                          allText: item.userInfo?.showName(),
-                          searchText: this.searchText
-                        })
-                      } else if (item.userInfo?.user?.accountId.includes(this.searchText)) {
-                        Text(item.userInfo?.showName())
-                          .fontSize(14)
-                          .fontColor('#333333')
-                          .maxLines(1)
-                          .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-                        MatchSearchText({
-                          allText: item.userInfo?.user.accountId,
-                          searchText: this.searchText,
-                          fontSize: 13
-                        })
+                      if (item.userInfo) {
+                        this.contactSearchResultTextBuilder(
+                          item.userInfo.showName(),
+                          resolveContactSearchTextPresentation(item.userInfo, this.searchText)
+                        )
                       }
                     }
                     .layoutWeight(1)
@@ -126,7 +117,8 @@ export struct SearchPage {
                     param: conversationId
                   })
                 })
-              })
+              }, (item: SearchListModel) => item.userInfo ?
+                getContactSearchRenderKey(item.userInfo, this.searchText) : this.searchText)
             }
           }
 
@@ -172,7 +164,8 @@ export struct SearchPage {
                     param: conversationId
                   })
                 })
-              })
+              }, (item: SearchListModel) =>
+                [item.team?.teamId ?? '', this.searchText, item.team?.name ?? ''].join('::'))
             }
           }
 
@@ -218,7 +211,8 @@ export struct SearchPage {
                     param: conversationId
                   })
                 })
-              })
+              }, (item: SearchListModel) =>
+                [item.team?.teamId ?? '', this.searchText, item.team?.name ?? ''].join('::'))
             }
           }
         }
@@ -233,5 +227,43 @@ export struct SearchPage {
     .onReady((context: NavDestinationContext) => {
       this.pathStack = context.pathStack
     })
+  }
+
+  private isSearchResultEmpty(): boolean {
+    return this.searchText.length > 0 && this.viewModel.friendData.length === 0 &&
+      this.viewModel.discussData.length === 0 && this.viewModel.seniorData.length === 0
+  }
+
+  @Builder
+  contactSearchResultTextBuilder(primaryText: string, presentation: SearchTextPresentation) {
+    Column() {
+      if (presentation.primaryMatched) {
+        MatchSearchText({
+          allText: primaryText,
+          searchText: this.searchText.trim()
+        })
+      } else {
+        Text(primaryText)
+          .fontSize(14)
+          .fontColor('#333333')
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+
+      if (presentation.secondaryText.length > 0) {
+        MatchSearchText({
+          allText: presentation.secondaryText,
+          searchText: this.searchText.trim(),
+          fontSize: 13,
+          normalFontColor: '#999999',
+          highlightFontColor: '#337EFF'
+        })
+      }
+    }
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  aboutToDisappear(): void {
+    this.viewModel.onDestroy()
   }
 }

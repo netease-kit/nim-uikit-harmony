@@ -19,8 +19,7 @@ import {
   AvatarItem,
   CommonAvatar,
   NavigationBackBuilder,
-  StringIsEmpty,
-  TailString
+  StringIsEmpty
 } from '@nimkit/common';
 import { EditType, PersonInfoArrowItem, PersonInfoItem, PersonInfoSwitchItem } from '../model/MineInfoItem';
 import { PersonInfoViewModel } from '../viewmodel/PersonInfoViewModel';
@@ -265,7 +264,7 @@ export struct PersonInfoPage {
         Row() {
           CommonAvatar({
             item: new AvatarItem(this.viewModel.userWithFriend?.user?.avatar,
-              (this.alias?.length ?? 0) > 0 ? TailString(this.alias) : this.viewModel.userWithFriend?.shortName(),
+              this.viewModel.userWithFriend?.getAvatarName(),
               AvatarColorUntil.getBackgroundColorById(this.viewModel.accountId)),
             roundRadius: 30,
             textSize: 22
@@ -557,16 +556,7 @@ export struct PersonInfoPage {
                 }
               }
               .height(48)
-              .onClick(() => {
-                this.pathStack.popToName('ChatP2PPage')
-                this.pathStack.popToName('ChatTeamPage')
-                const accountId = this.viewModel.userWithFriend?.user?.accountId ?? ''
-                const conversationId = ChatKitClient.nim.conversationIdUtil.p2pConversationId(accountId)
-                this.pathStack.replacePath({
-                  name: 'ChatP2PPage',
-                  param: conversationId
-                })
-              })
+              .onClick(() => this.openChat())
 
               ListItem() {
                 Column() {
@@ -609,14 +599,7 @@ export struct PersonInfoPage {
                 }
               }
               .height(48)
-              .onClick(() => {
-                this.pathStack.popToName('ChatP2PPage')
-                this.pathStack.popToName('ChatTeamPage')
-                this.pathStack.replacePath({
-                  name: 'ChatP2PPage',
-                  param: ChatKitClient.nim.conversationIdUtil.p2pConversationId(this.viewModel.userWithFriend?.user?.accountId)
-                })
-              })
+              .onClick(() => this.openChat())
             } else {
               ListItem() {
                 Column() {
@@ -659,6 +642,32 @@ export struct PersonInfoPage {
     })
     .onDisAppear(() => {
       this.viewModel.onDestroy()
+    })
+  }
+
+  private openChat(): void {
+    const accountId = this.viewModel.userWithFriend?.user?.accountId ?? this.viewModel.accountId
+    const conversationId = ChatKitClient.nim.conversationIdUtil.p2pConversationId(accountId)
+    const isUserAIBot = this.isBot || UserAIBotManager.hasCachedUserAIBot(accountId) ||
+      UserAIBotManager.isDeletedUserAIBot(accountId)
+    if (isUserAIBot) {
+      // 用户级机器人聊天入口必须回到子会话列表
+      this.pathStack.popToName('ChatBotSubSessionListPage')
+      const cachedBot = UserAIBotManager.getCachedUserAIBot(accountId)
+      this.pathStack.popToName('ChatP2PPage')
+      this.pathStack.popToName('ChatTeamPage')
+      this.pathStack.replacePath({
+        name: 'ChatBotSubSessionListPage',
+        param: [conversationId, accountId, cachedBot?.name ?? this.viewModel.userWithFriend?.user?.name ?? accountId]
+      })
+      return
+    }
+
+    this.pathStack.popToName('ChatP2PPage')
+    this.pathStack.popToName('ChatTeamPage')
+    this.pathStack.replacePath({
+      name: 'ChatP2PPage',
+      param: conversationId
     })
   }
 }

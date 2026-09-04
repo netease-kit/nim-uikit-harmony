@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from '@ohos/hypium';
-import { V2NIMTeamMemberRole } from '@nimsdk/base';
-import { TeamMemberWithUser } from '@nimkit/chatkit';
+import { V2NIMFriend, V2NIMTeamMember, V2NIMTeamMemberRole, V2NIMUser } from '@nimsdk/base';
+import { TeamMemberCache, TeamMemberWithUser } from '@nimkit/chatkit';
 import { TeamMemberListViewModel } from '../../../main/ets/viewModel/TeamMemberListViewModel';
 
 /**
@@ -21,14 +21,46 @@ class MockTeamMemberData {
   teamId: string = "test_team"
   teamType: number = 0
   inTeam: boolean = true
+  teamNick?: string = undefined
 }
 
-function createMember(accountId: string, memberRole: V2NIMTeamMemberRole, joinTime: number): TeamMemberWithUser {
+class MockFriendData {
+  accountId: string = ""
+  alias?: string = undefined
+}
+
+class MockUserData {
+  accountId: string = ""
+  name?: string = undefined
+}
+
+function createMember(
+  accountId: string,
+  memberRole: V2NIMTeamMemberRole,
+  joinTime: number,
+  teamNick?: string,
+  alias?: string,
+  userName?: string
+): TeamMemberWithUser {
   let data = new MockTeamMemberData()
   data.accountId = accountId
   data.memberRole = memberRole
   data.joinTime = joinTime
-  return new TeamMemberWithUser(data as V2NIMTeamMember, undefined, undefined)
+  data.teamNick = teamNick
+
+  let friend = new MockFriendData()
+  friend.accountId = accountId
+  friend.alias = alias
+
+  let user = new MockUserData()
+  user.accountId = accountId
+  user.name = userName
+
+  return new TeamMemberWithUser(
+    data as V2NIMTeamMember,
+    friend as V2NIMFriend,
+    user as V2NIMUser
+  )
 }
 
 /**
@@ -105,6 +137,136 @@ export default function teamMemberListViewModelTest() {
       let mgrB = createMember("mgr_b", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_MANAGER, 100)
       expect(vm.sortTeamMember(mgrA, mgrB) > 0).assertTrue()
       expect(vm.sortTeamMember(mgrB, mgrA) < 0).assertTrue()
+    })
+  })
+
+  describe('TeamMemberListViewModel_searchTeamMembers', () => {
+    it('should_search_all_cached_members_before_they_are_revealed_by_paging', 0, async () => {
+      const cache = TeamMemberCache.getInstance()
+      cache.clear()
+      cache.intTeamInfo('test_team')
+      const visibleMember = createMember(
+        'visible_user', V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL, 1)
+      const hiddenMember = createMember(
+        'HiddenAccount101', V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL, 101)
+      cache.membersMap.set(visibleMember.getAccId(), visibleMember)
+      cache.membersMap.set(hiddenMember.getAccId(), hiddenMember)
+      cache.isFinish = true
+
+      let vm = new TeamMemberListViewModel()
+      vm.teamId = 'test_team'
+      vm.memberList = [visibleMember]
+
+      await vm.searchTeamMembers('hiddenaccount101')
+
+      expect(vm.getDisplayList().length).assertEqual(1)
+      expect(vm.getDisplayList()[0].getAccId()).assertEqual('HiddenAccount101')
+      cache.clear()
+    })
+
+    it('should_match_alias_team_nick_user_name_and_account_id', 0, async () => {
+      let vm = new TeamMemberListViewModel()
+      let aliasMember = createMember(
+        "alias_user",
+        V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL,
+        1,
+        undefined,
+        "好友备注"
+      )
+      let teamNickMember = createMember(
+        "team_nick_user",
+        V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL,
+        2,
+        "群昵称"
+      )
+      let userNameMember = createMember(
+        "name_user",
+        V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL,
+        3,
+        undefined,
+        undefined,
+        "用户名称"
+      )
+      let accountMember = createMember(
+        "Account_130",
+        V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL,
+        4
+      )
+      vm.memberList = [aliasMember, teamNickMember, userNameMember, accountMember]
+
+      await vm.searchTeamMembers("备注")
+      expect(vm.getDisplayList()[0] === aliasMember).assertTrue()
+      await vm.searchTeamMembers("群昵")
+      expect(vm.getDisplayList()[0] === teamNickMember).assertTrue()
+      await vm.searchTeamMembers("名称")
+      expect(vm.getDisplayList()[0] === userNameMember).assertTrue()
+      await vm.searchTeamMembers("account_130")
+      expect(vm.getDisplayList()[0] === accountMember).assertTrue()
+    })
+
+    it('should_normalize_keyword_and_restore_full_list_when_cleared', 0, async () => {
+      let vm = new TeamMemberListViewModel()
+      let member = createMember("Account_130", V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL, 1)
+      vm.memberList = [member]
+
+      await vm.searchTeamMembers("  130  ")
+      expect(vm.searchKeyword).assertEqual("130")
+      expect(vm.getDisplayList().length).assertEqual(1)
+
+      await vm.searchTeamMembers("   ")
+      expect(vm.searchKeyword).assertEqual("")
+      expect(vm.getDisplayList()[0] === member).assertTrue()
+    })
+
+    it('should_derive_search_result_from_latest_member_profile', 0, async () => {
+      let vm = new TeamMemberListViewModel()
+      let member = createMember(
+        "user_a",
+        V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL,
+        1,
+        undefined,
+        "旧备注"
+      )
+      vm.memberList = [member]
+      await vm.searchTeamMembers("新备注")
+      expect(vm.getDisplayList().length).assertEqual(0)
+
+      let friend = new MockFriendData()
+      friend.accountId = "user_a"
+      friend.alias = "新备注"
+      member.friendInfo = friend as V2NIMFriend
+
+      expect(vm.getDisplayList()[0] === member).assertTrue()
+    })
+
+    it('should_refresh_render_key_when_keyword_or_name_changes', 0, async () => {
+      let vm = new TeamMemberListViewModel()
+      let member = createMember(
+        "130",
+        V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL,
+        1,
+        "群昵称",
+        "好友备注",
+        "用户名称"
+      )
+
+      const initialKey = vm.getMemberRenderKey(member)
+      await vm.searchTeamMembers("  1  ")
+      const searchKey = vm.getMemberRenderKey(member)
+      const stableSearchKey = vm.getMemberRenderKey(member)
+      let updatedMember = createMember(
+        "130",
+        V2NIMTeamMemberRole.V2NIM_TEAM_MEMBER_ROLE_NORMAL,
+        1,
+        "群昵称",
+        "新备注",
+        "用户名称"
+      )
+      const updatedNameKey = vm.getMemberRenderKey(updatedMember)
+
+      expect(initialKey === searchKey).assertFalse()
+      expect(searchKey).assertEqual(stableSearchKey)
+      expect(searchKey === updatedNameKey).assertFalse()
     })
   })
 }

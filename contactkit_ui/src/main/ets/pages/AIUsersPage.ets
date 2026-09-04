@@ -82,7 +82,7 @@ export struct AIUsersPage {
                   ViewItemBuilder({
                     avatarItem: new AvatarItem(
                       item.userInfo?.user?.avatar,
-                      TailString(item.userInfo?.user?.name ?? ''),
+                      TailString(item.userInfo?.user?.name || item.userInfo?.user?.accountId || ''),
                       AvatarColorUntil.getBackgroundColorById(item.userInfo?.user?.accountId ?? '')
                     ),
                     title: item.userInfo?.user?.name,
@@ -105,7 +105,7 @@ export struct AIUsersPage {
                   ViewItemBuilder({
                     avatarItem: new AvatarItem(
                       item.user.avatar,
-                      TailString(item.user.name),
+                      TailString(item.user.name || item.user.accountId),
                       AvatarColorUntil.getBackgroundColorById(item.user.accountId)
                     ),
                     title: item.user.name,
