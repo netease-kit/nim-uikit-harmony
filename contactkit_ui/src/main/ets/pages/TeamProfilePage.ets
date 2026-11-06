@@ -16,6 +16,13 @@ import {
 } from '@nimkit/common';
 import { V2NIMError, V2NIMErrorCode, V2NIMTeam, V2NIMTeamType, V2NIMUser } from '@nimsdk/base';
 import {
+  conversationOpenRegistry,
+  ConversationOpenIntent,
+  ConversationOpenSource,
+  ConversationRouteKey,
+  ConversationRouteKind
+} from '@nimkit/conversationkit_ui';
+import {
   resolveTeamApplyJoinErrorToastType,
   TeamApplyJoinToastType
 } from '../utils/TeamProfileUtils';
@@ -166,9 +173,18 @@ export struct TeamProfilePage {
   }
 
   goChat(teamId: string, teamType: V2NIMTeamType) {
+    const routeKind = teamType === V2NIMTeamType.V2NIM_TEAM_TYPE_SUPER ?
+      ConversationRouteKind.SUPER_TEAM : ConversationRouteKind.TEAM
     const conversationId = teamType === V2NIMTeamType.V2NIM_TEAM_TYPE_SUPER
       ? ChatKitClient.nim.conversationIdUtil.superTeamConversationId(teamId)
       : ChatKitClient.nim.conversationIdUtil.teamConversationId(teamId)
+    const intent = new ConversationOpenIntent(
+      new ConversationRouteKey(routeKind, conversationId),
+      ConversationOpenSource.CONTACT
+    )
+    if (conversationOpenRegistry.open(intent)) {
+      return
+    }
     this.pathStack.pushPath({
       name: 'ChatTeamPage',
       param: conversationId

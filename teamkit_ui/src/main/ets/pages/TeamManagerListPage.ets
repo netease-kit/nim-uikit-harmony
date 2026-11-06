@@ -40,7 +40,7 @@ struct TeamManagerListPage {
       },
     },
     ),
-    width: '70%'
+    width: 270
   })
   //移除管理员Id
   removeManagerId?: string

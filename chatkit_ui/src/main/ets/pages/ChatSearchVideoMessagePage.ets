@@ -5,7 +5,13 @@
  */
 
 import { Logger } from '@nimkit/common';
-import { CommonEmptyResult, NavigationBackBuilder, NECommonUtils, VideoViewerDialog, } from '@nimkit/common'
+import {
+  CommonEmptyResult,
+  NavigationBackBuilder,
+  NECommonUtils,
+  shouldOpenContextAction,
+  VideoViewerDialog
+} from '@nimkit/common'
 import { ChatSearchVideoMessageParams, ChatSearchVideoMessageViewModel, DateGroupedMessages } from '../viewmodel/ChatSearchVideoMessageViewModel'
 import { NIMMessageInfo } from '../model/NIMMessageInfo'
 import { getMessageVideoRatio, getMessageVideoUrl, getVideoMessageThumbnail, getVideoMessageUrl } from '../common/MessageHelper'
@@ -141,6 +147,11 @@ struct VideoMessageItem {
           .gesture(LongPressGesture().onAction((event: GestureEvent) => {
             this.onMessageClick?.onItemLongClick?.(event, this.message)
           }), GestureMask.IgnoreInternal)
+          .onMouse((event: MouseEvent) => {
+            if (shouldOpenContextAction(event.button, event.action)) {
+              this.onMessageClick?.onItemContextMenu?.(event, this.message)
+            }
+          })
 
         // 视频图标和时长
         Row() {
@@ -466,6 +477,9 @@ export struct ChatSearchVideoMessagePage {
                           },
                           onItemLongClick: () => {
                             // 长按显示操作菜单
+                            this.showVideoActionDialog(item)
+                          },
+                          onItemContextMenu: () => {
                             this.showVideoActionDialog(item)
                           }
                         }

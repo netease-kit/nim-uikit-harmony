@@ -58,6 +58,9 @@ export struct ConversationGroupManagePage {
       .width('100%')
       .height('100%')
       .backgroundColor(PAGE_BACKGROUND_COLOR)
+      .onAreaChange((_oldArea: Area, newArea: Area) => {
+        this.pageWidth = Number(newArea.width)
+      })
     }
     .hideTitleBar(true)
     .onReady((context: NavDestinationContext) => {
@@ -282,9 +285,13 @@ export struct ConversationGroupManagePage {
       .zIndex(1)
   }
 
+  // 页面自身宽度即详情区宽度，用于限制分组名称弹窗只占右栏
+  private pageWidth: number = 0
+
   private openCreateGroupPage(): void {
     const dialog = new CustomDialogController({
       builder: ConversationGroupNameDialog({
+        panelWidth: this.pageWidth,
         title: $r('app.string.conversation_group_create_title'),
         onSubmitName: async (name: string): Promise<void> => {
           await this.viewModel.createConversationGroup(name)
@@ -296,13 +303,13 @@ export struct ConversationGroupManagePage {
           this.closeCreateGroupDialog()
         }
       }),
-      alignment: DialogAlignment.Bottom,
+      alignment: DialogAlignment.BottomEnd,
       customStyle: true,
       backgroundColor: Color.Transparent,
       backgroundBlurStyle: BlurStyle.NONE,
       keyboardAvoidMode: KeyboardAvoidMode.NONE,
       height: CONVERSATION_GROUP_NAME_DIALOG_CONTAINER_HEIGHT,
-      width: '100%',
+      // customStyle 模式下控制器 width 不生效，弹窗宽度由内容节点按 panelWidth 决定
       autoCancel: false,
       openAnimation: {
         duration: 0,

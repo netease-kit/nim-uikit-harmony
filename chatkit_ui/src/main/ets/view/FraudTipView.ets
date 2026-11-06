@@ -44,12 +44,12 @@ export struct FraudTipView {
       }) {
         Text() {
           Span($r('app.string.fraud_tip_content'))
-            .fontSize(12)
+            .fontSize(13)
             .fontColor('#101010')
             .lineHeight(17) // 保证换行后行高均匀
           if (this.canReport) {
             Span($r('app.string.fraud_report_action'))
-              .fontSize(12)
+              .fontSize(13)
               .fontColor('#7AA2DB')
               .lineHeight(17) // 保证换行后行高均匀
               .onClick(() => {

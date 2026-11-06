@@ -212,7 +212,17 @@ export class AudioPlayerManager {
   // 通过url设置网络地址来实现播放直播码流
   async avPlayerLive(url: string, onStart?: () => void,
     onFinish?: () => void, messageClientId?: string) {
-    await this.setAudioPlayDevice()
+    try {
+      await this.setAudioPlayDevice()
+    } catch (error) {
+      // Device routing must not prevent playback through the system default output.
+      const e = error as BusinessError
+      Logger.warn('ChatKitUI', `${AudioPlayerManager.logTag}, use default audio output: ${e.code}, ${e.message}`)
+      await this.audioRenderer?.release().catch((releaseError: BusinessError) => {
+        Logger.warn('ChatKitUI', `${AudioPlayerManager.logTag}, release audio output failed: ${releaseError.code}`)
+      })
+      this.audioRenderer = undefined
+    }
     // 创建avPlayer实例对象
     if (!this.avPlayer) {
       this.avPlayer = await media.createAVPlayer();

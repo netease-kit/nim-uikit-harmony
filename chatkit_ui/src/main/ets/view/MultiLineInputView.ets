@@ -163,35 +163,43 @@ export struct MultiLineInputView {
   /**
    * @ 选择器 Dialog Controller
    */
-  chatAitDialogController: CustomDialogController = new CustomDialogController({
-    builder: ChatAitDialog({
-      teamId: this.teamId,
-      team: this.team,
-      showAitAll: this.showAitAll,
-      showAIUser: this.showAIUserAit,
-      showTeamMember: this.showTeamMemberAit,
-      aiUsers: this.aiUsers,
-      onSelectedAll: this.onSelectedAll.bind(this),
-      onMemberSelected: this.onTeamMemberSelected.bind(this),
-      onAIUserSelected: this.onAIUserSelected.bind(this)
-    }),
-    openAnimation: {
-      curve: Curve.Linear,
-      playMode: PlayMode.Alternate
-    },
-    autoCancel: true,
-    alignment: DialogAlignment.Bottom,
-    backgroundColor: Color.White,
-    height: '60%',
-    width: '100%',
-    customStyle: true
-  })
+  private chatAitDialogController?: CustomDialogController = undefined
+  // 输入区自身宽度即详情区宽度，单屏时等于整窗宽度
+  private selfWidth: number = 0
+
+  private openAitDialog(): void {
+    this.chatAitDialogController = new CustomDialogController({
+      builder: ChatAitDialog({
+        teamId: this.teamId,
+        team: this.team,
+        showAitAll: this.showAitAll,
+        showAIUser: this.showAIUserAit,
+        showTeamMember: this.showTeamMemberAit,
+        aiUsers: this.aiUsers,
+        onSelectedAll: this.onSelectedAll.bind(this),
+        onMemberSelected: this.onTeamMemberSelected.bind(this),
+        onAIUserSelected: this.onAIUserSelected.bind(this)
+      }),
+      openAnimation: {
+        curve: Curve.Linear,
+        playMode: PlayMode.Alternate
+      },
+      autoCancel: true,
+      alignment: DialogAlignment.BottomEnd,
+      backgroundColor: Color.White,
+      cornerRadius: 0,
+      height: '60%',
+      // 不能开启 customStyle：该模式下弹窗 width/height 不生效且区域铺满整屏，@ 列表会挡住左侧内容
+      width: this.selfWidth > 0 ? this.selfWidth : '100%'
+    })
+    this.chatAitDialogController.open()
+  }
 
   /**
    * @All 选择回调
    */
   onSelectedAll() {
-    this.chatAitDialogController.close()
+    this.chatAitDialogController?.close()
     let aitValue = getContext().resourceManager.getStringByNameSync('chat_team_ait_all') + ' '
     this.addAitSpan(accountAll, aitValue, true)
   }
@@ -201,12 +209,12 @@ export struct MultiLineInputView {
    * @param member 群成员对象
    */
   onTeamMemberSelected(member: TeamMemberWithUser) {
-    this.chatAitDialogController.close()
+    this.chatAitDialogController?.close()
     this.addAitSpan(member.getAccId(), member.getAitName() + ' ', true)
   }
 
   onAIUserSelected(aiUser: V2NIMAIUser) {
-    this.chatAitDialogController.close()
+    this.chatAitDialogController?.close()
     this.addAitSpan(aiUser.accountId, (aiUser.name ?? aiUser.accountId) + ' ', true)
   }
 
@@ -223,7 +231,7 @@ export struct MultiLineInputView {
       // 检查是否有成员缺失 userInfo，如果有则从云端获取
       await this.ensureMemberUserInfo(teamMemberCache)
     }
-    this.chatAitDialogController.open()
+    this.openAitDialog()
   }
 
   private canShowAitDialog(): boolean {
@@ -531,6 +539,7 @@ export struct MultiLineInputView {
       if (this.replyMsg && this.chatInfo) {
         Row() {
           Image($r('app.media.ic_chat_reply_close')).height(20).width(20).margin({ right: 12 })
+            .draggable(false)
             .onClick(() => {
               if (this.onCloseReply) {
                 this.onCloseReply()
@@ -566,6 +575,7 @@ export struct MultiLineInputView {
 
         // 收起按钮
         Image($r('app.media.ic_chat_input_collapse'))
+          .draggable(false)
           .width(24)
           .height(24)
           .margin({ left: 8 })
@@ -623,6 +633,7 @@ export struct MultiLineInputView {
 
         // 发送按钮
         Image($r('app.media.ic_chat_send'))
+          .draggable(false)
           .width(28)
           .height(28)
           .margin({ right: 8, bottom: 8 })
@@ -639,6 +650,9 @@ export struct MultiLineInputView {
       left: { anchor: "__container__", align: HorizontalAlign.Start },
       right: { anchor: "__container__", align: HorizontalAlign.End },
       top: { anchor: "__container__", align: VerticalAlign.Top }
+    })
+    .onAreaChange((_oldArea: Area, newArea: Area) => {
+      this.selfWidth = Number(newArea.width)
     })
   }
 }

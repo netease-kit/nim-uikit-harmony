@@ -198,7 +198,7 @@
     },
     {
       "name": "team_agree_mode_subscribe",
-      "value": "开启后，拉入入群，需被邀请人同意后才可成功"
+      "value": "开启后，拉人入群，需被邀请人同意后才可成功"
     },
     {
       "name": "team_join_mode_title",

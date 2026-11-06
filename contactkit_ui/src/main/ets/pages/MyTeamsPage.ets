@@ -16,6 +16,13 @@ import {
   ViewItemBuilder
 } from '@nimkit/common';
 import { V2NIMTeam } from '@nimsdk/base';
+import {
+  conversationOpenRegistry,
+  ConversationOpenIntent,
+  ConversationOpenSource,
+  ConversationRouteKey,
+  ConversationRouteKind
+} from '@nimkit/conversationkit_ui';
 import { MyTeamsViewModel } from '../viewmodel/MyTeamsViewModel';
 
 @ComponentV2
@@ -65,10 +72,14 @@ export struct MyTeamsPage {
                 })
               }
               .onClick(() => {
-                this.pathStack.pushPath({
-                  name: 'ChatTeamPage',
-                  param: ConversationIdUtilRepo.teamConversationId(item.teamId)
-                })
+                const conversationId = ConversationIdUtilRepo.teamConversationId(item.teamId)
+                const intent = new ConversationOpenIntent(
+                  new ConversationRouteKey(ConversationRouteKind.TEAM, conversationId),
+                  ConversationOpenSource.CONTACT
+                )
+                if (!conversationOpenRegistry.open(intent)) {
+                  this.pathStack.pushPath({ name: 'ChatTeamPage', param: conversationId })
+                }
               })
             })
           }

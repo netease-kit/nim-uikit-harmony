@@ -103,6 +103,14 @@
       "data": {
         "description": "app language page"
       }
+    },
+    {
+      "name": "AdaptiveEmptyDetailPage",
+      "pageSourceFile": "src/main/ets/pages/AdaptiveEmptyDetailPage.ets",
+      "buildFunction": "AdaptiveEmptyDetailPageBuilder",
+      "data": {
+        "description": "adaptive detail placeholder"
+      }
     }
   ]
 }

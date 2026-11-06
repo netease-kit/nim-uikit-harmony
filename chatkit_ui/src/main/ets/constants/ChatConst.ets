@@ -35,6 +35,11 @@ export class ChatConst {
   static readonly messageInputAreaHeight: number = 180;
   // 消息长按菜单每个item的宽度
   static readonly menuItemWidth: number = 60;
+
+  // 快捷评论面板（页面内渲染，与长按菜单同一套定位）
+  static readonly reactionPickerWidth: number = 320;
+  static readonly reactionPickerHeight: number = 251;
+  static readonly reactionPickerGap: number = 8;
   static readonly menuItemHeight: number = 66;
   // 消息长按菜单列数
   static readonly menuItemColumnNum: number = 5;

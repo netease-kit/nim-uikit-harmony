@@ -5,6 +5,22 @@
  *
  */
 
+// 已成功加载过头像的 URL 集合。
+// 会话列表按未读数/预览等数据更新时会重建行，行内的 CommonAvatar 也是新实例，
+// loadedAvatarKey 会被重置导致头像首帧透明（看起来闪一下）；命中这个集合就直接以可见状态开始。
+const MAX_CACHED_AVATAR_URLS: number = 500
+const loadedAvatarUrlCache: Set<string> = new Set<string>()
+
+function rememberLoadedAvatarUrl(key: string): void {
+  if (key.length <= 0) {
+    return
+  }
+  if (loadedAvatarUrlCache.size > MAX_CACHED_AVATAR_URLS) {
+    loadedAvatarUrlCache.clear()
+  }
+  loadedAvatarUrlCache.add(key)
+}
+
 @ComponentV2
 export struct CommonAvatar {
   /**
@@ -26,6 +42,13 @@ export struct CommonAvatar {
   @Param longPressGesture: ((event: GestureEvent) => void) | undefined = undefined
   @Local failedAvatarKey: string = ''
   @Local loadedAvatarKey: string = ''
+
+  aboutToAppear(): void {
+    // 行重建时复用"已加载过"的判断，避免首帧透明（闪烁）
+    if (loadedAvatarUrlCache.has(this.getAvatarUrlKey())) {
+      this.loadedAvatarKey = this.getAvatarFailureKey()
+    }
+  }
 
   build() {
     if (this.item != null) {
@@ -61,11 +84,16 @@ export struct CommonAvatar {
         .height('100%')
         .draggable(false)
         .objectFit(ImageFit.Cover)
+        // 按显示尺寸解码：头像原图往往比 48vp 大很多，冷启首次滑动时逐行解码大图会掉帧
+        .autoResize(true)
+        // 异步加载：同步加载会在 UI 线程阻塞（首屏滑动卡顿），
+        // 首帧是否透明由"已加载 URL 集合"决定，已加载过的头像仍然不闪
         .syncLoad(false)
         .borderRadius(this.roundRadius)
         .opacity(this.shouldShowLoadedAvatar() ? 1 : 0)
         .onComplete(() => {
           this.loadedAvatarKey = this.getAvatarFailureKey()
+          rememberLoadedAvatarUrl(this.getAvatarFailureKey())
         })
         .onError(() => {
           this.failedAvatarKey = this.getAvatarFailureKey()
@@ -82,6 +110,7 @@ export struct CommonAvatar {
       .height('100%')
       .draggable(false)
       .objectFit(ImageFit.Cover)
+      .autoResize(true)
       .syncLoad(false)
       .borderRadius(this.roundRadius)
       .onError(() => {

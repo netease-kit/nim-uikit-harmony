@@ -12,6 +12,7 @@ import neEmojiManagerTest from './NEEmojiManager.test';
 import emoticonPaginationUtilsTest from './EmoticonPaginationUtils.test';
 import stickerFileUtilsTest from './StickerFileUtils.test';
 import chatTeamMuteStateUtilsTest from './ChatTeamMuteStateUtils.test';
+import chatViewportPolicyTest from './ChatViewportPolicy.test';
 
 export default function testsuite() {
   lastReadPositionUtilsTest();
@@ -22,4 +23,5 @@ export default function testsuite() {
   emoticonPaginationUtilsTest();
   stickerFileUtilsTest();
   chatTeamMuteStateUtilsTest();
+  chatViewportPolicyTest();
 }

@@ -14,6 +14,7 @@ export struct NEImageButton {
   build() {
     RelativeContainer() {
       Image(this.image)
+        .draggable(false)
         .width(24)
         .height(24)
         .alignRules({

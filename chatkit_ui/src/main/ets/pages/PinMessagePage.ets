@@ -194,6 +194,8 @@ export struct PinMessagePage {
     width: '100%',
     customStyle: true
   })
+  // 页面自身宽度即详情区宽度，用于限制消息详情只占右栏
+  private pageWidth: number = 0
   @Local tapMessage?: NIMMessageInfo
   @Local pinMoreActionDialogHeight: number = 42
   @Local forwardMessages: NIMMessageInfo[] = []
@@ -234,20 +236,27 @@ export struct PinMessagePage {
     backgroundColor: Color.Transparent,
     backgroundBlurStyle: BlurStyle.NONE,
   })
-  textMessageDetailDialog: CustomDialogController = new CustomDialogController({
-    builder: TextMessageDetailDialog({
-      message: this.tapMessage,
-      onClose: () => {
-        this.closeTextMessageDetailDialog()
-      }
-    }),
-    cornerRadius: 0,
-    alignment: DialogAlignment.Center,
-    backgroundColor: Color.White,
-    height: '100%',
-    width: '100%',
-    customStyle: true
-  })
+  private textMessageDetailDialog?: CustomDialogController = undefined
+
+  private openTextMessageDetailDialog(): void {
+    this.textMessageDetailDialog = new CustomDialogController({
+      builder: TextMessageDetailDialog({
+        panelWidth: this.pageWidth,
+        message: this.tapMessage,
+        onClose: () => {
+          this.closeTextMessageDetailDialog()
+        }
+      }),
+      cornerRadius: 0,
+      // customStyle 模式下弹窗区域铺满整屏，宽度由内容按 panelWidth 决定，这里只需贴右侧
+      alignment: DialogAlignment.CenterEnd,
+      backgroundColor: Color.White,
+      height: '100%',
+      customStyle: true
+    })
+    this.textMessageDetailDialog.open()
+  }
+
   private listScroller: Scroller = new Scroller()
   private scrollIndex: number = 0
 
@@ -354,9 +363,9 @@ export struct PinMessagePage {
                     } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
                       this.showVideoDetail(msg)
                     } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
-                      this.textMessageDetailDialog.open()
+                      this.openTextMessageDetailDialog()
                     } else if (msg && isMultiLineMessage(msg.message)) {
-                      this.textMessageDetailDialog.open()
+                      this.openTextMessageDetailDialog()
                     } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
                       showLocationDetail(msg, getContext(this) as common.UIAbilityContext)
                     } else if (msg?.message.messageType === V2NIMMessageType.V2NIM_MESSAGE_TYPE_CUSTOM) {
@@ -412,6 +421,11 @@ export struct PinMessagePage {
           this.scrollIndex = start
         })
       }
+      .width('100%')
+      .height('100%')
+      .onAreaChange((_oldArea: Area, newArea: Area) => {
+        this.pageWidth = Number(newArea.width)
+      })
     }
     .hideTitleBar(true)
     .backgroundColor('#EFF1F4')

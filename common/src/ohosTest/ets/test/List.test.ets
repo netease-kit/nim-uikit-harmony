@@ -14,6 +14,7 @@ import BreakpointConstantsTest from './BreakpointConstants.test';
 import CommonUtilsTest from './CommonUtils.test';
 import AppLanguageUtilsTest from './AppLanguageUtils.test';
 import MatchSearchTextUtilsTest from './MatchSearchTextUtils.test';
+import AdaptiveLayoutPolicyTest from './AdaptiveLayoutPolicy.test';
 
 export default function testsuite() {
   localUnitTest();
@@ -26,4 +27,5 @@ export default function testsuite() {
   CommonUtilsTest();
   AppLanguageUtilsTest();
   MatchSearchTextUtilsTest();
+  AdaptiveLayoutPolicyTest();
 }

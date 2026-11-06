@@ -267,6 +267,14 @@
     {
       "name": "conversation_group_conversation_not_exist_tips",
       "value": "会话不存在"
+    },
+    {
+      "name": "start_mute_conversation",
+      "value": "开始免打扰"
+    },
+    {
+      "name": "cancel_mute_conversation",
+      "value": "取消免打扰"
     }
   ]
 }

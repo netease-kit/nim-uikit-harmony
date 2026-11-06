@@ -8,6 +8,7 @@
 import { Logger } from '@nimkit/common';
 import { V2NIMUser } from '@nimsdk/base';
 import { pasteboard } from '@kit.BasicServicesKit';
+import { ComponentContent } from '@kit.ArkUI';
 import {
   AvatarColorUntil,
   AvatarItem,
@@ -22,67 +23,93 @@ import { EditInfoViewModel } from '../model/EditInfoViewModel';
 import { EditInfoParam } from './EditInfoPage';
 import fs from '@ohos.file.fs';
 
-@CustomDialog
-export struct DatePickerDialog {
-  controller?: CustomDialogController
+/**
+ * 生日选择器弹窗参数。
+ * 弹窗宽度随参数传入，页面宽高变化时通过 ComponentContent.update 触发重渲染，弹窗尺寸跟随变化。
+ */
+export class DatePickerDialogParam {
+  panelWidth: number
   dateString?: string
+  selectedDate?: Date
   onDateChanged?: (value?: Date) => void
-  selectedData?: Date
-  viewModel = new EditInfoViewModel()
+  onClose?: () => void
 
-  build() {
-    Column() {
-      Row() {
-        Button($r('app.string.mine_edit_cancel'), { type: ButtonType.Normal })
-          .fontSize(13)
-          .fontColor("#337EFF")
-          .backgroundColor(Color.White)
-          .width(60)
-          .height(20)
-          .margin({ left: 20 })
-          .onClick(() => {
-            this.controller?.close()
-          })
+  constructor(panelWidth: number, dateString?: string, selectedDate?: Date,
+    onDateChanged?: (value?: Date) => void, onClose?: () => void) {
+    this.panelWidth = panelWidth
+    this.dateString = dateString
+    this.selectedDate = selectedDate
+    this.onDateChanged = onDateChanged
+    this.onClose = onClose
+  }
+}
 
-        Row()
-          .height(1)
-          .layoutWeight(1)
+function resolvePickerSelectedDate(param: DatePickerDialogParam): Date {
+  if (param.selectedDate) {
+    return param.selectedDate
+  }
+  if (param.dateString) {
+    const parsed = new Date(param.dateString)
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed
+    }
+  }
+  return new Date()
+}
 
-        Button($r('app.string.mine_edit_sure'), { type: ButtonType.Normal })
-          .fontSize(13)
-          .fontColor("#337EFF")
-          .backgroundColor(Color.White)
-          .width(60)
-          .height(20)
-          .margin({ right: 20 })
-          .onClick(() => {
-            if (this.onDateChanged) {
-              this.onDateChanged(this.selectedData)
-            }
-            this.controller?.close()
-          })
-      }
-      .height(38)
+@Builder
+export function datePickerDialogBuilder(params: DatePickerDialogParam) {
+  Column() {
+    Row() {
+      Button($r('app.string.mine_edit_cancel'), { type: ButtonType.Normal })
+        .fontSize(13)
+        .fontColor("#337EFF")
+        .backgroundColor(Color.White)
+        .width(60)
+        .height(20)
+        .margin({ left: 20 })
+        .onClick(() => {
+          params.onClose?.()
+        })
 
       Row()
         .height(1)
-        .width('100%')
-        .backgroundColor("#EFF1F4")
+        .layoutWeight(1)
 
-      DatePicker({
-        start: new Date('1970-1-1'),
-        end: new Date(),
-        selected: new Date(this.dateString)
-      })
-        .width('100%')
-        .margin({ top: 9 })
+      Button($r('app.string.mine_edit_sure'), { type: ButtonType.Normal })
+        .fontSize(13)
+        .fontColor("#337EFF")
         .backgroundColor(Color.White)
-        .onDateChange((value) => {
-          this.selectedData = value
+        .width(60)
+        .height(20)
+        .margin({ right: 20 })
+        .onClick(() => {
+          params.onDateChanged?.(params.selectedDate)
+          params.onClose?.()
         })
     }
-    .backgroundColor(Color.White)
+    .height(38)
+
+    Row()
+      .height(1)
+      .width('100%')
+      .backgroundColor("#EFF1F4")
+
+    DatePicker({
+      start: new Date('1970-1-1'),
+      end: new Date(),
+      selected: resolvePickerSelectedDate(params)
+    })
+      .width('100%')
+      .margin({ top: 9 })
+      .backgroundColor(Color.White)
+      .onDateChange((value) => {
+        params.selectedDate = value
+      })
   }
+  .width(params.panelWidth > 0 ? params.panelWidth : '100%')
+  .height(248)
+  .backgroundColor(Color.White)
 }
 
 // 跳转页面入口函数
@@ -153,14 +180,63 @@ export struct MineInfoPage {
       }
     }
   }
-  dateDialog: CustomDialogController = new CustomDialogController({
-    builder: DatePickerDialog({ dateString: this.myUser?.birthday, onDateChanged: this.onDateChanged }),
-    cornerRadius: 0,
-    alignment: DialogAlignment.Bottom,
-    backgroundColor: Color.White,
-    height: 248,
-    width: '100%'
-  })
+  private pageWidth: number = 0
+  private datePickerContent?: ComponentContent<DatePickerDialogParam> = undefined
+  private datePickerParam?: DatePickerDialogParam = undefined
+
+  private openDateDialog(): void {
+    this.closeDateDialog()
+    const param = new DatePickerDialogParam(this.pageWidth, this.mineInfoItems1[4].subTitle?.toString(), undefined,
+      this.onDateChanged, () => {
+        this.closeDateDialog()
+      })
+    const content = new ComponentContent(this.getUIContext(), wrapBuilder(datePickerDialogBuilder), param)
+    this.datePickerParam = param
+    this.datePickerContent = content
+    // 弹窗尺寸由内容决定，内容宽度写的是详情页宽度，分栏时贴在右栏底部，单屏时保持整宽。
+    this.getUIContext().getPromptAction().openCustomDialog(content, {
+      alignment: DialogAlignment.BottomEnd,
+      autoCancel: true,
+      onWillDismiss: () => {
+        // 点击弹窗外关闭时只清理引用，避免后续误用已关闭的弹窗内容
+        this.datePickerContent = undefined
+        this.datePickerParam = undefined
+      }
+    })
+  }
+
+  private closeDateDialog(): void {
+    const content = this.datePickerContent
+    this.datePickerContent = undefined
+    this.datePickerParam = undefined
+    if (content) {
+      this.getUIContext().getPromptAction().closeCustomDialog(content).then(() => {
+        content.dispose()
+      }).catch(() => {
+        content.dispose()
+      })
+    }
+  }
+
+  private syncDateDialogWidth(): void {
+    const content = this.datePickerContent
+    const current = this.datePickerParam
+    if (!content || !current || current.panelWidth === this.pageWidth) {
+      return
+    }
+    const next = new DatePickerDialogParam(this.pageWidth, current.dateString, current.selectedDate,
+      current.onDateChanged, current.onClose)
+    this.datePickerParam = next
+    try {
+      content.update(next)
+    } catch (err) {
+      // 弹窗已被系统关闭时内容节点可能已失效，直接丢弃引用即可
+      this.datePickerContent = undefined
+      this.datePickerParam = undefined
+      Logger.warn('ContactKit', 'update date picker width failed', err)
+    }
+  }
+
   chooseAvatarDialog: CustomDialogController = new CustomDialogController({
     builder: ChooseAvatarDialog({ onImageChosen: this.onImageChosen }),
     cornerRadius: 0,
@@ -169,6 +245,10 @@ export struct MineInfoPage {
     backgroundBlurStyle: BlurStyle.NONE,
     height: 140,
   })
+
+  aboutToDisappear(): void {
+    this.closeDateDialog()
+  }
 
   getGenderString() {
     return this.gender === 2 ? $r("app.string.person_gender_female") :
@@ -271,7 +351,7 @@ export struct MineInfoPage {
                 }
 
                 if (item.editType == EditType.birthday) {
-                  this.dateDialog.open()
+                  this.openDateDialog()
                 }
 
               })
@@ -347,6 +427,12 @@ export struct MineInfoPage {
           bottom: 56 + 12
         })
       }
+      .width('100%')
+      .onAreaChange((_oldArea: Area, newArea: Area) => {
+        this.pageWidth = Number(newArea.width)
+        // 弹窗已打开时窗口尺寸变化，同步弹窗宽度，避免弹窗停在旧宽度上
+        this.syncDateDialogWidth()
+      })
     }
     .hideTitleBar(true)
     .backgroundColor('#EFF1F4')

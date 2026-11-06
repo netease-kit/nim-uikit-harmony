@@ -267,6 +267,14 @@
     {
       "name": "conversation_group_conversation_not_exist_tips",
       "value": "Conversation does not exist"
+    },
+    {
+      "name": "start_mute_conversation",
+      "value": "Mute Notifications"
+    },
+    {
+      "name": "cancel_mute_conversation",
+      "value": "Unmute Notifications"
     }
   ]
 }

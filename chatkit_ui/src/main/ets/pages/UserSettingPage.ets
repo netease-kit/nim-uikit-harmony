@@ -9,6 +9,8 @@ import { Logger } from '@nimkit/common';
 import {
   ChatKitClient,
   ContactRepo,
+  ConversationRepo,
+  LocalConversationRepo,
   ErrorUtils,
   IMKitConfigCenter,
   NEFriendUserCache,
@@ -105,11 +107,16 @@ export struct UserSettingPage {
       try {
         const createTeamResult = await TeamRepo.createGroupTeam(inviteeAccountIds)
 
-        // 替换聊天页
+        // 新建讨论组的系统消息不应在首次进入聊天页时形成未读提示。
         if (createTeamResult?.team) {
+          const conversationId = ChatKitClient.nim.conversationIdUtil.teamConversationId(createTeamResult.team.teamId)
+          if (IMKitConfigCenter.enableLocalConversation) {
+            await LocalConversationRepo.clearUnreadCountByIds([conversationId])
+          } else {
+            await ConversationRepo.clearUnreadCountByIds([conversationId])
+          }
           this.pathStack.popToName('ChatP2PPage')
-          this.pathStack.replacePathByName('ChatTeamPage',
-            ChatKitClient.nim.conversationIdUtil.teamConversationId(createTeamResult.team.teamId))
+          this.pathStack.replacePathByName('ChatTeamPage', conversationId)
         }
       } catch (err) {
         Logger.info('ChatKitUI', err)

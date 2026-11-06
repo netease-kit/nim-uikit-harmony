@@ -31,6 +31,8 @@ export struct MessageOperationView {
   @Param
   onReactionExpandedChange?: (expanded: boolean) => void = undefined;
   @Param
+  onPointerHoverChange?: (hovered: boolean) => void = undefined;
+  @Param
   enableReaction: boolean = false;
   @Param
   reactionExpanded: boolean = false;
@@ -101,6 +103,13 @@ export struct MessageOperationView {
         }
       }
     }.backgroundColor(Color.White).borderRadius(8)
+    // 操作菜单是独立交互层，避免触摸继续冒泡到消息文本的选区处理。
+    .onTouch((event: TouchEvent) => {
+      event.stopPropagation()
+    })
+    .onHover((hovered: boolean) => {
+      this.onPointerHoverChange?.(hovered)
+    })
     .width(this.viewWidth)
     .constraintSize({ minHeight: this.viewHeight })
   }

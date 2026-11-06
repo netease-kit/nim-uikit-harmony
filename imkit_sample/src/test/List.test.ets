@@ -6,7 +6,9 @@
  */
 
 import localUnitTest from './LocalUnit.test';
+import ConversationNavigationCoordinatorTest from './ConversationNavigationCoordinator.test';
 
 export default function testsuite() {
   localUnitTest();
+  ConversationNavigationCoordinatorTest();
 }

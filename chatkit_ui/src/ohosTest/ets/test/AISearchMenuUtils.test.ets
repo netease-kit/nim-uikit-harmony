@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from '@ohos/hypium'
 import {
+  AISearchSelectionState,
   canShowAISearchForMessageType,
   getMultiLineAISearchText,
   getRenderedTextLength,
@@ -17,6 +18,29 @@ import { V2NIMMessageType } from '@nimsdk/base'
 
 export default function aiSearchMenuUtilsTest() {
   describe('AISearchMenuUtils', () => {
+    it('opens a mouse selection with only the dragged text selected', 0, () => {
+      const state = new AISearchSelectionState()
+      state.openRange('hello', 1, 4, 0, 0, 100, 20)
+      expect(state.selectedText()).assertEqual('ell')
+      expect(state.isAllSelected()).assertFalse()
+    })
+    it('keeps a source range for copying and a rendered range for highlighting', 0, () => {
+      const state = new AISearchSelectionState()
+      state.openRange('[哈哈]abc', 4, 5, 1, 2, 0, 0, 100, 20)
+      expect(state.start).assertEqual(4)
+      expect(state.end).assertEqual(5)
+      expect(state.selectedText()).assertEqual('a')
+      expect(state.displayStart).assertEqual(1)
+      expect(state.displayEnd).assertEqual(2)
+    })
+
+    it('highlights the whole text when the message is opened entirely', 0, () => {
+      const state = new AISearchSelectionState()
+      state.open('hello', 0, 0, 100, 20)
+      expect(state.displayStart).assertEqual(0)
+      expect(state.displayEnd).assertGreater(state.displayEnd, 'hello'.length)
+    })
+
     it('should_identify_full_selection', 0, () => {
       expect(isSelectAllText(0, 4, 4)).assertTrue()
     })

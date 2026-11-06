@@ -359,7 +359,7 @@ struct Index {
         .width('100%')
         .margin({ top: 10 })
       }
-    }.mode(NavigationMode.Auto)
+    }.mode(NavigationMode.Stack)
     .hideTitleBar(true)
   }
 

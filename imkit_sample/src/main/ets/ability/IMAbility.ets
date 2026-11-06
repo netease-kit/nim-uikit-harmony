@@ -7,7 +7,13 @@
 
 import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { display, window } from '@kit.ArkUI';
-import { BreakpointConstants, Logger } from '@nimkit/common';
+import {
+  adaptiveWindowManager,
+  AdaptiveWindowSnapshot,
+  BreakpointConstants,
+  Logger,
+  resolveAdaptiveLayout
+} from '@nimkit/common';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { hiAppEvent, hilog } from '@kit.PerformanceAnalysisKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
@@ -16,6 +22,7 @@ import { UIObserver } from '../uitrace/UIObserver';
 import UITraceLogger from '../uitrace/UITraceLogger';
 import { NotificationHelper } from '@nimkit/chatkit';
 import { V2NIMConversationType } from '@nimsdk/base';
+import { resolveShellOrientationPolicy, ShellOrientationPolicy } from '../manager/AdaptiveShellPolicy';
 
 /**
  * 通知点击跳转参数
@@ -35,6 +42,16 @@ interface PushJumpData {
 
 export default class IMKitAbility extends UIAbility {
   private windowObj?: window.Window;
+  private isFoldableDevice: boolean = false;
+  private isFoldedScreen: boolean = false;
+  private appliedOrientationPolicy?: ShellOrientationPolicy = undefined;
+  private readonly adaptiveOrientationListener = (snapshot: AdaptiveWindowSnapshot): void => {
+    this.applyAdaptiveOrientation(snapshot)
+  }
+  private readonly foldStatusListener = (status: display.FoldStatus): void => {
+    this.isFoldedScreen = status === display.FoldStatus.FOLD_STATUS_FOLDED
+    this.applyAdaptiveOrientation(adaptiveWindowManager.state.getSnapshot())
+  }
   // 待处理的通知跳转参数
   private pendingNotificationParams: NotificationParams | undefined = undefined;
 
@@ -146,6 +163,8 @@ export default class IMKitAbility extends UIAbility {
   }
 
   onDestroy(): void {
+    this.releaseAdaptiveOrientation()
+    adaptiveWindowManager.release()
     Logger.info('Ability onDestroy');
   }
 
@@ -170,12 +189,19 @@ export default class IMKitAbility extends UIAbility {
     let context = this.context;
     let pathDir = context.filesDir;
     Logger.info('netease Ability onWindowStageCreate', pathDir);
+
+    // Initialize the real window snapshot before page construction so the first
+    // frame can choose the correct foldable layout instead of falling back to 0x0 Compact.
+    this.windowObj = windowStage.getMainWindowSync()
+    adaptiveWindowManager.init(this.windowObj)
+    this.initAdaptiveOrientation()
+
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
         Logger.error('Failed to load the content. Cause: %{public}s', JSON.stringify(err) ?? '');
         return;
       }
-      const uiContext: UIContext = windowStage.getMainWindowSync().getUIContext();
+      const uiContext: UIContext = this.windowObj!.getUIContext();
       UIObserver.getInstance().onWillClick(uiContext);
       UIObserver.getInstance().onScrollEvent(uiContext);
       UIObserver.getInstance().onNavDestinationSwitch(uiContext);
@@ -219,6 +245,9 @@ export default class IMKitAbility extends UIAbility {
 
   onWindowStageDestroy(): void {
     // Main window is destroyed, release UI related resources.
+    this.releaseAdaptiveOrientation()
+    adaptiveWindowManager.release()
+    this.windowObj = undefined
     Logger.info('Ability onWindowStageDestroy');
   }
 
@@ -247,5 +276,49 @@ export default class IMKitAbility extends UIAbility {
       curBp = BreakpointConstants.BREAKPOINT_LG;
     }
     AppStorage.setOrCreate('currentBreakpoint', curBp);
+  }
+
+  private initAdaptiveOrientation(): void {
+    this.releaseAdaptiveOrientation()
+    try {
+      this.isFoldableDevice = display.isFoldable()
+      if (this.isFoldableDevice) {
+        this.isFoldedScreen = display.getFoldStatus() === display.FoldStatus.FOLD_STATUS_FOLDED
+        display.on('foldStatusChange', this.foldStatusListener)
+      }
+    } catch (error) {
+      Logger.warn('Unable to read fold state: ' + JSON.stringify(error))
+      this.isFoldableDevice = false
+      this.isFoldedScreen = false
+    }
+    adaptiveWindowManager.state.subscribe(this.adaptiveOrientationListener)
+  }
+
+  private releaseAdaptiveOrientation(): void {
+    adaptiveWindowManager.state.unsubscribe(this.adaptiveOrientationListener)
+    if (this.isFoldableDevice) {
+      display.off('foldStatusChange', this.foldStatusListener)
+    }
+    this.isFoldableDevice = false
+    this.isFoldedScreen = false
+    this.appliedOrientationPolicy = undefined
+  }
+
+  private applyAdaptiveOrientation(snapshot: AdaptiveWindowSnapshot): void {
+    if (!this.windowObj) {
+      return
+    }
+    const layoutMode = resolveAdaptiveLayout(snapshot.widthVp, snapshot.heightVp).mode
+    const policy = resolveShellOrientationPolicy(layoutMode, this.isFoldedScreen, this.isFoldableDevice)
+    if (policy === this.appliedOrientationPolicy) {
+      return
+    }
+    this.appliedOrientationPolicy = policy
+    const orientation = policy === ShellOrientationPolicy.PORTRAIT_ONLY ?
+      window.Orientation.PORTRAIT : window.Orientation.AUTO_ROTATION_RESTRICTED
+    this.windowObj.setPreferredOrientation(orientation).catch((error: BusinessError): void => {
+      Logger.warn('Failed to update adaptive orientation: ' + JSON.stringify(error))
+      this.appliedOrientationPolicy = undefined
+    })
   }
 }

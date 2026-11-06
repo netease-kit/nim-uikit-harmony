@@ -15,6 +15,10 @@
     {
       "name": "chat_message_text_font_size",
       "value": "14vp"
+    },
+    {
+      "name": "chat_saved_message_card_max_width",
+      "value": "300vp"
     }
   ]
 }

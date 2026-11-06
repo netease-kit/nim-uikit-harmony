@@ -24,6 +24,8 @@ const DIALOG_INITIAL_OFFSET_Y: number = 1000
 @CustomDialog
 export struct ConversationGroupNameDialog {
   controller?: CustomDialogController
+  // 弹窗只占详情区宽度；customStyle 模式下弹窗区域铺满整屏，宽度需由内容自己声明
+  panelWidth: number = 0
   title: ResourceStr = $r('app.string.conversation_group_create_title')
   initialName: string = ''
   onSubmitName?: (name: string) => Promise<void>
@@ -126,7 +128,7 @@ export struct ConversationGroupNameDialog {
       .opacity(this.panelOpacity)
       .translate({ y: this.panelOffsetY })
     }
-    .width('100%')
+    .width(this.panelWidth > 0 ? this.panelWidth : '100%')
     .height(DIALOG_CONTAINER_HEIGHT)
   }
 

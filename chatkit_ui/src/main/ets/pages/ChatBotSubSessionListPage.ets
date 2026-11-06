@@ -392,6 +392,7 @@ export struct ChatBotSubSessionListPage {
   private showTopicAction(item: ChatBotSubSessionItem): void {
     AlertDialog.show({
       title: item.title,
+      width: 300,
       message: '',
       autoCancel: true,
       alignment: DialogAlignment.Bottom,

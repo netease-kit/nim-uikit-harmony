@@ -13,6 +13,7 @@ export struct CommonEmptyResult {
   @Param emptyImageWidth?: number = 122
   @Param fontSize?: number = 14
   @Param fontColor?: ResourceStr = '#B3B7BC'
+  @Param centerContent: boolean = false
 
   build() {
     Column() {
@@ -20,7 +21,7 @@ export struct CommonEmptyResult {
         .width(this.emptyImageWidth)
         .height(this.emptyImageHeight)
         .objectFit(ImageFit.Contain)
-        .margin({ top: 80 })
+        .margin({ top: this.centerContent ? 0 : 80 })
 
       Text(this.tips)
         .fontSize(this.fontSize)
@@ -31,6 +32,7 @@ export struct CommonEmptyResult {
 
     }
     .width('100%').height('100%')
+    .justifyContent(this.centerContent ? FlexAlign.Center : FlexAlign.Start)
     .backgroundColor(Color.Transparent)
   }
 }

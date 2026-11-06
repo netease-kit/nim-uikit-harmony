@@ -4,7 +4,7 @@
  *  found in the LICENSE file.
  */
 
-import { Logger } from '@nimkit/common';
+import { Logger, resolveContextAction } from '@nimkit/common';
 import { EmojiParseType, NEEmojiParseResult } from '../manager/NEEmojiManager'
 import {
   V2NIMConversationType,
@@ -61,6 +61,17 @@ import {
 
 const AI_SEARCH_MARKDOWN_SELECT_DEBUG_TAG = 'AISearchMarkdownSelect'
 let aiMarkdownLinkifyRegistered = false
+
+function openNestedContextAction(event: MouseEvent, action?: (event: MouseEvent) => void): void {
+  const decision = resolveContextAction(event.button, event.action, true)
+  if (!decision.open) {
+    return
+  }
+  if (decision.stopPropagation) {
+    event.stopPropagation()
+  }
+  action?.(event)
+}
 
 export function getMessageBackgroundColor(message: NIMMessageInfo | undefined,
   fallback: ResourceColor, hasReaction: boolean = false): ResourceColor {
@@ -178,6 +189,10 @@ export struct messageContent {
   @Param
   aiSearchSelectingTranslation: boolean = false
   @Param
+  aiSearchSelectionStart: number = 0
+  @Param
+  aiSearchSelectionEnd: number = 0
+  @Param
   showReaction: boolean = false
 
   private isAIStreamResponseMessage(): boolean {
@@ -193,7 +208,9 @@ export struct messageContent {
           onMessageClick: this.onMessageClick,
           chatInfo: this.chatInfo,
           aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
-          aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
+          aiSearchSelectingTranslation: this.aiSearchSelectingTranslation,
+          aiSearchSelectionStart: this.aiSearchSelectionStart,
+          aiSearchSelectionEnd: this.aiSearchSelectionEnd
         });
       } else {
         richTextBuilder({
@@ -201,17 +218,29 @@ export struct messageContent {
           onMessageClick: this.onMessageClick,
           chatInfo: this.chatInfo,
           aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
-          aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
+          aiSearchSelectingTranslation: this.aiSearchSelectingTranslation,
+          aiSearchSelectionStart: this.aiSearchSelectionStart,
+          aiSearchSelectionEnd: this.aiSearchSelectionEnd
         });
       }
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
-      locationBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+      locationBuilder({ message: this.message, onMessageClick: this.onMessageClick })
+        // 与标记/收藏列表一致：消息体最宽 chat_saved_message_card_max_width(300vp)，避免宽屏下卡片撑满整行。
+        // 必须同时给出确定的宽度：只给 maxWidth 时节点仍是 wrapContent，内部地图图片的 100%
+        // 会按未收敛的可用宽度计算，图片从卡片右侧溢出（与 73480 pin 列表的修法一致）。
+        .width('100%')
+        .constraintSize({ maxWidth: $r('app.float.chat_saved_message_card_max_width') });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
       imageBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
       videoBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE) {
-      fileBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+      fileBuilder({ message: this.message, onMessageClick: this.onMessageClick })
+        // 与标记/收藏列表一致：消息体最宽 chat_saved_message_card_max_width(300vp)，避免宽屏下卡片撑满整行。
+        // 必须同时给出确定的宽度：只给 maxWidth 时节点仍是 wrapContent，卡片内部按「未收敛的可用宽度」
+        // 排版（文件名所在的 70% 列会超过上限），文件名会画到气泡外面。
+        .width('100%')
+        .constraintSize({ maxWidth: $r('app.float.chat_saved_message_card_max_width') });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
       MessageAudioItemView({
         message: this.message,
@@ -227,10 +256,17 @@ export struct messageContent {
           onMessageClick: this.onMessageClick,
           chatInfo: this.chatInfo,
           aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
-          aiSearchSelectingTranslation: this.aiSearchSelectingTranslation
+          aiSearchSelectingTranslation: this.aiSearchSelectingTranslation,
+          aiSearchSelectionStart: this.aiSearchSelectionStart,
+          aiSearchSelectionEnd: this.aiSearchSelectionEnd
         })
       } else if (this.message.isMergeMsg) {
         mergedMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick })
+        // 与标记/收藏列表一致：消息体最宽 chat_saved_message_card_max_width(300vp)，避免宽屏下卡片撑满整行。
+        // 同样要给出确定宽度：窄分栏（单屏/双屏）下只给 maxWidth 会让卡片按整行宽度排版，
+        // 卡片比气泡列还宽，右侧顶到发送方头像上。
+        .width('100%')
+        .constraintSize({ maxWidth: $r('app.float.chat_saved_message_card_max_width') })
       } else {
         unknownBuilder({ message: this.message, onMessageClick: this.onMessageClick });
       }
@@ -252,13 +288,17 @@ export struct pinMessageContent {
     if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
       pinTextBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
-      pinLocationBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+      pinLocationBuilder({ message: this.message, onMessageClick: this.onMessageClick })
+        .width('80%')
+        .constraintSize({ maxWidth: $r('app.float.chat_saved_message_card_max_width') })
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
       imageBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
       videoBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_FILE) {
-      fileBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+      fileBuilder({ message: this.message, onMessageClick: this.onMessageClick })
+        .width('80%')
+        .constraintSize({ maxWidth: $r('app.float.chat_saved_message_card_max_width') })
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_AUDIO) {
       MessageAudioItemView({ message: this.message, onMessageClick: this.onMessageClick, isReceiveStyle: true });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_CALL) {
@@ -267,7 +307,9 @@ export struct pinMessageContent {
       if (this.message.isMultiLineMsg) {
         multiLineMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick, isPinCollectionMode: true })
       } else if (this.message.isMergeMsg) {
-        mergedMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick }).width('80%')
+        mergedMessageBuilder({ message: this.message, onMessageClick: this.onMessageClick })
+          .width('80%')
+          .constraintSize({ maxWidth: $r('app.float.chat_saved_message_card_max_width') })
       } else {
         unknownBuilder({ message: this.message, onMessageClick: this.onMessageClick });
       }
@@ -288,7 +330,8 @@ export struct memberHistoryMessageContent {
     if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_TEXT) {
       historyTextBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_LOCATION) {
-      pinLocationBuilder({ message: this.message, onMessageClick: this.onMessageClick });
+      pinLocationBuilder({ message: this.message, onMessageClick: this.onMessageClick })
+        .width('80%')
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_IMAGE) {
       imageBuilder({ message: this.message, onMessageClick: this.onMessageClick });
     } else if (this.message.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_VIDEO) {
@@ -339,6 +382,11 @@ export struct multiLineMessageBuilder {
   aiSearchSelectingMessageId: string = ''
   @Param
   aiSearchSelectingTranslation: boolean = false
+  @Param
+  aiSearchSelectionStart: number = 0
+  @Param
+  aiSearchSelectionEnd: number = 0
+  private mouseSelectionArea: Area | undefined = undefined
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
 
   /**
@@ -382,6 +430,12 @@ export struct multiLineMessageBuilder {
     const text = this.getSelectableMultiLineText()
     const range = normalizeRenderedSelectionRange(text, getEmojiRenderUnits(text), selectionStart, selectionEnd)
     this.onMessageClick?.onTextSelectionChange?.(this.message, text, range[0], range[1], false)
+  }
+
+  private handleMouseMultiLineSelection(start: number, end: number, area: Area): void {
+    const text = this.getSelectableMultiLineText()
+    const range = normalizeRenderedSelectionRange(text, getEmojiRenderUnits(text), start, end)
+    this.onMessageClick?.onMouseTextSelection?.(this.message, text, range[0], range[1], false, area, start, end)
   }
 
   @Builder
@@ -543,13 +597,24 @@ export struct multiLineMessageBuilder {
             .textAlign(TextAlign.Start)
             .copyOption(CopyOptions.LocalDevice)
             .margin({ top: this.getMultiLineTitleText().length > 0 ? 4 : 0 })
-            .selection(this.isSelectingMultiLineText() ? 0 : -1,
-              this.isSelectingMultiLineText() ? this.getSelectableMultiLineTextLength() : -1)
+            .selection(this.isSelectingMultiLineText() ? this.aiSearchSelectionStart : -1,
+              this.isSelectingMultiLineText() ? this.aiSearchSelectionEnd : -1)
             .selectedBackgroundColor('#66337EFF')
             .bindSelectionMenu(TextSpanType.DEFAULT, this.EmptySelectionMenu, TextResponseType.DEFAULT)
+            .bindSelectionMenu(TextSpanType.DEFAULT, this.EmptySelectionMenu, TextResponseType.SELECT, {
+              onAppear: (start: number, end: number) => {
+                if (this.mouseSelectionArea && end > start) {
+                  this.handleMouseMultiLineSelection(start, end, this.mouseSelectionArea)
+                }
+              }
+            })
+            .onAreaChange((_oldArea: Area, area: Area) => {
+              this.mouseSelectionArea = area
+            })
             .onTextSelectionChange((selectionStart: number, selectionEnd: number) => {
               this.handleMultiLineTextSelectionChange(selectionStart, selectionEnd)
             })
+
           }
         }
       }
@@ -626,6 +691,11 @@ export struct multiLineMessageBuilder {
         .gesture(LongPressGesture().onAction((event: GestureEvent) => {
           this.onMessageClick?.onTranslatedAreaLongClick?.(event, this.message)
         }))
+        .onMouse((event: MouseEvent) => {
+          openNestedContextAction(event, (contextEvent: MouseEvent) => {
+            this.onMessageClick?.onTranslatedAreaContextMenu?.(contextEvent, this.message)
+          })
+        })
         }
       }
       .alignItems(HorizontalAlign.Start)
@@ -656,6 +726,10 @@ export struct richTextBuilder {
   aiSearchSelectingMessageId: string = ''
   @Param
   aiSearchSelectingTranslation: boolean = false
+  @Param
+  aiSearchSelectionStart: number = 0
+  @Param
+  aiSearchSelectionEnd: number = 0
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
 
   aboutToAppear(): void {
@@ -775,6 +849,7 @@ export struct richTextBuilder {
                         this.handleMarkdownTextSelectionChange(text, selectionStart, selectionEnd)
                       }
                     })
+
                   }
                 })
 
@@ -813,6 +888,12 @@ export struct textBuilder {
   aiSearchSelectingMessageId: string = ''
   @Param
   aiSearchSelectingTranslation: boolean = false
+  @Param
+  aiSearchSelectionStart: number = 0
+  @Param
+  aiSearchSelectionEnd: number = 0
+  private mouseMessageArea: Area | undefined = undefined
+  private mouseTranslationArea: Area | undefined = undefined
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
 
   private onItemClick(event: ClickEvent) {
@@ -871,6 +952,12 @@ export struct textBuilder {
     const text = this.getSelectableMessageText()
     const range = normalizeRenderedSelectionRange(text, getEmojiRenderUnits(text), selectionStart, selectionEnd)
     this.onMessageClick?.onTextSelectionChange?.(this.message, text, range[0], range[1], false)
+  }
+
+  private handleMouseMessageSelection(start: number, end: number, area: Area): void {
+    const text = this.getSelectableMessageText()
+    const range = normalizeRenderedSelectionRange(text, getEmojiRenderUnits(text), start, end)
+    this.onMessageClick?.onMouseTextSelection?.(this.message, text, range[0], range[1], false, area, start, end)
   }
 
   private handleTranslationTextSelectionChange(selectionStart: number, selectionEnd: number): void {
@@ -995,13 +1082,24 @@ export struct textBuilder {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .ellipsisMode(EllipsisMode.END)
         .copyOption(CopyOptions.LocalDevice)
-        .selection(this.isSelectingMessageText() ? 0 : -1,
-          this.isSelectingMessageText() ? this.getSelectableMessageTextLength() : -1)
+        .selection(this.isSelectingMessageText() ? this.aiSearchSelectionStart : -1,
+          this.isSelectingMessageText() ? this.aiSearchSelectionEnd : -1)
         .selectedBackgroundColor('#66337EFF')
         .bindSelectionMenu(TextSpanType.DEFAULT, this.EmptySelectionMenu, TextResponseType.DEFAULT)
+        .bindSelectionMenu(TextSpanType.DEFAULT, this.EmptySelectionMenu, TextResponseType.SELECT, {
+          onAppear: (start: number, end: number) => {
+            if (this.mouseMessageArea && end > start) {
+              this.handleMouseMessageSelection(start, end, this.mouseMessageArea)
+            }
+          }
+        })
+        .onAreaChange((_oldArea: Area, area: Area) => {
+          this.mouseMessageArea = area
+        })
         .onTextSelectionChange((selectionStart: number, selectionEnd: number) => {
           this.handleMessageTextSelectionChange(selectionStart, selectionEnd)
         })
+
       }
 
         if (this.message.isReceiveMessage() && this.message.translationLoading) {
@@ -1045,13 +1143,25 @@ export struct textBuilder {
             .fontColor($r('app.color.color_chat_title'))
             .textAlign(TextAlign.Start)
             .copyOption(CopyOptions.LocalDevice)
-            .selection(this.isSelectingTranslationText() ? 0 : -1,
-              this.isSelectingTranslationText() ? this.getSelectableTranslatedText().length : -1)
+            .selection(this.isSelectingTranslationText() ? this.aiSearchSelectionStart : -1,
+              this.isSelectingTranslationText() ? this.aiSearchSelectionEnd : -1)
             .selectedBackgroundColor('#66337EFF')
             .bindSelectionMenu(TextSpanType.DEFAULT, this.EmptySelectionMenu, TextResponseType.DEFAULT)
+            .bindSelectionMenu(TextSpanType.DEFAULT, this.EmptySelectionMenu, TextResponseType.SELECT, {
+              onAppear: (start: number, end: number) => {
+                if (this.mouseTranslationArea && end > start) {
+                  this.onMessageClick?.onMouseTextSelection?.(this.message, this.getSelectableTranslatedText(),
+                    start, end, true, this.mouseTranslationArea, start, end)
+                }
+              }
+            })
+            .onAreaChange((_oldArea: Area, area: Area) => {
+              this.mouseTranslationArea = area
+            })
             .onTextSelectionChange((selectionStart: number, selectionEnd: number) => {
               this.handleTranslationTextSelectionChange(selectionStart, selectionEnd)
             })
+
           Row() {
             Image($r('app.media.ic_chat_menu_translate'))
               .width(12)
@@ -1068,6 +1178,11 @@ export struct textBuilder {
         .gesture(LongPressGesture().onAction((event: GestureEvent) => {
           this.onMessageClick?.onTranslatedAreaLongClick?.(event, this.message)
         }))
+        .onMouse((event: MouseEvent) => {
+          openNestedContextAction(event, (contextEvent: MouseEvent) => {
+            this.onMessageClick?.onTranslatedAreaContextMenu?.(contextEvent, this.message)
+          })
+        })
         }
       }
       .alignItems(HorizontalAlign.Start)
@@ -1217,6 +1332,11 @@ export struct imageBuilder {
         .gesture(LongPressGesture().onAction((event: GestureEvent) => {
           this.onMessageClick?.onItemLongClick?.(event, this.message)
         }), GestureMask.IgnoreInternal)
+        .onMouse((event: MouseEvent) => {
+          openNestedContextAction(event, (contextEvent: MouseEvent) => {
+            this.onMessageClick?.onItemContextMenu?.(contextEvent, this.message)
+          })
+        })
         .onComplete(() => {
           // 图片加载完成后，缓存 PixelMap（用于预览时作为占位图）
           this.cacheThumbPixelMap()
@@ -1356,6 +1476,11 @@ export struct videoBuilder {
     }.gesture(LongPressGesture().onAction((event: GestureEvent) => {
       this.onMessageClick?.onItemLongClick?.(event, this.message)
     }), GestureMask.IgnoreInternal)
+      .onMouse((event: MouseEvent) => {
+        openNestedContextAction(event, (contextEvent: MouseEvent) => {
+          this.onMessageClick?.onItemContextMenu?.(contextEvent, this.message)
+        })
+      })
   }
 }
 
@@ -1528,9 +1653,17 @@ export struct locationBuilder {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .padding({ left: 12, right: 12 })
       if (this.imagePex) {
-        Image(this.imagePex).width('100%').height(88).margin({ top: 8 })
+        Image(this.imagePex)
+          .width('100%')
+          .height(88)
+          .margin({ top: 8 })
+          .draggable(false)
       } else {
-        Image($r('app.media.ic_chat_location_default')).width('100%').height(88).margin({ top: 8 })
+        Image($r('app.media.ic_chat_location_default'))
+          .width('100%')
+          .height(88)
+          .margin({ top: 8 })
+          .draggable(false)
       }
     }.alignItems(HorizontalAlign.Start)
   }
@@ -1594,12 +1727,19 @@ export struct pinLocationBuilder {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .padding({ left: 12, right: 12 })
       if (this.imagePex) {
-        Image(this.imagePex).width('100%').height(88).margin({ top: 8 })
+        Image(this.imagePex)
+          .width('100%')
+          .height(88)
+          .margin({ top: 8 })
+          .draggable(false)
       } else {
-        Image($r('app.media.ic_chat_location_default')).width('100%').height(88).margin({ top: 8 })
+        Image($r('app.media.ic_chat_location_default'))
+          .width('100%')
+          .height(88)
+          .margin({ top: 8 })
+          .draggable(false)
       }
     }.alignItems(HorizontalAlign.Start)
-    .width('80%')
   }
 }
 

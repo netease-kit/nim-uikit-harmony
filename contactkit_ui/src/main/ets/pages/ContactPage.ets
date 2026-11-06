@@ -105,6 +105,7 @@ export function ContactPageBuilder() {
 export struct ContactPage {
   @Param pathStack: NavPathStack = new NavPathStack()
   @Param onUnreadApplicationChange?: (countString?: string) => void = undefined
+  @Param onOpenDetail?: (info: NavPathInfo) => void = undefined
   @Local viewModel: ContactViewModel = new ContactViewModel()
   @Local subscriptViewModel: SubscriptionViewModel = new SubscriptionViewModel()
   @Local isFinishedInit: boolean = false
@@ -154,10 +155,10 @@ export struct ContactPage {
             firstButtonIcon: $r('app.media.nav_search'),
             secondButtonIcon: $r('app.media.nav_add'),
             firstButtonAction: () => {
-              this.pathStack.pushPath({ name: 'SearchPage' })
+              this.openDetail({ name: 'SearchPage' })
             },
             secondButtonAction: () => {
-              this.pathStack.pushPath({
+              this.openDetail({
                 name: 'AddFriendPage'
               })
             }
@@ -172,8 +173,12 @@ export struct ContactPage {
               .height(60)
               .backgroundColor(Color.White)
               .onClick(() => {
-                this.pathStack.pushPath({
-                  name: obj.item.routerUrl,
+                const routeName = obj.item.routerUrl
+                if (!routeName) {
+                  return
+                }
+                this.openDetail({
+                  name: routeName,
                   onPop: (popInfo: PopInfo) => {
                     // 返回时刷新合并的未读数
                     this.loadCombinedUnreadCount()
@@ -237,7 +242,7 @@ export struct ContactPage {
                     .height(60)
                     .backgroundColor(Color.White)
                     .onClick(() => {
-                      this.pathStack.pushPath({
+                      this.openDetail({
                         name: 'PersonInfoPage',
                         param: item.user?.accountId
                       })
@@ -296,6 +301,14 @@ export struct ContactPage {
   private disposeEventListeners(): void {
     this.disposableBag.dispose()
     ContactRepo.listener.off('loadFriendCache', this.onLoadFriendCache)
+  }
+
+  private openDetail(info: NavPathInfo): void {
+    if (this.onOpenDetail) {
+      this.onOpenDetail(info)
+      return
+    }
+    this.pathStack.pushPath(info)
   }
 
   private getListHeaderOffset(): number {

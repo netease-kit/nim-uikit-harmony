@@ -12,6 +12,7 @@ import { AudioPlayerManager } from '../manager/AudioPlayerManager'
 import { ChatConst } from '../constants/ChatConst'
 import { MessageItemClick } from './MessageItemClick'
 import { shouldStopAudioPlaybackOnMessageItemDisappear } from '../common/AudioPlaybackPolicy'
+import { resolveContextAction } from '@nimkit/common'
 
 @ComponentV2
 export struct MessageAudioItemView {
@@ -93,11 +94,13 @@ export struct MessageAudioItemView {
               .draggable(false)
             Text(getAudioMessageText(this.message))
               .margin({ left: 8 }).maxLines(1)
+              .flexShrink(1)
               .fontColor('#ff333333')
               .fontSize(14)
           } else {
             Text(getAudioMessageText(this.message))
               .margin({ right: 8 }).maxLines(1)
+              .flexShrink(1)
               .fontColor('#ff333333')
               .fontSize(14)
             Image(this.receiveSoundImages[this.receiveSoundIndex])
@@ -109,6 +112,7 @@ export struct MessageAudioItemView {
         }
         .justifyContent(this.showReceiveStyle() ? FlexAlign.Start : FlexAlign.End)
         .width(getAudioMessageWidth(this.message))
+        .constraintSize({ maxWidth: '100%' })
         .height(ChatConst.audioMessageWidth)
 
         // 语音转文字加载中
@@ -148,7 +152,15 @@ export struct MessageAudioItemView {
           })
         )
       )
+      .onMouse((event: MouseEvent) => {
+        const decision = resolveContextAction(event.button, event.action, true)
+        if (decision.open) {
+          event.stopPropagation()
+          this.onMessageClick?.onItemContextMenu?.(event, this.message)
+        }
+      })
       .width(getAudioMessageWidth(this.message))
+      .constraintSize({ maxWidth: '100%' })
     }
     .backgroundColor(this.showReactionBackground ?
       $r('app.color.color_chat_reaction_content_bg') : Color.Transparent)
@@ -160,6 +172,7 @@ export struct MessageAudioItemView {
       right: 4
     })
     .width(getAudioMessageWidth(this.message))
+    .constraintSize({ maxWidth: '100%' })
   }
 
   private syncPlayState() {

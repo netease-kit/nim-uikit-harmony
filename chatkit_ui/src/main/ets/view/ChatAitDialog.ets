@@ -276,7 +276,7 @@ export struct ChatAitDialog {
         .layoutWeight(1)
       }
       .width('100%')
-      .height('60%')
+      .height('100%')
       .backgroundColor('#ffFFFFFF')
       .visibility(this.showFlag)
       .transition(TransitionEffect.OPACITY.animation({ duration: this.animationDur })

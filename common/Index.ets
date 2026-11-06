@@ -88,8 +88,48 @@ export { CommonConfirmDialog } from './src/main/ets/view/CommonConfirmDialog'
 
 export { MatchSearchText } from './src/main/ets/view/MatchSearchText'
 
+export {
+  ContextActionDecision,
+  ContextActionTrigger,
+  resolveContextAction,
+  shouldOpenContextAction,
+  shouldDismissSelectionOnTouch,
+  shouldCloseMouseSelectionOnCollapse,
+  MOUSE_MENU_SETTLE_MS,
+  TOUCH_MENU_SETTLE_MS
+} from './src/main/ets/utils/ContextActionPolicy'
+
 export {CommonLongLoadingProgress } from './src/main/ets/builder/CommonLongLoadingProgress'
 
 export { BreakpointConstants} from './src/main/ets/constants/BreakpointConstants'
 
 export { UserAvatarNameItem } from './src/main/ets/model/UserAvatarNameItem'
+
+export {
+  AdaptiveAvoidAreaSnapshot,
+  AdaptiveHeightBreakpoint,
+  AdaptiveLayoutDecision,
+  AdaptiveLayoutMode,
+  AdaptiveLayoutProfile,
+  AdaptiveRegionLayout,
+  AdaptiveRegionRole,
+  AdaptiveRegionSpec,
+  AdaptiveWidthBreakpoint,
+  AdaptiveWindowSnapshot
+} from './src/main/ets/model/AdaptiveLayoutModel'
+
+export {
+  resolveAdaptiveLayout,
+  resolveAdaptiveProfile,
+  resolveHeightBreakpoint,
+  resolveWidthBreakpoint
+} from './src/main/ets/utils/AdaptiveLayoutPolicy'
+
+export {
+  AdaptiveWindowManager,
+  AdaptiveWindowStateStore,
+  adaptiveWindowManager
+} from './src/main/ets/utils/AdaptiveWindowManager'
+
+export { resolveAdaptiveDetailDialogWidth } from './src/main/ets/utils/AdaptiveDialogLayout'
+export type { AdaptiveWindowListener } from './src/main/ets/utils/AdaptiveWindowManager'

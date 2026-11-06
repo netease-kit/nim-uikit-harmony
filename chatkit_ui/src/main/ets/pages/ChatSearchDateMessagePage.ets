@@ -9,6 +9,7 @@ import {
   AvatarItem,
   CommonAvatar,
   CommonEmptyResult,
+  shouldOpenContextAction,
   TailString
 } from '@nimkit/common'
 import {
@@ -305,6 +306,11 @@ struct DateMessageItem {
     .gesture(LongPressGesture().onAction(() => {
       this.onLongClick?.()
     }))
+    .onMouse((event: MouseEvent) => {
+      if (shouldOpenContextAction(event.button, event.action)) {
+        this.onLongClick?.()
+      }
+    })
   }
 }
 

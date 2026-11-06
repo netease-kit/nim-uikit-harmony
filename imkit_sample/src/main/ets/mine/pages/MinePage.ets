@@ -24,6 +24,7 @@ function MinePageBuilder() {
 @ComponentV2
 export struct MinePage {
   @Param pathStack: NavPathStack = new NavPathStack()
+  @Param onOpenDetail?: (info: NavPathInfo) => void = undefined
   @Local myUser?: V2NIMUser = resolveMineUser(NEFriendUserCache.mineUserCache?.user, ChatKitClient.getLoginUserId());
 
   getAvatarName(): string {
@@ -111,7 +112,7 @@ export struct MinePage {
         .height(143)
         .backgroundColor(Color.White)
         .onClick(() => {
-          this.pathStack.pushPath({
+          this.openDetail({
             name: 'MineInfoPage'
           })
         })
@@ -129,7 +130,7 @@ export struct MinePage {
             })
           }
           .onClick(() => {
-            this.pathStack.pushPath({ name: 'SettingPage' })
+            this.openDetail({ name: 'SettingPage' })
           })
 
           // 收藏（根据配置显示/隐藏）
@@ -145,7 +146,7 @@ export struct MinePage {
               })
             }
             .onClick(() => {
-              this.pathStack.pushPath({ name: 'CollectionMessagePage' })
+              this.openDetail({ name: 'CollectionMessagePage' })
             })
           }
 
@@ -161,7 +162,7 @@ export struct MinePage {
             })
           }
           .onClick(() => {
-            this.pathStack.pushPath({ name: 'AboutPage' })
+            this.openDetail({ name: 'AboutPage' })
           })
         }
         .height('100%')
@@ -173,5 +174,13 @@ export struct MinePage {
       .backgroundColor("#EFF1F4")
     }
     .hideTitleBar(true)
+  }
+
+  private openDetail(info: NavPathInfo): void {
+    if (this.onOpenDetail) {
+      this.onOpenDetail(info)
+      return
+    }
+    this.pathStack.pushPath(info)
   }
 }

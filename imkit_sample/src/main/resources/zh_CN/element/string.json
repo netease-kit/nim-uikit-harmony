@@ -49,6 +49,22 @@
       "value": "我的"
     },
     {
+      "name": "adaptive_detail_empty",
+      "value": "请选择会话"
+    },
+    {
+      "name": "adaptive_detail_welcome",
+      "value": "欢迎使用云信"
+    },
+    {
+      "name": "adaptive_detail_empty_contact",
+      "value": "请选择联系人"
+    },
+    {
+      "name": "adaptive_detail_empty_mine",
+      "value": "请选择功能"
+    },
+    {
       "name": "mine_remove_collection_tip",
       "value": "确认要删除该收藏吗？"
     },

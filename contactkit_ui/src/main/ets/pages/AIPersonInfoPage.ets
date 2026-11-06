@@ -16,6 +16,13 @@ import {
 import { EditType, PersonInfoArrowItem, PersonInfoItem, PersonInfoSwitchItem } from '../model/MineInfoItem';
 import { PersonInfoViewModel } from '../viewmodel/PersonInfoViewModel';
 import { EditInfoParam } from './EditInfoPage';
+import {
+  conversationOpenRegistry,
+  ConversationOpenIntent,
+  ConversationOpenSource,
+  ConversationRouteKey,
+  ConversationRouteKind
+} from '@nimkit/conversationkit_ui';
 
 @Builder
 export function AIPersonInfoItemBuilder(item: PersonInfoItem | PersonInfoArrowItem | PersonInfoSwitchItem) {
@@ -268,11 +275,19 @@ export struct AIPersonInfoPage {
             }
             .height(48)
             .onClick(() => {
+              const conversationId = this.p2pConversationId()
+              const intent = new ConversationOpenIntent(
+                new ConversationRouteKey(ConversationRouteKind.P2P, conversationId),
+                ConversationOpenSource.AI_ENTRY
+              )
+              if (conversationOpenRegistry.open(intent)) {
+                return
+              }
               this.pathStack.popToName('ChatP2PPage')
               this.pathStack.popToName('ChatTeamPage')
               this.pathStack.pushPath({
                 name: 'ChatP2PPage',
-                param: this.p2pConversationId()
+                param: conversationId
               })
             })
           }

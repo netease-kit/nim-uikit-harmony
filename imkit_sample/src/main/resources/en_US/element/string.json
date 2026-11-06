@@ -49,6 +49,22 @@
       "value": "我的"
     },
     {
+      "name": "adaptive_detail_empty",
+      "value": "Select a conversation"
+    },
+    {
+      "name": "adaptive_detail_welcome",
+      "value": "Welcome to Yunxin"
+    },
+    {
+      "name": "adaptive_detail_empty_contact",
+      "value": "Select a contact"
+    },
+    {
+      "name": "adaptive_detail_empty_mine",
+      "value": "Select a feature"
+    },
+    {
       "name": "mine_remove_collection_tip",
       "value": "确认要删除该收藏吗？"
     },

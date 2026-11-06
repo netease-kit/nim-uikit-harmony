@@ -234,15 +234,26 @@ export function isConversationAitBadgeVisible(conversation: ConversationItem,
   return aitConversationIds.has(conversation.conversationId) && conversation.unreadCount > 0
 }
 
+function isPinnedConversation(conversation: ConversationItem, pinnedConversationId: string): boolean {
+  return pinnedConversationId.length > 0 && conversation.conversationId === pinnedConversationId
+}
+
+/**
+ * 按默认分组过滤会话。pinnedConversationId 为当前正在查看的会话：
+ * @我 / 未读分组在进入会话后免打扰与未读状态会被清掉，这里把它保留在列表里，
+ * 直到用户离开该会话（pinnedConversationId 变为空）后才从分组中消失。
+ */
 export function filterConversationsByDefaultGroup(conversations: ConversationItem[], groupKey: string,
-  aitConversationIds: Set<string>): ConversationItem[] {
+  aitConversationIds: Set<string>, pinnedConversationId: string = ''): ConversationItem[] {
   if (groupKey === CONVERSATION_GROUP_DEFAULT_AIT_KEY) {
     return conversations.filter((conversation: ConversationItem): boolean =>
-    isConversationAitBadgeVisible(conversation, aitConversationIds))
+    isConversationAitBadgeVisible(conversation, aitConversationIds) ||
+      isPinnedConversation(conversation, pinnedConversationId))
   }
   if (groupKey === CONVERSATION_GROUP_DEFAULT_UNREAD_KEY) {
     return conversations.filter((conversation: ConversationItem): boolean =>
-    conversation.unreadCount > 0 && conversation.mute !== true)
+    (conversation.unreadCount > 0 && conversation.mute !== true) ||
+      isPinnedConversation(conversation, pinnedConversationId))
   }
   return conversations.slice()
 }

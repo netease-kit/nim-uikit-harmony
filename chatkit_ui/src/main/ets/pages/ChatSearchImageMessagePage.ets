@@ -5,7 +5,14 @@
  */
 
 import { Logger } from '@nimkit/common';
-import { CommonEmptyResult, ImagesIndexModel, ImageViewDialog, NavigationBackBuilder, NECommonUtils, } from '@nimkit/common'
+import {
+  CommonEmptyResult,
+  ImagesIndexModel,
+  ImageViewDialog,
+  NavigationBackBuilder,
+  NECommonUtils,
+  shouldOpenContextAction
+} from '@nimkit/common'
 import { ChatSearchImageMessageParams, ChatSearchImageMessageViewModel, DateGroupedMessages } from '../viewmodel/ChatSearchImageMessageViewModel'
 import { NIMMessageInfo } from '../model/NIMMessageInfo'
 import { getMessageImageUrls } from '../common/MessageHelper'
@@ -119,6 +126,11 @@ struct ImageMessageItem {
         .gesture(LongPressGesture().onAction((event: GestureEvent) => {
           this.onMessageClick?.onItemLongClick?.(event, this.message)
         }), GestureMask.IgnoreInternal)
+        .onMouse((event: MouseEvent) => {
+          if (shouldOpenContextAction(event.button, event.action)) {
+            this.onMessageClick?.onItemContextMenu?.(event, this.message)
+          }
+        })
     }
     .width('100%')
     .height('100%')
@@ -413,6 +425,9 @@ export struct ChatSearchImageMessagePage {
                           },
                           onItemLongClick: () => {
                             // 长按显示操作菜单
+                            this.showImageActionDialog(item)
+                          },
+                          onItemContextMenu: () => {
                             this.showImageActionDialog(item)
                           }
                         }

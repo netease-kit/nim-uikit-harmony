@@ -50,7 +50,7 @@ struct TeamMemberListPage {
       },
     },
     ),
-    width: '70%'
+    width: 270
   })
   //要踢的成员Id
   kickMemberId?: string

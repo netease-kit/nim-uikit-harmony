@@ -59,6 +59,8 @@ export struct VideoItemView {
   @Param videoUrl: string = ''; // 视频url
   @Local topRectHeight: number = 0; // 系统状态栏高度
   @Local bottomRectHeight: number = 0; // 系统状态栏高度
+  @Local videoViewportWidthVp: number = 0;
+  @Local videoViewportHeightVp: number = 0;
   private avPlayer: media.AVPlayer = {} as media.AVPlayer; // 视频播放器对象
   private surfaceID: string | undefined = undefined; // 视频播放器ID
   private isCreate: boolean = false; // 视频播放器是否被创建
@@ -381,19 +383,24 @@ export struct VideoItemView {
           type: XComponentType.SURFACE,
           controller: this.xComponentController
         })
-          .width('100%')
-          .aspectRatio(this.videoRatioLocal)
+          .width(this.resolveVideoWidth())
+          .height(this.resolveVideoHeight())
           .onLoad(() => {
             this.surfaceID = this.xComponentController.getXComponentSurfaceId();
           })
       }
       .borderRadius(0)
       .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Center)
       .width('100%')
       .height('100%')
       .aspectRatio(-1)
       .layoutWeight(LAYOUT_WEIGHT)
       .backgroundColor(Color.Black)
+      .onAreaChange((_oldValue: Area, newValue: Area) => {
+        this.videoViewportWidthVp = Number(newValue.width) || 0
+        this.videoViewportHeightVp = Number(newValue.height) || 0
+      })
       .zIndex(0)
 
       Flex({ direction: FlexDirection.Column, justifyContent: FlexAlign.SpaceBetween }) {
@@ -458,7 +465,6 @@ export struct VideoItemView {
               .opacity(0.6)
               .onClick(() => {
                 this.isLandscape = !this.isLandscape;
-                this.videoRatioLocal = this.videoRatioLocal > 0 ? 1 / this.videoRatioLocal : 0
               })
           }
 
@@ -501,6 +507,24 @@ export struct VideoItemView {
   };
   private callbackBitrateUpdate: (bitrateList: number[]) => void = (bitrateList: number[]) => { // 比特率更新回调
   };
+  private resolveVideoRatio(): number {
+    return this.videoRatioLocal > 0 ? this.videoRatioLocal : 16 / 9
+  }
+
+  private resolveVideoWidth(): Length {
+    if (this.videoViewportWidthVp <= 0 || this.videoViewportHeightVp <= 0) {
+      return '100%'
+    }
+    return Math.min(this.videoViewportWidthVp, this.videoViewportHeightVp * this.resolveVideoRatio())
+  }
+
+  private resolveVideoHeight(): Length {
+    if (this.videoViewportWidthVp <= 0 || this.videoViewportHeightVp <= 0) {
+      return '100%'
+    }
+    return Math.min(this.videoViewportHeightVp, this.videoViewportWidthVp / this.resolveVideoRatio())
+  }
+
   private callbackErrorUpdate: (error: string) => void = (error: string) => { // 错误状态回调
   };
 }

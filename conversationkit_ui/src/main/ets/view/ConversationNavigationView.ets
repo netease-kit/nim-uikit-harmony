@@ -3,11 +3,19 @@ import { ChatKitClient, ErrorUtils, NEUserWithFriend, IMKitConfigCenter, PersonS
 import { NECommonUtils } from '@nimkit/common'
 import { scanBarcode, scanCore } from '@kit.ScanKit'
 import { V2NIMUserAIBot } from '@nimsdk/base'
+import {
+  ConversationOpenIntent,
+  ConversationOpenSource,
+  ConversationRouteKey,
+  ConversationRouteKind
+} from '../model/ConversationOpenIntent'
 
 @ComponentV2
 export struct ConversationNavigationView {
   @Local conversationPopupShowed: boolean = false
   @Param pathStack: NavPathStack = new NavPathStack()
+  @Param onOpenConversation?: (intent: ConversationOpenIntent) => void = undefined
+  @Param onOpenDetail?: (info: NavPathInfo) => void = undefined
   @Event goSearchPage: (pathStack: NavPathStack) => void = (pathStack: NavPathStack) => {
   }
 
@@ -104,7 +112,7 @@ export struct ConversationNavigationView {
       }.onClick(() => {
         if (this.conversationPopupShowed) {
           this.conversationPopupShowed = false
-          this.goAddFriend(this.pathStack)
+          this.goAddFriend()
         }
       })
 
@@ -120,7 +128,7 @@ export struct ConversationNavigationView {
         }.onClick(() => {
           if (this.conversationPopupShowed) {
             this.conversationPopupShowed = false
-            this.goToPersonSelectPage(this.pathStack, true)
+            this.goToPersonSelectPage(true)
           }
         })
 
@@ -135,7 +143,7 @@ export struct ConversationNavigationView {
         }.onClick(() => {
           if (this.conversationPopupShowed) {
             this.conversationPopupShowed = false
-            this.goToPersonSelectPage(this.pathStack, false)
+            this.goToPersonSelectPage(false)
           }
         })
 
@@ -150,7 +158,7 @@ export struct ConversationNavigationView {
         }.onClick(() => {
           if (this.conversationPopupShowed) {
             this.conversationPopupShowed = false
-            this.goSearchTeam(this.pathStack)
+            this.goSearchTeam()
           }
         })
 
@@ -218,7 +226,7 @@ export struct ConversationNavigationView {
         })
         return
       }
-      this.pathStack.pushPath({
+      this.openDetail({
         name: 'BindBotPage',
         param: qrcode,
         onPop: (popInfo: PopInfo) => {
@@ -233,12 +241,12 @@ export struct ConversationNavigationView {
     }
   }
 
-  goSearchTeam(pathStack: NavPathStack) {
-    pathStack.pushPath({ name: 'SearchTeamPage' })
+  goSearchTeam() {
+    this.openDetail({ name: 'SearchTeamPage' })
   }
 
-  goAddFriend(pathStack: NavPathStack) {
-    pathStack.pushPath({ name: 'AddFriendPage' })
+  goAddFriend() {
+    this.openDetail({ name: 'AddFriendPage' })
   }
 
   groupSelectorCallback = async (selectedList: NEUserWithFriend[]) => {
@@ -261,14 +269,14 @@ export struct ConversationNavigationView {
     }
   }
 
-  goToPersonSelectPage(pathStack: NavPathStack, isGroup: boolean) {
+  goToPersonSelectPage(isGroup: boolean) {
     if (isGroup) {
-      pathStack.pushPath({
+      this.openDetail({
         name: 'PersonSelectPage',
         param: new PersonSelectParam(this.groupSelectorCallback, [], 200, true)
       })
     } else {
-      pathStack.pushPath({
+      this.openDetail({
         name: 'PersonSelectPage',
         param: new PersonSelectParam(this.teamSelectorCallback, [], 200, true)
       })
@@ -278,10 +286,7 @@ export struct ConversationNavigationView {
   createGroupTeam(invitees: string[]) {
     TeamRepo.createGroupTeam(invitees).then((result) => {
       if (result) {
-        this.pathStack.pushPath({
-          name: 'ChatTeamPage',
-          param: ChatKitClient.nim.conversationIdUtil.teamConversationId(result.team.teamId)
-        })
+        this.openTeamConversation(result.team.teamId)
       }
     })
   }
@@ -289,11 +294,29 @@ export struct ConversationNavigationView {
   createAdvanceTeam(invitees: string[]) {
     TeamRepo.createAdvanceTeam(invitees).then((result) => {
       if (result) {
-        this.pathStack.pushPath({
-          name: 'ChatTeamPage',
-          param: ChatKitClient.nim.conversationIdUtil.teamConversationId(result.team.teamId)
-        })
+        this.openTeamConversation(result.team.teamId)
       }
     })
+  }
+
+  private openDetail(info: NavPathInfo): void {
+    if (this.onOpenDetail) {
+      this.onOpenDetail(info)
+      return
+    }
+    this.pathStack.pushPath(info)
+  }
+
+  private openTeamConversation(teamId: string): void {
+    const conversationId = ChatKitClient.nim.conversationIdUtil.teamConversationId(teamId)
+    const intent = new ConversationOpenIntent(
+      new ConversationRouteKey(ConversationRouteKind.TEAM, conversationId),
+      ConversationOpenSource.CONVERSATION_LIST
+    )
+    if (this.onOpenConversation) {
+      this.onOpenConversation(intent)
+      return
+    }
+    this.pathStack.pushPath({ name: 'ChatTeamPage', param: conversationId })
   }
 }

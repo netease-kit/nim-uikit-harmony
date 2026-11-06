@@ -108,12 +108,18 @@ function renderOffsetToSourceOffset(sourceText: string, units: AISearchTextRende
   return sourceText.length
 }
 
+// 整条选中时传给文本组件的右边界，组件会自行裁剪到文本末尾
+const MAX_SELECTION_RENDER_OFFSET: number = 2147483647
+
 @ObservedV2
 export class AISearchSelectionState {
   @Trace active: boolean = false
   @Trace text: string = ''
   @Trace start: number = 0
   @Trace end: number = 0
+  // 文本组件使用的渲染偏移，仅用于回显选区高亮（emoji 标签在组件里只占 1 个位置）
+  @Trace displayStart: number = 0
+  @Trace displayEnd: number = 0
   @Trace rectX: number = 0
   @Trace rectY: number = 0
   @Trace rectWidth: number = 0
@@ -123,6 +129,8 @@ export class AISearchSelectionState {
     this.text = text
     this.start = 0
     this.end = text.length
+    this.displayStart = 0
+    this.displayEnd = MAX_SELECTION_RENDER_OFFSET
     this.rectX = x
     this.rectY = y
     this.rectWidth = Math.max(width, 1)
@@ -130,9 +138,19 @@ export class AISearchSelectionState {
     this.active = text.trim().length > 0
   }
 
+  openRange(text: string, start: number, end: number, displayStart: number, displayEnd: number,
+    x: number, y: number, width: number, height: number): void {
+    this.open(text, x, y, width, height)
+    this.updateRange(start, end)
+    this.displayStart = displayStart
+    this.displayEnd = displayEnd
+  }
+
   updateRange(start: number, end: number): void {
     this.start = normalizeSelectionStart(start, end)
     this.end = normalizeSelectionEnd(start, end, this.text.length)
+    this.displayStart = start
+    this.displayEnd = end
   }
 
   close(): void {
@@ -140,6 +158,8 @@ export class AISearchSelectionState {
     this.text = ''
     this.start = 0
     this.end = 0
+    this.displayStart = 0
+    this.displayEnd = 0
     this.rectX = 0
     this.rectY = 0
     this.rectWidth = 0

@@ -6,11 +6,15 @@
  */
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 
+export type MessageContextEvent = GestureEvent | MouseEvent
+
 export interface MessageItemClick {
   // 消息点击
   onItemClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void
   // 消息长按
   onItemLongClick?: (event: GestureEvent, msg: NIMMessageInfo | undefined) => void
+  // 鼠标右键操作消息
+  onItemContextMenu?: (event: MouseEvent, msg: NIMMessageInfo | undefined) => void
   // 头像点击
   onAvatarClick?: (msg: NIMMessageInfo | undefined) => void
   // 头像长按
@@ -27,9 +31,15 @@ export interface MessageItemClick {
   onSendFailClick?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void
   // 长按译文区域
   onTranslatedAreaLongClick?: (event: GestureEvent, msg: NIMMessageInfo | undefined) => void
+  // 鼠标右键操作译文区域
+  onTranslatedAreaContextMenu?: (event: MouseEvent, msg: NIMMessageInfo | undefined) => void
   // 文本选择范围变化
   onTextSelectionChange?: (msg: NIMMessageInfo | undefined, text: string, start: number, end: number,
     isTranslation: boolean) => void
+  onMouseTextSelection?: (msg: NIMMessageInfo | undefined, text: string, start: number, end: number,
+    isTranslation: boolean, area: Area, displayStart: number, displayEnd: number) => void
+  // 文本处于框选状态时处理键盘复制快捷键
+  onCopySelectionShortcut?: (event: KeyEvent, msg: NIMMessageInfo | undefined, isTranslation: boolean) => boolean
   // AI 流式消息 - 停止输出
   onAIStreamStop?: (event: ClickEvent, msg: NIMMessageInfo | undefined) => void
   // AI 流式消息 - 重新生成

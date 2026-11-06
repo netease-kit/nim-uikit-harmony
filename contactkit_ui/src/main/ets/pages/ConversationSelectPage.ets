@@ -182,7 +182,8 @@ export struct ConversationSelectPage {
                 }
                 .listDirection(Axis.Horizontal)
                 .scrollBar(BarState.Off)
-                .width(316)
+                // 已选会话横条按可用宽度伸展，箭头顶到最右侧，避免宽屏下被固定宽度挤住
+                .layoutWeight(1)
                 .backgroundColor(Color.White)
                 .padding({
                   left: 16,
@@ -193,7 +194,8 @@ export struct ConversationSelectPage {
                   .width(4.92)
                   .height(9.54)
                   .margin({
-                    left: 35
+                    left: 16,
+                    right: 16
                   })
               }
               .width('100%')

@@ -18,6 +18,13 @@ import {
 } from '@nimkit/common';
 import { BotInfoViewModel } from '../viewmodel/BotInfoViewModel';
 import { V2NIMUserAIBot } from '@nimsdk/base';
+import {
+  conversationOpenRegistry,
+  ConversationOpenIntent,
+  ConversationOpenSource,
+  ConversationRouteKey,
+  ConversationRouteKind
+} from '@nimkit/conversationkit_ui';
 
 @ComponentV2
 export struct BotInfoPage {
@@ -197,6 +204,15 @@ export struct BotInfoPage {
               this.viewModel.accid,
               this.viewModel.bot?.name ?? this.viewModel.accid
             ]
+            const intent = new ConversationOpenIntent(
+              new ConversationRouteKey(ConversationRouteKind.BOT_SUB_SESSION_LIST, conversationId),
+              ConversationOpenSource.CONTACT,
+              this.viewModel.accid,
+              this.viewModel.bot?.name ?? this.viewModel.accid
+            )
+            if (conversationOpenRegistry.open(intent)) {
+              return
+            }
             this.pathStack.pushPath({ name: 'ChatBotSubSessionListPage', param: botSubSessionParams })
           })
         }

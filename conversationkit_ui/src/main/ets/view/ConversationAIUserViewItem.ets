@@ -10,6 +10,10 @@ import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
 import { DateUtil } from '@nimkit/common';
 import { V2NIMAIUser, V2NIMLocalConversation, V2NIMMessageCallAttachment, V2NIMMessageType } from '@nimsdk/base';
 
+export function resolveAIUserItemBackground(): string {
+  return '#ffFFFFFF'
+}
+
 @ComponentV2
 export struct ConversationAIUserViewItem {
   @Param aiUserInfo: V2NIMAIUser | null = null
@@ -66,6 +70,7 @@ export struct ConversationAIUserViewItem {
       }
       .width(62)
       .height(82)
+      .backgroundColor(resolveAIUserItemBackground())
       .onClick(() => {
         // this.goToChatPage()
         if (this.onItemClick !== undefined) {

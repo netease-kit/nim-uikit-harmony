@@ -147,29 +147,37 @@ export struct NEChatInputView {
   /**
    * @弹框
    */
-  chatAitDialogController: CustomDialogController = new CustomDialogController({
-    builder: ChatAitDialog({
-      teamId: this.teamId,
-      team: this.team,
-      showAitAll: this.showAitAll,
-      showAIUser: this.showAIUserAit,
-      showTeamMember: this.showTeamMemberAit,
-      aiUsers: this.aiUsers,
-      onSelectedAll: this.onSelectedAll.bind(this),
-      onMemberSelected: this.onTeamMemberSelected.bind(this),
-      onAIUserSelected: this.onAIUserSelected.bind(this)
-    }),
-    openAnimation: {
-      curve: Curve.Linear,
-      playMode: PlayMode.Alternate
-    },
-    autoCancel: true,
-    alignment: DialogAlignment.Bottom,
-    backgroundColor: Color.White,
-    height: '60%',
-    width: '100%',
-    customStyle: true
-  })
+  private chatAitDialogController?: CustomDialogController = undefined
+  // 输入区自身宽度即详情区宽度，单屏时等于整窗宽度
+  private selfWidth: number = 0
+
+  private openAitDialog(): void {
+    this.chatAitDialogController = new CustomDialogController({
+      builder: ChatAitDialog({
+        teamId: this.teamId,
+        team: this.team,
+        showAitAll: this.showAitAll,
+        showAIUser: this.showAIUserAit,
+        showTeamMember: this.showTeamMemberAit,
+        aiUsers: this.aiUsers,
+        onSelectedAll: this.onSelectedAll.bind(this),
+        onMemberSelected: this.onTeamMemberSelected.bind(this),
+        onAIUserSelected: this.onAIUserSelected.bind(this)
+      }),
+      openAnimation: {
+        curve: Curve.Linear,
+        playMode: PlayMode.Alternate
+      },
+      autoCancel: true,
+      alignment: DialogAlignment.BottomEnd,
+      backgroundColor: Color.White,
+      cornerRadius: 0,
+      height: '60%',
+      // 不能开启 customStyle：该模式下弹窗 width/height 不生效且区域铺满整屏，@ 列表会挡住左侧内容
+      width: this.selfWidth > 0 ? this.selfWidth : '100%'
+    })
+    this.chatAitDialogController.open()
+  }
 
   aboutToAppear(): void {
     this.initData();
@@ -287,7 +295,7 @@ export struct NEChatInputView {
       // 检查是否有成员缺失userInfo，如果有则从云端获取
       await this.ensureMemberUserInfo(teamMemberCache)
     }
-    this.chatAitDialogController.open()
+    this.openAitDialog()
   }
 
   private canShowAitDialog(): boolean {
@@ -529,6 +537,7 @@ export struct NEChatInputView {
         if (!this.mute && this.replyMsg) {
           Row() {
             Image($r('app.media.ic_chat_reply_close')).height(20).width(20).margin({ right: 12 })
+              .draggable(false)
               .onClick(() => {
                 this.onDidClickCloseReply?.()
               })
@@ -629,6 +638,7 @@ export struct NEChatInputView {
             if (this.canShowAIHelperButton()) {
               Image(this.inputStyle === InputStyleType.AiHelper ?
                 $rawfile('ai_icon_highlight.png') : $rawfile('ic_chat_ai_helper.svg'))
+                .draggable(false)
                 .width(24)
                 .height(24)
                 .onClick(() => {
@@ -638,6 +648,7 @@ export struct NEChatInputView {
             // 扩展按钮
             if (this.canShowRichTextButton()) {
               Image($r('app.media.ic_chat_input_expand'))
+                .draggable(false)
                 .width(20)
                 .height(20)
                 .onClick(() => {
@@ -864,6 +875,9 @@ export struct NEChatInputView {
           .height('100%')
       }
     }
+    .onAreaChange((_oldArea: Area, newArea: Area) => {
+      this.selfWidth = Number(newArea.width)
+    })
   }
 }
 

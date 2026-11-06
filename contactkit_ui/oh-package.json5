@@ -1,6 +1,6 @@
 {
   "name": "@nimkit/contactkit_ui",
-  "version": "10.9.60",
+  "version": "10.9.70",
   "description": "Please describe the basic information.",
   "main": "Index.ets",
   "author": "",
@@ -8,6 +8,7 @@
   "dependencies": {
     "@nimkit/common": "file:../common",
     "@nimkit/chatkit": "../chatkit",
-    "@nimsdk/base": "10.11.0",
+    "@nimkit/conversationkit_ui": "file:../conversationkit_ui",
+    "@nimsdk/base": "10.11.5",
   }
 }

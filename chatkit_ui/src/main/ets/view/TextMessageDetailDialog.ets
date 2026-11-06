@@ -9,6 +9,8 @@ import { getMultiLineBody, getMultiLineTitle, isMultiLineMessage } from '@nimkit
 @CustomDialog
 export struct TextMessageDetailDialog {
   controller?: CustomDialogController
+  // 详情只占详情区宽度；customStyle 模式下弹窗区域铺满整屏，宽度需由内容自己声明
+  panelWidth: number = 0
   onClose?: () => void
   @BuilderParam message: NIMMessageInfo | undefined
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
@@ -114,7 +116,7 @@ export struct TextMessageDetailDialog {
           this.closeDialog()
         })
       }
-      .width('100%')
+      .width(this.panelWidth > 0 ? this.panelWidth : '100%')
       .height('100%')
       .backgroundColor(Color.White)
       .onClick(() => {

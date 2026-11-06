@@ -24,6 +24,13 @@ import {
 import { EditType, PersonInfoArrowItem, PersonInfoItem, PersonInfoSwitchItem } from '../model/MineInfoItem';
 import { PersonInfoViewModel } from '../viewmodel/PersonInfoViewModel';
 import { EditInfoParam } from './EditInfoPage';
+import {
+  conversationOpenRegistry,
+  ConversationOpenIntent,
+  ConversationOpenSource,
+  ConversationRouteKey,
+  ConversationRouteKind
+} from '@nimkit/conversationkit_ui';
 
 /// 删除好友底部悬浮弹窗
 @CustomDialog
@@ -652,14 +659,32 @@ export struct PersonInfoPage {
       UserAIBotManager.isDeletedUserAIBot(accountId)
     if (isUserAIBot) {
       // 用户级机器人聊天入口必须回到子会话列表
-      this.pathStack.popToName('ChatBotSubSessionListPage')
       const cachedBot = UserAIBotManager.getCachedUserAIBot(accountId)
+      const displayName = cachedBot?.name ?? this.viewModel.userWithFriend?.user?.name ?? accountId
+      const intent = new ConversationOpenIntent(
+        new ConversationRouteKey(ConversationRouteKind.BOT_SUB_SESSION_LIST, conversationId),
+        ConversationOpenSource.CONTACT,
+        accountId,
+        displayName
+      )
+      if (conversationOpenRegistry.open(intent)) {
+        return
+      }
+      this.pathStack.popToName('ChatBotSubSessionListPage')
       this.pathStack.popToName('ChatP2PPage')
       this.pathStack.popToName('ChatTeamPage')
       this.pathStack.replacePath({
         name: 'ChatBotSubSessionListPage',
-        param: [conversationId, accountId, cachedBot?.name ?? this.viewModel.userWithFriend?.user?.name ?? accountId]
+        param: [conversationId, accountId, displayName]
       })
+      return
+    }
+
+    const intent = new ConversationOpenIntent(
+      new ConversationRouteKey(ConversationRouteKind.P2P, conversationId),
+      ConversationOpenSource.CONTACT
+    )
+    if (conversationOpenRegistry.open(intent)) {
       return
     }
 

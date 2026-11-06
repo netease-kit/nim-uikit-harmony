@@ -5,10 +5,19 @@
  *
  */
 
-import { Logger } from '@nimkit/common';
+import deviceInfo from '@ohos.deviceInfo';
+import {
+  adaptiveWindowManager,
+  AdaptiveWindowSnapshot,
+  ContextActionTrigger,
+  Logger,
+  shouldCloseMouseSelectionOnCollapse,
+  TOUCH_MENU_SETTLE_MS
+} from '@nimkit/common';
 import { ChatUserInfo } from '../model/ChatUserInfo';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { MessageComponent } from '../view/MessageComponent';
+import { MessageContextEvent } from '../view/MessageItemClick';
 import { ChatBotSubSessionViewModel } from '../viewmodel/ChatBotSubSessionViewModel';
 import { NEChatEmojiView } from '../view/NEChatEmojiView';
 import { NEEmojiManager, NEEmojiParseResult, NIMEmoticonType } from '../manager/NEEmojiManager';
@@ -32,6 +41,7 @@ import { cameraPicker } from '@kit.CameraKit';
 import { LengthMetrics, promptAction, window } from '@kit.ArkUI';
 import { NERectData } from '../model/NERectData';
 import { MessageOperationView } from '../view/MessageOperationView';
+import { MessageReactionPicker } from '../view/MessageReactionPicker';
 import { MessageOperationItem, MessageOperationType } from '../model/MessageOperationItem';
 import { BusinessError, pasteboard } from '@kit.BasicServicesKit';
 import { DeviceUtils } from '../common/DeviceUtils';
@@ -95,6 +105,22 @@ import {
   RichInputTransferNodeType
 } from '../common/InputTransferUtils';
 import { ChatBotSubSessionParam, ChatBotSubSessionResult } from '../model/ChatBotSubSessionParam';
+import {
+  clampPopupX,
+  resolveChatBaseHeight,
+  resolveChatPaneWidth,
+  resolveReactionPickerLayout
+} from '../common/ChatViewportPolicy';
+
+
+// 长按松开后等这么久再还原整条选区，避免长按过程中反复重发
+const SELECTION_RESTORE_DEBOUNCE_MS: number = 150
+// 清空受控选区后隔一帧再重新下发整条选区
+const SELECTION_RESTORE_DELAY_MS: number = 32
+// 单次长按最多还原次数，防止系统持续回报局部范围时反复闪烁
+const SELECTION_RESTORE_MAX_ATTEMPTS: number = 2
+
+const IS_2IN1_DEVICE: boolean = deviceInfo.deviceType === '2in1'
 
 @CustomDialog
 struct ChatBotSubSessionRenameDialog {
@@ -246,7 +272,7 @@ struct ChatBotSubSessionActionDialog {
           this.onCancel?.()
         })
     }
-    .width('100%')
+    .width(300)
     .backgroundColor(Color.White)
     .borderRadius({ topLeft: 12, topRight: 12 })
     .clip(true)
@@ -271,6 +297,12 @@ export struct ChatBotSubSessionPage {
   @Local hideInput: boolean = false;
   @Local scrollHeight: number = 0;
   @Local showOperationView: boolean = false;
+  // 快捷评论面板：页面内渲染（与长按菜单同一套定位），不再使用弹窗
+  @Local showReactionPickerPanel: boolean = false
+  // 快捷评论面板宽度：窄分栏下按聊天栏宽度收窄，不能写死
+  @Local reactionPickerWidthVp: number = ChatConst.reactionPickerWidth
+  @Local reactionPickerMsg: NIMMessageInfo | undefined = undefined
+  reactionPickerRect: NERectData = new NERectData();
   @Local showMultiSelect: boolean = false;
   @Local multiSelectCount: number = 0;
   // 长按操作弹窗的边距值
@@ -301,16 +333,34 @@ export struct ChatBotSubSessionPage {
   private reactionMenuItemCount: number = 0
   private reactionMenuPreferAbove: boolean = true
   @Local private reactionMenuExpanded: boolean = false
+  private operationMenuPointerHovered: boolean = false
+  private selectionInputIsMouse: boolean = false
+  private selectionOpenedByLongPress: boolean = false
+  private operationMenuOpenedAt: number = 0
+  private restoreSelectionTimer: number = -1
+  private restoreSelectionAttempts: number = 0
+  private suppressCollapseClose: boolean = false
 
   @Monitor('showOperationView')
   onOperationViewVisibilityChange(): void {
     if (!this.showOperationView) {
+      this.operationMenuPointerHovered = false
       this.reactionMenuExpanded = false
     }
   }
   screenHeight: number = 0;
   screenWidth: number = 0;
+  screenOriginX: number = 0;
+  // 页面实测宽度（分栏时等于整窗宽度）、聊天栏左边界
+  measuredAreaWidth: number = 0;
   keyboardHeight: number = 0
+  private readonly adaptiveWindowListener = (snapshot: AdaptiveWindowSnapshot): void => {
+    const height = resolveChatBaseHeight(snapshot.heightVp, this.screenHeight)
+    if (height !== this.screenHeight) {
+      this.screenHeight = height
+      this.computeScrollHeight()
+    }
+  }
   //导航栏高度，用于计算弹窗位置
   navBarHeight: number = 80;
   // 底部输入框以及固定按钮操作栏高度
@@ -711,6 +761,7 @@ export struct ChatBotSubSessionPage {
    * 从多行正文 RichEditor 提取纯文本
    */
   aboutToAppear(): void {
+    adaptiveWindowManager.state.subscribe(this.adaptiveWindowListener)
     NEEmojiManager.instance.setup();
     DeviceUtils.rootDirPath = getContext(this).filesDir
     this.operationMoreDataList = setupMoreOperationData(true)
@@ -864,6 +915,20 @@ export struct ChatBotSubSessionPage {
     return this.aitManager.getFirstAIChatAccount(this.getAIChatUsers().map(aiUser => aiUser.accountId))
   }
 
+  /**
+   * 菜单可见时（存在选中片段或整条消息）响应 Ctrl+C，复制内容与菜单"复制"完全一致。
+   * 快捷键绑定在操作菜单容器上，菜单关闭后不再拦截按键，输入框内的 Ctrl+C 仍走系统原生复制。
+   */
+  private copyOperationText(): void {
+    const copyText = this.getOperationText()
+    if (copyText.length === 0) {
+      return
+    }
+    const pasteboardData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, copyText)
+    pasteboard.getSystemPasteboard().setDataSync(pasteboardData)
+    NECommonUtils.showToast($r('app.string.chat_message_copy_success_tips'))
+  }
+
   private getOperationText(): string {
     if (!this.operationMsg) {
       return ''
@@ -950,14 +1015,13 @@ export struct ChatBotSubSessionPage {
     }
     const opMenuWidth = showReaction ? 320 : computeOperateViewWidthByCount(itemCount)
     const opMenuHeight = computeOperateViewHeightByCount(itemCount) + (showReaction ? 51 : 0)
-    this.operationRect.x = this.aiSearchSelectionState.rectX +
-      (this.aiSearchSelectionState.rectWidth - opMenuWidth) / 2
-    if (this.operationRect.x < this.operationViewMargin) {
-      this.operationRect.x = this.operationViewMargin
-    }
-    if (this.operationRect.x + opMenuWidth + this.operationViewMargin > this.screenWidth) {
-      this.operationRect.x = this.screenWidth - opMenuWidth - this.operationViewMargin
-    }
+    this.operationRect.x = clampPopupX(
+      this.aiSearchSelectionState.rectX - this.screenOriginX +
+        (this.aiSearchSelectionState.rectWidth - opMenuWidth) / 2,
+      opMenuWidth,
+      this.currentPaneWidth(),
+      this.operationViewMargin
+    )
     if (showReaction) {
       this.reactionAnchorTop = this.aiSearchSelectionState.rectY
       this.reactionAnchorBottom = this.aiSearchSelectionState.rectY + this.aiSearchSelectionState.rectHeight
@@ -975,6 +1039,51 @@ export struct ChatBotSubSessionPage {
     this.showOperationView = itemCount > 0 || showReaction
   }
 
+  /**
+   * 「+」入口：在页面内渲染快捷评论面板。
+   * x 用与长按菜单完全相同的 clampPopupX（同一函数、同一 margin、同一基准：消息气泡矩形）；
+   * y 贴在「+」号上方，与原来的弹窗位置一致。
+   */
+  private openReactionPickerForMessage(message: NIMMessageInfo, anchor: NERectData): void {
+    if (!canShowMessageReaction(message.message, message.isRevokeMsg)) {
+      return
+    }
+    // 基准是聊天栏而不是整窗：分栏/折叠分屏下整窗含左侧会话栏，用整窗会把面板推出右栏。
+    // 聊天栏里放得下时面板跟着「+」的位置走，只有会溢出时才退回聊天栏内居中。
+    const paneWidth = this.currentPaneWidth()
+    // anchor 是整窗坐标，换算成聊天栏内坐标
+    const anchorCenterX = anchor.x + anchor.width / 2 - this.screenOriginX
+    const pickerLayout = resolveReactionPickerLayout(paneWidth, ChatConst.reactionPickerWidth,
+      this.operationViewMargin, anchorCenterX)
+    this.reactionPickerWidthVp = pickerLayout.widthVp
+    this.reactionPickerRect.x = pickerLayout.xVp
+    const anchorTopInPage = anchor.y - this.navBarHeight
+    const preferredY = anchorTopInPage - ChatConst.reactionPickerHeight - ChatConst.reactionPickerGap
+    this.reactionPickerRect.y = Math.max(this.operationViewMargin, preferredY)
+    this.reactionPickerMsg = message
+    this.showReactionPickerPanel = true
+  }
+
+  /**
+   * 聊天栏实际可用宽度：分栏时窗口宽度减去聊天栏左边界；单屏时与窗口宽度一致。
+   */
+  private currentPaneWidth(): number {
+    return resolveChatPaneWidth(this.screenWidth, this.screenOriginX, this.measuredAreaWidth)
+  }
+
+  private closeReactionPickerPanel(): void {
+    this.showReactionPickerPanel = false
+    this.reactionPickerMsg = undefined
+  }
+
+  private onReactionPickerSelect(index: number): void {
+    const message = this.reactionPickerMsg
+    this.closeReactionPickerPanel()
+    if (message !== undefined) {
+      this.chatViewModel.toggleQuickComment(message, index)
+    }
+  }
+
   private updateReactionMenuPosition(expanded: boolean): void {
     this.reactionMenuExpanded = expanded
     const operationHeight = computeOperateViewHeightByCount(this.reactionMenuItemCount)
@@ -986,6 +1095,9 @@ export struct ChatBotSubSessionPage {
   private closeAISearchSelection(): void {
     this.aiSearchSelectionState.close()
     this.aiSearchSelectingMessageId = ''
+    this.selectionInputIsMouse = false
+    this.selectionOpenedByLongPress = false
+    this.cancelWholeTextRestore()
   }
 
   private clearOperationMenuIfMatch(messageClientId?: string): void {
@@ -1003,7 +1115,7 @@ export struct ChatBotSubSessionPage {
     this.closeAISearchSelection()
   }
 
-  private openAISearchSelection(event: GestureEvent, msg: NIMMessageInfo | undefined): boolean {
+  private openAISearchSelection(event: MessageContextEvent, msg: NIMMessageInfo | undefined): boolean {
     if (!canShowAISearchForMessage(msg)) {
       return false
     }
@@ -1012,12 +1124,12 @@ export struct ChatBotSubSessionPage {
     return this.openTextSelection(event, msg, text, false)
   }
 
-  private openTranslationSelection(event: GestureEvent, msg: NIMMessageInfo | undefined): boolean {
+  private openTranslationSelection(event: MessageContextEvent, msg: NIMMessageInfo | undefined): boolean {
     const text = msg ? MessageTranslationService.instance.getTranslatedDisplayText(msg).trim() : ''
     return this.openTextSelection(event, msg, text, true)
   }
 
-  private openTextSelection(event: GestureEvent, msg: NIMMessageInfo | undefined, text: string,
+  private openTextSelection(event: MessageContextEvent, msg: NIMMessageInfo | undefined, text: string,
     isTranslation: boolean): boolean {
     Logger.info('ChatKitUI', `[AISearchMarkdownSelect] P2P openTextSelection msgId=${msg?.getMessageClientId()} textLength=${text.length} isTranslation=${isTranslation} hasX=${event.target.area.globalPosition.x !== undefined} hasY=${event.target.area.globalPosition.y !== undefined}`)
     if (text.length === 0 || event.target.area.globalPosition.x === undefined ||
@@ -1038,12 +1150,25 @@ export struct ChatBotSubSessionPage {
     this.selectedOperationText = ''
     this.operationMenuItems = this.getSelectionOperationMenuItems()
     this.updateSelectionOperationMenu()
+    this.operationMenuOpenedAt = Date.now()
+    this.restoreSelectionAttempts = 0
     Logger.info('ChatKitUI', `[AISearchMarkdownSelect] P2P setSelectingMessageId id=${this.aiSearchSelectingMessageId}`)
     Logger.info('ChatKitUI', `[AISearchMarkdownSelect] P2P openTextSelection opened msgId=${msg?.getMessageClientId()} active=${this.aiSearchSelectionState.active} rect=${this.aiSearchSelectionState.rectX},${this.aiSearchSelectionState.rectY},${this.aiSearchSelectionState.rectWidth},${this.aiSearchSelectionState.rectHeight}`)
     return true
   }
 
-  private showOperationMenu(event: GestureEvent, msg: NIMMessageInfo | undefined,
+  private resolveContextTouchX(event: MessageContextEvent): number | undefined {
+    const fingers = (event as GestureEvent).fingerList
+    if (fingers !== undefined && fingers.length > 0) {
+      const x = Number(fingers[0].globalX)
+      if (x > 0) {
+        return x
+      }
+    }
+    return undefined
+  }
+
+  private showOperationMenu(event: MessageContextEvent, msg: NIMMessageInfo | undefined,
     operationItems?: Array<MessageOperationItem>, selectedText: string = ''): void {
     this.reactionMenuExpanded = false
     if (selectedText.length === 0) {
@@ -1066,14 +1191,14 @@ export struct ChatBotSubSessionPage {
     let opMenuHeight = computeOperateViewHeightByCount(itemCount) + (showReaction ? 51 : 0)
     let marginSize = this.operationViewMargin
     if (event.target.area.position.x !== undefined) {
-      let xPoint = Number(event.target.area.globalPosition.x) +
-        (Number(event.target.area.width) - opMenuWidth) / 2
-      if (xPoint < marginSize) {
-        xPoint = marginSize
-      }
-      if (xPoint + opMenuWidth + marginSize > this.screenWidth) {
-        xPoint = this.screenWidth - opMenuWidth - marginSize
-      }
+      // 横向锚点：优先用触摸点，其次才退回整行中心。
+      // 原来按"整行居中"算（整行宽 - 菜单宽)/2，右侧自己发的消息会被摆到聊天栏中间偏左，
+      // 离消息很远；改成与快捷评论面板同一规则——以手指位置为基准居中，越界只贴边。
+      const touchedGlobalX = this.resolveContextTouchX(event)
+      const anchorCenterX = touchedGlobalX !== undefined
+        ? touchedGlobalX - this.screenOriginX
+        : Number(event.target.area.globalPosition.x) - this.screenOriginX + Number(event.target.area.width) / 2
+      let xPoint = clampPopupX(anchorCenterX - opMenuWidth / 2, opMenuWidth, this.currentPaneWidth(), marginSize)
       this.operationRect.x = xPoint;
     }
     if (event.target.area.position.y !== undefined) {
@@ -1098,8 +1223,126 @@ export struct ChatBotSubSessionPage {
     this.showOperationView = itemCount > 0 || showReaction
   }
 
+  private handleMessageContextAction(event: MessageContextEvent, msg: NIMMessageInfo | undefined,
+    trigger: ContextActionTrigger): void {
+    if (this.showMultiSelect || msg?.isRevokeMsg || msg?.isAIStreamInProgress()) {
+      return
+    }
+    this.selectionInputIsMouse = this.isMouseSource(event, trigger)
+    this.selectionOpenedByLongPress = this.selectionInputIsMouse &&
+      trigger === ContextActionTrigger.TOUCH_LONG_PRESS
+    // 2in1 上触屏长按不做文本选区：系统选区层会吞掉后续触屏事件，导致自绘操作菜单点不动。
+    // 鼠标长按/右键维持原样（整条选区 + 复制/AI划词搜），手机与折叠屏也不受影响。
+    if (IS_2IN1_DEVICE && trigger === ContextActionTrigger.TOUCH_LONG_PRESS && !this.selectionInputIsMouse) {
+      this.showOperationMenu(event, msg, getOperateMenu(msg))
+      return
+    }
+    // 长按与右键统一以整条消息重新打开，丢弃此前的框选范围；框选范围由消息文本组件单独上报
+    if (this.openAISearchSelection(event, msg)) {
+      return
+    }
+    this.showOperationMenu(event, msg, getOperateMenu(msg))
+  }
+
+  private handleTranslationContextAction(event: MessageContextEvent, msg: NIMMessageInfo | undefined,
+    trigger: ContextActionTrigger): void {
+    if (!msg) {
+      return
+    }
+    this.selectionInputIsMouse = this.isMouseSource(event, trigger)
+    this.selectionOpenedByLongPress = this.selectionInputIsMouse &&
+      trigger === ContextActionTrigger.TOUCH_LONG_PRESS
+    // 2in1 上触屏长按不做文本选区：系统选区层会吞掉后续触屏事件，导致翻译操作菜单（复制/转发/隐藏）点不动，
+    // 处理方式与 OMIM-73493 一致；鼠标长按/右键仍走原选区路径。
+    if (IS_2IN1_DEVICE && trigger === ContextActionTrigger.TOUCH_LONG_PRESS && !this.selectionInputIsMouse) {
+      Logger.info('ChatKitUI', `[DIAG73518] 2in1 touch long press on translation: no selection, show menu directly`)
+      this.operationMsg = msg
+      this.translatedActionMsg = msg
+      this.translationOperationMode = true
+      this.operationMenuItems = getTranslationOperateMenu()
+      this.showOperationMenu(event, msg, this.operationMenuItems)
+      return
+    }
+    if (this.openTranslationSelection(event, msg)) {
+      return
+    }
+    this.operationMsg = msg
+    this.translatedActionMsg = msg
+    this.translationOperationMode = true
+    this.operationMenuItems = getTranslationOperateMenu()
+    this.showOperationMenu(event, msg, this.operationMenuItems)
+    this.translationOperationMode = true
+  }
+
+  private isMouseSource(event: MessageContextEvent, trigger: ContextActionTrigger): boolean {
+    return trigger === ContextActionTrigger.MOUSE_RIGHT_CLICK || event.source === SourceType.Mouse ||
+      event.sourceTool === SourceTool.MOUSE || event.sourceTool === SourceTool.TOUCHPAD
+  }
+  private isWholeTextRange(start: number, end: number): boolean {
+    return start <= 0 && end >= this.aiSearchSelectionState.text.length
+  }
+
+  private cancelWholeTextRestore(): void {
+    if (this.restoreSelectionTimer !== -1) {
+      clearTimeout(this.restoreSelectionTimer)
+      this.restoreSelectionTimer = -1
+    }
+    this.restoreSelectionAttempts = 0
+    this.suppressCollapseClose = false
+  }
+
+  /**
+   * 鼠标长按会把受控选区调整到按压位置。等长按结束后清空一次受控选区，再重新下发整条选区，
+   * 让高亮最终停在整条消息文字上。仅在鼠标来源时使用，触屏路径不经过这里。
+   */
+  private scheduleWholeTextRestore(msg: NIMMessageInfo | undefined): void {
+    const messageClientId = msg?.getMessageClientId() ?? ''
+    if (messageClientId.length === 0 || this.restoreSelectionAttempts >= SELECTION_RESTORE_MAX_ATTEMPTS) {
+      return
+    }
+    if (this.restoreSelectionTimer !== -1) {
+      clearTimeout(this.restoreSelectionTimer)
+    }
+    this.restoreSelectionTimer = setTimeout((): void => {
+      this.restoreSelectionTimer = -1
+      this.applyWholeTextSelection(msg, messageClientId)
+    }, SELECTION_RESTORE_DEBOUNCE_MS)
+  }
+
+  private applyWholeTextSelection(msg: NIMMessageInfo | undefined, messageClientId: string): void {
+    if (!this.selectionOpenedByLongPress || !this.showOperationView || this.operationMsg !== msg) {
+      return
+    }
+    this.restoreSelectionAttempts += 1
+    // 清空受控选区会先触发一次空选区回调，这段时间内屏蔽“点菜单外”的关闭判定
+    this.suppressCollapseClose = true
+    this.aiSearchSelectingMessageId = ''
+    setTimeout((): void => {
+      if (this.selectionOpenedByLongPress && this.showOperationView && this.operationMsg === msg) {
+        this.aiSearchSelectingMessageId = messageClientId
+      }
+      setTimeout((): void => {
+        this.suppressCollapseClose = false
+      }, SELECTION_RESTORE_DELAY_MS)
+    }, SELECTION_RESTORE_DELAY_MS)
+  }
+
   private updateTextSelection(msg: NIMMessageInfo | undefined, text: string, start: number, end: number,
     isTranslation: boolean): void {
+    if (this.selectionInputIsMouse) {
+      if (!this.suppressCollapseClose && shouldCloseMouseSelectionOnCollapse(start === end,
+        this.showOperationView, this.operationMenuPointerHovered, Date.now() - this.operationMenuOpenedAt)) {
+        // 鼠标点击菜单外导致文本失焦：结束本次选区，下次右键重新以整条消息打开
+        this.showOperationView = false
+        this.closeAISearchSelection()
+        return
+      }
+      if (this.selectionOpenedByLongPress && start !== end && !this.isWholeTextRange(start, end)) {
+        this.scheduleWholeTextRestore(msg)
+      }
+      // 鼠标选区范围由整条消息打开或框选回调决定，忽略文本组件的局部选区回调
+      return
+    }
     Logger.info('ChatKitUI', `[AISearchMarkdownSelect] P2P updateTextSelection enter msgId=${msg?.getMessageClientId()} active=${this.aiSearchSelectionState.active} operationSame=${this.operationMsg === msg} mode=${this.translationOperationMode} isTranslation=${isTranslation} start=${start} end=${end} textLength=${text.length}`)
     if (!this.aiSearchSelectionState.active || this.operationMsg !== msg ||
       this.translationOperationMode !== isTranslation) {
@@ -1111,7 +1354,26 @@ export struct ChatBotSubSessionPage {
     this.selectedOperationText = this.aiSearchSelectionState.isAllSelected() ? '' :
     this.aiSearchSelectionState.selectedText()
     this.updateSelectionOperationMenu()
-    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] P2P updateTextSelection updated allSelected=${this.aiSearchSelectionState.isAllSelected()} selectedLength=${this.selectedOperationText.length}`)
+    Logger.info('ChatKitUI', `[AISearchMarkdownSelect] Bot updateTextSelection updated allSelected=${this.aiSearchSelectionState.isAllSelected()} selectedLength=${this.selectedOperationText.length}`)
+  }
+
+  private openMouseTextSelection(msg: NIMMessageInfo | undefined, text: string, start: number, end: number,
+    isTranslation: boolean, area: Area, displayStart: number, displayEnd: number): void {
+    if (!msg || this.showMultiSelect || start === end || text.length === 0) {
+      return
+    }
+    this.selectionInputIsMouse = true
+    this.selectionOpenedByLongPress = false
+    this.cancelWholeTextRestore()
+    this.aiSearchSelectionState.openRange(text, start, end, displayStart, displayEnd,
+      Number(area.globalPosition.x), Number(area.globalPosition.y) - this.navBarHeight,
+      Number(area.width), Number(area.height))
+    this.operationMsg = msg
+    this.translatedActionMsg = isTranslation ? msg : undefined
+    this.translationOperationMode = isTranslation
+    this.aiSearchSelectingMessageId = msg.getMessageClientId()
+    this.updateSelectionOperationMenu()
+    this.operationMenuOpenedAt = Date.now()
   }
 
   @Builder
@@ -1396,9 +1658,14 @@ export struct ChatBotSubSessionPage {
                   showSelect: this.showMultiSelect,
                   aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
                   aiSearchSelectingTranslation: this.translationOperationMode,
+                  aiSearchSelectionStart: this.aiSearchSelectionState.displayStart,
+                  aiSearchSelectionEnd: this.aiSearchSelectionState.displayEnd,
                   enableReaction: this.chatViewModel.isMessageReactionEnabled(),
                   onReactionClick: async (message: NIMMessageInfo, index: number): Promise<boolean> => {
                     return await this.chatViewModel.toggleQuickComment(message, index)
+                  },
+                  onOpenReactionPicker: (message: NIMMessageInfo, anchor: NERectData): void => {
+                    this.openReactionPickerForMessage(message, anchor)
                   },
                   onMessageClick: {
                     onAvatarClick: ((msg: NIMMessageInfo | undefined) => {
@@ -1421,20 +1688,11 @@ export struct ChatBotSubSessionPage {
                       }
                     }),
                     onItemLongClick: ((event: GestureEvent, msg: NIMMessageInfo | undefined) => {
-                      if (this.showMultiSelect) {
-                        return
-                      }
-                      if (msg?.isRevokeMsg) {
-                        return
-                      }
-                      if (msg?.isAIStreamInProgress()) {
-                        return
-                      }
-                      if (this.openAISearchSelection(event, msg)) {
-                        return
-                      }
-                      this.showOperationMenu(event, msg, getOperateMenu(msg))
+                      this.handleMessageContextAction(event, msg, ContextActionTrigger.TOUCH_LONG_PRESS)
                     }),
+                    onItemContextMenu: (event: MouseEvent, msg: NIMMessageInfo | undefined) => {
+                      this.handleMessageContextAction(event, msg, ContextActionTrigger.MOUSE_RIGHT_CLICK)
+                    },
                     onItemClick: (_event: ClickEvent, msg: NIMMessageInfo | undefined) => {
                       if (this.showMultiSelect) {
                         if (msg?.canOperateInMultiSelect()) {
@@ -1518,21 +1776,20 @@ export struct ChatBotSubSessionPage {
                       }
                     },
                     onTranslatedAreaLongClick: (event: GestureEvent, msg: NIMMessageInfo | undefined) => {
-                      if (msg) {
-                        if (this.openTranslationSelection(event, msg)) {
-                          return
-                        }
-                        this.operationMsg = msg
-                        this.translatedActionMsg = msg
-                        this.translationOperationMode = true
-                        this.operationMenuItems = getTranslationOperateMenu()
-                        this.showOperationMenu(event, msg, this.operationMenuItems)
-                        this.translationOperationMode = true
-                      }
+                      this.handleTranslationContextAction(event, msg, ContextActionTrigger.TOUCH_LONG_PRESS)
+                    },
+                    onTranslatedAreaContextMenu: (event: MouseEvent, msg: NIMMessageInfo | undefined) => {
+                      this.handleTranslationContextAction(event, msg, ContextActionTrigger.MOUSE_RIGHT_CLICK)
                     },
                     onTextSelectionChange: (msg: NIMMessageInfo | undefined, text: string, start: number,
                       end: number, isTranslation: boolean) => {
                       this.updateTextSelection(msg, text, start, end, isTranslation)
+                    },
+                    onMouseTextSelection: (msg: NIMMessageInfo | undefined, text: string, start: number,
+                      end: number, isTranslation: boolean, area: Area, displayStart: number,
+                      displayEnd: number) => {
+                      this.openMouseTextSelection(msg, text, start, end, isTranslation, area, displayStart,
+                        displayEnd)
                     },
                     onAvatarLongPress: () => {
 
@@ -1607,6 +1864,11 @@ export struct ChatBotSubSessionPage {
           })
           .onTouch((event) => {
             if (event.type == TouchType.Down) {
+              // 与 10.9.60 一致：触屏点菜单外即关闭菜单并收起选区；
+              // 只保留菜单刚弹出 200ms 内的保护，避免系统调整选区时的抖动把菜单自己关掉。
+              if (this.showOperationView && Date.now() - this.operationMenuOpenedAt < TOUCH_MENU_SETTLE_MS) {
+                return
+              }
               this.showOperationView = false
               this.closeAISearchSelection()
               this.getUIContext().getFocusController().clearFocus();
@@ -1640,6 +1902,18 @@ export struct ChatBotSubSessionPage {
               left: { anchor: "__container__", align: HorizontalAlign.Start },
               right: { anchor: "__container__", align: HorizontalAlign.End },
               top: { anchor: "chatPageListView", align: VerticalAlign.Bottom },
+            })
+
+          // 紧贴输入框下方的一条同色条：只负责盖住输入框底边与窗口底边之间的缝，
+          // 不改变输入框高度、不影响消息区布局。
+          Column()
+            .width('100%')
+            .height(8)
+            .backgroundColor($r('app.color.chat_input_background'))
+            .alignRules({
+              left: { anchor: "__container__", align: HorizontalAlign.Start },
+              right: { anchor: "__container__", align: HorizontalAlign.End },
+              top: { anchor: "chat_input", align: VerticalAlign.Bottom },
             })
 
           // 单行输入框：使用 visibility 控制显隐，避免组件销毁导致内容丢失
@@ -1758,6 +2032,7 @@ export struct ChatBotSubSessionPage {
                 this.aitManager.cleanAit()
                 this.builderSpans.splice(0, this.builderSpans.length)
                 this.resetAITranslateView()
+                this.scrollToNewMessage()
               },
               onSendMultiLineMessage: (title: string, body: string) => {
                 this.showOperationView = false
@@ -1766,7 +2041,6 @@ export struct ChatBotSubSessionPage {
                 this.clearInput(true)
                 this.aitManager.cleanAit()
                 this.builderSpans.splice(0, this.builderSpans.length)
-                this.resetAITranslateView()
                 // 发送后滚动到最新消息
                 this.scrollToNewMessage()
               },
@@ -2004,6 +2278,7 @@ export struct ChatBotSubSessionPage {
                   this.aitManager.cleanAit()
                   this.builderSpans.splice(0, this.builderSpans.length)
                   this.resetAITranslateView()
+                  this.scrollToNewMessage()
                 }
               }).padding({ top: 0 })
                 .width('100%')
@@ -2142,6 +2417,18 @@ export struct ChatBotSubSessionPage {
           .id("input_expand_back_container")
           .backgroundColor($r('app.color.chat_input_background'))
 
+          // 更多/多行/表情面板展开时，最底节点变成这个面板，同样在它底边补一条同色条，
+          // 盖住面板底边与窗口底边之间的缝（2in1/PC 白条）
+          Column()
+            .width('100%')
+            .height(8)
+            .backgroundColor($r('app.color.chat_input_background'))
+            .alignRules({
+              left: { anchor: "input_expand_back_container", align: HorizontalAlign.Start },
+              right: { anchor: "input_expand_back_container", align: HorizontalAlign.End },
+              top: { anchor: "input_expand_back_container", align: VerticalAlign.Bottom },
+            })
+
           // 滚动到新消息按钮
           if (this.showScrollToNewMessageButton && !this.showMultiSelect) {
             Row() {
@@ -2193,6 +2480,9 @@ export struct ChatBotSubSessionPage {
               reactionExpanded: this.reactionMenuExpanded,
               onReactionExpandedChange: (expanded: boolean): void => {
                 this.updateReactionMenuPosition(expanded)
+              },
+              onPointerHoverChange: (hovered: boolean): void => {
+                this.operationMenuPointerHovered = hovered
               },
               didClickReaction: (index: number): void => {
                 this.showOperationView = false
@@ -2303,8 +2593,14 @@ export struct ChatBotSubSessionPage {
               }
             })
               .position({ x: this.operationRect.x, y: this.operationRect.y })
+              .zIndex(1000)
               .borderRadius(8)
               .shadow(ShadowStyle.OUTER_DEFAULT_MD)
+              // 淡入淡出：与弹窗类面板观感一致
+              .transition(TransitionEffect.OPACITY.animation({ duration: 150, curve: Curve.EaseInOut }))
+              .keyboardShortcut('c', [ModifierKey.CTRL], () => {
+                this.copyOperationText()
+              })
 
           }
 
@@ -2317,6 +2613,40 @@ export struct ChatBotSubSessionPage {
         }
         .width('100%')
         .height('100%')
+        // 内容列刷白：输入框上方那段空隙保持白色，聊天区外观不变
+        .backgroundColor(Color.White)
+
+        if (this.showReactionPickerPanel) {
+          // 点面板外任意位置关闭
+          Column()
+            .width('100%')
+            .height('100%')
+            .backgroundColor('#00000000')
+            .onClick(() => this.closeReactionPickerPanel())
+            .transition(TransitionEffect.OPACITY.animation({ duration: 150, curve: Curve.EaseInOut }))
+
+          Column() {
+            MessageReactionPicker({
+              expanded: true,
+              showExpandButton: false,
+              onReactionClick: (index: number): void => {
+                this.onReactionPickerSelect(index)
+              }
+            })
+              .width(this.reactionPickerWidthVp)
+              .backgroundColor(Color.White)
+              .borderRadius(8)
+          }
+          .width(this.reactionPickerWidthVp)
+          .position({ x: this.reactionPickerRect.x, y: this.reactionPickerRect.y })
+          .zIndex(1001)
+          .borderRadius(8)
+          .shadow(ShadowStyle.OUTER_DEFAULT_MD)
+          .onTouch((event: TouchEvent) => {
+            event.stopPropagation()
+          })
+          .transition(TransitionEffect.OPACITY.animation({ duration: 150, curve: Curve.EaseInOut }))
+        }
 
         if (this.showAISearchPanel) {
           Column()
@@ -2340,8 +2670,18 @@ export struct ChatBotSubSessionPage {
       }
       .width('100%')
       .height('100%')
+      .onAreaChange((_oldValue: Area, newValue: Area) => {
+        const width = Number(newValue.width) || 0
+        if (width > 0 && width !== this.screenWidth) {
+          this.screenWidth = width
+        }
+        this.screenOriginX = Number(newValue.globalPosition.x) || 0
+        this.measuredAreaWidth = width
+      })
     }
     .hideTitleBar(true)
+    // 内容列之外、输入框下方那条缝用输入框底色兜住（纯颜色，无新增节点）
+    .backgroundColor($r('app.color.chat_input_background'))
     .onReady((context: NavDestinationContext) => {
       this.pathStack = context.pathStack
       const params = this.pathStack.getParamByName("ChatBotSubSessionPage") as ChatBotSubSessionParam[];
@@ -2981,6 +3321,7 @@ export struct ChatBotSubSessionPage {
   }
 
   aboutToDisappear(): void {
+    adaptiveWindowManager.state.unsubscribe(this.adaptiveWindowListener)
     MessageTranslationService.instance.removeTranslationFinishedListener(this.translationFinishedListener)
     this.chatViewModel.clearUnreadCount()
     this.chatViewModel.onOperateMessageInvalid = undefined

@@ -41,7 +41,7 @@ export function teamExitWarningDialogBuilder(params: TeamExitDialogParam) {
         .width('50%')
     }
   }.backgroundColor(Color.White)
-  .width('80%')
+  .width(300)
   .borderRadius(8)
 }
 

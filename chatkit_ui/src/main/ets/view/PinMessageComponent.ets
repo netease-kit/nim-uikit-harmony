@@ -6,7 +6,7 @@
  */
 import { ChatInfo } from '../model/ChatInfo';
 import { NIMMessageInfo } from '../model/NIMMessageInfo';
-import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
+import { AvatarColorUntil, AvatarItem, CommonAvatar, shouldOpenContextAction } from '@nimkit/common';
 import { V2NIMMessageType } from '@nimsdk/base';
 import { isMultiLineMessage } from '@nimkit/chatkit';
 import {
@@ -125,6 +125,11 @@ export struct PinMessageComponent {
         .gesture(LongPressGesture().onAction((event: GestureEvent) => {
           this.onMessageClick?.onItemLongClick?.(event, this.message)
         }))
+        .onMouse((event: MouseEvent) => {
+          if (shouldOpenContextAction(event.button, event.action)) {
+            this.onMessageClick?.onItemContextMenu?.(event, this.message)
+          }
+        })
       }
     }
     .margin({

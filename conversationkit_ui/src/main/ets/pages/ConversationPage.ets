@@ -5,10 +5,28 @@
  *
  */
 
-import { ConversationIdUtilRepo, ErrorUtils, IMKitConfigCenter, UserAIBotManager } from '@nimkit/chatkit'
-import { CommonEmptyResult, CommonLongLoadingProgress, CustomLoadMoreBuilder, NetworkBrokenBuilder } from '@nimkit/common'
-import { V2NIMAIUser, V2NIMConversationType } from '@nimsdk/base'
+import {
+  ChatKitClient,
+  ConversationIdUtilRepo,
+  ErrorUtils,
+  IMKitConfigCenter,
+  UserAIBotManager
+} from '@nimkit/chatkit'
+import { CommonEmptyResult, CommonLongLoadingProgress, CustomLoadMoreBuilder, Logger, NetworkBrokenBuilder } from '@nimkit/common'
+import {
+  V2NIMAIUser,
+  V2NIMConversationType,
+  V2NIMP2PMessageMuteMode,
+  V2NIMTeamMessageMuteMode,
+  V2NIMTeamType
+} from '@nimsdk/base'
 import { ConversationGroupDefaultNames } from '../model/ConversationGroupModel'
+import {
+  ConversationOpenIntent,
+  ConversationOpenSource,
+  ConversationRouteKey,
+  ConversationRouteKind
+} from '../model/ConversationOpenIntent'
 import { AitServer } from '../service/ait/AitService'
 import {
   CloudConversationStrategy,
@@ -19,7 +37,7 @@ import {
 import { ConversationAIUserViewItem } from '../view/ConversationAIUserViewItem'
 import { ConversationGroupBar } from '../view/ConversationGroupBar'
 import { ConversationNavigationView } from '../view/ConversationNavigationView'
-import { ConversationViewItem } from '../view/ConversationViewItem'
+import { ConversationViewItem, resolveConversationItemBackground } from '../view/ConversationViewItem'
 import { EndItemView } from '../view/EndItemView'
 import { FraudTipView } from '../view/FraudTipView'
 import { ConversationAIViewModel } from '../viewmodel/ConversationAIViewModel'
@@ -35,6 +53,9 @@ struct ConversationPageContent {
   @Param onUreadMessageChange?: (unreadCount?: number) => void = undefined
   @Param onConversationFirstReady?: (count: number) => void = undefined
   @Param onConversationFirstStable?: (count: number) => void = undefined
+  @Param onOpenConversation?: (intent: ConversationOpenIntent) => void = undefined
+  @Param onOpenDetail?: (info: NavPathInfo) => void = undefined
+  @Param selectedConversationId: string = ''
   private readonly cloudStrategy: CloudConversationStrategy = new CloudConversationStrategy()
   private readonly localStrategy: LocalConversationStrategy = new LocalConversationStrategy()
   @Local cloudViewModel: ConversationViewModel = new ConversationViewModel(this.cloudStrategy)
@@ -47,8 +68,19 @@ struct ConversationPageContent {
   private pendingSubscribeAccounts: Set<string> = new Set()
   private hasRequestedAIUsersOnDemand: boolean = false
 
+  @Monitor('selectedConversationId')
+  onSelectedConversationChanged(): void {
+    this.applyPinnedConversation(this.selectedConversationId)
+  }
+
+  private applyPinnedConversation(conversationId: string): void {
+    this.cloudViewModel.setPinnedConversation(conversationId)
+    this.localViewModel.setPinnedConversation(conversationId)
+  }
+
   aboutToAppear(): void {
     this.logPerf('conversation.page.appear.start')
+    this.applyPinnedConversation(this.selectedConversationId)
     this.activeViewModel().onUreadMessageChange = this.onUreadMessageChange
     this.activeViewModel().onConversationFirstReady = (count: number) => {
       this.logPerf('conversation.page.first_ready_callback', `count=${count}`)
@@ -203,7 +235,7 @@ struct ConversationPageContent {
         await this.activeViewModel().selectConversationGroup(group)
       },
       onManageClick: () => {
-        this.pathStack.pushPath({
+        this.openDetail({
           name: 'ConversationGroupManagePage',
           param: this.conversationGroupViewModel
         })
@@ -213,7 +245,10 @@ struct ConversationPageContent {
 
   @Builder
   private conversationListContentBuilder() {
-    if (this.activeViewModel().isFinishedSyncLoad && this.activeViewModel().data.totalCount() <= 0) {
+    // 「未读 / @我」分组按未读数据过滤，首屏没有未读时过滤结果可能为空，但角标来自服务端聚合计数。
+    // 这种「假空」状态下不能直接显示空态，要显示 loading，由 viewmodel 逐页补拉。
+    if (this.activeViewModel().isFinishedSyncLoad && this.activeViewModel().data.totalCount() <= 0 &&
+      !this.activeViewModel().isRefillingGroup) {
       ListItem() {
         Column() {
           CommonEmptyResult({
@@ -227,7 +262,8 @@ struct ConversationPageContent {
         .height(360)
         .backgroundColor('#ffFFFFFF')
       }
-    } else if (!this.activeViewModel().isFinishedSyncLoad && this.activeViewModel().data.totalCount() <= 0) {
+    } else if ((!this.activeViewModel().isFinishedSyncLoad || this.activeViewModel().isRefillingGroup) &&
+      this.activeViewModel().data.totalCount() <= 0) {
       ListItem() {
         Column() {
           CommonLongLoadingProgress()
@@ -250,9 +286,11 @@ struct ConversationPageContent {
               })
             }
 
+            // 列表底部留白：2in1/桌面窗口下窗口底边会吃掉约 20vp，
+            // 留白给到 50vp，保证最后一条会话能完整滚进视口。
             Row()
               .width('100%')
-              .height(16)
+              .height(50)
               .backgroundColor('#ffFFFFFF')
           }
         }
@@ -269,6 +307,20 @@ struct ConversationPageContent {
         haveBeanAit: this.activeViewModel().aitConversationList.has(item.conversationId),
         isUserAIBot: this.activeViewModel().userAIBotConversationList.has(item.conversationId),
         isAIUser: this.isAIUserConversation(item),
+        isSelected: this.selectedConversationId === item.conversationId,
+        onContextAction: (action: string) => {
+          if (action === 'stickTop') {
+            this.stickTopConversation(item, true)
+          } else if (action === 'unstickTop') {
+            this.stickTopConversation(item, false)
+          } else if (action === 'mute') {
+            this.setConversationMute(item, true)
+          } else if (action === 'unmute') {
+            this.setConversationMute(item, false)
+          } else if (action === 'delete') {
+            this.deleteConversation(item)
+          }
+        },
         onItemClick: () => {
           this.goToChatPage(item)
         },
@@ -294,7 +346,10 @@ struct ConversationPageContent {
         actionAreaDistance: 112
       }
     })
-    .backgroundColor(item.stickTop ? '#ffF3F5F7' : '#ffffffff')
+    .backgroundColor(resolveConversationItemBackground(
+      this.selectedConversationId === item.conversationId,
+      item.stickTop
+    ))
   }
 
   private shouldShowLoadMoreFooter(): boolean {
@@ -314,8 +369,10 @@ struct ConversationPageContent {
   titleBuilder() {
     ConversationNavigationView({
       pathStack: this.pathStack,
+      onOpenConversation: this.onOpenConversation,
+      onOpenDetail: this.onOpenDetail,
       goSearchPage: (pathStack: NavPathStack) => {
-        pathStack.pushPath({ name: 'SearchPage' })
+        this.openDetail({ name: 'SearchPage' })
       }
     })
   }
@@ -418,20 +475,60 @@ struct ConversationPageContent {
     EndItemView({
       conversationInfo: item,
       deleteItem: async () => {
-        if (this.activeViewModel().requiresNetworkForDelete() && !ErrorUtils.checkNetworkAndToast()) {
-          return
-        }
-        this.scroller.closeAllSwipeActions()
-        await this.activeViewModel().deleteConversation(item.conversationId)
+        await this.deleteConversation(item)
       },
       stickTopItem: async (stickTop: boolean) => {
-        if (ErrorUtils.checkNetworkAndToast()) {
-          await this.activeViewModel().stickTopConversation(item.conversationId ?? '', stickTop)
-          this.scroller.closeAllSwipeActions()
-        }
+        await this.stickTopConversation(item, stickTop)
       }
     }).width(140)
       .backgroundColor(item.stickTop ? '#ffF3F5F7' : '#ffffffff')
+  }
+
+  /**
+   * 会话消息免打扰：单聊走点对点免打扰模式，群聊按群类型走群消息免打扰模式。
+   */
+  private async setConversationMute(item: ConversationItem, mute: boolean): Promise<void> {
+    if (!ErrorUtils.checkNetworkAndToast()) {
+      return
+    }
+    const settingService = ChatKitClient.nim.settingService
+    const targetId = this.getConversationTargetId(item)
+    if (!settingService || targetId.length === 0) {
+      return
+    }
+    try {
+      if (item.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_P2P) {
+        await settingService.setP2PMessageMuteMode(targetId, mute ?
+          V2NIMP2PMessageMuteMode.V2NIM_P2P_MESSAGE_MUTE_MODE_ON :
+          V2NIMP2PMessageMuteMode.V2NIM_P2P_MESSAGE_MUTE_MODE_OFF)
+      } else if (item.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM ||
+        item.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_SUPER_TEAM) {
+        await settingService.setTeamMessageMuteMode(targetId,
+          item.type === V2NIMConversationType.V2NIM_CONVERSATION_TYPE_SUPER_TEAM ?
+            V2NIMTeamType.V2NIM_TEAM_TYPE_SUPER : V2NIMTeamType.V2NIM_TEAM_TYPE_NORMAL,
+          mute ? V2NIMTeamMessageMuteMode.V2NIM_TEAM_MESSAGE_MUTE_MODE_ON :
+            V2NIMTeamMessageMuteMode.V2NIM_TEAM_MESSAGE_MUTE_MODE_OFF)
+      }
+      this.scroller.closeAllSwipeActions()
+    } catch (e) {
+      Logger.error('ConversationKit', `setConversationMute failed: ${e}`)
+    }
+  }
+
+  private async deleteConversation(item: ConversationItem): Promise<void> {
+    if (this.activeViewModel().requiresNetworkForDelete() && !ErrorUtils.checkNetworkAndToast()) {
+      return
+    }
+    this.scroller.closeAllSwipeActions()
+    await this.activeViewModel().deleteConversation(item.conversationId)
+  }
+
+  private async stickTopConversation(item: ConversationItem, stickTop: boolean): Promise<void> {
+    if (!ErrorUtils.checkNetworkAndToast()) {
+      return
+    }
+    await this.activeViewModel().stickTopConversation(item.conversationId ?? '', stickTop)
+    this.scroller.closeAllSwipeActions()
   }
 
   private async goToChatPage(conversationInfo: ConversationItem): Promise<void> {
@@ -440,28 +537,62 @@ struct ConversationPageContent {
       const isUserAIBot = await UserAIBotManager.isUserAIBot(targetId)
       if (isUserAIBot) {
         const cachedBot = UserAIBotManager.getCachedUserAIBot(targetId)
-        const botSubSessionParams: string[] = [
-          conversationInfo.conversationId,
+        const displayName = cachedBot?.name ?? conversationInfo.name ?? targetId
+        const intent = new ConversationOpenIntent(
+          new ConversationRouteKey(ConversationRouteKind.BOT_SUB_SESSION_LIST, conversationInfo.conversationId),
+          ConversationOpenSource.CONVERSATION_LIST,
           targetId,
-          cachedBot?.name ?? conversationInfo.name ?? targetId
-        ]
-        this.pathStack.pushPath({
-          name: 'ChatBotSubSessionListPage',
-          param: botSubSessionParams
-        })
+          displayName
+        )
+        if (this.onOpenConversation) {
+          this.onOpenConversation(intent)
+        } else {
+          this.pathStack.pushPath({
+            name: 'ChatBotSubSessionListPage',
+            param: [conversationInfo.conversationId, targetId, displayName]
+          })
+        }
         return
       }
-      this.pathStack.pushPath({ name: 'ChatP2PPage', param: conversationInfo.conversationId })
-    } else if (conversationInfo?.type == V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM) {
-      this.pathStack.pushPath({ name: 'ChatTeamPage', param: conversationInfo.conversationId })
+      this.openConversation(new ConversationOpenIntent(
+        new ConversationRouteKey(ConversationRouteKind.P2P, conversationInfo.conversationId),
+        ConversationOpenSource.CONVERSATION_LIST
+      ), 'ChatP2PPage')
+    } else if (conversationInfo?.type == V2NIMConversationType.V2NIM_CONVERSATION_TYPE_TEAM ||
+      conversationInfo?.type == V2NIMConversationType.V2NIM_CONVERSATION_TYPE_SUPER_TEAM) {
+      const kind = conversationInfo.type == V2NIMConversationType.V2NIM_CONVERSATION_TYPE_SUPER_TEAM ?
+        ConversationRouteKind.SUPER_TEAM : ConversationRouteKind.TEAM
+      this.openConversation(new ConversationOpenIntent(
+        new ConversationRouteKey(kind, conversationInfo.conversationId),
+        ConversationOpenSource.CONVERSATION_LIST
+      ), 'ChatTeamPage')
     }
   }
 
   private goToAIChatPage(aiUser: V2NIMAIUser) {
     if (aiUser.accountId) {
       const aiConversationId: string = ConversationIdUtilRepo.p2pConversationId(aiUser.accountId)
-      this.pathStack.pushPath({ name: 'ChatP2PPage', param: aiConversationId })
+      this.openConversation(new ConversationOpenIntent(
+        new ConversationRouteKey(ConversationRouteKind.P2P, aiConversationId),
+        ConversationOpenSource.AI_ENTRY
+      ), 'ChatP2PPage')
     }
+  }
+
+  private openConversation(intent: ConversationOpenIntent, fallbackRouteName: string): void {
+    if (this.onOpenConversation) {
+      this.onOpenConversation(intent)
+      return
+    }
+    this.pathStack.pushPath({ name: fallbackRouteName, param: intent.key.conversationId })
+  }
+
+  private openDetail(info: NavPathInfo): void {
+    if (this.onOpenDetail) {
+      this.onOpenDetail(info)
+      return
+    }
+    this.pathStack.pushPath(info)
   }
 
   private conversationItemKey(item: ConversationItem): string {
@@ -474,6 +605,10 @@ struct ConversationPageContent {
       `${lastMessage?.messageType ?? ''}|${lastMessage?.subType ?? ''}|` +
       `${lastMessage?.messageRefer?.messageClientId ?? ''}|${lastMessage?.messageRefer?.messageServerId ?? ''}|` +
       `${lastMessage?.messageRefer?.createTime ?? 0}|${lastMessage?.sendingState ?? ''}|${previewText}`
+      // 注意：不要把"是否选中"放进 key。选中态只影响行背景色，由 @Param isSelected 驱动重渲染即可；
+      // 放进 key 会让切换选中时该行被销毁重建，头像随之重建（先闪名字兜底再淡入图片）。
+      // 也不能去掉未读数/预览/时间等内容字段：这些更新大量走 reloadData，key 不变时行不会重新构建，
+      // 会出现"进了会话出来未读数不变"的错误。
   }
 
   private getConversationTargetId(item: ConversationItem): string {
@@ -492,6 +627,9 @@ export struct ConversationPage {
   @Param onUreadMessageChange?: (unreadCount?: number) => void = undefined
   @Param onConversationFirstReady?: (count: number) => void = undefined
   @Param onConversationFirstStable?: (count: number) => void = undefined
+  @Param onOpenConversation?: (intent: ConversationOpenIntent) => void = undefined
+  @Param onOpenDetail?: (info: NavPathInfo) => void = undefined
+  @Param selectedConversationId: string = ''
 
   build() {
     ConversationPageContent({
@@ -499,6 +637,9 @@ export struct ConversationPage {
       onUreadMessageChange: this.onUreadMessageChange,
       onConversationFirstReady: this.onConversationFirstReady,
       onConversationFirstStable: this.onConversationFirstStable,
+      onOpenConversation: this.onOpenConversation,
+      onOpenDetail: this.onOpenDetail,
+      selectedConversationId: this.selectedConversationId,
       mode: ConversationMode.CLOUD
     })
   }
@@ -510,6 +651,9 @@ export struct LocalConversationPage {
   @Param onUreadMessageChange?: (unreadCount?: number) => void = undefined
   @Param onConversationFirstReady?: (count: number) => void = undefined
   @Param onConversationFirstStable?: (count: number) => void = undefined
+  @Param onOpenConversation?: (intent: ConversationOpenIntent) => void = undefined
+  @Param onOpenDetail?: (info: NavPathInfo) => void = undefined
+  @Param selectedConversationId: string = ''
 
   build() {
     ConversationPageContent({
@@ -517,6 +661,9 @@ export struct LocalConversationPage {
       onUreadMessageChange: this.onUreadMessageChange,
       onConversationFirstReady: this.onConversationFirstReady,
       onConversationFirstStable: this.onConversationFirstStable,
+      onOpenConversation: this.onOpenConversation,
+      onOpenDetail: this.onOpenDetail,
+      selectedConversationId: this.selectedConversationId,
       mode: ConversationMode.LOCAL
     })
   }

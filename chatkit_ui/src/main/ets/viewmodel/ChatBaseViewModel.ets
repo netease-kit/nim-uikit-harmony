@@ -1172,8 +1172,16 @@ export class ChatBaseViewModel {
         this.lastReadVisibleStateReady)
   }
 
-  updateLastReadPosition(topVisibleIndex: number): void {
+  updateLastReadPosition(topVisibleIndex: number, bottomVisibleIndex?: number): void {
     if (!this.enableLastReadPosition() || topVisibleIndex < 0 || this.lastReadTargetMessageCreateTime <= 0) {
+      return
+    }
+    const totalCount = this.chatInfo?.msgList.totalCount() ?? 0
+    // 创建/邀请通知折叠后，未读锚点可能已被替换；全部历史可见时直接消费入口。
+    if (!this.isLoading && !this.hasMore && !this.hasNew && totalCount > 0 && topVisibleIndex === 0 &&
+      bottomVisibleIndex !== undefined && bottomVisibleIndex >= totalCount - 1) {
+      this.lastReadVisibleStateReady = true
+      this.lastReadPositionStatus = LastReadPositionStatus.CONSUMED
       return
     }
     const topVisibleMessage = this.chatInfo?.msgList.getData(topVisibleIndex)

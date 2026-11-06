@@ -26,6 +26,13 @@ import {
   resolveContactSearchTextPresentation,
   SearchTextPresentation
 } from '@nimkit/chatkit';
+import {
+  conversationOpenRegistry,
+  ConversationOpenIntent,
+  ConversationOpenSource,
+  ConversationRouteKey,
+  ConversationRouteKind
+} from '@nimkit/conversationkit_ui';
 
 // 跳转页面入口函数
 @Builder
@@ -112,10 +119,7 @@ export struct SearchPage {
                 .onClick(() => {
                   const conversationId =
                     ChatKitClient.nim.conversationIdUtil.p2pConversationId(item.userInfo?.user?.accountId)
-                  this.pathStack.pushPath({
-                    name: 'ChatP2PPage',
-                    param: conversationId
-                  })
+                  this.openConversation(ConversationRouteKind.P2P, conversationId, 'ChatP2PPage')
                 })
               }, (item: SearchListModel) => item.userInfo ?
                 getContactSearchRenderKey(item.userInfo, this.searchText) : this.searchText)
@@ -159,10 +163,7 @@ export struct SearchPage {
                 .height(52)
                 .onClick(() => {
                   const conversationId = ChatKitClient.nim.conversationIdUtil.teamConversationId(item.team?.teamId)
-                  this.pathStack.pushPath({
-                    name: 'ChatTeamPage',
-                    param: conversationId
-                  })
+                  this.openConversation(ConversationRouteKind.TEAM, conversationId, 'ChatTeamPage')
                 })
               }, (item: SearchListModel) =>
                 [item.team?.teamId ?? '', this.searchText, item.team?.name ?? ''].join('::'))
@@ -206,10 +207,7 @@ export struct SearchPage {
                 .height(52)
                 .onClick(() => {
                   const conversationId = ChatKitClient.nim.conversationIdUtil.teamConversationId(item.team?.teamId)
-                  this.pathStack.pushPath({
-                    name: 'ChatTeamPage',
-                    param: conversationId
-                  })
+                  this.openConversation(ConversationRouteKind.TEAM, conversationId, 'ChatTeamPage')
                 })
               }, (item: SearchListModel) =>
                 [item.team?.teamId ?? '', this.searchText, item.team?.name ?? ''].join('::'))
@@ -232,6 +230,16 @@ export struct SearchPage {
   private isSearchResultEmpty(): boolean {
     return this.searchText.length > 0 && this.viewModel.friendData.length === 0 &&
       this.viewModel.discussData.length === 0 && this.viewModel.seniorData.length === 0
+  }
+
+  private openConversation(kind: ConversationRouteKind, conversationId: string, fallbackRoute: string): void {
+    const intent = new ConversationOpenIntent(
+      new ConversationRouteKey(kind, conversationId),
+      ConversationOpenSource.SEARCH
+    )
+    if (!conversationOpenRegistry.open(intent)) {
+      this.pathStack.pushPath({ name: fallbackRoute, param: conversationId })
+    }
   }
 
   @Builder

@@ -9,7 +9,7 @@ import { NIMMessageInfo } from '../model/NIMMessageInfo';
 import { V2NIMConversationType, V2NIMErrorCode, V2NIMMessageSendingState, V2NIMMessageType } from '@nimsdk/base';
 import { ChatInfo } from '../model/ChatInfo';
 import { getNotificationMessageContent, getPinMessageOperatorName, getTipsMessageContent } from '../common/MessageHelper';
-import { AvatarColorUntil, AvatarItem, CommonAvatar } from '@nimkit/common';
+import { AvatarColorUntil, AvatarItem, CommonAvatar, shouldOpenContextAction } from '@nimkit/common';
 import {
   getMessageBackgroundColor as resolveMessageBackgroundColor,
   messageContent
@@ -19,6 +19,7 @@ import { ChatKitConfig } from '../ChatKitConfig';
 import { ChatKitClient, IMKitConfigCenter } from '@nimkit/chatkit';
 import { MessageReactionView } from './MessageReactionView';
 import { MessageReactionManager } from '../manager/MessageReactionManager';
+import { NERectData } from '../model/NERectData';
 import {
   buildReactionSummaries,
   getSendMessageComboFlexShrink,
@@ -26,6 +27,16 @@ import {
   ReactionSummary,
   shouldRightAlignSendMessageContent
 } from '../utils/MessageReactionUtils';
+
+/** 多选勾选框距行首的左边距，收发两侧必须共用同一数值，否则勾选框会左右错位 */
+const MULTI_SELECT_CHECKBOX_INSET: number = 16;
+
+function openMessageContextAction(event: MouseEvent, message: NIMMessageInfo | undefined,
+  onMessageClick: MessageItemClick | undefined): void {
+  if (shouldOpenContextAction(event.button, event.action)) {
+    onMessageClick?.onItemContextMenu?.(event, message)
+  }
+}
 
 /**
  * 消息组件按照UI样式，划分为发送消息组件、接收消息组件、通知消息组件和提示消息组件
@@ -47,6 +58,8 @@ export struct MessageComponent {
   @Param
   onReactionClick?: (msg: NIMMessageInfo, index: number) => Promise<boolean> = undefined
   @Param
+  onOpenReactionPicker?: (msg: NIMMessageInfo, anchor: NERectData) => void = undefined
+  @Param
   enableReaction: boolean = false
   @Param
   showSelect: boolean = false;
@@ -54,6 +67,10 @@ export struct MessageComponent {
   aiSearchSelectingMessageId: string = ''
   @Param
   aiSearchSelectingTranslation: boolean = false
+  @Param
+  aiSearchSelectionStart: number = 0
+  @Param
+  aiSearchSelectionEnd: number = 0
 
   build() {
     if (this.message?.getMessageType() == V2NIMMessageType.V2NIM_MESSAGE_TYPE_NOTIFICATION) {
@@ -71,7 +88,10 @@ export struct MessageComponent {
         showRadio: this.showSelect,
         aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
         aiSearchSelectingTranslation: this.aiSearchSelectingTranslation,
+        aiSearchSelectionStart: this.aiSearchSelectionStart,
+        aiSearchSelectionEnd: this.aiSearchSelectionEnd,
         onReactionClick: this.onReactionClick,
+        onOpenReactionPicker: this.onOpenReactionPicker,
         enableReaction: this.enableReaction
       });
     } else {
@@ -82,7 +102,10 @@ export struct MessageComponent {
         showRadio: this.showSelect,
         aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
         aiSearchSelectingTranslation: this.aiSearchSelectingTranslation,
+        aiSearchSelectionStart: this.aiSearchSelectionStart,
+        aiSearchSelectionEnd: this.aiSearchSelectionEnd,
         onReactionClick: this.onReactionClick,
+        onOpenReactionPicker: this.onOpenReactionPicker,
         enableReaction: this.enableReaction
       });
     }
@@ -151,7 +174,13 @@ export struct SenderMessageComponent {
   @Param
   aiSearchSelectingTranslation: boolean = false
   @Param
+  aiSearchSelectionStart: number = 0
+  @Param
+  aiSearchSelectionEnd: number = 0
+  @Param
   onReactionClick?: (msg: NIMMessageInfo, index: number) => Promise<boolean> = undefined
+  @Param
+  onOpenReactionPicker?: (msg: NIMMessageInfo, anchor: NERectData) => void = undefined
   @Param
   enableReaction: boolean = false
   @Local
@@ -246,23 +275,42 @@ export struct SenderMessageComponent {
         }
         Row() {
           if (this.showRadio) {
-            if (!this.message.canOperateInMultiSelect()) {
-              Text().margin({ top: (this.message?.getMessageHeight(this.getUIContext()) - 20) / 2, left: 16 })
-                .height('20')
-                .width('20')
-            } else {
-              Toggle({ type: ToggleType.Checkbox, isOn: this.message.isSelectedMsg })
-                .margin({ top: (this.message?.getMessageHeight(this.getUIContext()) - 20) / 2, left: 16 })
-                .height('20')
-                .width('20')
-                .onChange((value: boolean) => {
-                  this.onMessageClick?.onMultiSelect?.(value, this.message)
-                  this.radioOn = value;
-                })
+            // 发送方整行靠右排列，勾选框用可伸展容器固定在行首，避免宽屏下浮到消息中间；
+            // 勾选框自身定位与接收方保持一致，不使用容器 padding，避免收发两侧左右错位
+            Row() {
+              if (!this.message.canOperateInMultiSelect()) {
+                Text()
+                  .margin({
+                    top: (this.message?.getMessageHeight(this.getUIContext()) - 20) / 2,
+                    left: MULTI_SELECT_CHECKBOX_INSET
+                  })
+                  .height('20')
+                  .width('20')
+              } else {
+                Toggle({ type: ToggleType.Checkbox, isOn: this.message.isSelectedMsg })
+                  .margin({
+                    top: (this.message?.getMessageHeight(this.getUIContext()) - 20) / 2,
+                    left: MULTI_SELECT_CHECKBOX_INSET
+                  })
+                  .height('20')
+                  .width('20')
+                  .onChange((value: boolean) => {
+                    this.onMessageClick?.onMultiSelect?.(value, this.message)
+                    this.radioOn = value;
+                  })
+              }
             }
+            .layoutWeight(1)
+            .justifyContent(FlexAlign.Start)
+            .alignItems(VerticalAlign.Top)
           }
           Column() {
             Row() {
+              // 气泡与状态图标（发送中转圈 / 发送失败 / 已读回执）同一层叠放：
+              // 图标不再占用行内流式宽度，气泡可用宽度就不会被图标挤出行外压到右侧头像上；
+              // 图标按气泡左下角对齐后左移自身占位，视觉位置与原来一致。
+              Stack({ alignContent: Alignment.BottomStart }) {
+                Column() {
               if (!this.message.isRevokeMsg &&
                 (this.message.message.sendingState === V2NIMMessageSendingState.V2NIM_MESSAGE_SENDING_STATE_FAILED
                 || (this.message.message.messageStatus?.errorCode !== undefined && this.message.message.messageStatus?.errorCode !== 200)
@@ -362,6 +410,8 @@ export struct SenderMessageComponent {
                   }
                 }
               }
+                }
+                .offset({ x: -22 })
               Column() {
                 Row() {
                   messageContent({
@@ -370,6 +420,8 @@ export struct SenderMessageComponent {
                     chatInfo: this.chatUserInfo,
                     aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
                     aiSearchSelectingTranslation: this.aiSearchSelectingTranslation,
+                    aiSearchSelectionStart: this.aiSearchSelectionStart,
+                    aiSearchSelectionEnd: this.aiSearchSelectionEnd,
                     showReaction: this.shouldShowReaction()
                   })
                 }
@@ -396,6 +448,11 @@ export struct SenderMessageComponent {
                         return await this.onReactionClick?.(this.message, index) ?? false
                       }
                       return false
+                    },
+                    onOpenPicker: (anchor: NERectData): void => {
+                      if (this.message !== undefined) {
+                        this.onOpenReactionPicker?.(this.message, anchor)
+                      }
                     }
                   })
                   .constraintSize({ maxWidth: '100%' })
@@ -408,6 +465,7 @@ export struct SenderMessageComponent {
               .constraintSize({ maxWidth: '100%' })
               .flexShrink(getSendMessageComboFlexShrink(this.shouldShowReaction()))
             }
+              }
             .justifyContent(FlexAlign.End)
             .alignItems(VerticalAlign.Bottom)
             .margin({ right: 8 })
@@ -417,6 +475,9 @@ export struct SenderMessageComponent {
               .onAction((event: GestureEvent) => {
                 this.onMessageClick?.onItemLongClick?.(event, this.message)
               }))
+            .onMouse((event: MouseEvent) => {
+              openMessageContextAction(event, this.message, this.onMessageClick)
+            })
 
             // 仅当标记功能开启时显示标记提示
             if (IMKitConfigCenter.enablePin && this.message?.isPinMsg) {
@@ -490,7 +551,13 @@ export struct ReceiveMessageComponent {
   @Param
   aiSearchSelectingTranslation: boolean = false
   @Param
+  aiSearchSelectionStart: number = 0
+  @Param
+  aiSearchSelectionEnd: number = 0
+  @Param
   onReactionClick?: (msg: NIMMessageInfo, index: number) => Promise<boolean> = undefined
+  @Param
+  onOpenReactionPicker?: (msg: NIMMessageInfo, anchor: NERectData) => void = undefined
   @Param
   enableReaction: boolean = false
   @Local
@@ -589,12 +656,19 @@ export struct ReceiveMessageComponent {
         Row() {
           if (this.showRadio) {
             if (!this.message.canOperateInMultiSelect()) {
-              Text().margin({ top: (this.message?.getMessageHeight(this.getUIContext()) - 20) / 2, left: 16 })
+              Text()
+                .margin({
+                  top: (this.message?.getMessageHeight(this.getUIContext()) - 20) / 2,
+                  left: MULTI_SELECT_CHECKBOX_INSET
+                })
                 .height('20')
                 .width('20')
             } else {
               Toggle({ type: ToggleType.Checkbox, isOn: this.message.isSelectedMsg })
-                .margin({ top: (this.message?.getMessageHeight(this.getUIContext()) - 20) / 2, left: 16 })
+                .margin({
+                  top: (this.message?.getMessageHeight(this.getUIContext()) - 20) / 2,
+                  left: MULTI_SELECT_CHECKBOX_INSET
+                })
                 .height('20')
                 .width('20')
                 .onChange((value: boolean) => {
@@ -643,6 +717,8 @@ export struct ReceiveMessageComponent {
                     chatInfo: this.chatUserInfo,
                     aiSearchSelectingMessageId: this.aiSearchSelectingMessageId,
                     aiSearchSelectingTranslation: this.aiSearchSelectingTranslation,
+                    aiSearchSelectionStart: this.aiSearchSelectionStart,
+                    aiSearchSelectionEnd: this.aiSearchSelectionEnd,
                     showReaction: this.shouldShowReaction()
                   })
                 }
@@ -667,6 +743,11 @@ export struct ReceiveMessageComponent {
                         return await this.onReactionClick?.(this.message, index) ?? false
                       }
                       return false
+                    },
+                    onOpenPicker: (anchor: NERectData): void => {
+                      if (this.message !== undefined) {
+                        this.onOpenReactionPicker?.(this.message, anchor)
+                      }
                     }
                   })
                   .constraintSize({ maxWidth: '100%' })
@@ -704,6 +785,9 @@ export struct ReceiveMessageComponent {
             .gesture(LongPressGesture().onAction((event: GestureEvent) => {
               this.onMessageClick?.onItemLongClick?.(event, this.message)
             }))
+            .onMouse((event: MouseEvent) => {
+              openMessageContextAction(event, this.message, this.onMessageClick)
+            })
 
             // 仅当标记功能开启时显示标记提示
             if (IMKitConfigCenter.enablePin && this.message?.isPinMsg) {
@@ -902,6 +986,9 @@ export struct MergeDetailMessageComponent {
           .gesture(LongPressGesture().onAction((event: GestureEvent) => {
             this.onMessageClick?.onItemLongClick?.(event, this.message)
           }))
+          .onMouse((event: MouseEvent) => {
+            openMessageContextAction(event, this.message, this.onMessageClick)
+          })
 
         }
         .width('100%')

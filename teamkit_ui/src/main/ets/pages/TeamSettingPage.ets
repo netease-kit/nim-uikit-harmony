@@ -634,7 +634,7 @@ export struct TeamSettingPage {
           nextOwnerId,
           true
         )
-        this.pathStack.clear()
+        this.backToConversationList(false)
       } else {
         this.leftTeam()
       }
@@ -677,9 +677,29 @@ export struct TeamSettingPage {
       if (pathNames.includes('MyTeamsPage')) {
         this.pathStack.popToName('MyTeamsPage')
       } else {
-        this.pathStack.clear()
+        this.backToConversationList(false)
       }
     })
+  }
+
+  /**
+   * 退群/解散/转让群主后回到会话列表。
+   * 不能盲目按固定层数 pop：栈顶与聊天根页之间可能还夹着群成员、群公告等页面，
+   * 层数不匹配时聊天根页会残留在栈里，它的返回回调不执行，右侧就恢复不出空态占位页。
+   * 这里统一先回到聊天根页，再把它弹出，由聊天根页的 onPop 恢复占位页。
+   */
+  private backToConversationList(animated: boolean): void {
+    const pathNames = this.pathStack.getAllPathName()
+    if (pathNames.includes('ChatP2PPage') || pathNames.includes('ChatTeamPage') ||
+      pathNames.includes('ChatBotSubSessionPage')) {
+      // 与 10.9.60 一致：退群/解散后直接回到会话列表。
+      // 不能只退到聊天根页再弹一层——聊天页下面可能还压着群名片页、搜索群组页等入口页，
+      // 那样会退到这些已经失去意义的页面。清空详情栈后由壳层恢复右栏占位页。
+      this.pathStack.clear(animated)
+      this.getUIContext().getHostContext()?.eventHub.emit('teamExitResetDetail')
+      return
+    }
+    this.pathStack.pop(animated)
   }
 
   //弹框退出群组
@@ -707,7 +727,7 @@ export struct TeamSettingPage {
       if (pathNames.includes('MyTeamsPage')) {
         this.pathStack.popToName('MyTeamsPage')
       } else {
-        this.pathStack.clear()
+        this.backToConversationList(false)
       }
     })
   }

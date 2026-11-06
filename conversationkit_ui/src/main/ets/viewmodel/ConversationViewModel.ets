@@ -58,7 +58,6 @@ import {
   resolveDeferredBatchDelay
 } from './ConversationUpdateUtils'
 
-const UNREAD_GROUP_QUERY_ID: string = '__default_unread__'
 
 class ConversationApplyResult {
   displayChanged: boolean
@@ -77,6 +76,8 @@ export class ConversationViewModel {
   @Trace aitConversationList: Set<string> = new Set()
   @Trace userAIBotConversationList: Set<string> = new Set()
   @Trace selectedConversationGroupKey: string = CONVERSATION_GROUP_DEFAULT_ALL_KEY
+  // 当前正在查看的会话，用于在 @我 / 未读分组中保留该会话，直到用户离开
+  pinnedConversationId: string = ''
   public onUreadMessageChange?: (unreadCount?: number) => void = undefined
   public onConversationFirstReady?: (count: number) => void = undefined
   public onConversationListCountChange?: (count: number) => void = undefined
@@ -92,8 +93,15 @@ export class ConversationViewModel {
   private isLoadingCustomGroupConversation: boolean = false
   private customGroupLoadSeq: number = 0
   private customGroupLoadingSeq: number = 0
-  private readonly INITIAL_DISPLAY_COUNT: number = 12
+  // 首页首屏加载的会话条数（原为 12，按产品要求提升到 24）
+  private readonly INITIAL_DISPLAY_COUNT: number = 24
   private readonly LOAD_MORE_LIMIT: number = Constant.PAGE_SIZE
+  // 未读/@我 分组"假空"补拉的页数上限，避免异常情况反复拉取
+  private readonly REFILL_MAX_PAGES: number = 10
+  // 是否为「分组过滤结果为空但角标 > 0」补拉中（页面据此显示 loading 而不是空态）
+  @Trace isRefillingGroup: boolean = false
+  // 本次分组切换已经补拉过，避免重复触发
+  private refilledGroupKey: string = ''
   private readonly DEFERRED_BATCH_SIZE: number = 20
   private readonly PENDING_EVENT_FLUSH_DELAY_MS: number = 200
   private readonly DEFERRED_BATCH_DELAY_MS: number = 100
@@ -135,6 +143,7 @@ export class ConversationViewModel {
   initConversation() {
     this.logPerf('conversation.vm.init.start')
     this.setupNonMutedUnreadCount()
+    this.adoptAlreadySyncedState()
     if (this.hasLoadedConversationForReuse()) {
       this.setupEventHandler()
       this.logPerf('conversation.vm.init.skip_loaded')
@@ -143,6 +152,20 @@ export class ConversationViewModel {
     this.loadConversation()
     this.setupEventHandler()
     this.logPerf('conversation.vm.init.end')
+  }
+
+  /**
+   * 同步早已完成时（例如折叠屏在分栏与单屏之间切换，导致页面/ViewModel 重建），
+   * SDK 的 onSyncFinished 事件已经发过，新实例永远等不到它，会一直停在"同步中"：
+   * 列表底部一直是"加载中"，且 loadMoreConversation 被 skip_sync 拦住、再也翻不了页。
+   * 这里先查一次 SDK 的同步完成标记，命中就直接落定状态。
+   */
+  private adoptAlreadySyncedState(): void {
+    if (this.isFinishedSyncLoad || !ChatKitClient.haveSyncedConversation) {
+      return
+    }
+    this.logPerf('conversation.vm.adopt_synced')
+    this.isFinishedSyncLoad = true
   }
 
   public hasLoadedConversationForReuse(): boolean {
@@ -220,13 +243,58 @@ export class ConversationViewModel {
     }
     this.customGroupLoadSeq++
     this.customGroupId = ''
-    if (this.mode === ConversationMode.CLOUD && group.kind === ConversationGroupKind.UNREAD) {
-      await this.selectCustomConversationGroup(UNREAD_GROUP_QUERY_ID)
-      return
-    }
+    // 切换分组后不再保留上一个分组里正在查看的会话
+    this.pinnedConversationId = ''
     this.selectedConversationGroupKey = group.groupKey
     this.isFinished = this.defaultFinished
+    this.refilledGroupKey = ''
     this.reloadDefaultGroupDisplay()
+    await this.refillGroupIfEmpty(group.groupKey)
+  }
+
+  /**
+   * 未读 / @我 分组按「本地已加载会话」过滤，而 tab 角标来自服务端聚合计数。
+   * 首屏会话都没未读时，过滤结果为空但角标仍 > 0，此前会直接显示空态且不会再加载（死锁）。
+   * 这里区分「真空」和「假空」：角标为 0 才交给页面显示空态；角标 > 0 就继续分页，
+   * 拉到未读会话或分页到底为止，期间页面显示 loading。
+   */
+  private async refillGroupIfEmpty(groupKey: string): Promise<void> {
+    if (groupKey !== CONVERSATION_GROUP_DEFAULT_UNREAD_KEY && groupKey !== CONVERSATION_GROUP_DEFAULT_AIT_KEY) {
+      return
+    }
+    if (this.data.totalCount() > 0) {
+      return
+    }
+    const counts = this.getDefaultConversationGroupCounts()
+    const badge = groupKey === CONVERSATION_GROUP_DEFAULT_AIT_KEY ? counts.aitCount : counts.unreadCount
+    if (badge <= 0) {
+      // 真空：确实没有未读，页面显示空态
+      return
+    }
+    if (this.isRefillingGroup || this.refilledGroupKey === groupKey) {
+      return
+    }
+    this.refilledGroupKey = groupKey
+    this.isRefillingGroup = true
+    this.logPerf('conversation.group.refill.start', `group=${groupKey} badge=${badge}`)
+    try {
+      let loadedPages = 0
+      // 逐页补拉：直到过滤出未读会话、分页到底、或达到上限（防止异常情况死循环）
+      while (this.data.totalCount() <= 0 && !this.isFinished && loadedPages < this.REFILL_MAX_PAGES) {
+        const offsetBefore = this.offset
+        await this.loadMoreConversation(true)
+        this.reloadDefaultGroupDisplay()
+        loadedPages++
+        if (this.offset === offsetBefore) {
+          break
+        }
+      }
+      this.logPerf('conversation.group.refill.end',
+        `group=${groupKey} pages=${loadedPages} count=${this.data.totalCount()} finished=${this.isFinished}`)
+    } finally {
+      this.isRefillingGroup = false
+      this.reloadDefaultGroupDisplay()
+    }
   }
 
   public async reloadSelectedCustomGroupIfNeeded(groupId: string): Promise<void> {
@@ -275,7 +343,12 @@ export class ConversationViewModel {
     this.selectedConversationGroupKey = CONVERSATION_GROUP_DEFAULT_ALL_KEY
   }
 
-  public async loadMoreConversation() {
+  /**
+   * @param ignoreEmptyGuard 为 true 时跳过「当前显示列表为空就不加载」的守卫。
+   * 未读/@我 分组按未读数据过滤，首屏没有未读会话时过滤结果为空，但未读会话可能在后几页，
+   * 这时必须允许继续分页拉取，否则分组会永远空着且不会自愈。
+   */
+  public async loadMoreConversation(ignoreEmptyGuard: boolean = false) {
     if (this.isCustomGroupSelected()) {
       await this.loadMoreCustomConversationGroup()
       return
@@ -292,7 +365,7 @@ export class ConversationViewModel {
       this.logPerf('conversation.load_more.skip_finished')
       return
     }
-    if (this.data.totalCount() <= 0) {
+    if (!ignoreEmptyGuard && this.data.totalCount() <= 0) {
       this.logPerf('conversation.load_more.skip_empty')
       return
     }
@@ -853,6 +926,27 @@ export class ConversationViewModel {
     }
   }
 
+  /**
+   * 会话数据就地更新：命中当前列表且排序位置未变时，只通知这一行重渲染，
+   * 不再整表 reloadData。整表重载会销毁重建所有可见行，头像随之重新加载而闪烁。
+   * 返回 false 表示需要走整表重排（新增会话、置顶/排序变化、不在当前分组）。
+   */
+  private applyConversationInPlace(conversation: ConversationItem): boolean {
+    const list = this.data.conversationList
+    for (let index = 0; index < list.length; index++) {
+      const current = list[index]
+      if (current.conversationId !== conversation.conversationId) {
+        continue
+      }
+      if (this.sortConversation(current, conversation) !== 0) {
+        return false
+      }
+      this.data.replaceData(index, conversation)
+      return true
+    }
+    return false
+  }
+
   private addConversation(conversation: ConversationItem) {
     this.logPerf('conversation.add', `conversationId=${conversation.conversationId}`)
     const snapshotConversation = this.snapshotConversation(conversation)
@@ -861,7 +955,7 @@ export class ConversationViewModel {
     if (result.displayChanged) {
       if (this.isCustomGroupSelected()) {
         this.data.reloadData()
-      } else {
+      } else if (!this.applyConversationInPlace(snapshotConversation)) {
         this.reloadDefaultGroupDisplay()
       }
     }
@@ -879,7 +973,7 @@ export class ConversationViewModel {
     if (result.displayChanged) {
       if (this.isCustomGroupSelected()) {
         this.data.reloadData()
-      } else {
+      } else if (!this.applyConversationInPlace(conversation)) {
         this.reloadDefaultGroupDisplay()
       }
     }
@@ -1057,6 +1151,16 @@ export class ConversationViewModel {
     ).length
   }
 
+  public setPinnedConversation(conversationId: string): void {
+    if (this.pinnedConversationId === conversationId) {
+      return
+    }
+    this.pinnedConversationId = conversationId
+    Logger.info('ConversationKit',
+      `setPinnedConversation conversationId=${conversationId} group=${this.selectedConversationGroupKey}`)
+    this.reloadDefaultGroupDisplay()
+  }
+
   private reloadDefaultGroupDisplay(): void {
     if (this.isCustomGroupSelected()) {
       return
@@ -1064,7 +1168,8 @@ export class ConversationViewModel {
     this.data.conversationList = filterConversationsByDefaultGroup(
       this.allConversationList,
       this.selectedConversationGroupKey,
-      this.aitConversationList
+      this.aitConversationList,
+      this.pinnedConversationId
     )
     this.data.reloadData()
     this.notifyDefaultGroupCountChange()
@@ -1302,8 +1407,8 @@ export class ConversationViewModel {
 
   private async selectCustomConversationGroup(groupId: string): Promise<void> {
     const requestSeq = ++this.customGroupLoadSeq
-    this.selectedConversationGroupKey = groupId === UNREAD_GROUP_QUERY_ID ?
-      CONVERSATION_GROUP_DEFAULT_UNREAD_KEY : groupId
+    this.pinnedConversationId = ''
+    this.selectedConversationGroupKey = groupId
     this.customGroupId = groupId
     this.customGroupOffset = 0
     this.customGroupFinished = false
@@ -1324,9 +1429,7 @@ export class ConversationViewModel {
     this.isLoadingCustomGroupConversation = true
     this.customGroupLoadingSeq = requestSeq
     try {
-      const option: V2NIMConversationOption = this.isUnreadGroupSelected() ? {
-        onlyUnread: true
-      } : {
+      const option: V2NIMConversationOption = {
         conversationGroupIds: [this.customGroupId]
       }
       let result = await this.model.getConversationListByOption(this.customGroupOffset, this.LOAD_MORE_LIMIT, option)
@@ -1337,7 +1440,7 @@ export class ConversationViewModel {
         if (result.conversationList.length > 0) {
           this.upsertConversationBatch(result.conversationList, false)
         }
-        if (!this.isUnreadGroupSelected() || result.finished || this.data.totalCount() > 0) {
+        if (result.finished || this.data.totalCount() > 0) {
           break
         }
         result = await this.model.getConversationListByOption(this.customGroupOffset, this.LOAD_MORE_LIMIT, option)
@@ -1356,10 +1459,6 @@ export class ConversationViewModel {
     return this.customGroupId.length > 0
   }
 
-  private isUnreadGroupSelected(): boolean {
-    return this.mode === ConversationMode.CLOUD && this.customGroupId === UNREAD_GROUP_QUERY_ID
-  }
-
   private refreshDefaultGroupDisplayAfterAitChanged(): void {
     if (this.isCustomGroupSelected()) {
       this.notifyDefaultGroupCountChange()
@@ -1374,9 +1473,6 @@ export class ConversationViewModel {
   }
 
   private isConversationInCurrentCustomGroup(conversation: ConversationItem): boolean {
-    if (this.isUnreadGroupSelected()) {
-      return conversation.unreadCount > 0 && conversation.mute !== true
-    }
     const cloudConversation = conversation as V2NIMConversation
     return this.customGroupId.length <= 0 || (cloudConversation.groupIds?.includes(this.customGroupId) ?? false)
   }
